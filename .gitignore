@@ -1,0 +1,30 @@
+.DS_Store
+*.swp
+*.swo
+
+# build artifacts
+/dist/
+super-board-v*.zip
+
+# editor / OS noise
+.idea/
+.vscode/
+*.code-workspace
+
+# super-board runtime state (if anyone runs the loop *inside* this repo)
+.claude/super-board/active
+.claude/super-board/inflight/
+.worktrees/
+
+# QA evidence (heavy artifacts; keep summaries)
+docs/super-board/runs/**/*.png
+docs/super-board/runs/**/*.jpg
+docs/super-board/runs/**/*.jpeg
+docs/super-board/runs/**/*.webp
+docs/super-board/runs/**/*.html
+docs/super-board/runs/**/*.log
+docs/super-board/runs/**/*.patch
+docs/super-board/runs/**/*.diff
+docs/super-board/runs/**/*.zip
+docs/super-board/runs/**/*.trace
+docs/super-board/runs/**/*.trace.zip

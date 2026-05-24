@@ -1,0 +1,99 @@
+// Source of truth: docs/superpowers/specs/2026-05-21-super-board-design.md §4
+//
+// This file is a REFERENCE DOC, not parsed by the skill at runtime. It uses
+// JSON5-style `//` line comments to inline field notes from spec §4 alongside
+// the schema. Strip comments before validating an actual config file as JSON.
+//
+// One config per GitHub project this repo drives, written to
+// `.claude/super-board/configs/<slug>.json` (committed). The active
+// pointer `.claude/super-board/active` is gitignored and per-machine.
+
+{
+  "version": 1,
+
+  // Short scannable label shown when multiple configs are listed.
+  // E.g. "staging QA" or "admin build pipeline".
+  "description": "<short scannable label, e.g. 'staging QA' or 'admin build pipeline'>",
+
+  "project": {
+    "owner": "<github-owner>",
+    "title": "<project title on GitHub>",
+    // Required; `gh project` CLI takes number, not title (titles aren't unique).
+    "number": 0
+  },
+
+  // "full" or "qa-only".
+  "variant": "qa-only",
+
+  "target": {
+    // "url" | "repo" | "repo+url". Tells the runner whether to clone, hit a
+    // URL, or both.
+    "type": "url",
+    "url": "<https://your-target-url.example.com>"
+  },
+
+  // `null` for URL-only; `{path, remote}` otherwise. `remote` can be `null`
+  // for local-only.
+  "repo": null,
+
+  // The branch all per-issue branches are cut from and squash-merged back into.
+  // Default `"main"`. Onboard warns and suggests `"staging"` or `"develop"` if
+  // `main` appears to be production.
+  "base_branch": "main",
+
+  // Names of the Status options on the project. Aliases tolerated;
+  // canonicalized at read time.
+  //
+  // Full variant (7):    Ready · Building · QA · Review · Done · Blocked · Skipped
+  // QA-only variant (6): Ready ·            QA · Review · Done · Blocked · Skipped
+  "columns": ["Ready", "QA", "Review", "Done", "Blocked", "Skipped"],
+
+  "paths": {
+    // `null` when no PROJECT.md exists (URL-only flows).
+    "project_md": null,
+    "pre_flight_md": "docs/super-board/pre-flight.md",
+    "runs_dir": "docs/super-board/runs"
+  },
+
+  // When `true`, Reviewer marks the PR ready but does NOT squash-merge; a
+  // human must click merge. Card auto-moves to Done when the PR is merged
+  // externally. Default `false`. Onboard FORCES this to `true` when
+  // `base_branch` is `main` AND the repo has a deploy workflow detected.
+  "human_approves_merge": false,
+
+  // Controls Reviewer's adversarial mode (folded-in super-truth pattern).
+  //   "off"          — never adversarial.
+  //   "non-trivial"  — (default) activates on cards with diff ≥10 lines OR
+  //                    labels in {security, migration, payments, auth}.
+  //   "always"       — every card gets adversarial review
+  //                    (cost: 2 sub-agent dispatches per card).
+  "truth_gate": "non-trivial",
+
+  // Minimum aggregated sub-agent confidence (0-100) required to approve.
+  // Default `70`. Below threshold, Reviewer must NOT approve; card moves to
+  // Blocked with `🛡 truth-check failed (confidence X/100)`. See §7.
+  "truth_threshold": 70,
+
+  // Max consecutive failures in the same lane on the same root-cause hash
+  // before the card auto-moves to Blocked. Default `2`. Root-cause hash
+  // defined in §7 Halt gates.
+  "rebuild_cap": 2,
+
+  // When the count of Blocked cards exceeds this percent of the initial Ready
+  // count, send a mid-run breakdown notification. Default `30`. Set to `0`
+  // to disable.
+  "block_rate_alert_pct": 30,
+
+  "notifications": {
+    // Auto-detected during onboard; can be overridden.
+    "channel": "telegram",
+    "chat_id": "auto",
+
+    // The assignee identity used as the claim mutex. Read by
+    // `super-board status` and `super-board run`. Recorded during onboard
+    // step 11 as either `super-board-bot[bot]` (when a GitHub App is
+    // installed on the repo) or the user's own GitHub login (solo projects).
+    // Pick during step 2 based on what `gh auth status` returned.
+    "bot_identity": "auto"
+  }
+}
