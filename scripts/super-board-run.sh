@@ -11,6 +11,10 @@
 #   4. Rate-limit guard — sleeps until reset when GraphQL remaining < 200.
 #   5. Per-tick project-items cache — one gh call per tick, not per column lookup.
 #   6. Tick interval bumped from 30s → 120s (GraphQL ProjectsV2 query is ~103 pts; 120s keeps usage <3.1k/hr vs 5k budget).
+#   7. Lane-zombie watchdog (added 2026-05-24 after fitbox-v4 first-run hang) — kills lane PIDs whose
+#      claimed issue has already moved out of the lane's expected source column. The worker's logical
+#      work is done; if the claude -p process lingers, lane appears busy forever and downstream cards
+#      pile up unprocessed. Uses the project-items cache so it costs zero extra API calls per tick.
 
 set -euo pipefail
 
@@ -76,13 +80,28 @@ top_card_in_column() {
   done
 }
 
+read_lock() {
+  # Reads $INFLIGHT_DIR/$1 (bash-assignment format) into PID/LANE/STARTED.
+  # Sets empty strings if the file is missing or legacy single-PID format.
+  local lock="$INFLIGHT_DIR/$1"
+  PID=""; LANE=""; STARTED=""
+  [ -f "$lock" ] || return 1
+  if grep -q '^PID=' "$lock" 2>/dev/null; then
+    # shellcheck disable=SC1090
+    . "$lock" 2>/dev/null || true
+  else
+    # Legacy format (pre v1.3.0): single line PID only.
+    PID=$(cat "$lock" 2>/dev/null || echo "")
+  fi
+  return 0
+}
+
 issue_locked() {
   # Returns 0 if the issue has a live in-flight lock; cleans stale locks.
   local issue="$1" lock="$INFLIGHT_DIR/$1"
   [ -f "$lock" ] || return 1
-  local pid
-  pid=$(cat "$lock" 2>/dev/null || echo "")
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+  read_lock "$issue"
+  if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
     return 0
   fi
   rm -f "$lock"
@@ -143,7 +162,10 @@ dispatch_lane() {
   esac
   nohup claude -p "$prompt" >/dev/null 2>&1 &
   pid=$!
-  echo "$pid" > "$INFLIGHT_DIR/$issue"
+  # v1.3.0+ lock format: bash-assignment style so `super-board stop` can source it
+  # to recover lane + dispatch time. issue_locked()/reap_finished_locks() still work
+  # because PID= is the first line.
+  printf 'PID=%s\nLANE=%s\nSTARTED=%s\n' "$pid" "$lane" "$(date -u +%FT%TZ)" > "$INFLIGHT_DIR/$issue"
   case "$lane" in
     build) BUILD_PID="$pid"; BUILD_ISSUE="$issue" ;;
     qa) QA_PID="$pid"; QA_ISSUE="$issue" ;;
@@ -152,22 +174,70 @@ dispatch_lane() {
   log "dispatch lane=${lane} issue=#${issue} pid=${pid} claim=${BOT_LOGIN:-local-only}"
 }
 
+issue_status() {
+  # Lookup issue #$1 in the cached project items; emit its current column name (or empty).
+  echo "$PROJECT_ITEMS_JSON" | jq -r --arg n "$1" '
+    .items[] | select(.content.number == ($n | tonumber)) | .status' | head -1
+}
+
+check_lane_zombie() {
+  # $1 = lane name (build|qa|review); $2 = space-separated list of expected source columns.
+  # If the lane's worker PID is alive but its claimed issue has already moved to a column
+  # NOT in the expected source set, the worker's logical work is done — kill the zombie
+  # process and free the lane. Uses cached project items only (no extra API calls).
+  local lane="$1" expected="$2" pid="" issue=""
+  case "$lane" in
+    build)  pid="$BUILD_PID";  issue="$BUILD_ISSUE" ;;
+    qa)     pid="$QA_PID";     issue="$QA_ISSUE" ;;
+    review) pid="$REVIEW_PID"; issue="$REVIEW_ISSUE" ;;
+    *) return 1 ;;
+  esac
+  [ -z "$pid" ] && return 0
+  [ -z "$issue" ] && return 0
+  kill -0 "$pid" 2>/dev/null || return 0   # already dead → reap_finished_locks handles it
+  local cur found=0 col
+  cur=$(issue_status "$issue")
+  [ -z "$cur" ] && return 0                # not in cache (closed/deleted/race) → don't kill
+  for col in $expected; do
+    [ "$cur" = "$col" ] && found=1
+  done
+  if [ "$found" -eq 0 ]; then
+    log "💀 zombie ${lane} worker on #${issue} (pid=${pid}) — card moved to '${cur}'; killing"
+    kill "$pid" 2>/dev/null || true
+    sleep 1
+    kill -9 "$pid" 2>/dev/null || true
+    rm -f "$INFLIGHT_DIR/$issue"
+    [ -n "$BOT_LOGIN" ] && gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+    case "$lane" in
+      build)  BUILD_PID="";  BUILD_ISSUE="" ;;
+      qa)     QA_PID="";     QA_ISSUE="" ;;
+      review) REVIEW_PID=""; REVIEW_ISSUE="" ;;
+    esac
+  fi
+}
+
+sweep_lane_zombies() {
+  check_lane_zombie build  "Ready Building"
+  check_lane_zombie qa     "QA"
+  check_lane_zombie review "Review"
+}
+
 reap_finished_locks() {
   # Sweep inflight/ for dead PIDs; remove locks AND sweep stale assignees so the
   # next dispatch can re-claim the card if the worker crashed without releasing.
   # The assignee remove is idempotent — no-op if the worker exited cleanly.
-  local lock pid issue
+  local lock issue
   for lock in "$INFLIGHT_DIR"/*; do
     [ -f "$lock" ] || continue
-    pid=$(cat "$lock" 2>/dev/null || echo "")
-    if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
-      issue=$(basename "$lock")
+    issue=$(basename "$lock")
+    read_lock "$issue"
+    if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
       rm -f "$lock"
       if [ -n "$BOT_LOGIN" ]; then
         gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
-        log "reaped stale lock + swept assignee on #${issue} (pid=${pid:-empty})"
+        log "reaped stale lock + swept assignee on #${issue} (pid=${PID:-empty})"
       else
-        log "reaped stale lock for #${issue} (pid=${pid:-empty})"
+        log "reaped stale lock for #${issue} (pid=${PID:-empty})"
       fi
     fi
   done
@@ -224,6 +294,12 @@ REVIEW_PID=""; REVIEW_ISSUE=""
 while true; do
   reap_finished_locks  # cheap local sweep; runs every tick
 
+  # ── Zombie sweep against the LAST cached project state (no extra API).
+  #    Catches workers whose card already moved out of the lane's source column
+  #    but whose claude -p process didn't exit. Runs every tick, even cheap ones,
+  #    so a cap-reached pipeline can still self-heal when one lane is a zombie.
+  sweep_lane_zombies
+
   # ── Free pre-check: count active lanes from local PIDs (no API calls).
   BUILD_IDLE=1; QA_IDLE=1; REVIEW_IDLE=1
   lane_idle "$BUILD_PID" || BUILD_IDLE=0
@@ -246,6 +322,17 @@ while true; do
   # ── Expensive-tick path: we have capacity, fetch real state.
   gh_rate_guard
   fetch_project_items
+
+  # Re-sweep zombies against fresh cache; the previous sweep used stale data.
+  sweep_lane_zombies
+  BUILD_IDLE=1; QA_IDLE=1; REVIEW_IDLE=1
+  lane_idle "$BUILD_PID" || BUILD_IDLE=0
+  lane_idle "$QA_PID" || QA_IDLE=0
+  lane_idle "$REVIEW_PID" || REVIEW_IDLE=0
+  ACTIVE_WORKERS=0
+  [ "$BUILD_IDLE" -eq 1 ] || ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
+  [ "$QA_IDLE" -eq 1 ] || ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
+  [ "$REVIEW_IDLE" -eq 1 ] || ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
 
   READY=$(column_count "Ready")
   BUILDING=0

@@ -4,6 +4,12 @@ An autonomous GitHub Project board executor for Claude Code. Drag a card into th
 
 Super Board watches your GitHub Project, dispatches headless `claude -p` workers to Build / QA / Review the cards, and moves each card across the board as it goes — all without holding a single Claude session open.
 
+## Watch it run
+
+[![Watch the super-board walkthrough on YouTube](https://img.youtube.com/vi/nX_bGyIOFM4/maxresdefault.jpg)](https://youtu.be/nX_bGyIOFM4)
+
+▶ [https://youtu.be/nX_bGyIOFM4](https://youtu.be/nX_bGyIOFM4)
+
 ## Quickstart
 
 1. Download the latest release zip from [Releases](../../releases/latest).
@@ -17,6 +23,8 @@ Super Board watches your GitHub Project, dispatches headless `claude -p` workers
 5. From inside Claude Code, type `/super-board run <slug>`. The orchestrator spawns the headless runner, prints a PID + log path, and exits.
 
 That's it. Move cards into `Ready`, watch them flow through the board.
+
+To stop everything cleanly: `/super-board stop`. It posts a "stopped mid-flight" comment on every in-flight issue + PR (lane, last commit, resume hint), releases the assignee mutex, kills the workers and dispatcher. To resume, just `/super-board run <slug>` again — the board is the state, so cards are picked up from whichever column they were in.
 
 ## How it works
 

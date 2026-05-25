@@ -480,3 +480,23 @@ Suspected causes:
 **Mitigation for now:** the dispatcher's `reap_finished_locks` + assignee sweep + re-dispatch keep the pipeline rolling, so this is a wall-clock issue, not a correctness issue. A worker that doesn't move the card will eventually have another worker do it.
 
 **Real fix (TODO):** require workers to call `sb_gh_guard_check` (or equivalent retry-with-backoff) around the column-move mutation, and to write a `move-mutation-result: ok|err|skipped` line in the PR handoff comment so the dispatcher can log retries and budget for them. See follow-up issue (file via `/super-board run`-time review).
+
+### Known issue — lane-zombie workers (added 2026-05-24, auto-remediated)
+
+**Symptom seen on fitbox-v4 first run:** a Tester worker successfully moved #81 QA → Review and the Reviewer subsequently merged it to Done — but the original Tester's `claude -p` process kept running for 30+ minutes afterward. The dispatcher's `lane_idle()` check uses `kill -0` on the lane PID and saw the zombie as "still busy," so the QA lane never re-dispatched. By the time it was noticed, the QA column had grown 1 → 2 → 3 cards with no Tester picking them up.
+
+Different from the multi-attempt-move issue above: there the worker exited without moving the card; here the worker moved the card but didn't exit.
+
+**Auto-remediation (now implemented in `super-board-run.sh` as anti-zombie control #7):**
+
+Every tick — both cheap and expensive — `sweep_lane_zombies` runs `check_lane_zombie` for each lane. For each lane whose PID is alive AND whose claimed issue's current column is NOT in the lane's expected source set:
+
+| Lane    | Expected source columns | Anything else means → |
+|---------|-------------------------|-----------------------|
+| build   | Ready, Building         | zombie                |
+| qa      | QA                      | zombie                |
+| review  | Review                  | zombie                |
+
+On zombie detection: `SIGTERM` + 1s + `SIGKILL` the PID, remove the inflight lock, idempotently sweep the assignee, clear the lane PID/issue vars, log `💀 zombie <lane> worker on #<N> (pid=<P>) — card moved to '<col>'; killing`. Uses the cached project items only — zero extra API calls per tick.
+
+Trade-off: if someone (human or external tool) manually moves a card out of its source column while a worker is legitimately mid-work, the watchdog will kill that worker. Acceptable — manual board edits during an active run are an anti-pattern, and the worker would fail on its own column-move anyway.
