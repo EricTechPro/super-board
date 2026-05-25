@@ -80,13 +80,28 @@ top_card_in_column() {
   done
 }
 
+read_lock() {
+  # Reads $INFLIGHT_DIR/$1 (bash-assignment format) into PID/LANE/STARTED.
+  # Sets empty strings if the file is missing or legacy single-PID format.
+  local lock="$INFLIGHT_DIR/$1"
+  PID=""; LANE=""; STARTED=""
+  [ -f "$lock" ] || return 1
+  if grep -q '^PID=' "$lock" 2>/dev/null; then
+    # shellcheck disable=SC1090
+    . "$lock" 2>/dev/null || true
+  else
+    # Legacy format (pre v1.3.0): single line PID only.
+    PID=$(cat "$lock" 2>/dev/null || echo "")
+  fi
+  return 0
+}
+
 issue_locked() {
   # Returns 0 if the issue has a live in-flight lock; cleans stale locks.
   local issue="$1" lock="$INFLIGHT_DIR/$1"
   [ -f "$lock" ] || return 1
-  local pid
-  pid=$(cat "$lock" 2>/dev/null || echo "")
-  if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+  read_lock "$issue"
+  if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
     return 0
   fi
   rm -f "$lock"
@@ -147,7 +162,10 @@ dispatch_lane() {
   esac
   nohup claude -p "$prompt" >/dev/null 2>&1 &
   pid=$!
-  echo "$pid" > "$INFLIGHT_DIR/$issue"
+  # v1.3.0+ lock format: bash-assignment style so `super-board stop` can source it
+  # to recover lane + dispatch time. issue_locked()/reap_finished_locks() still work
+  # because PID= is the first line.
+  printf 'PID=%s\nLANE=%s\nSTARTED=%s\n' "$pid" "$lane" "$(date -u +%FT%TZ)" > "$INFLIGHT_DIR/$issue"
   case "$lane" in
     build) BUILD_PID="$pid"; BUILD_ISSUE="$issue" ;;
     qa) QA_PID="$pid"; QA_ISSUE="$issue" ;;
@@ -208,18 +226,18 @@ reap_finished_locks() {
   # Sweep inflight/ for dead PIDs; remove locks AND sweep stale assignees so the
   # next dispatch can re-claim the card if the worker crashed without releasing.
   # The assignee remove is idempotent — no-op if the worker exited cleanly.
-  local lock pid issue
+  local lock issue
   for lock in "$INFLIGHT_DIR"/*; do
     [ -f "$lock" ] || continue
-    pid=$(cat "$lock" 2>/dev/null || echo "")
-    if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
-      issue=$(basename "$lock")
+    issue=$(basename "$lock")
+    read_lock "$issue"
+    if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
       rm -f "$lock"
       if [ -n "$BOT_LOGIN" ]; then
         gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
-        log "reaped stale lock + swept assignee on #${issue} (pid=${pid:-empty})"
+        log "reaped stale lock + swept assignee on #${issue} (pid=${PID:-empty})"
       else
-        log "reaped stale lock for #${issue} (pid=${pid:-empty})"
+        log "reaped stale lock for #${issue} (pid=${PID:-empty})"
       fi
     fi
   done
