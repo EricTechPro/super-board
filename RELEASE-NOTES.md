@@ -1,5 +1,25 @@
 # Release notes
 
+## v1.4.0 — 2026-05-27
+
+### Pure-Python `super-board status` renderer (~50× faster)
+
+The status snapshot now renders via `.claude/bin/super-board-status.py` instead of being assembled token-by-token by the model. Same locked 80-column kanban template; ~1.3s instead of ~1min per invocation.
+
+Pure Python 3 stdlib + `gh` CLI. No bash, no jq. Works on macOS, Linux, and Windows.
+
+Highlights:
+
+- Handles both user-owned and organization-owned GitHub Projects (`repositoryOwner { ... on ProjectV2Owner }`).
+- Paginates project items via cursor + endCursor, with a 2000-card ceiling and a truncation warning past that.
+- Defensive input handling: slug-arg sanitization rejects `..` and other path-traversal sentinels; issue-title control-char strip prevents hostile titles from emitting escape sequences into the kanban frame.
+- Lane-handoff fix: clean Build → QA → Review handoffs no longer leave phantom in-flight entries from the prior lane.
+- Cross-platform CI (`.github/workflows/cross-platform.yml`): smoke matrix on ubuntu/macos/windows × py3.10/3.12, plus 22 parser fixture tests that pin the regexes against real dispatcher log lines.
+
+Agents that invoke the `super-board` skill will now prefer the script and print its stdout verbatim. The locked template spec in `references/status.md` is retained as fallback / change-control documentation.
+
+Contributed by @LucariusWest (#2).
+
 ## v1.3.0 — 2026-05-24
 
 ### New verb: `super-board stop`
