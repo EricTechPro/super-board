@@ -1,0 +1,63 @@
+name: cross-platform
+
+# Smoke + syntax check for the pure-Python super-board-status renderer
+# across Ubuntu, macOS, and Windows. No `gh` auth, no GitHub Project —
+# just proves Python can parse + execute the script on each platform and
+# that the "no config" code path exits with the documented code (64)
+# everywhere.
+#
+# Security note: this workflow only interpolates `matrix.*` values (which
+# are defined in this file). It does NOT consume any `github.event.*` input,
+# so workflow-injection patterns from issue/PR titles or commit messages
+# do not apply here.
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  smoke:
+    name: smoke (${{ matrix.os }} / py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Step 1 — proves the script is syntactically valid on this Python
+      # version. Catches typing-syntax, f-string, walrus, etc. regressions
+      # without needing any runtime state.
+      - name: compile super-board-status
+        run: python -m py_compile scripts/super-board-status.py
+
+      # Step 2 — exercise the "no config + no active marker + no single
+      # config" path of super-board-status.py. Documented to exit 64.
+      # Runs in the repo root, where no `.claude/super-board/configs/` exists.
+      - name: status — no-config path exits 64
+        shell: bash
+        run: |
+          set +e
+          python scripts/super-board-status.py
+          ec=$?
+          set -e
+          if [ "$ec" -ne 64 ]; then
+            echo "::error::Expected exit 64 (no config), got $ec"
+            exit 1
+          fi
+          echo "OK: super-board-status.py exited 64 as documented"
+
+      # Step 3 — unit-test the manifest parser against real dispatcher log
+      # lines from `scripts/super-board-run.sh`. Catches the class of
+      # regression that ships when the parser's regexes drift away from
+      # what the dispatcher actually emits.
+      - name: status — parser fixture tests
+        run: python tests/test_status_parse.py
