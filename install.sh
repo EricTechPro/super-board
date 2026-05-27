@@ -33,7 +33,7 @@ for skill in super-board super-build super-qa super-review; do
 done
 
 echo "→ installing dispatcher scripts into $TARGET/.claude/bin/"
-for script in super-board-run.sh super-board-gh-guard.sh; do
+for script in super-board-run.sh super-board-gh-guard.sh super-board-status.py; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     cp "$REPO_ROOT/scripts/$script" "$TARGET/.claude/bin/"
     chmod +x "$TARGET/.claude/bin/$script"
