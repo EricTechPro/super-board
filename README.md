@@ -59,6 +59,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```json
 {
   "variant": "full",
+  "worker_backend": "claude-p",
   "project": { "owner": "your-gh-login-or-org", "number": 12 },
   "base_branch": "main",
   "human_approves_merge": false,
