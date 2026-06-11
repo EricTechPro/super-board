@@ -2,7 +2,7 @@
 
 An autonomous GitHub Project board executor for Claude Code. Drag a card into the `Ready` column, walk away, come back to merged PRs.
 
-Super Board watches your GitHub Project, dispatches headless `claude -p` workers to Build / QA / Review the cards, and moves each card across the board as it goes — all without holding a single Claude session open.
+Super Board watches your GitHub Project, dispatches agents to Build / QA / Review the cards, and moves each card across the board as it goes. Default backend: dynamic workflows (in-session waves); a legacy headless `claude -p` dispatcher remains as explicit opt-in.
 
 ## Watch it run
 
@@ -34,12 +34,55 @@ There are four skills in this repo:
 
 | Skill | Role |
 |---|---|
-| **super-board** | The orchestrator. Invoked by the human via `/super-board run`. Validates preconditions, dispatches the headless runner (`scripts/super-board-run.sh`), and exits. Holds NO product context. |
+| **super-board** | The orchestrator. Invoked by the human via `/super-board run`. Validates preconditions, plans waves, launches the `super-board-wave` workflow (or the legacy headless runner on opt-in). Holds NO product context. |
 | **super-build** | Headless worker. Reads a `Ready` card, spins up a git worktree, implements the change, opens a PR, moves the card to `QA`. |
 | **super-qa** | Headless worker. Reads a `QA` card, runs Playwright path specs against the worker's branch, captures evidence (screenshots, logs), comments on the PR, and either moves the card to `Review` or kicks it back to `Ready` with a rebuild label. |
 | **super-review** | Headless worker. Reads a `Review` card, runs the merge-readiness checks, posts findings, and either merges (or hands off to a human gate). |
 
-The runner (`scripts/super-board-run.sh`) is pure bash. It re-reads the GitHub Project on every tick — it holds no Claude session state, so it survives Ctrl-C, restarts, and rate-limit pauses without losing track of cards.
+The board is the only state in both backends — every agent re-reads it, so runs survive Ctrl-C, restarts, and rate-limit pauses without losing track of cards.
+
+## The six agentic patterns, mapped
+
+The patterns live in the workflow script (`workflows/super-board-wave.js`) — the conductor. The skills (`super-build` / `super-qa` / `super-review`) are the sheet music each lane agent reads. The workflow spawns a fresh agent per lane whose prompt says: *"Run super-build on issue #N, follow run.md's Builder lifecycle exactly."*
+
+One card's journey (#47, starting in `Ready`):
+
+```
+            ┌─ ROUTING ─────────────┐
+ #47 Ready →│ classify agent (haiku)│→ "bug, low" → cheap model for lanes
+            └───────────────────────┘
+                       ↓
+            ┌─ PROMPT CHAINING ──────────────────────────────────┐
+            │ Build agent ──advanced?──→ QA agent ──→ Review agent│
+            │ (super-build)   │no        (super-qa)  (super-review)│
+            │                 ↓                                    │
+            │           chain stops; the board keeps the card      │
+            └─────────────────────────────────────────────────────┘
+```
+
+A wave (3 cards at once):
+
+```
+ ORCHESTRATOR (your session)           ← orchestrator–workers
+   │ plan wave → claim → launch
+   ▼
+ #47: classify → build → qa → review   ┐
+ #51:           qa → review            ├ parallelization (cards overlap)
+ #52: classify → build ✗(bounced)      ┘
+                          │
+ Review lanes: ──[mutex]── one merge at a time
+```
+
+When each pattern fires:
+
+| Pattern | When |
+|---|---|
+| **Routing** | `Ready` cards only — classify picks haiku/sonnet/full model per card |
+| **Prompt chaining** | Every card — each lane runs only if the previous returned `advanced` |
+| **Parallelization** | Always — card A can be in Review while card B builds |
+| **Evaluator–optimizer** | QA/Review judge the Builder's work; a fail bounces the card to `Ready` and the next wave rebuilds with the comments as context |
+| **Orchestrator–workers** | Every wave — your session never codes; lane agents do all product work |
+| **Autonomous loop** | The wave loop repeats until the board is drained or a halt gate fires |
 
 ## Safety controls
 
