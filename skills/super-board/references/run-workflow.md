@@ -25,14 +25,27 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
    `.claude/workflows/super-board-wave.js` (catches a broken script before
    burning tokens):
    `{ echo '(async function(){'; sed 's/^export const meta/const meta/' .claude/workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module`
-5. No legacy run active: BOTH `pgrep -f 'super-board-run.sh'` (the legacy
-   dispatcher idles between dispatches with zero workers alive) and
-   `pgrep -f 'claude -p .*super-board run'` are empty, AND `/workflows`
-   shows no running super-board-wave.
-6. Wave marker: create `.claude/super-board/inflight/workflow-wave.lock`
-   (mkdir -p the directory) containing the config slug and start time;
-   remove it when the run ends or stops. The legacy dispatcher refuses to
-   start while it exists — this is the reverse half of precondition 5.
+5. Wave marker FIRST, then the legacy check (lock-before-look closes the
+   TOCTOU window where both backends pass each other's checks at once):
+   a. Atomically create `.claude/super-board/inflight/workflow-wave.lock`
+      (mkdir -p the directory) containing the config slug and start time:
+      `(set -C; printf 'SLUG=%s\nSTARTED=%s\n' <slug> "$(date -u +%FT%TZ)" > <lock>)`.
+      If it already exists and `/workflows` shows no running
+      super-board-wave, it is stale from a crashed run — replace it.
+      Remove the lock when the run ends or stops. The legacy dispatcher
+      refuses to start (and halts mid-run) while it exists.
+   b. THEN verify no legacy run is active: BOTH
+      `pgrep -f 'super-board-run.sh'` (the legacy dispatcher idles between
+      dispatches with zero workers alive) and
+      `pgrep -f 'claude -p .*super-board run'` are empty, AND `/workflows`
+      shows no running super-board-wave. If a legacy run is detected,
+      remove the lock just created and stop — the legacy run won.
+6. Crash-recovery sweep (the workflow backend's equivalent of the legacy
+   reaper): with no wave running, strip `bot_identity` from any
+   Review/QA/Ready/Building card that still carries it
+   (`gh issue edit <n> --remove-assignee <bot_identity>`). A crashed
+   orchestrator releases nothing — leaked assignees make the planner skip
+   those cards forever and the board silently stops draining.
 
 ## The wave loop
 
@@ -48,9 +61,15 @@ Repeat until a done condition or halt gate fires:
    cards only when `human_approves_merge: true` (merge-race guard). If
    `cards` is empty and Building/QA/Review counts are 0 → done. If empty
    but cards sit in Blocked only → report and stop.
-3. **Claim** — for each card, `gh issue edit <n> --add-assignee <bot_identity>`
-   (skip the card on claim failure — race lost). Skipped when bot_identity
-   is unset.
+3. **Claim** — for each card, `gh issue edit <n> --add-assignee <bot_identity>`,
+   then VERIFY: re-read assignees (`gh issue view <n> --json assignees`) and
+   proceed only if the list is exactly `[<bot_identity>]`. Adding an assignee
+   does NOT fail when someone else already claimed (issues accept up to 10
+   assignees), so the add alone is not a mutex — on any other assignee set,
+   remove own assignee and skip the card (race lost). Skipped when
+   bot_identity is unset — accepted single-orchestrator risk: without it
+   there is no cross-session claim at all, so never run two orchestrators
+   (or /loop re-entries) against the same board without bot_identity.
 4. **Launch** — Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
    `args: { configPath, variant, cards, humanApprovesMerge }`. Runs in the background; the
@@ -88,7 +107,8 @@ Lane agents inherit the session allowlist and run in acceptEdits. Add these
 to your project's `.claude/settings.json` → `permissions.allow` so waves
 don't stall on prompts:
 
-    "Bash(gh issue edit:*)", "Bash(gh issue comment:*)", "Bash(gh pr comment:*)",
+    "Bash(gh issue view:*)", "Bash(gh issue edit:*)", "Bash(gh issue comment:*)",
+    "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)", "Bash(gh pr comment:*)",
     "Bash(gh pr create:*)", "Bash(gh pr ready:*)", "Bash(gh project item-edit:*)",
     "Bash(gh project item-list:*)", "Bash(gh api:*)", "Bash(git worktree:*)",
     "Bash(git checkout:*)", "Bash(git add:*)", "Bash(git commit:*)",
@@ -99,4 +119,9 @@ don't stall on prompts:
 
 `gh pr merge` is deliberately NOT in the list — Reviewer merges remain
 gated by an interactive prompt, and by `human_approves_merge` for boards
-that require a human click.
+that require a human click. Consequence: on auto-merge boards
+(`human_approves_merge: false`) every Reviewer squash-merge pauses for one
+interactive approval, so this backend is **attended-only** by default.
+For genuinely unattended auto-merge runs you must consciously add
+`"Bash(gh pr merge:*)"` yourself — doing so removes the last human gate
+before the base branch, so pair it with a non-production `base_branch`.

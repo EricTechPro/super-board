@@ -40,4 +40,13 @@ HUMAN=$(jq '.human_approves_merge = true' fixtures/wave-config.json)
 OUT6=$("$PLAN" --config <(echo "$HUMAN") --items fixtures/wave-items-review-heavy.json)
 echo "$OUT6" | jq -e '[.cards[] | select(.status == "Review")] | length >= 2' >/dev/null || fail "human_approves_merge should allow extra Review cards, got: $OUT6"
 
-echo "PASS: test-wave-plan.sh (6 scenarios)"
+# Scenario 7 — invalid variant fails loudly (exit 65), never silently qa-only
+BAD=$(jq '.variant = "fulll"' fixtures/wave-config.json)
+RC=0; "$PLAN" --config <(echo "$BAD") --items fixtures/wave-items.json >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 65 ] || fail "invalid variant should exit 65, got $RC"
+
+# Scenario 8 — empty board → cards:[] (run-workflow.md done condition depends on this shape)
+OUT8=$("$PLAN" --config fixtures/wave-config.json --items <(echo '{"items":[]}'))
+echo "$OUT8" | jq -e '.cards == []' >/dev/null || fail "empty board should yield cards:[], got: $OUT8"
+
+echo "PASS: test-wave-plan.sh (8 scenarios)"

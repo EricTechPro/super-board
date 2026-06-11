@@ -230,6 +230,10 @@ reap_finished_locks() {
   for lock in "$INFLIGHT_DIR"/*; do
     [ -f "$lock" ] || continue
     issue=$(basename "$lock")
+    # Issue locks only: basenames are issue numbers. Anything else (e.g. the
+    # workflow backend's workflow-wave.lock) is not ours to reap — deleting it
+    # would dissolve the backend mutual exclusion mid-run.
+    case "$issue" in *[!0-9]*|'') continue ;; esac
     read_lock "$issue"
     if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
       rm -f "$lock"
@@ -300,6 +304,15 @@ QA_PID=""; QA_ISSUE=""
 REVIEW_PID=""; REVIEW_ISSUE=""
 
 while true; do
+  # Workflow-backend mutual exclusion, re-checked every tick: the startup
+  # check alone leaves a TOCTOU window where a workflow run starting at the
+  # same moment as this dispatcher is never detected by either side.
+  if [ -f "$WAVE_LOCK" ]; then
+    log "🛑 workflow-backend wave appeared mid-run ($WAVE_LOCK) — halting for mutual exclusion."
+    log "    Resume after the wave: $0 $CONFIG_SLUG"
+    exit 74
+  fi
+
   reap_finished_locks  # cheap local sweep; runs every tick
 
   # ── Zombie sweep against the LAST cached project state (no extra API).

@@ -38,11 +38,13 @@ else
   ITEMS=$(gh project item-list "$NUMBER" --owner "$OWNER" --format json --limit 500)
 fi
 
-if [ "$VARIANT" = "full" ]; then
-  COLUMNS='["Review","QA","Ready"]'
-else
-  COLUMNS='["Review","Ready"]'
-fi
+# Validate loudly: a typo (or missing key → literal "null") must not silently
+# drop the QA column from selection and strand cards there.
+case "$VARIANT" in
+  full)    COLUMNS='["Review","QA","Ready"]' ;;
+  qa-only) COLUMNS='["Review","Ready"]' ;;
+  *) echo "invalid variant in config: ${VARIANT} (expected full|qa-only)" >&2; exit 65 ;;
+esac
 
 # Merge-race guard: concurrent auto-merges into the same base branch can
 # race, so extra Review cards (beyond the base 1) are only eligible when a
