@@ -26,8 +26,8 @@ If invoked with no verb, ask which (see no-verb behavior in spec §8).
 | `super-board onboard ...` | `references/onboard.md` |
 | `super-board lint ...` | `references/lint.md` |
 | `super-board status ...` | `references/status.md` |
-| `super-board run ...` | `references/run.md` |
-| `super-board run ...` with config `worker_backend: "workflow"` | `references/run-workflow.md` (lane lifecycles still come from `references/run.md`) |
+| `super-board run ...` (default — `worker_backend` unset or `"workflow"`) | `references/run-workflow.md` (lane lifecycles still come from `references/run.md`) |
+| `super-board run ...` with config `worker_backend: "claude-p"` (legacy, explicit opt-in) | `references/run.md` |
 | `super-board stop ...` / "stop the run" / "pause the loop" / "kill super-board" | `references/stop.md` |
 | "resume" / "pick up where I left off" / "restart after stop" | `references/stop.md` (resume = run; no separate verb) |
 | Anything about Block/Skip exits | `references/block-template.md` |
@@ -40,7 +40,7 @@ Replaces: `super-work-trader` (rename + extension). The 3-lane mechanics are inh
 
 super-board is an **autonomous trader**. The interactive Claude session that invokes any of the five verbs is an **orchestrator**, not a worker. The orchestrator:
 
-- Validates preconditions, then dispatches per the config's `worker_backend`: `"claude-p"` (default) → `nohup ./scripts/super-board-run.sh`, report PID + log path, exit; `"workflow"` → stay in-session and run the wave loop in `references/run-workflow.md` (launch workflow, reconcile, repeat). In both backends the orchestrator never does product work itself.
+- Validates preconditions, then dispatches per the config's `worker_backend`: `"workflow"` (default) → stay in-session and run the wave loop in `references/run-workflow.md` (launch workflow, reconcile, repeat); `"claude-p"` (legacy, explicit opt-in only) → `nohup ./scripts/super-board-run.sh`, report PID + log path, exit. In both backends the orchestrator never does product work itself.
 - Delegates all build / QA / review work to workers — headless `claude -p` (claude-p backend) or workflow lane agents (workflow backend).
 - Must NOT do product work itself, must NOT patch the dispatcher mid-run, must NOT wait for workers, must NOT hold context for multi-card progress.
 

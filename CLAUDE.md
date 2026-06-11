@@ -13,8 +13,8 @@ This repo ships four skills under `skills/`:
 
 1. Verify preconditions (clean git, no orphan workers, GraphQL quota, etc.).
 2. Dispatch per the config's `worker_backend`:
-   - `"claude-p"` (default) — spawn the headless runner `nohup scripts/super-board-run.sh <slug> &`, report PID + log path, exit.
-   - `"workflow"` — stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `super-board-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
+   - `"workflow"` (default) — stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `super-board-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
+   - `"claude-p"` (legacy, explicit opt-in only) — spawn the headless runner `nohup scripts/super-board-run.sh <slug> &`, report PID + log path, exit. The runner refuses to start (exit 78) unless the config sets this value.
 3. Report back to the user (dispatch confirmation, or one status line per wave).
 
 The orchestrator MUST NOT:

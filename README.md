@@ -20,11 +20,11 @@ Super Board watches your GitHub Project, dispatches headless `claude -p` workers
    ```
 3. Wire up a GitHub Project board with a `Status` field whose columns are `Backlog`, `Ready`, `Building`, `QA`, `Review`, `Done`.
 4. Drop a config at `.claude/super-board/configs/<slug>.json` pointing at your board.
-5. From inside Claude Code, type `/super-board run <slug>`. The orchestrator spawns the headless runner, prints a PID + log path, and exits.
+5. From inside Claude Code, type `/super-board run <slug>`. The orchestrator plans a wave, launches the `super-board-wave` dynamic workflow, reconciles results, and repeats until the board is drained.
 
 That's it. Move cards into `Ready`, watch them flow through the board.
 
-**Workflow backend (new in 1.5.0):** set `"worker_backend": "workflow"` in your board config to drain waves in-session via dynamic workflows instead of headless `claude -p` workers. The orchestrator session plans a wave, launches the `super-board-wave` workflow, reconciles results, and repeats — lane lifecycles are unchanged. See `skills/super-board/references/run-workflow.md`.
+**Backends (default flipped in 1.6.0):** `"worker_backend": "workflow"` is the default — waves are drained in-session via dynamic workflows (requires dynamic workflows enabled in `/config`); see `skills/super-board/references/run-workflow.md`. The legacy headless dispatcher (`"claude-p"`, `claude -p` workers spawned by `scripts/super-board-run.sh`) is explicit opt-in only — the dispatcher refuses to run (exit 78) unless the config sets it. Lane lifecycles are identical in both.
 
 To stop everything cleanly: `/super-board stop`. It posts a "stopped mid-flight" comment on every in-flight issue + PR (lane, last commit, resume hint), releases the assignee mutex, kills the workers and dispatcher. To resume, just `/super-board run <slug>` again — the board is the state, so cards are picked up from whichever column they were in.
 
@@ -59,7 +59,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```json
 {
   "variant": "full",
-  "worker_backend": "claude-p",
+  "worker_backend": "workflow",
   "project": { "owner": "your-gh-login-or-org", "number": 12 },
   "base_branch": "main",
   "human_approves_merge": false,

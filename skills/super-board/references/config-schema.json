@@ -25,11 +25,12 @@
   // "full" or "qa-only".
   "variant": "qa-only",
 
-  // Worker dispatch backend. "claude-p" (default) spawns headless workers via
-  // .claude/bin/super-board-run.sh. "workflow" drains waves in-session via
-  // the super-board-wave dynamic workflow (references/run-workflow.md).
-  // Requires dynamic workflows enabled in /config.
-  "worker_backend": "claude-p",
+  // Worker dispatch backend. "workflow" (default) drains waves in-session via
+  // the super-board-wave dynamic workflow (references/run-workflow.md);
+  // requires dynamic workflows enabled in /config. "claude-p" is the legacy
+  // headless dispatcher (.claude/bin/super-board-run.sh) — explicit opt-in
+  // only; the dispatcher refuses to run (exit 78) unless set here.
+  "worker_backend": "workflow",
 
   "target": {
     // "url" | "repo" | "repo+url". Tells the runner whether to clone, hit a

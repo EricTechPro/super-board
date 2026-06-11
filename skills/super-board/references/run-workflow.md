@@ -1,10 +1,12 @@
 # super-board run — workflow backend contract
 
-Used when the active config has `"worker_backend": "workflow"`. The legacy
-bash dispatcher (`.claude/bin/super-board-run.sh`, see `run.md`) remains the
-default backend; this file ONLY changes who dispatches workers. Lane
-lifecycles, branch/PR model, comment cadence, Block templates, halt gates,
-and done conditions are all inherited from `run.md` unchanged.
+The DEFAULT backend (v1.6.0+): used when the active config sets
+`"worker_backend": "workflow"` or omits the key. The legacy bash dispatcher
+(`.claude/bin/super-board-run.sh`, see `run.md`) runs only on explicit
+`"worker_backend": "claude-p"`; this file ONLY changes who dispatches
+workers. Lane lifecycles, branch/PR model, comment cadence, Block
+templates, halt gates, and done conditions are all inherited from `run.md`
+unchanged.
 
 ## Orchestrator delegation contract (NON-NEGOTIABLE, adapted)
 
