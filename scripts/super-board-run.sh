@@ -256,6 +256,14 @@ if [ "$ORPHANS" -gt 0 ]; then
   exit 73
 fi
 
+# Workflow-backend mutual exclusion (see references/run-workflow.md §Preconditions).
+WAVE_LOCK=".claude/super-board/inflight/workflow-wave.lock"
+if [ -f "$WAVE_LOCK" ]; then
+  log "🛑 refusing to start: workflow-backend wave in flight ($WAVE_LOCK exists)."
+  log "    If no wave is actually running, remove the stale lock: rm $WAVE_LOCK"
+  exit 74
+fi
+
 # Production-merge guard.
 if [ "$BASE_BRANCH" = "main" ] && [ "$HUMAN_APPROVES" = "false" ]; then
   if rg -qU 'on:\s*\n?\s*push:\s*\n?\s*branches:[^a-z]*main' .github/workflows 2>/dev/null \

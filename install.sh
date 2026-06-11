@@ -20,7 +20,7 @@ if [ ! -d "$TARGET/.claude" ]; then
   echo "creating $TARGET/.claude (didn't exist)"
 fi
 
-mkdir -p "$TARGET/.claude/skills" "$TARGET/.claude/bin"
+mkdir -p "$TARGET/.claude/skills" "$TARGET/.claude/bin" "$TARGET/.claude/workflows"
 
 echo "→ installing skills into $TARGET/.claude/skills/"
 for skill in super-board super-build super-qa super-review; do
@@ -33,11 +33,19 @@ for skill in super-board super-build super-qa super-review; do
 done
 
 echo "→ installing dispatcher scripts into $TARGET/.claude/bin/"
-for script in super-board-run.sh super-board-gh-guard.sh super-board-status.py; do
+for script in super-board-run.sh super-board-gh-guard.sh super-board-status.py super-board-wave-plan.sh; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     cp "$REPO_ROOT/scripts/$script" "$TARGET/.claude/bin/"
     chmod +x "$TARGET/.claude/bin/$script"
     echo "    ✓ $script"
+  fi
+done
+
+echo "→ installing dynamic workflows into $TARGET/.claude/workflows/"
+for wf in super-board-wave.js; do
+  if [ -f "$REPO_ROOT/workflows/$wf" ]; then
+    cp "$REPO_ROOT/workflows/$wf" "$TARGET/.claude/workflows/"
+    echo "    ✓ $wf"
   fi
 done
 

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "variant": "full",
+  "max_workers": 3,
+  "project": { "owner": "test-owner", "number": 99 }
+}

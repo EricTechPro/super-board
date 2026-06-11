@@ -1,5 +1,30 @@
 # Release notes
 
+## v1.5.0 — 2026-06-10
+
+### New worker backend: dynamic workflows (`"worker_backend": "workflow"`)
+
+Super Board can now drain a board using Claude Code's dynamic-workflow runtime instead of headless `claude -p` processes. Set `"worker_backend": "workflow"` in your board config and `/super-board run <slug>` stays in-session: it plans a wave, claims assignees, launches the `super-board-wave` workflow, reconciles results, and repeats until the board is drained.
+
+What the runtime replaces from the bash dispatcher:
+
+| Hand-built in the `claude-p` backend | Built into the workflow runtime |
+|---|---|
+| `nohup claude -p &` + PID files | `agent()` calls tracked by the runtime |
+| Cold-start race → atomic assignee claim | Orchestration is in-process; no race window |
+| Zombie sweep | Agents die with the run; visible in `/workflows` |
+| Log-grep for human gates | `schema:` forces structured status objects back |
+| Re-dispatch after crash from scratch | `resumeFromRunId` — completed lane agents return cached |
+
+New pieces:
+
+- **`workflows/super-board-wave.js`** — one wave: classify (haiku router for model tiering) → Build → QA → Review per card, as a barrier-free `pipeline()`. Card A can be in Review while card B is still building. On auto-merge boards (`human_approves_merge: false`) Review lanes are serialized via an in-script mutex (merge-race guard).
+- **`scripts/super-board-wave-plan.sh`** — read-only, backlog-aware wave selection: one card per non-empty column downstream-first (Review → QA → Ready), remaining `max_workers` slots fill from the most backlogged column; extra Review cards gated behind `human_approves_merge`. Covered by `tests/test-wave-plan.sh` (6 fixture scenarios, CI'd on ubuntu/macos).
+- **`skills/super-board/references/run-workflow.md`** — the orchestrator contract for this backend: preconditions, the wave loop, stop/resume, halt gates, and the gh/git allowlist lane agents need.
+- **Backend mutual exclusion** — the legacy dispatcher refuses to start while `.claude/super-board/inflight/workflow-wave.lock` exists (exit 74), and the workflow backend refuses to start while a legacy run is alive.
+
+The `claude-p` backend remains the default and is unchanged — board contract, columns, issue format, commit conventions, and Block templates are identical in both backends. Lane lifecycles still come from `references/run.md`; `run-workflow.md` only changes who dispatches workers.
+
 ## v1.4.0 — 2026-05-27
 
 ### Pure-Python `super-board status` renderer (~50× faster)

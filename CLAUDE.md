@@ -12,9 +12,10 @@ This repo ships four skills under `skills/`:
 **`super-board` is an autonomous trader. The interactive Claude session that invokes `/super-board run` is an *orchestrator*, NOT a worker.** Its only jobs are:
 
 1. Verify preconditions (clean git, no orphan workers, GraphQL quota, etc.).
-2. Spawn the headless runner: `nohup scripts/super-board-run.sh <slug> &`.
-3. Report PID + log path back to the user.
-4. Exit.
+2. Dispatch per the config's `worker_backend`:
+   - `"claude-p"` (default) — spawn the headless runner `nohup scripts/super-board-run.sh <slug> &`, report PID + log path, exit.
+   - `"workflow"` — stay in-session and run the wave loop in `skills/super-board/references/run-workflow.md`: plan a wave, claim assignees, launch the `super-board-wave` dynamic workflow, reconcile, repeat. Lane agents inside the workflow do all product work.
+3. Report back to the user (dispatch confirmation, or one status line per wave).
 
 The orchestrator MUST NOT:
 
@@ -47,8 +48,10 @@ This repo is consumed by dropping its `.claude/`-shaped tree into a target proje
 ├── skills/super-build/...
 ├── skills/super-qa/...
 ├── skills/super-review/...
+├── workflows/super-board-wave.js
 └── bin/super-board-run.sh
     bin/super-board-gh-guard.sh
+    bin/super-board-wave-plan.sh
 ```
 
 The orchestrator skill expects `scripts/super-board-run.sh` to exist on the project's path. The release zip places it at `.claude/bin/`; users who prefer can symlink to `scripts/`.

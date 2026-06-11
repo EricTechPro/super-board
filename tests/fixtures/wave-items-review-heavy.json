@@ -1,0 +1,8 @@
+{
+  "items": [
+    { "status": "Review", "content": { "type": "Issue", "number": 20, "title": "review card a", "assignees": [] } },
+    { "status": "Review", "content": { "type": "Issue", "number": 21, "title": "review card b", "assignees": [] } },
+    { "status": "Review", "content": { "type": "Issue", "number": 22, "title": "review card c", "assignees": [] } },
+    { "status": "Ready",  "content": { "type": "Issue", "number": 23, "title": "ready card", "assignees": [] } }
+  ]
+}

@@ -39,6 +39,19 @@ There are four skills in this repo:
 
 The runner (`scripts/super-board-run.sh`) is pure bash. It re-reads the GitHub Project on every tick — it holds no Claude session state, so it survives Ctrl-C, restarts, and rate-limit pauses without losing track of cards.
 
+## Two worker backends
+
+Pick per board via `"worker_backend"` in the config:
+
+| Backend | How workers run | When to use |
+|---|---|---|
+| `"claude-p"` (default) | Headless `claude -p` processes spawned by the bash dispatcher. Fully detached — close your session and it keeps running. | Unattended overnight runs; no dynamic-workflows requirement. |
+| `"workflow"` | Lane agents inside a `super-board-wave` dynamic workflow, orchestrated by your interactive session. The runtime tracks agents, budgets, and crash recovery (`resumeFromRunId`) — no PID files, no zombie sweeps, no cold-start claim race. | Attended or `/loop`-paced runs; richer progress in `/workflows`; structured per-card results. |
+
+The board contract is identical in both: same columns, same issue format, same commit conventions. Wave selection is backlog-aware (one card per non-empty column downstream-first, then extra slots fill from the most backlogged column), computed by `scripts/super-board-wave-plan.sh`. The two backends are mutually exclusive per project — each refuses to start while the other is active. See `skills/super-board/references/run-workflow.md` for the full contract, including the gh/git allowlist workflow lane agents need.
+
+The workflow backend requires dynamic workflows enabled in Claude Code (`/config`).
+
 ## Safety controls
 
 Worker storms are the failure mode that bit early users. Super Board prevents them with defense in depth:
@@ -57,6 +70,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```json
 {
   "variant": "full",
+  "worker_backend": "claude-p",
   "project": { "owner": "your-gh-login-or-org", "number": 12 },
   "base_branch": "main",
   "human_approves_merge": false,
