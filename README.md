@@ -35,9 +35,21 @@ There are four skills in this repo:
 | Skill | Role |
 |---|---|
 | **super-board** | The orchestrator. Invoked by the human via `/super-board run`. Validates preconditions, plans waves, launches the `super-board-wave` workflow (or the legacy headless runner on opt-in). Holds NO product context. |
-| **super-build** | Headless worker. Reads a `Ready` card, spins up a git worktree, implements the change, opens a PR, moves the card to `QA`. |
-| **super-qa** | Headless worker. Reads a `QA` card, runs Playwright path specs against the worker's branch, captures evidence (screenshots, logs), comments on the PR, and either moves the card to `Review` or kicks it back to `Ready` with a rebuild label. |
-| **super-review** | Headless worker. Reads a `Review` card, runs the merge-readiness checks, posts findings, and either merges (or hands off to a human gate). |
+| **super-build** | Builder lane agent. Reads a `Ready` card, spins up a git worktree, implements the change, opens a PR, moves the card to `QA`. |
+| **super-qa** | Tester lane agent. Reads a `QA` card, runs Playwright path specs against the worker's branch, captures evidence (screenshots, logs), comments on the PR, and either moves the card to `Review` or kicks it back to `Ready` with a rebuild label. |
+| **super-review** | Reviewer lane agent. Reads a `Review` card, runs the merge-readiness checks, posts findings, and either merges (or hands off to a human gate). |
+
+The three lane skills run as workflow agents inside `super-board-wave` by default; on the legacy `claude-p` backend the same skills run as headless `claude -p` workers. Same lifecycles either way.
+
+## The five verbs
+
+| Verb | What it does |
+|---|---|
+| `/super-board onboard` | One-time setup wizard — points at your GitHub Project, checks the `Status` columns, writes `.claude/super-board/configs/<slug>.json`. |
+| `/super-board lint` | Pre-flight readiness — walks the active-pipeline issues, flags vague or missing acceptance criteria before agents burn tokens on them. |
+| `/super-board status` | Read-only snapshot — renders the board as an 80-column kanban with column counts and in-flight work (~1.3s, pure Python). |
+| `/super-board run <slug>` | The autonomous loop — plans waves, dispatches lane agents, repeats until the board is drained. Also the resume command: state lives on the board, so re-running picks up where things left off. |
+| `/super-board stop` | Graceful shutdown — posts "stopped mid-flight" comments on every in-flight issue + PR, releases assignee mutexes, kills any workers. Resume with `run`. |
 
 The board is the only state in both backends — every agent re-reads it, so runs survive Ctrl-C, restarts, and rate-limit pauses without losing track of cards.
 
