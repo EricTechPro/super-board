@@ -32,6 +32,13 @@
   // only; the dispatcher refuses to run (exit 78) unless set here.
   "worker_backend": "workflow",
 
+  // Default model ladder for lane workers, indexed by card complexity from
+  // the classify router. Overridden per run by `super-board run --low|--high`.
+  //   "low"    — haiku (low) / sonnet (medium) / opus (high)
+  //   "medium" — (default) sonnet / opus / session model
+  //   "high"   — opus floor; medium+ inherit the session model
+  "model_tier": "medium",
+
   "target": {
     // "url" | "repo" | "repo+url". Tells the runner whether to clone, hit a
     // URL, or both.

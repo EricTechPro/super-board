@@ -74,8 +74,13 @@ Repeat until a done condition or halt gate fires:
    (or /loop re-entries) against the same board without bot_identity.
 4. **Launch** — Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, variant, cards, humanApprovesMerge }`. Runs in the background; the
+   `args: { configPath, variant, cards, humanApprovesMerge, tier }`. Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
+   `tier` is the run's model ladder: `'low'` when the user invoked
+   `super-board run --low` (haiku/sonnet/opus by card complexity), `'high'`
+   for `run --high` (opus floor, session model above), omitted/`'medium'`
+   otherwise (sonnet/opus/session — the default). A `model_tier` key in the
+   config sets the default; an explicit flag wins over config.
 5. **Reconcile** (when the run completes) — read the returned `cards`
    summary. For EVERY card in the wave, release the assignee
    (`gh issue edit <n> --remove-assignee <bot_identity>`, idempotent).
