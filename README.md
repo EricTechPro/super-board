@@ -2,7 +2,7 @@
 
 An autonomous GitHub Project board executor for Claude Code. Drag a card into the `Ready` column, walk away, come back to merged PRs.
 
-Super Board watches your GitHub Project, dispatches headless `claude -p` workers to Build / QA / Review the cards, and moves each card across the board as it goes — all without holding a single Claude session open.
+Super Board watches your GitHub Project, dispatches agents to Build / QA / Review the cards, and moves each card across the board as it goes. Default backend: dynamic workflows (in-session waves); a legacy headless `claude -p` dispatcher remains as explicit opt-in.
 
 ## Watch it run
 
@@ -20,9 +20,11 @@ Super Board watches your GitHub Project, dispatches headless `claude -p` workers
    ```
 3. Wire up a GitHub Project board with a `Status` field whose columns are `Backlog`, `Ready`, `Building`, `QA`, `Review`, `Done`.
 4. Drop a config at `.claude/super-board/configs/<slug>.json` pointing at your board.
-5. From inside Claude Code, type `/super-board run <slug>`. The orchestrator spawns the headless runner, prints a PID + log path, and exits.
+5. From inside Claude Code, type `/super-board run <slug>`. The orchestrator plans a wave, launches the `super-board-wave` dynamic workflow, reconciles results, and repeats until the board is drained.
 
 That's it. Move cards into `Ready`, watch them flow through the board.
+
+**Backends (default flipped in 1.6.0):** `"worker_backend": "workflow"` is the default — waves are drained in-session via dynamic workflows (requires dynamic workflows enabled in `/config`); see `skills/super-board/references/run-workflow.md`. The legacy headless dispatcher (`"claude-p"`, `claude -p` workers spawned by `scripts/super-board-run.sh`) is explicit opt-in only — the dispatcher refuses to run (exit 78) unless the config sets it. Lane lifecycles are identical in both.
 
 To stop everything cleanly: `/super-board stop`. It posts a "stopped mid-flight" comment on every in-flight issue + PR (lane, last commit, resume hint), releases the assignee mutex, kills the workers and dispatcher. To resume, just `/super-board run <slug>` again — the board is the state, so cards are picked up from whichever column they were in.
 
@@ -32,12 +34,67 @@ There are four skills in this repo:
 
 | Skill | Role |
 |---|---|
-| **super-board** | The orchestrator. Invoked by the human via `/super-board run`. Validates preconditions, dispatches the headless runner (`scripts/super-board-run.sh`), and exits. Holds NO product context. |
-| **super-build** | Headless worker. Reads a `Ready` card, spins up a git worktree, implements the change, opens a PR, moves the card to `QA`. |
-| **super-qa** | Headless worker. Reads a `QA` card, runs Playwright path specs against the worker's branch, captures evidence (screenshots, logs), comments on the PR, and either moves the card to `Review` or kicks it back to `Ready` with a rebuild label. |
-| **super-review** | Headless worker. Reads a `Review` card, runs the merge-readiness checks, posts findings, and either merges (or hands off to a human gate). |
+| **super-board** | The orchestrator. Invoked by the human via `/super-board run`. Validates preconditions, plans waves, launches the `super-board-wave` workflow (or the legacy headless runner on opt-in). Holds NO product context. |
+| **super-build** | Builder lane agent. Reads a `Ready` card, spins up a git worktree, implements the change, opens a PR, moves the card to `QA`. |
+| **super-qa** | Tester lane agent. Reads a `QA` card, runs Playwright path specs against the worker's branch, captures evidence (screenshots, logs), comments on the PR, and either moves the card to `Review` or kicks it back to `Ready` with a rebuild label. |
+| **super-review** | Reviewer lane agent. Reads a `Review` card, runs the merge-readiness checks, posts findings, and either merges (or hands off to a human gate). |
 
-The runner (`scripts/super-board-run.sh`) is pure bash. It re-reads the GitHub Project on every tick — it holds no Claude session state, so it survives Ctrl-C, restarts, and rate-limit pauses without losing track of cards.
+The three lane skills run as workflow agents inside `super-board-wave` by default; on the legacy `claude-p` backend the same skills run as headless `claude -p` workers. Same lifecycles either way.
+
+## The five verbs
+
+| Verb | What it does |
+|---|---|
+| `/super-board onboard` | One-time setup wizard — points at your GitHub Project, checks the `Status` columns, writes `.claude/super-board/configs/<slug>.json`. |
+| `/super-board lint` | Pre-flight readiness — walks the active-pipeline issues, flags vague or missing acceptance criteria before agents burn tokens on them. |
+| `/super-board status` | Read-only snapshot — renders the board as an 80-column kanban with column counts and in-flight work (~1.3s, pure Python). |
+| `/super-board run <slug>` | The autonomous loop — plans waves, dispatches lane agents, repeats until the board is drained. Also the resume command: state lives on the board, so re-running picks up where things left off. |
+| `/super-board stop` | Graceful shutdown — posts "stopped mid-flight" comments on every in-flight issue + PR, releases assignee mutexes, kills any workers. Resume with `run`. |
+
+The board is the only state in both backends — every agent re-reads it, so runs survive Ctrl-C, restarts, and rate-limit pauses without losing track of cards.
+
+## The six agentic patterns, mapped
+
+The patterns live in the workflow script (`workflows/super-board-wave.js`) — the conductor. The skills (`super-build` / `super-qa` / `super-review`) are the sheet music each lane agent reads. The workflow spawns a fresh agent per lane whose prompt says: *"Run super-build on issue #N, follow run.md's Builder lifecycle exactly."*
+
+One card's journey (#47, starting in `Ready`):
+
+```
+            ┌─ ROUTING ─────────────┐
+ #47 Ready →│ classify agent (haiku)│→ "bug, low" → cheap model for lanes
+            └───────────────────────┘
+                       ↓
+            ┌─ PROMPT CHAINING ──────────────────────────────────┐
+            │ Build agent ──advanced?──→ QA agent ──→ Review agent│
+            │ (super-build)   │no        (super-qa)  (super-review)│
+            │                 ↓                                    │
+            │           chain stops; the board keeps the card      │
+            └─────────────────────────────────────────────────────┘
+```
+
+A wave (3 cards at once):
+
+```
+ ORCHESTRATOR (your session)           ← orchestrator–workers
+   │ plan wave → claim → launch
+   ▼
+ #47: classify → build → qa → review   ┐
+ #51:           qa → review            ├ parallelization (cards overlap)
+ #52: classify → build ✗(bounced)      ┘
+                          │
+ Review lanes: ──[mutex]── one merge at a time
+```
+
+When each pattern fires:
+
+| Pattern | When |
+|---|---|
+| **Routing** | `Ready` cards only — classify picks haiku/sonnet/full model per card |
+| **Prompt chaining** | Every card — each lane runs only if the previous returned `advanced` |
+| **Parallelization** | Always — card A can be in Review while card B builds |
+| **Evaluator–optimizer** | QA/Review judge the Builder's work; a fail bounces the card to `Ready` and the next wave rebuilds with the comments as context |
+| **Orchestrator–workers** | Every wave — your session never codes; lane agents do all product work |
+| **Autonomous loop** | The wave loop repeats until the board is drained or a halt gate fires |
 
 ## Safety controls
 
@@ -57,6 +114,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```json
 {
   "variant": "full",
+  "worker_backend": "workflow",
   "project": { "owner": "your-gh-login-or-org", "number": 12 },
   "base_branch": "main",
   "human_approves_merge": false,

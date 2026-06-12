@@ -61,3 +61,26 @@ jobs:
       # what the dispatcher actually emits.
       - name: status — parser fixture tests
         run: python tests/test_status_parse.py
+
+  wave-plan:
+    name: wave-plan (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Workflow-backend planner: 6 fixture scenarios, no gh calls.
+      # Needs bash + jq, both preinstalled on ubuntu/macos runners.
+      - name: wave-plan — fixture tests
+        run: bash tests/test-wave-plan.sh
+
+      # Syntax-check the dynamic workflow script the same way the
+      # orchestrator's precondition 4 does (run-workflow.md).
+      - name: wave workflow — node --check
+        run: |
+          { echo '(async function(){'; sed 's/^export const meta/const meta/' workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module
+          echo "OK: workflows/super-board-wave.js parses"

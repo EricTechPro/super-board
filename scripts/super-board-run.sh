@@ -46,6 +46,16 @@ BLOCK_ALERT_PCT=$(jq -r '.block_rate_alert_pct // 30' "$CONFIG_PATH")
 TICK_SECONDS=$(jq -r '.tick_seconds // 120' "$CONFIG_PATH")
 MAX_WORKERS=$(jq -r '.max_workers // 3' "$CONFIG_PATH")
 BOT_LOGIN=$(jq -r '.notifications.bot_identity // .bot_identity // ""' "$CONFIG_PATH")
+WORKER_BACKEND=$(jq -r '.worker_backend // "workflow"' "$CONFIG_PATH")
+
+# Workflow is the default backend (v1.6.0). This legacy dispatcher only runs
+# when the config opts in explicitly — never by accident or stale habit.
+if [ "$WORKER_BACKEND" != "claude-p" ]; then
+  echo "🛑 board '${CONFIG_SLUG}' uses the workflow backend (worker_backend=${WORKER_BACKEND})." >&2
+  echo "    Run it in-session: /super-board run ${CONFIG_SLUG}  (see references/run-workflow.md)" >&2
+  echo "    To use this legacy dispatcher, set \"worker_backend\": \"claude-p\" in the config." >&2
+  exit 78
+fi
 
 RUN_DATE=$(date +%Y-%m-%d)
 RUN_MANIFEST="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
@@ -230,6 +240,10 @@ reap_finished_locks() {
   for lock in "$INFLIGHT_DIR"/*; do
     [ -f "$lock" ] || continue
     issue=$(basename "$lock")
+    # Issue locks only: basenames are issue numbers. Anything else (e.g. the
+    # workflow backend's workflow-wave.lock) is not ours to reap — deleting it
+    # would dissolve the backend mutual exclusion mid-run.
+    case "$issue" in *[!0-9]*|'') continue ;; esac
     read_lock "$issue"
     if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
       rm -f "$lock"
@@ -254,6 +268,14 @@ if [ "$ORPHANS" -gt 0 ]; then
   log "    Stop them first: pkill -f 'claude -p .*super-board run'"
   log "    Then re-run: $0 $CONFIG_SLUG"
   exit 73
+fi
+
+# Workflow-backend mutual exclusion (see references/run-workflow.md §Preconditions).
+WAVE_LOCK=".claude/super-board/inflight/workflow-wave.lock"
+if [ -f "$WAVE_LOCK" ]; then
+  log "🛑 refusing to start: workflow-backend wave in flight ($WAVE_LOCK exists)."
+  log "    If no wave is actually running, remove the stale lock: rm $WAVE_LOCK"
+  exit 74
 fi
 
 # Production-merge guard.
@@ -292,6 +314,15 @@ QA_PID=""; QA_ISSUE=""
 REVIEW_PID=""; REVIEW_ISSUE=""
 
 while true; do
+  # Workflow-backend mutual exclusion, re-checked every tick: the startup
+  # check alone leaves a TOCTOU window where a workflow run starting at the
+  # same moment as this dispatcher is never detected by either side.
+  if [ -f "$WAVE_LOCK" ]; then
+    log "🛑 workflow-backend wave appeared mid-run ($WAVE_LOCK) — halting for mutual exclusion."
+    log "    Resume after the wave: $0 $CONFIG_SLUG"
+    exit 74
+  fi
+
   reap_finished_locks  # cheap local sweep; runs every tick
 
   # ── Zombie sweep against the LAST cached project state (no extra API).

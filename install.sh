@@ -33,13 +33,20 @@ for skill in super-board super-build super-qa super-review; do
 done
 
 echo "→ installing dispatcher scripts into $TARGET/.claude/bin/"
-for script in super-board-run.sh super-board-gh-guard.sh super-board-status.py; do
+for script in super-board-run.sh super-board-gh-guard.sh super-board-status.py super-board-wave-plan.sh; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     cp "$REPO_ROOT/scripts/$script" "$TARGET/.claude/bin/"
     chmod +x "$TARGET/.claude/bin/$script"
     echo "    ✓ $script"
   fi
 done
+
+echo "→ installing dynamic workflow into $TARGET/.claude/workflows/"
+mkdir -p "$TARGET/.claude/workflows"
+if [ -f "$REPO_ROOT/workflows/super-board-wave.js" ]; then
+  cp "$REPO_ROOT/workflows/super-board-wave.js" "$TARGET/.claude/workflows/"
+  echo "    ✓ super-board-wave.js"
+fi
 
 echo
 echo "✓ installed. next steps:"
