@@ -77,7 +77,7 @@ For each Ready item:
 - Capture `content.number` (issue #), `content.title`, `content.body`, `content.labels` (via separate `gh issue view N --json labels` if `item-list` doesn't include them).
 - **Skip** issues with the `loop:in-progress` label (in flight in another orchestrator) or `loop:halted` label (manually paused) or `human-gated` label (requires manual handling).
 - Parse `body` for `Depends on: #N1, #N2` lines (case-insensitive). If any dep is still open AND not in the current Ready set, the issue is blocked — leave it for a future run.
-- Parse `body` for an optional `Skills:` line (e.g. `Skills: superpowers:test-driven-development, superpowers:verification-before-completion`). If absent, the worker uses defaults from the preamble.
+- Parse `body` for an optional `Skills:` line (e.g. `Skills: mattpocock-skills:tdd, verification-before-completion`). If absent, the worker uses defaults from the preamble.
 
 **Ordering:**
 1. **Board order first** — `gh project item-list` returns items in the human's manual board order. Respect that. If the user wants Issue X before Issue Y, they drag X above Y on the board.
@@ -183,7 +183,7 @@ Every Ready issue should be executable without live clarification. Preferred iss
 
 ## Notes / Constraints
 - Depends on: #123, #456
-- Skills: superpowers:test-driven-development, superpowers:verification-before-completion
+- Skills: mattpocock-skills:tdd, verification-before-completion
 - Human gates: <deploy, destructive DB action, product decision, etc.>
 ```
 
@@ -196,7 +196,7 @@ Super Build treats acceptance criteria as the completion contract. Workers must 
 - **Never modify code in the main worktree** while workers are running. Only run `gh issue` commands and merge/cleanup operations.
 - **Merge conflicts** between concurrent workers' branches → halt loop, notify Telegram with conflict files, leave `loop:in-progress` label so a human can resolve. Don't auto-resolve.
 - **Telegram cadence:** 1 message at start, 1 per dispatch wave, 1 per completion (success/fail), 1 final summary. Don't spam.
-- **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present, otherwise use defaults (`superpowers:test-driven-development`, `superpowers:verification-before-completion`). All decision points use gstack advisors (`/plan-ceo-review`, `/plan-eng-review`, `/cso`, `/plan-design-review`) with majority vote (tie → smallest blast radius). See `references/gstack-voting.md` for when to invoke vs. when to escalate, and the required `--- gstack-vote ---` commit trailer.
+- **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present, otherwise use defaults (`mattpocock-skills:tdd`, `verification-before-completion`). All decision points run the advisor panel (grill the question, then poll eng / product / security / design / QA) with majority vote (tie → smallest blast radius). See `references/decision-policy.md` for the skill map, when to convene vs. when to escalate, and the required `--- decision-vote ---` commit trailer.
 
 ## Worker preamble
 

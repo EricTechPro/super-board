@@ -3,15 +3,14 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
 ## Decision policy (mandatory)
 
 1. **For ANY decision point, AskUserQuestion-style prompt, or "should I X or Y?" branch:**
-   - Spawn ALL relevant gstack advisors IN PARALLEL via the Task/Skill tool:
-     - `/plan-ceo-review` (product/scope decisions)
-     - `/plan-eng-review` (technical/architecture decisions)
-     - `/cso` (security/risk decisions)
-     - `/plan-design-review` (UX/UI decisions)
-   - Use only those that apply to the decision at hand.
-   - Adopt the option recommended by the **MAJORITY** of advisors.
+   - Run the advisor panel described in `references/decision-policy.md`. It needs no external CLI:
+     - `mattpocock-skills:grilling` — stress-test the options before you pick one.
+     - `mattpocock-skills:code-review` — technical/architecture judgment on a concrete diff.
+     - Inline role-play for the roles with no skill of their own (product/scope, security/risk, UX/UI).
+   - Use only the roles that apply to the decision at hand.
+   - Adopt the option recommended by the **MAJORITY** of roles.
    - Tie → pick the option with the **smallest blast radius** (least irreversible, smallest scope, easiest to revert).
-   - Log the vote tally + rationale in the session output.
+   - Log the vote tally + rationale in the session output and in the commit trailer.
 
 2. **NEVER call `AskUserQuestion`. NEVER block waiting for the user.**
 
@@ -22,12 +21,13 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
    - The orchestrator will detect this in the log, add the `human-gated` label to the issue, and notify the user.
 
 4. **Skill selection.** Parse the issue body for a `Skills:` line. Examples:
-   - `Skills: superpowers:test-driven-development, superpowers:verification-before-completion`
-   - `Skills: superpowers:writing-plans, superpowers:systematic-debugging`
+   - `Skills: mattpocock-skills:tdd, verification-before-completion`
+   - `Skills: mattpocock-skills:to-spec, mattpocock-skills:diagnosing-bugs`
    If no `Skills:` line is present, default to:
-   - `superpowers:test-driven-development` (for any feature/bugfix that touches code)
-   - `superpowers:verification-before-completion` (always, before final commit)
+   - `mattpocock-skills:tdd` (for any feature/bugfix that touches code)
+   - `verification-before-completion` (always, before final commit)
    Invoke each via the Skill tool BEFORE writing any code.
+   Skill vocabulary is pinned in `references/decision-policy.md` → "Skill map".
 
 5. **Honor the per-issue 14-gate contract** (TDD, atomic commits, lint/typecheck/test green, etc.). Plan-only issues skip gates 3-7 (execution + tests). Review-only issues skip gates 1-7. Do not expand product scope beyond the issue body; when scope is missing or unsafe, use WIP-PARTIAL or HUMAN GATE instead of guessing.
 
@@ -38,7 +38,7 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
       - **Intentional partial** → `wip(loop): #<N> partial — <slice-summary>` if you deliberately landed a subset (foundation/scaffolding, single layer of the feature) AND the partial is type-checked, linted, and tested in isolation AND merging it to the base branch is safe (no broken imports, no half-wired routes). Then:
         1. Make your final assistant message **start with the literal first line `WIP-PARTIAL: <one-line reason for stopping>`** — this is the dispatcher's contract for "merge as partial, leave issue open." Without this prefix the orchestrator will treat your branch as a failed run and discard it.
         2. Exit non-zero (the harness will exit on `end_turn` of the final message; that is sufficient).
-      - **Spec is not implementation.** If `docs/superpowers/specs/<…>-design.md` already exists on the base branch, that's the design. The issue's acceptance criteria are about the IMPLEMENTATION the spec describes (schema + routes + service + UI + i18n + migration + tests). Only `chore(loop): close` if those AC checkboxes are filled by THIS branch's diff. A spec amendment alone is NOT a `chore(loop): close` — at most it is a `wip(loop):` (and usually it's no commit at all).
+      - **Spec is not implementation.** If `docs/specs/<…>-design.md` already exists on the base branch, that's the design. The issue's acceptance criteria are about the IMPLEMENTATION the spec describes (schema + routes + service + UI + i18n + migration + tests). Only `chore(loop): close` if those AC checkboxes are filled by THIS branch's diff. A spec amendment alone is NOT a `chore(loop): close` — at most it is a `wip(loop):` (and usually it's no commit at all).
       - **Anti-loophole.** If your branch's diff against the base is < 50 lines of non-spec code, OR contains zero new files under `server/`, `client/`, `shared/db/`, or `shared/zod/`, do NOT emit `chore(loop): close` regardless of how the issue body reads. Either commit `wip(loop):` with `WIP-PARTIAL:` prefix as above, or do not commit at all and surface the situation in the final assistant message.
       - **Do not edit the issue body.** Acceptance-criterion checkboxes are the orchestrator's source of truth; rewriting them to "look done" is gaming the contract.
    c. Stop. Do **NOT** run `gh issue close`, do **NOT** remove the `loop:in-progress` label, do **NOT** comment on the issue — the orchestrator handles all of that after merging your branch.
