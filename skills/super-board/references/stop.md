@@ -1,6 +1,6 @@
 # super-board stop — full contract
 
-Pointer: spec `docs/superpowers/specs/2026-05-21-super-board-design.md` §9 (added in v1.3.0).
+Pointer: spec `docs/specs/2026-05-21-super-board-design.md` §9 (added in v1.3.0).
 
 **Where it runs:** interactive orchestrator. Spawns the headless `scripts/super-board-stop.sh` synchronously, reports the summary, exits. No background processes.
 

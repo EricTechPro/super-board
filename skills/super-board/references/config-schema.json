@@ -1,4 +1,4 @@
-// Source of truth: docs/superpowers/specs/2026-05-21-super-board-design.md §4
+// Source of truth: docs/specs/2026-05-21-super-board-design.md §4
 //
 // This file is a REFERENCE DOC, not parsed by the skill at runtime. It uses
 // JSON5-style `//` line comments to inline field notes from spec §4 alongside
@@ -73,7 +73,24 @@
   // human must click merge. Card auto-moves to Done when the PR is merged
   // externally. Default `false`. Onboard FORCES this to `true` when
   // `base_branch` is `main` AND the repo has a deploy workflow detected.
+  //
+  // On the workflow backend, `false` ALSO requires "Bash(gh pr merge:*)" in the
+  // session allowlist — without it every Reviewer stalls on an approval prompt
+  // and nothing lands. See references/run-workflow.md → "Mid-run permission prompts".
   "human_approves_merge": false,
+
+  // ── Runaway controls (v2.0.0).
+  // Halt after this many consecutive dispatch cycles in which NO card reached
+  // Done or Skipped. Progress is measured by landed work, never by lane
+  // occupancy: a pipeline that is 100% busy and lands nothing is precisely the
+  // runaway this gate exists to catch. Default `6`.
+  "no_progress_cycles": 6,
+
+  // Hard ceiling on total worker dispatches for one run; the loop halts with a
+  // runaway summary when it is reached. `0` disables the ceiling. Bounds
+  // worst-case spend even when a board trickles just enough Done movement to
+  // keep resetting `no_progress_cycles`. Default `0`.
+  "max_dispatches": 0,
 
   // Controls Reviewer's adversarial mode (folded-in super-truth pattern).
   //   "off"          — never adversarial.

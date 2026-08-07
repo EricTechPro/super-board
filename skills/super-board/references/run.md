@@ -1,6 +1,6 @@
 # super-board run — full contract
 
-Pointer: spec `docs/superpowers/specs/2026-05-21-super-board-design.md` §7 "Verb 3 — super-board run".
+Pointer: spec `docs/specs/2026-05-21-super-board-design.md` §7 "Verb 3 — super-board run".
 
 **Where it runs:** headless. Spawned as a `nohup`-backgrounded process; the current Claude session exits immediately after dispatch. The runner script (`scripts/super-board-run.sh`) is a pure shell while-loop that dispatches one `claude -p` worker per lane and never holds Claude session state. Each `claude -p` worker is its own short-lived headless context — load this file at the start of every lane.
 
@@ -258,12 +258,43 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - **Above threshold** — continue to step 7.
    - **No Reproducer needed** — Tester's tests were re-run in step 5.
 7. Decide per finding:
-   - **No findings + threads clean + truth ≥ threshold + tests green** → squash-merge PR (or mark ready if `human_approves_merge`), delete branch, close issue, move card Review → Done.
+   - **No findings + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
    - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
    - **Test-side new finding** → open new `[QA]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
    - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[QA]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Add a `🛡 → ✅ CI-budget bypass` comment to both the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
    - **Human-gate / Blocker (schema, API contract, money, auth, migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked.
 8. Clean up worktree.
+
+### Merge protocol (Reviewer only — added 2026-08-06, issue #9)
+
+Builder opens every PR as a **draft**, and GitHub will not merge a draft: `gh pr merge --auto`
+on a draft queues forever and never fires. A run that skipped this step produced two
+substantial builds and landed **zero commits on `main` in six hours**. The Reviewer must
+walk these steps in order, and the card **must not reach Done until the merge is confirmed
+on the base branch**.
+
+```
+1. Mark ready      gh pr ready <PR>                     # idempotent; no-op if already ready
+2. Branch A — human_approves_merge: true
+     → stop here. Card Review → Done is NOT taken; leave the card in Review with a
+       `[review]` comment saying the PR is ready for a human to merge.
+   Branch B — human_approves_merge: false
+     → gh pr merge <PR> --squash --delete-branch
+3. Confirm the merge LANDED, do not trust the exit code:
+     gh pr view <PR> --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "none")'
+     Expect: MERGED <sha>.  Then verify the sha is reachable from the base branch:
+     git fetch origin <base> && git merge-base --is-ancestor <sha> origin/<base>
+4. Only after step 3 passes: close the issue, move card Review → Done, post the ✅ comment
+   citing the merge commit sha.
+5. If the merge is REFUSED (failing required checks, conflicts, branch protection):
+     → move the card Review → **Blocked** with the §4 Block template naming the blocker.
+     → do NOT leave it in Review. A card left in Review is re-picked next tick and
+       re-reviewed forever, which is the re-dispatch waste tracked in issue #10.
+```
+
+**Ordering invariant.** `Done` means "merged". If step 3 cannot be satisfied, the card
+goes to Blocked, never Done. Anything that reads the board — status, halt gate, the
+landed-work progress signal — depends on Done meaning the code is on the base branch.
 
 ## Commenting cadence (issue + PR, every lane)
 
