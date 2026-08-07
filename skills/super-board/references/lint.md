@@ -1,7 +1,7 @@
 # super-board lint — 7-phase interactive ticket clarifier
 
 > Reference for the `super-board lint` verb. See spec §6 of
-> `docs/superpowers/specs/2026-05-21-super-board-design.md` for the full
+> `docs/specs/2026-05-21-super-board-design.md` for the full
 > design rationale. This file is the worker-facing playbook.
 
 **Where it runs:** current Claude Code session. Interactive. Single-pass.
@@ -107,11 +107,11 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | Flagged pattern | Skill dispatched |
 |---|---|
 | QA ticket, vague test surface | `qa-test-planner` |
-| Feature ticket, undefined UX | `gstack:shape` |
-| Copy / microcopy / error message AC | `gstack:clarify` |
-| Bug ticket, no repro steps | `investigate` |
-| Issue needing fundamental rethink (criteria #10, #11) | `superpowers:brainstorming` |
-| Issue with multiple interpretations (criterion #12) | `gsd-discuss-phase` |
+| Feature ticket, undefined UX | `shape` |
+| Copy / microcopy / error message AC | `clarify` |
+| Bug ticket, no repro steps | `mattpocock-skills:diagnosing-bugs` |
+| Issue needing fundamental rethink (criteria #10, #11) | `mattpocock-skills:grilling` |
+| Issue with multiple interpretations (criterion #12) | `mattpocock-skills:grilling` |
 | Catch-all (none of above) | Inline draft (sub-agent in lint itself) |
 
 One sub-agent per issue. User stays in control of pacing.

@@ -213,7 +213,7 @@ Every auto-filed finding must give a future headless Claude/Super Build session 
 
 ## Suggested fix path
 - Suggested owner: `super-build` | `super-ux` | `super-qa` | `super-review`
-- Suggested skills: `systematic-debugging`, `test-driven-development`, `verification-before-completion`
+- Suggested skills: `mattpocock-skills:diagnosing-bugs`, `mattpocock-skills:tdd`, `verification-before-completion`
 - Notes for implementer: <first suspected file/function, if known>
 
 ## Acceptance criteria
@@ -481,10 +481,10 @@ These run in Phase 1 regression alongside `e2e/paths/`.
 
 The worker (per `references/iteration-preamble.md`) must load and follow:
 
-- `superpowers:using-superpowers`
-- `superpowers:test-driven-development`
-- `superpowers:systematic-debugging`
-- `superpowers:verification-before-completion`
+- `mattpocock-skills:ask-matt` (router — when the right flow is unclear)
+- `mattpocock-skills:tdd`
+- `mattpocock-skills:diagnosing-bugs`
+- `verification-before-completion` (no Matt Pocock equivalent — kept as-is)
 - `playwright-best-practices` — when writing or refactoring a spec. Reference
   its `locators.md` (data-testid first, `getByRole` fallback),
   `fixtures-hooks.md` (custom fixtures for auth, pre-test seeding, teardown),

@@ -5,7 +5,7 @@ description: GitHub-Project-driven autonomous pipeline. Five verbs — onboard, 
 
 # super-board — autonomous GitHub Project pipeline
 
-Spec: `docs/superpowers/specs/2026-05-21-super-board-design.md`
+Spec: `docs/specs/2026-05-21-super-board-design.md`
 
 ## Five verbs
 

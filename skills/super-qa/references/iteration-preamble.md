@@ -33,8 +33,10 @@ worker memory creep:
 2. **Do NOT read every prior `iteration-*.md`.** `docs/super-qa/report/QA-REPORT.md` is
    the rolled-up dashboard — read that. Read individual iteration files only
    if you need a specific bug's full repro.
-3. **Use ONE gstack advisor by default (`/plan-eng-review`).** Escalate to a
-   second only on a high-priority finding or when priority/category disagreement is material.
+3. **Use ONE advisor role by default (eng, via `mattpocock-skills:code-review`).**
+   Escalate to a second role only on a high-priority finding or when
+   priority/category disagreement is material. Panel rules:
+   `.claude/skills/super-build/references/decision-policy.md`.
 4. **Per-iteration cap: 30 screenshots.** Re-use steps between TCs that share
    prefixes.
 5. **`--max-turns 250` is your hard ceiling.** Past turn 200, finish what
@@ -42,10 +44,10 @@ worker memory creep:
 
 ## Skills you MUST use (load explicitly via Skill tool)
 
-- `superpowers:using-superpowers` (always first)
-- `superpowers:test-driven-development` (red spec before fix)
-- `superpowers:systematic-debugging` (root-cause discipline for fixes)
-- `superpowers:verification-before-completion` (before claiming a fix done)
+- `mattpocock-skills:ask-matt` (router — when the right flow for a finding is unclear)
+- `mattpocock-skills:tdd` (red spec before fix)
+- `mattpocock-skills:diagnosing-bugs` (root-cause discipline for fixes)
+- `verification-before-completion` (before claiming a fix done — no Matt Pocock equivalent)
 - `playwright-best-practices` (load when writing or refactoring a spec).
   Reference its `locators.md` (data-testid first, `getByRole` fallback),
   `fixtures-hooks.md` (custom fixtures for auth and pre-test seeding/teardown),

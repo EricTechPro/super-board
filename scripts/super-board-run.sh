@@ -15,12 +15,31 @@
 #      claimed issue has already moved out of the lane's expected source column. The worker's logical
 #      work is done; if the claude -p process lingers, lane appears busy forever and downstream cards
 #      pile up unprocessed. Uses the project-items cache so it costs zero extra API calls per tick.
+#   8. Closed-issue guard (added 2026-08-06, issue #10) — a card is selected by Status column, which
+#      says nothing about whether the underlying issue is still open. Before every dispatch the
+#      candidate's issue state is checked; a CLOSED issue sitting in a non-terminal column is
+#      reconciled to Done instead of being handed another worker.
+#   9. Landed-work halt gate (added 2026-08-06, issue #8) — forward progress is measured by the set of
+#      cards in Done changing, NOT by lane occupancy. A pipeline that is 100% busy but lands nothing
+#      is exactly the runaway this gate must catch, so lane state no longer suppresses it.
+#      Config: no_progress_cycles (default 6), max_dispatches (default 0 = unlimited).
+#
+# PID namespace trap (Git Bash / MSYS, issue #13): `kill -0` inside this script checks MSYS-namespace
+# PIDs; PowerShell `Get-Process` checks Windows-namespace PIDs. The two disagree about the same
+# process — a live worker can look dead to Windows tooling and vice versa. Always diagnose liveness
+# with the same tool family that recorded the PID. Workers are started with `nohup claude -p ... &`
+# (no subshell, no `exec` of a native PE), so `$!` names the worker itself rather than a bash stub.
 
 set -euo pipefail
 
 # ───────────────────────────── args + paths ─────────────────────────────
+# SB_LIB_ONLY=1 sources this file for its helpers only (gate tests). Config discovery,
+# preconditions and the run loop are all skipped; the caller supplies whatever vars it needs.
 CONFIG_SLUG="${1:-}"
-if [ -z "$CONFIG_SLUG" ]; then
+if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
+  CONFIG_SLUG="${CONFIG_SLUG:-lib}"
+  CONFIG_PATH="${CONFIG_PATH:-/dev/null}"
+elif [ -z "$CONFIG_SLUG" ]; then
   if [ -f .claude/super-board/active ]; then
     CONFIG_SLUG=$(cat .claude/super-board/active)
   else
@@ -29,6 +48,7 @@ if [ -z "$CONFIG_SLUG" ]; then
   fi
 fi
 
+if [ "${SB_LIB_ONLY:-0}" != "1" ]; then
 CONFIG_PATH=".claude/super-board/configs/${CONFIG_SLUG}.json"
 if [ ! -f "$CONFIG_PATH" ]; then
   echo "config not found: $CONFIG_PATH" >&2
@@ -47,6 +67,10 @@ TICK_SECONDS=$(jq -r '.tick_seconds // 120' "$CONFIG_PATH")
 MAX_WORKERS=$(jq -r '.max_workers // 3' "$CONFIG_PATH")
 BOT_LOGIN=$(jq -r '.notifications.bot_identity // .bot_identity // ""' "$CONFIG_PATH")
 WORKER_BACKEND=$(jq -r '.worker_backend // "workflow"' "$CONFIG_PATH")
+# Runaway controls (issue #8). NO_PROGRESS_CYCLES counts dispatch cycles with no
+# card reaching Done, regardless of lane occupancy. MAX_DISPATCHES=0 disables the ceiling.
+NO_PROGRESS_CYCLES=$(jq -r '.no_progress_cycles // 6' "$CONFIG_PATH")
+MAX_DISPATCHES=$(jq -r '.max_dispatches // 0' "$CONFIG_PATH")
 
 # Workflow is the default backend (v1.6.0). This legacy dispatcher only runs
 # when the config opts in explicitly — never by accident or stale habit.
@@ -59,8 +83,18 @@ fi
 
 RUN_DATE=$(date +%Y-%m-%d)
 RUN_MANIFEST="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
+# Per-worker logs (issue #13). Workers used to be spawned with >/dev/null, so the run
+# log could never show what a worker was doing during a 13-minute silence.
+WORKER_LOG_DIR="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}-workers"
 INFLIGHT_DIR=".claude/super-board/inflight"
-mkdir -p "docs/super-board/runs" .worktrees "$INFLIGHT_DIR"
+mkdir -p "docs/super-board/runs" "$WORKER_LOG_DIR" .worktrees "$INFLIGHT_DIR"
+fi  # end non-lib-only setup
+
+# Defaults so the helpers below are safe to source under `set -u` in lib-only mode.
+: "${RUN_MANIFEST:=/dev/null}"
+: "${WORKER_LOG_DIR:=/dev/null}"
+: "${INFLIGHT_DIR:=/dev/null}"
+: "${PROJECT_OWNER:=}" ; : "${PROJECT_NUMBER:=0}" ; : "${BOT_LOGIN:=}"
 
 # ───────────────────────────── helpers ─────────────────────────────
 log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$RUN_MANIFEST"; }
@@ -75,19 +109,100 @@ column_count() {
   echo "$PROJECT_ITEMS_JSON" | jq --arg col "$1" '[.items[] | select(.status == $col)] | length'
 }
 
+# ── Status-field resolution (issue #10 reconcile path).
+# Option IDs are resolved BY NAME at runtime and cached for the run. Never hard-code
+# them: `updateProjectV2Field` replaces the whole option list and remints every ID,
+# so a hard-coded map goes stale silently the first time anyone edits the columns.
+STATUS_FIELD_ID=""
+STATUS_OPTIONS_JSON=""
+resolve_status_field() {
+  [ -n "$STATUS_FIELD_ID" ] && return 0
+  local payload
+  payload=$(gh api graphql -f query='
+    query($owner:String!, $number:Int!) {
+      user(login:$owner) { projectV2(number:$number) { field(name:"Status") {
+        ... on ProjectV2SingleSelectField { id options { id name } } } } }
+      organization(login:$owner) { projectV2(number:$number) { field(name:"Status") {
+        ... on ProjectV2SingleSelectField { id options { id name } } } } }
+    }' -f owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" 2>/dev/null) || return 1
+  STATUS_FIELD_ID=$(echo "$payload" | jq -r '
+    (.data.user.projectV2.field.id // .data.organization.projectV2.field.id // "")')
+  STATUS_OPTIONS_JSON=$(echo "$payload" | jq -c '
+    (.data.user.projectV2.field.options // .data.organization.projectV2.field.options // [])')
+  [ -n "$STATUS_FIELD_ID" ] && [ "$STATUS_FIELD_ID" != "null" ]
+}
+
+status_option_id() {
+  # $1 = option name. Fails loud (exit 1 + empty output) when the name is absent
+  # from the live option set, rather than mutating with a stale ID.
+  local id
+  id=$(echo "${STATUS_OPTIONS_JSON:-[]}" | jq -r --arg n "$1" '
+    map(select(.name == $n)) | .[0].id // empty' 2>/dev/null)
+  [ -n "$id" ] || return 1
+  echo "$id"
+}
+
+set_card_status() {
+  # $1 = project item id, $2 = target status name. Returns non-zero if unresolvable.
+  local item_id="$1" name="$2" opt_id
+  resolve_status_field || { log "⚠ could not resolve Status field — skipping reconcile"; return 1; }
+  opt_id=$(status_option_id "$name") || {
+    log "⚠ Status option '${name}' not present on the board — skipping reconcile"; return 1; }
+  gh project item-edit --id "$item_id" --project-id "$(project_node_id)" \
+    --field-id "$STATUS_FIELD_ID" --single-select-option-id "$opt_id" >/dev/null 2>&1
+}
+
+PROJECT_NODE_ID=""
+project_node_id() {
+  if [ -z "$PROJECT_NODE_ID" ]; then
+    PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json 2>/dev/null \
+      | jq -r '.id // ""')
+  fi
+  echo "$PROJECT_NODE_ID"
+}
+
+issue_is_open() {
+  # $1 = issue number. Returns 0 when OPEN, 1 when CLOSED.
+  # Unknown/erroring lookups return 0 (open) so a transient gh failure never
+  # silently reconciles a live card into Done.
+  local state
+  state=$(gh issue view "$1" --json state -q '.state' 2>/dev/null) || return 0
+  [ "$state" != "CLOSED" ]
+}
+
+TOP_ISSUE=""
+TOP_ITEM_ID=""
 top_card_in_column() {
-  # Returns the FIRST issue number in $1 with no assignee AND no local in-flight lock.
-  local col="$1" issue
-  for issue in $(echo "$PROJECT_ITEMS_JSON" | jq -r --arg col "$col" '
-        .items[]
-        | select(.status == $col and .content.type == "Issue")
-        | select((.content.assignees // []) | length == 0)
-        | .content.number'); do
-    if ! issue_locked "$issue"; then
-      echo "$issue"
-      return 0
+  # Sets TOP_ISSUE / TOP_ITEM_ID to the FIRST dispatchable card in column $1:
+  # no assignee, no local in-flight lock, and the underlying issue still OPEN.
+  # A CLOSED issue found in a non-terminal column is reconciled to Done and skipped —
+  # dispatching a worker at it is the single largest observed waste category (issue #10).
+  #
+  # The result is returned via TOP_ISSUE, NOT stdout: this function logs as it
+  # reconciles, and log lines on stdout would be captured by a `$(...)` caller and
+  # read back as a card number.
+  local col="$1" issue item_id
+  TOP_ISSUE=""; TOP_ITEM_ID=""
+  while IFS=$'\t' read -r issue item_id; do
+    [ -n "$issue" ] || continue
+    issue_locked "$issue" && continue
+    if ! issue_is_open "$issue"; then
+      log "reconciled closed #${issue} -> Done (was '${col}') — dispatching 0 workers for it"
+      set_card_status "$item_id" "Done" || log "  ↳ reconcile of #${issue} could not be written to the board"
+      [ -n "$BOT_LOGIN" ] && gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+      rm -f "$INFLIGHT_DIR/$issue"
+      continue
     fi
-  done
+    TOP_ISSUE="$issue"; TOP_ITEM_ID="$item_id"
+    return 0
+  done <<EOF
+$(echo "$PROJECT_ITEMS_JSON" | jq -r --arg col "$col" '
+    .items[]
+    | select(.status == $col and .content.type == "Issue")
+    | select((.content.assignees // []) | length == 0)
+    | [(.content.number | tostring), (.id // "")] | @tsv')
+EOF
+  return 1
 }
 
 read_lock() {
@@ -161,6 +276,12 @@ dispatch_lane() {
     log "skip dispatch lane=${lane} issue=#${issue} — already locked"
     return 0
   fi
+  # Authoritative closed-issue gate (issue #10). top_card_in_column also filters and
+  # reconciles, but every dispatch path funnels through here — one guard, one place.
+  if ! issue_is_open "$issue"; then
+    log "skip dispatch lane=${lane} issue=#${issue} — issue is CLOSED"
+    return 0
+  fi
   if ! try_claim_assignee "$issue"; then
     return 0
   fi
@@ -170,8 +291,19 @@ dispatch_lane() {
     review) prompt="Run super-review on issue #${issue} for super-board run. Read .claude/skills/super-board/references/run.md → Reviewer lifecycle. Config: ${CONFIG_PATH}." ;;
     *) log "unknown lane: $lane"; return 1 ;;
   esac
-  nohup claude -p "$prompt" >/dev/null 2>&1 &
+  # Worker output goes to a per-worker log, not /dev/null (issue #13). Redirect at the
+  # `claude` invocation itself — no wrapping subshell, no `exec` — so the wire to the
+  # file survives and `$!` names the worker process rather than a bash stub.
+  local worker_log="${WORKER_LOG_DIR}/worker-${lane}-${issue}.log"
+  {
+    printf '=== dispatch lane=%s issue=#%s at %s ===\n' "$lane" "$issue" "$(date -u +%FT%TZ)"
+    printf 'prompt: %s\n\n' "$prompt"
+  } >> "$worker_log"
+  nohup claude -p "$prompt" >> "$worker_log" 2>&1 &
   pid=$!
+  DISPATCH_COUNT=$((DISPATCH_COUNT + 1))
+  DISPATCH_LOG="${DISPATCH_LOG}${issue}
+"
   # v1.3.0+ lock format: bash-assignment style so `super-board stop` can source it
   # to recover lane + dispatch time. issue_locked()/reap_finished_locks() still work
   # because PID= is the first line.
@@ -232,6 +364,50 @@ sweep_lane_zombies() {
   check_lane_zombie review "Review"
 }
 
+done_signature() {
+  # The set of cards that have LANDED, as a stable string. This — not lane
+  # occupancy — is the run's definition of forward progress (issue #8).
+  # Skipped counts as terminal: a card deliberately dropped is a decision, not a stall.
+  echo "$PROJECT_ITEMS_JSON" | jq -r '
+    [.items[] | select(.status == "Done" or .status == "Skipped") | .content.number // empty]
+    | sort | @csv' 2>/dev/null || echo ""
+}
+
+record_cycle_progress() {
+  # One dispatch cycle's verdict on forward progress (issue #8).
+  # Reads/writes PREV_DONE_SIG + NO_PROGRESS_CYCLE_COUNT + LANDED_COUNT.
+  # Returns 0 = keep running, 1 = halt (runaway).
+  # $1 = the current done signature (injected so tests need no board).
+  local cur="$1"
+  if [ "$cur" != "$PREV_DONE_SIG" ]; then
+    LANDED_COUNT=$((LANDED_COUNT + 1))
+    NO_PROGRESS_CYCLE_COUNT=0
+    PREV_DONE_SIG="$cur"
+    return 0
+  fi
+  NO_PROGRESS_CYCLE_COUNT=$((NO_PROGRESS_CYCLE_COUNT + 1))
+  [ "$NO_PROGRESS_CYCLE_COUNT" -lt "$NO_PROGRESS_CYCLES" ]
+}
+
+dispatch_ceiling_hit() {
+  # Returns 0 when the hard spend ceiling is reached. MAX_DISPATCHES=0 disables it.
+  [ "$MAX_DISPATCHES" -gt 0 ] && [ "$DISPATCH_COUNT" -ge "$MAX_DISPATCHES" ]
+}
+
+runaway_summary() {
+  # Loud, actionable halt line: what the run spent, and on what.
+  log "   dispatches=${DISPATCH_COUNT} reaps=${REAP_COUNT} cards-landed-this-run=${LANDED_COUNT}"
+  local top
+  top=$(printf '%s' "$DISPATCH_LOG" | grep -c . 2>/dev/null || echo 0)
+  if [ "${top:-0}" -gt 0 ]; then
+    log "   most re-dispatched issues (count issue):"
+    printf '%s' "$DISPATCH_LOG" | grep . | sort | uniq -c | sort -rn | head -5 | while read -r line; do
+      log "     $line"
+    done
+  fi
+  log "   → inspect worker logs in ${WORKER_LOG_DIR}/"
+}
+
 reap_finished_locks() {
   # Sweep inflight/ for dead PIDs; remove locks AND sweep stale assignees so the
   # next dispatch can re-claim the card if the worker crashed without releasing.
@@ -247,6 +423,7 @@ reap_finished_locks() {
     read_lock "$issue"
     if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
       rm -f "$lock"
+      REAP_COUNT=$((REAP_COUNT + 1))
       if [ -n "$BOT_LOGIN" ]; then
         gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
         log "reaped stale lock + swept assignee on #${issue} (pid=${PID:-empty})"
@@ -257,8 +434,20 @@ reap_finished_locks() {
   done
 }
 
+# ───────────────────────── run counters (shared state) ─────────────────────────
+DISPATCH_COUNT=0
+REAP_COUNT=0
+LANDED_COUNT=0
+DISPATCH_LOG=""
+
+# Sourced by the gate tests (`SB_LIB_ONLY=1 . scripts/super-board-run.sh`) to exercise
+# the helpers above without starting a run. Executing the script normally is unaffected.
+if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 # ───────────────────────────── preconditions ─────────────────────────────
-log "super-board run started — config=${CONFIG_SLUG} variant=${VARIANT} base=${BASE_BRANCH} tick=${TICK_SECONDS}s max_workers=${MAX_WORKERS}"
+log "super-board run started — config=${CONFIG_SLUG} variant=${VARIANT} base=${BASE_BRANCH} tick=${TICK_SECONDS}s max_workers=${MAX_WORKERS} no_progress_cycles=${NO_PROGRESS_CYCLES} max_dispatches=${MAX_DISPATCHES}"
 
 # Orphan-worker guard. `|| true` defends against pipefail when pgrep finds nothing.
 ORPHANS=$(pgrep -f 'claude -p .*super-board run' 2>/dev/null | grep -v "^$$\$" | wc -l | tr -d ' ' || true)
@@ -308,7 +497,10 @@ fetch_project_items
 INITIAL_READY=$(column_count "Ready")
 log "initial Ready count: $INITIAL_READY"
 
-NO_PROGRESS_TICKS=0
+# Landed-work baseline (issue #8). Progress is a change in this set, not lane state.
+PREV_DONE_SIG=$(done_signature)
+INITIAL_DONE_SIG="$PREV_DONE_SIG"
+NO_PROGRESS_CYCLE_COUNT=0
 BUILD_PID=""; BUILD_ISSUE=""
 QA_PID=""; QA_ISSUE=""
 REVIEW_PID=""; REVIEW_ISSUE=""
@@ -388,58 +580,53 @@ while true; do
     fi
   fi
 
-  PROGRESS=0
-
   # ACTIVE_WORKERS already computed at top of loop (free pre-check).
   can_dispatch() {
     [ "$ACTIVE_WORKERS" -lt "$MAX_WORKERS" ]
   }
 
   if can_dispatch && [ "$REVIEW" -gt 0 ] && [ "$REVIEW_IDLE" -eq 1 ]; then
-    card=$(top_card_in_column "Review")
-    if [ -n "${card:-}" ]; then
-      dispatch_lane review "$card"
-      PROGRESS=1
+    if top_card_in_column "Review"; then
+      dispatch_lane review "$TOP_ISSUE"
       ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
     fi
   fi
   if can_dispatch && [ "$QA" -gt 0 ] && [ "$QA_IDLE" -eq 1 ]; then
-    card=$(top_card_in_column "QA")
-    if [ -n "${card:-}" ]; then
-      dispatch_lane qa "$card"
-      PROGRESS=1
+    if top_card_in_column "QA"; then
+      dispatch_lane qa "$TOP_ISSUE"
       ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
     fi
   fi
   if can_dispatch && [ "$VARIANT" = "full" ] && [ "$READY" -gt 0 ] && [ "$BUILD_IDLE" -eq 1 ]; then
-    card=$(top_card_in_column "Ready")
-    if [ -n "${card:-}" ]; then
-      dispatch_lane build "$card"
-      PROGRESS=1
+    if top_card_in_column "Ready"; then
+      dispatch_lane build "$TOP_ISSUE"
       ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
     fi
   fi
   if can_dispatch && [ "$VARIANT" = "qa-only" ] && [ "$READY" -gt 0 ] && [ "$QA_IDLE" -eq 1 ]; then
-    card=$(top_card_in_column "Ready")
-    if [ -n "${card:-}" ]; then
-      dispatch_lane qa "$card"
-      PROGRESS=1
+    if top_card_in_column "Ready"; then
+      dispatch_lane qa "$TOP_ISSUE"
       ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
     fi
   fi
 
-  if [ "$PROGRESS" -eq 0 ]; then
-    if [ "$BUILD_IDLE" -eq 0 ] || [ "$QA_IDLE" -eq 0 ] || [ "$REVIEW_IDLE" -eq 0 ]; then
-      NO_PROGRESS_TICKS=0
-    else
-      NO_PROGRESS_TICKS=$((NO_PROGRESS_TICKS + 1))
-      if [ "$NO_PROGRESS_TICKS" -ge 3 ]; then
-        log "🛑 halt — no card progressed for 3 ticks while all lanes idle"
-        break
-      fi
-    fi
-  else
-    NO_PROGRESS_TICKS=0
+  # ── Landed-work halt gate (issue #8).
+  #    Progress = the Done/Skipped set changed since the last dispatch cycle. Lane
+  #    occupancy is deliberately NOT part of this condition: the runaway this gate
+  #    exists to catch is a pipeline that is 100% busy and lands nothing, and the old
+  #    `AND no lane active` clause made that case unhaltable (293 ticks, 0 merges).
+  if ! record_cycle_progress "$(done_signature)"; then
+    log "🛑 halt — RUNAWAY: no card reached Done in ${NO_PROGRESS_CYCLES} dispatch cycles"
+    runaway_summary
+    break
+  fi
+
+  # ── Hard dispatch ceiling. Bounds worst-case spend even if the board keeps
+  #    trickling just enough Done movement to reset the gate above.
+  if dispatch_ceiling_hit; then
+    log "🛑 halt — dispatch ceiling reached (${DISPATCH_COUNT}/${MAX_DISPATCHES})"
+    runaway_summary
+    break
   fi
 
   sleep "$TICK_SECONDS"

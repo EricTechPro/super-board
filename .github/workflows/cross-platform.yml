@@ -78,6 +78,12 @@ jobs:
       - name: wave-plan — fixture tests
         run: bash tests/test-wave-plan.sh
 
+      # Dispatcher gates: closed-issue guard (#10), landed-work halt gate (#8),
+      # dispatch ceiling, by-name status-option resolution. `gh` is stubbed on
+      # PATH — no auth, no network, no board.
+      - name: run-gates — fixture tests
+        run: bash tests/test-run-gates.sh
+
       # Syntax-check the dynamic workflow script the same way the
       # orchestrator's precondition 4 does (run-workflow.md).
       - name: wave workflow — node --check

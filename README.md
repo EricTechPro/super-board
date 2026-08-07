@@ -153,4 +153,9 @@ MIT. See [LICENSE](./LICENSE).
 
 ## Credits
 
-Designed and maintained by Eric Tech. Skill structure inspired by [obra/superpowers](https://github.com/obra/superpowers).
+Designed and maintained by Eric Tech. Skill structure originally inspired by [obra/superpowers](https://github.com/obra/superpowers).
+
+Workers run on the [mattpocock/skills](https://github.com/mattpocock/skills) process stack —
+`tdd`, `diagnosing-bugs`, `code-review`, `grilling`, `to-spec`, `ask-matt`. The full
+mapping (including the three skills that stayed because Matt's pack has no equivalent)
+is in [`skills/super-build/references/decision-policy.md`](./skills/super-build/references/decision-policy.md).

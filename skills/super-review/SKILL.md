@@ -170,11 +170,35 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of 8 su
    - Green → continue. Red → open new `[QA]`-prefixed thread quoting failure, move card Review → QA with `loop:rebuild-N`, exit.
 6. **Adversarial mode** (per `config.truth_gate` — `off` / `non-trivial` / `always`, default `non-trivial`): see section below.
 7. Decide per finding:
-   - **No findings + threads clean + truth ≥ threshold + tests green** → squash-merge PR (or mark ready if `human_approves_merge`), delete branch, close issue, move card Review → Done.
+   - **No findings + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
    - **Test-side new finding** → new `[QA]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).
    - **Blocker (schema, contract, money, auth, migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked.
 8. Clean up worktree.
+
+### Merge protocol — Done means merged
+
+Builder opens PRs as **drafts**, and GitHub never auto-merges a draft. Skipping the
+`gh pr ready` step is why a six-hour run landed zero commits on `main` while producing
+two complete builds. In order, no shortcuts:
+
+1. `gh pr ready <PR>` — idempotent, safe on an already-ready PR.
+2. `human_approves_merge: true` → stop; leave the card in **Review** with a `[review]`
+   comment that the PR is ready for a human. Do not move it to Done.
+   `human_approves_merge: false` → `gh pr merge <PR> --squash --delete-branch`.
+3. **Confirm the merge landed** — never trust the merge command's exit code:
+   `gh pr view <PR> --json state,mergeCommit` must report `MERGED` plus a commit sha,
+   and that sha must be an ancestor of the base branch
+   (`git merge-base --is-ancestor <sha> origin/<base>`).
+4. Only then: close the issue, move card Review → **Done**, post the ✅ comment citing
+   the merge commit sha.
+5. Merge refused (failing checks, conflicts, branch protection) → card Review →
+   **Blocked** with the §4 Block template naming the blocker. Never leave it in Review;
+   a card left in Review gets re-picked and re-reviewed indefinitely.
+
+**Invariant:** a card in `Done` has its code on the base branch. The run loop's
+landed-work halt gate reads `Done` as its definition of progress, so a card marked Done
+without a confirmed merge makes a runaway look like a healthy run.
 
 ### Prefix discipline
 - Every new review comment Reviewer writes MUST be prefixed `[builder]`, `[QA]`, or `[review]`.

@@ -11,6 +11,10 @@ super-board-v*.zip
 .vscode/
 *.code-workspace
 
+# python bytecode (tests/test_status_parse.py runs in place)
+__pycache__/
+*.pyc
+
 # super-board runtime state (if anyone runs the loop *inside* this repo)
 .claude/super-board/active
 .claude/super-board/inflight/

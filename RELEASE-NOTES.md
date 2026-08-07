@@ -1,5 +1,86 @@
 # Release notes
 
+## v2.0.0 — 2026-08-06
+
+Two breaking changes ship together: the worker skill vocabulary moves to the
+Matt Pocock stack, and "forward progress" is redefined in terms of landed work.
+
+### BREAKING — workers run on mattpocock/skills
+
+`superpowers:*`, the `gstack` CLI and `gsd-*` are no longer dependencies.
+Boards that pin skills in an issue's `Skills:` line must update the names:
+
+| Was | Now |
+| --- | --- |
+| `superpowers:using-superpowers` | `mattpocock-skills:ask-matt` |
+| `superpowers:test-driven-development` | `mattpocock-skills:tdd` |
+| `superpowers:systematic-debugging` | `mattpocock-skills:diagnosing-bugs` |
+| `superpowers:writing-plans` | `mattpocock-skills:to-spec` |
+| `superpowers:brainstorming` | `mattpocock-skills:grilling` |
+| `gsd-discuss-phase` | `mattpocock-skills:grilling` |
+| `gstack:shape` | `shape` *(kept — no equivalent)* |
+| `gstack:clarify` | `clarify` *(kept — no equivalent)* |
+| `superpowers:verification-before-completion` | `verification-before-completion` *(kept — no equivalent)* |
+
+The advisor panel no longer shells out to `gstack vote`. It grills the decision
+with `mattpocock-skills:grilling`, polls eng via `mattpocock-skills:code-review`,
+role-plays the remaining seats inline, and records the result under a
+`--- decision-vote ---` commit trailer (was `--- gstack-vote ---`).
+`references/gstack-voting.md` is replaced by `references/decision-policy.md`,
+which carries the full skill map.
+
+### BREAKING — halt gate measures landed work, not lane occupancy (#8)
+
+The old gate required "no card progressed for 3 ticks" **AND** "no lane active".
+Lanes are almost always occupied, so the second clause made the gate
+unreachable: one run went 293 ticks over ~6h with zero commits to `main` and
+never self-halted. Progress is now a change in the set of cards in
+`Done`/`Skipped`, checked every dispatch cycle regardless of lane state.
+
+- New config `no_progress_cycles` (default `6`) — halt after this many cycles
+  with nothing landed.
+- New config `max_dispatches` (default `0` = unlimited) — hard spend ceiling.
+- Both halts print a runaway summary: dispatch count, reap count, cards landed,
+  the most re-dispatched issues, and where to find the worker logs.
+
+### Fix: closed issues are no longer re-dispatched (#10)
+
+The loop selected cards by Status column and never checked issue state, so
+workers were dispatched at already-CLOSED issues — roughly half of one run's 30
+dispatches. Now every dispatch path checks issue state first, and a closed issue
+sitting in a non-terminal column is reconciled to `Done` instead of being handed
+another worker. Status option IDs for that reconcile are resolved **by name at
+runtime** and fail loud on an unknown name, so a column edit can't silently
+stale them out.
+
+### Fix: Reviewer merge protocol — Done now means merged (#9)
+
+Builder opens draft PRs and GitHub never auto-merges a draft, so reviewed work
+sat on branches: 0 commits to `main` across a 6h window while two complete
+builds waited. The Reviewer lifecycle now mandates `gh pr ready` → merge →
+**verify the merge commit is an ancestor of the base branch** → only then close
+the issue and move the card to Done. A merge-blocked PR routes to `Blocked`
+rather than back to `Review`, where it would be re-reviewed indefinitely.
+`run-workflow.md` documents the `human_approves_merge` × allowlist matrix that
+silently produced the zero-merge night.
+
+### Fix: worker output is captured again (#13)
+
+Workers were spawned with `>/dev/null`, so a 13-minute worker left no trace in
+the run log. Output now lands in
+`docs/super-board/runs/<date>-<slug>-workers/worker-<lane>-<issue>.log`.
+The MSYS-vs-Windows PID namespace trap is documented in the script header —
+`kill -0` in Git Bash and PowerShell's `Get-Process` disagree about the same
+process, which is what made a live worker look dead during that incident.
+
+### Tests
+
+`tests/test-run-gates.sh` — 28 assertions, deterministic, stubbed `gh`, no
+network. Covers the landed-work signal, the halt gate's independence from lane
+state, the dispatch ceiling, the closed-issue guard at both the selection and
+dispatch choke points, and by-name status-option resolution. `super-board-run.sh`
+is now sourceable via `SB_LIB_ONLY=1` for gate testing.
+
 ## v1.7.1 — 2026-06-11
 
 ### Fix: tolerate JSON-string `args` at wave launch
