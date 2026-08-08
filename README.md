@@ -128,14 +128,28 @@ When each pattern fires:
 
 ## Safety controls
 
-Worker storms are the failure mode that bit early users. Super Board prevents them with defense in depth:
+**Worker storms** are the failure mode that bit early users — 30 `Ready` cards
+starting 30 Builders. Six gates stand between you and that:
 
-1. **Orphan scan** on startup — refuses to run if any `super-board` workers are already alive from a prior crashed run.
-2. **In-flight lockfiles** at `.claude/super-board/inflight/<issue-N>` — survive runner restart and gate `top_card_in_column` even when GitHub state hasn't propagated.
-3. **Atomic assignee claim BEFORE worker spawn** — closes the 10–30s `claude -p` cold-start race.
-4. **One worker per lane** — at most one Builder, one Tester, one Reviewer at a time. A 30-card `Ready` backlog does NOT start 30 Builders.
-5. **GraphQL rate-limit guard** — sleeps until reset when remaining quota dips under 200.
-6. **120-second tick** — keeps ProjectsV2 query cost (~103 GraphQL pts/tick) at ~3.1k/hr, well under the 5k budget. Bump in your config if you have more headroom.
+```
+  spawn a worker?
+       │
+       ├─ 1  orphan scan ........... workers alive from a crashed run?  → refuse
+       ├─ 2  in-flight lockfile .... .claude/super-board/inflight/<N>   → skip
+       │       survives restart; gates the column even before GitHub catches up
+       ├─ 3  assignee claim ........ atomic, BEFORE spawn               → skip
+       │       closes the 10-30s claude -p cold-start race
+       ├─ 4  lane occupied? ........ 1 Builder · 1 Tester · 1 Reviewer  → wait
+       ├─ 5  GraphQL quota <200 .... sleep until reset                  → wait
+       └─ 6  tick not elapsed? ..... 120s floor                         → wait
+       │
+       ▼  all six clear
+     spawn
+```
+
+The 120-second tick holds ProjectsV2 query cost (~103 GraphQL pts/tick) to
+~3.1k/hr against a 5k budget. Raise `tick_seconds` in your config if you have
+headroom.
 
 ## Configuration
 
@@ -155,9 +169,22 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 }
 ```
 
-Variants:
-- `full` — Build + QA + Review (3 lanes, max 3 workers)
-- `qa-only` — QA + Review only (2 lanes, max 2 workers). Useful for hardening already-built code.
+```
+  variant               full | qa-only
+  worker_backend        workflow | claude-p
+  human_approves_merge  true = never auto-merge, always hand to you
+  rebuild_cap           bounces allowed before a card goes Blocked
+  tick_seconds          GraphQL budget floor — raise if you have headroom
+  max_workers           one per lane; 3 for full, 2 for qa-only
+```
+
+```
+  variant       lanes                                    max workers
+  ─────────     ─────────────────────────────────────    ───────────
+  full          Ready → Building → QA → Review → Done         3
+  qa-only              Ready → QA → Review → Done              2
+                       └ hardening code that already exists
+```
 
 ## How workers decide what test to write
 

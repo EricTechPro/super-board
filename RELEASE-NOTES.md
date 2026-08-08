@@ -14,9 +14,15 @@ a diagram reads faster in a terminal.
   three layers, then the localisation ladder as a box with "found here" at the
   top and "write it HERE" at the bottom.
 - **Backends collapsed into a comparison table** (`workflow` vs `claude-p`).
+- **Safety controls became a spawn-gate decision tree** — the six guards drawn
+  as the checks a worker passes before it starts, rather than a numbered list.
+- **Config keys annotated beside the JSON, not inside it.** The JSON block stays
+  valid so it survives copy-paste; annotations sit in a plain block underneath.
+- **Variants drawn as their lane strips**, so `full` vs `qa-only` is visible
+  instead of described.
 - Skill structure and the pattern/conductor note became code blocks.
 
-Prose blocks over 200 characters: 8 → 2. Code fences: 8 → 16.
+Prose blocks over 200 characters: 8 → 2. Code fences: 8 → 24.
 
 ## v2.1.0 — 2026-08-07
 
