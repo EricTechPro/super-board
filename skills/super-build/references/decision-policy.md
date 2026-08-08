@@ -26,11 +26,35 @@ column is the skill to invoke.
 | Pin domain terminology or record an ADR | `mattpocock-skills:domain-modeling` |
 | Resolve an in-progress merge/rebase conflict | `mattpocock-skills:resolving-merge-conflicts` |
 | Prove a claim before calling work done | `verification-before-completion` |
+| Decide *which kind* of test a change needs | `testing-strategy` |
+| Write a unit or integration test (TS/JS) | `vitest` |
+| Write a browser e2e spec | `playwright-best-practices` |
 | Feature ticket with undefined UX | `shape` |
 | Copy / microcopy / error-message wording | `clarify` |
 
-The last three have no equivalent in the Matt Pocock pack and are kept as-is.
+The last six have no equivalent in the Matt Pocock pack and are kept as-is.
 Everything else routes through `mattpocock-skills:*`.
+
+**Testing is three layers, not one skill.** They answer different questions:
+
+- **Discipline** — `mattpocock-skills:tdd`. Seams, red-green order, assertion
+  anti-patterns. Deliberately agnostic about the *kind* of test, which is why
+  it is not enough alone.
+- **Placement** — the localisation ladder. Walk down and stop at the first rung
+  that still reproduces: (1) call the module directly → unit; (2) wire real
+  collaborators → integration; (3) drive a browser → e2e; (4) needs a live
+  third party → not a test, file a mock/contract gap. Write it at the rung you
+  stopped on, not the rung you found it on.
+- **Mechanics** — the repo decides the library, so read `package.json`. TS/JS
+  unit and integration → `vitest`. Browser e2e → `playwright-best-practices`.
+
+`testing-strategy` informs *coverage* (what a component type is worth testing,
+what to skip) — it does not decide placement.
+
+Two gates before a test counts as done: it must go **red for the right reason**
+against the unfixed code (a timeout or missing selector means you pinned the
+harness, not the bug), and it must **survive a refactor** that leaves behaviour
+unchanged.
 
 ## When to convene the panel
 

@@ -2,10 +2,12 @@
 name: super-qa
 description: >-
   Super QA canonical workflow for functional bug-bash, evidence capture, and fix-ready issue filing.
-  Builds and runs Playwright path specs from `docs/super-qa/queue.md`, records screenshots/logs/HARs,
-  files product-readable issues with clear type/priority/area labels, and continues until traversal is
-  complete or only human-gated blockers remain. Use when the user says "run super-qa", "QA review",
-  "bug bash", "verify and fix", or invokes `/super-qa`.
+  Crawls routes from `docs/super-qa/queue.md` with Playwright, records screenshots/logs/HARs, files
+  product-readable issues with clear type/priority/area labels, and continues until traversal is
+  complete or only human-gated blockers remain. Crawling is always browser-driven, but the regression
+  test it leaves behind is written at whichever layer the defect actually lives — unit or integration
+  in Vitest, e2e in Playwright only when the browser is the thing that broke. Use when the user says
+  "run super-qa", "QA review", "bug bash", "verify and fix", or invokes `/super-qa`.
 ---
 
 # super-qa — BFS Route-Crawler that Builds the Spec Suite
@@ -482,9 +484,16 @@ These run in Phase 1 regression alongside `e2e/paths/`.
 The worker (per `references/iteration-preamble.md`) must load and follow:
 
 - `mattpocock-skills:ask-matt` (router — when the right flow is unclear)
-- `mattpocock-skills:tdd`
+- `mattpocock-skills:tdd` (the discipline layer — seams, red-green, assertion
+  anti-patterns; does not change with the kind of test)
 - `mattpocock-skills:diagnosing-bugs`
 - `verification-before-completion` (no Matt Pocock equivalent — kept as-is)
+- `testing-strategy` — coverage judgment per component type, and what to skip.
+  Consult it for *what is worth testing*; it does not pick the layer. The
+  localisation ladder in `references/iteration-preamble.md` picks the layer.
+- `vitest` — mechanics for unit and integration tests in a TS/JS repo. 19
+  references (`core-expect`, `features-mocking`, `features-coverage`,
+  `core-hooks`, `advanced-vi`).
 - `playwright-best-practices` — when writing or refactoring a spec. Reference
   its `locators.md` (data-testid first, `getByRole` fallback),
   `fixtures-hooks.md` (custom fixtures for auth, pre-test seeding, teardown),

@@ -25,9 +25,14 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
    - `Skills: mattpocock-skills:to-spec, mattpocock-skills:diagnosing-bugs`
    If no `Skills:` line is present, default to:
    - `mattpocock-skills:tdd` (for any feature/bugfix that touches code)
+   - `vitest` or `playwright-best-practices` — pick by walking the localisation
+     ladder in `references/decision-policy.md`, not by habit
+   - `testing-strategy` (when the issue leaves coverage scope open)
    - `verification-before-completion` (always, before final commit)
    Invoke each via the Skill tool BEFORE writing any code.
    Skill vocabulary is pinned in `references/decision-policy.md` → "Skill map".
+   `tdd` tells you how to write a test worth having; the ladder tells you which
+   layer to write it at. Reaching straight for an e2e spec skips the ladder.
 
 5. **Honor the per-issue 14-gate contract** (TDD, atomic commits, lint/typecheck/test green, etc.). Plan-only issues skip gates 3-7 (execution + tests). Review-only issues skip gates 1-7. Do not expand product scope beyond the issue body; when scope is missing or unsafe, use WIP-PARTIAL or HUMAN GATE instead of guessing.
 
