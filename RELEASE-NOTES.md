@@ -1,5 +1,29 @@
 # Release notes
 
+## v2.1.1 — 2026-08-07
+
+Docs only, no behaviour change. The README explained itself in paragraphs where
+a diagram reads faster in a terminal.
+
+- **New "At a glance" table** up top — what it does, what you get, how you
+  start, what holds state. Previously you read five paragraphs first.
+- **"How it works" leads with the lane pipeline** as an ASCII diagram
+  (`Backlog → Ready → Building → QA → Review → Done`, with the bounce-back edge
+  and the orchestrator underneath), then the skill table.
+- **The testing section is two diagrams instead of two screens of prose** — the
+  three layers, then the localisation ladder as a box with "found here" at the
+  top and "write it HERE" at the bottom.
+- **Backends collapsed into a comparison table** (`workflow` vs `claude-p`).
+- **Safety controls became a spawn-gate decision tree** — the six guards drawn
+  as the checks a worker passes before it starts, rather than a numbered list.
+- **Config keys annotated beside the JSON, not inside it.** The JSON block stays
+  valid so it survives copy-paste; annotations sit in a plain block underneath.
+- **Variants drawn as their lane strips**, so `full` vs `qa-only` is visible
+  instead of described.
+- Skill structure and the pattern/conductor note became code blocks.
+
+Prose blocks over 200 characters: 8 → 2. Code fences: 8 → 24.
+
 ## v2.1.0 — 2026-08-07
 
 Workers now decide *which layer* a test belongs at, instead of defaulting to the
