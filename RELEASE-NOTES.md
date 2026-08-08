@@ -1,5 +1,63 @@
 # Release notes
 
+## v2.1.0 — 2026-08-07
+
+Workers now decide *which layer* a test belongs at, instead of defaulting to the
+layer the bug was observed at.
+
+### Testing is three layers, not one skill
+
+`mattpocock-skills:tdd` says how to write a test worth having. It is
+deliberately agnostic about the *kind* of test — which meant Testers, who find
+every bug through a browser by construction, left every regression as a
+Playwright spec.
+
+Three layers now, answering different questions:
+
+| Layer | Question | Skill |
+| --- | --- | --- |
+| Discipline | How do I write a test worth having? | `mattpocock-skills:tdd` |
+| Placement | Which layer does this defect live at? | the localisation ladder |
+| Mechanics | How do I express it in this repo? | `vitest` / `playwright-best-practices` |
+
+### The localisation ladder
+
+Walk down, stop at the first rung that still reproduces the failure:
+
+1. Call the module directly with the same inputs → **unit** (Vitest)
+2. Wire the real collaborators together → **integration** (Vitest)
+3. Drive a real browser → **e2e** (Playwright)
+4. Only fails against a live third party → not a test; file a mock/contract gap
+
+Write the test at the rung you **stopped on**, not the rung you **found it on**.
+Where a bug was observed says nothing about where it lives. The reason is
+locality of failure: an e2e pinning a pure-logic defect is slower, flakier, and
+goes red pointing at a page instead of a function, so the next person debugs the
+wrong file.
+
+### Two gates before a test counts as done
+
+- **Red for the right reason.** Run against the *unfixed* code and read the
+  message — it must name the defect. Red from a timeout or a missing selector
+  pins the harness, not the bug.
+- **Refactor-survivable.** Rewrite the implementation with behaviour unchanged;
+  it must still pass.
+
+### New optional skills
+
+`vitest` (`antfu/skills@vitest`) and `testing-strategy`
+(`anthropics/knowledge-work-plugins@testing-strategy`). `testing-strategy`
+informs *coverage* — what a component type is worth testing and what to skip —
+not placement. Contract testing stays out of the default set: Pact solves
+consumer/provider drift across independently deployed services, which a
+single-app repo does not have.
+
+### Fixed
+
+- `super-qa`'s frontmatter advertised "builds and runs Playwright path specs",
+  framing every regression as e2e regardless of what the references said.
+  Crawling is still browser-driven; the regression test it leaves behind is not.
+
 ## v2.0.0 — 2026-08-06
 
 Two breaking changes ship together: the worker skill vocabulary moves to the

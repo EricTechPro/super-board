@@ -129,6 +129,59 @@ Variants:
 - `full` — Build + QA + Review (3 lanes, max 3 workers)
 - `qa-only` — QA + Review only (2 lanes, max 2 workers). Useful for hardening already-built code.
 
+## How workers decide what test to write
+
+Every worker that writes a test — Builder fixing an issue, Tester pinning a
+bug-bash finding — runs the same three layers. They answer different questions
+and none of them substitutes for another.
+
+```
+  discipline   mattpocock-skills:tdd      how do I write a test that is worth having?
+       ↓                                   seams · red-green · assertion anti-patterns
+  placement    the localisation ladder    which layer does this defect actually live at?
+       ↓                                   unit → integration → e2e → contract gap
+  mechanics    vitest | playwright-       how do I express it in this repo's tooling?
+               best-practices
+```
+
+**The middle layer is the one people skip, and it is the one that matters.**
+
+A Tester finds every bug through a browser — that is what a route crawler does.
+It is tempting to leave the regression as a Playwright spec because that is
+where it was observed. That is the wrong instinct: *where you observed a bug
+says nothing about where it lives.* Workers walk down a ladder and stop at the
+first rung that still reproduces the failure:
+
+| Rung | Reproduces when you… | Test |
+| --- | --- | --- |
+| 1 | call the function/module directly with the same inputs | unit — Vitest |
+| 2 | wire the real collaborators together (handler + db, service + repo) | integration — Vitest |
+| 3 | drive a real browser (hydration, focus, navigation, CSS, client race) | e2e — Playwright |
+| 4 | hit a live third party | not a test — file a mock/contract gap |
+
+The test is written at the rung it **stopped on**, not the rung it was **found
+on**. The reason is locality of failure: a test should go red in the same place
+the bug lives. An e2e pinning a pure-logic defect is slower, flakier, and when
+it breaks it points at a page instead of at the function, so the next person
+debugs the wrong file.
+
+Two gates before a test counts as done:
+
+- **Red for the right reason.** Run it against the *unfixed* code and read the
+  message. It must name the defect. Red from a timeout or a missing selector
+  means you pinned your harness, not the bug.
+- **Refactor-survivable.** Rewrite the implementation with behaviour unchanged
+  — does it still pass? If not, it is coupled to internals.
+
+`testing-strategy` sits alongside as the reference for *what is worth covering*
+per component type and what to skip (trivial getters, framework code, one-off
+scripts). It informs coverage, not placement.
+
+Contract testing is deliberately not in the default set. Pact-style contracts
+solve consumer/provider drift across independently deployed services; adding
+them to a single-app repo is ceremony with nothing to verify. Turn them on when
+a service is genuinely split out.
+
 ## Requirements
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (the host that loads the skills)

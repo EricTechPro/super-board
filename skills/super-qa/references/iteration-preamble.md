@@ -56,6 +56,60 @@ worker memory creep:
   The `[data-testid]` rule below is reinforced there; fixture-based setup
   and POM are the path to keep specs reusable as the suite grows.
 
+### Where does this test go? — localise the defect, don't consult a pyramid
+
+**You found every bug through a browser. That says nothing about where the bug
+lives.** A route crawler observes at the top of the stack by construction, so
+"I saw it in the UI" is never evidence that it belongs in an e2e spec. Before
+writing anything, work down this ladder and stop at the **first rung that still
+reproduces the failure**:
+
+1. **Call the function or module directly with the same inputs.** Reproduces?
+   → unit test, Vitest. Most logic bugs stop here — bad date maths, a wrong
+   comparison, an unhandled null, a mis-parsed number.
+2. **Wire the real collaborators together** (route handler + db, service +
+   repository, reducer + store). Reproduces only now? → integration test,
+   Vitest. The defect is in the seam, not either side.
+3. **Drive a real browser.** Reproduces only here? → e2e, Playwright. Legitimate
+   when the browser *is* the thing that broke: hydration mismatch, focus
+   management, navigation, a CSS rule that hides the control, a client-only
+   race.
+4. **Only reproduces against a live third party.** Do **not** write an e2e that
+   depends on someone else's uptime. File it as a mock/contract gap and say so.
+
+**Write the test at the rung you stopped on — not the rung you found it on.**
+
+Why this and not "some unit, some e2e": a test should fail in the same place
+the bug lives. An e2e pinning a pure-logic defect is slower, flakier, and when
+it goes red it points at a page instead of at the function, so the next person
+debugs the wrong file. Locality of failure is the whole point.
+
+`testing-strategy` is the reference for what a given component type is *worth*
+covering (API endpoints, data paths, frontend, infra) and what to skip (trivial
+getters, framework code, one-off scripts). Consult it for coverage judgment —
+it does not decide the layer, the ladder above does.
+
+**Then two checks before the test counts as done:**
+
+- **Red for the right reason.** Run it against the *unfixed* code and read the
+  failure message. It must name the actual defect. A test that goes red on a
+  timeout, a missing selector, or a setup error is not pinning the bug — it is
+  pinning your test harness.
+- **Will it survive a refactor?** If the implementation were rewritten with
+  behaviour unchanged, would this still pass? If no, it is coupled to internals
+  — see `mattpocock-skills:tdd` on seams and the assertion anti-patterns
+  (tautological, implementation-coupled, horizontally sliced).
+
+**Then the mechanics.** The library follows from the rung, and the repo decides
+it — read `package.json`, don't assume. TS/JS unit and integration → `vitest`
+(19 references: `core-expect`, `features-mocking`, `features-coverage`,
+`core-hooks`, `advanced-vi`). Browser e2e → `playwright-best-practices`.
+
+**Keeping the e2e.** Once the regression is pinned at its own rung, keep a thin
+e2e only if the route itself is a critical user path. Do not keep both a unit
+test and an e2e for the same defect — that is one bug with two maintenance
+costs and two chances to flake.
+
 For ANY decision point — bug-vs-flake, severity, what subtree to expand —
 call `/plan-eng-review` once. Document the verdict in `iteration-N.md` as a
 one-liner. Escalate per the budget rule above.
