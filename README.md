@@ -2,7 +2,15 @@
 
 An autonomous GitHub Project board executor for Claude Code. Drag a card into the `Ready` column, walk away, come back to merged PRs.
 
-Super Board watches your GitHub Project, dispatches agents to Build / QA / Review the cards, and moves each card across the board as it goes. Default backend: dynamic workflows (in-session waves); a legacy headless `claude -p` dispatcher remains as explicit opt-in.
+## At a glance
+
+| | |
+|---|---|
+| **What it does** | Watches a GitHub Project, runs Build → QA → Review per card, merges when green |
+| **What you get** | Merged PRs with evidence — screenshots, test reruns, review findings on the PR |
+| **How you start** | `/super-board run <slug>` — drag cards into `Ready`, walk away |
+| **What holds state** | The board itself. Ctrl-C, restart, resume — cards pick up from their column |
+| **Backend** | Dynamic workflows (in-session waves) by default; headless `claude -p` on opt-in |
 
 ## Watch it run
 
@@ -24,22 +32,40 @@ Super Board watches your GitHub Project, dispatches agents to Build / QA / Revie
 
 That's it. Move cards into `Ready`, watch them flow through the board.
 
-**Backends (default flipped in 1.6.0):** `"worker_backend": "workflow"` is the default — waves are drained in-session via dynamic workflows (requires dynamic workflows enabled in `/config`); see `skills/super-board/references/run-workflow.md`. The legacy headless dispatcher (`"claude-p"`, `claude -p` workers spawned by `scripts/super-board-run.sh`) is explicit opt-in only — the dispatcher refuses to run (exit 78) unless the config sets it. Lane lifecycles are identical in both.
+**Backends** — lane lifecycles are identical in both:
 
-To stop everything cleanly: `/super-board stop`. It posts a "stopped mid-flight" comment on every in-flight issue + PR (lane, last commit, resume hint), releases the assignee mutex, kills the workers and dispatcher. To resume, just `/super-board run <slug>` again — the board is the state, so cards are picked up from whichever column they were in.
+| | `workflow` (default since 1.6.0) | `claude-p` (opt-in) |
+|---|---|---|
+| Runs as | in-session dynamic workflow waves | headless `claude -p` workers |
+| Needs | dynamic workflows on in `/config` | nothing extra |
+| Reference | `skills/super-board/references/run-workflow.md` | `scripts/super-board-run.sh` |
+
+The legacy dispatcher refuses to run (exit 78) unless the config explicitly sets it.
+
+**Stop and resume** — `/super-board stop` posts a "stopped mid-flight" comment on every in-flight issue and PR (lane, last commit, resume hint), releases the assignee mutex, kills workers and dispatcher. Resume with `/super-board run <slug>`: the board is the state, so cards pick up from whichever column they were in.
 
 ## How it works
 
-There are four skills in this repo:
+```
+  Backlog → Ready ─────→ Building ─────→ QA ──────────→ Review ────→ Done
+                             │             │                │          ▲
+                        super-build     super-qa      super-review     │
+                        worktree+PR     evidence      merge gate       │
+                             │             │                │     squash-merge
+                             └─────────────┴────────────────┘
+                                  bounce back on failure
 
-| Skill | Role |
-|---|---|
-| **super-board** | The orchestrator. Invoked by the human via `/super-board run`. Validates preconditions, plans waves, launches the `super-board-wave` workflow (or the legacy headless runner on opt-in). Holds NO product context. |
-| **super-build** | Builder lane agent. Reads a `Ready` card, spins up a git worktree, implements the change, opens a PR, moves the card to `QA`. |
-| **super-qa** | Tester lane agent. Reads a `QA` card, runs Playwright path specs against the worker's branch, captures evidence (screenshots, logs), comments on the PR, and either moves the card to `Review` or kicks it back to `Ready` with a rebuild label. |
-| **super-review** | Reviewer lane agent. Reads a `Review` card, runs the merge-readiness checks, posts findings, and either merges (or hands off to a human gate). |
+  ORCHESTRATOR (super-board) — plans waves, holds no product context, writes no code
+```
 
-The three lane skills run as workflow agents inside `super-board-wave` by default; on the legacy `claude-p` backend the same skills run as headless `claude -p` workers. Same lifecycles either way.
+| Skill | Lane | Does |
+|---|---|---|
+| **super-board** | — | Orchestrator. Validates preconditions, plans waves, launches them. Holds NO product context. |
+| **super-build** | `Ready` → `QA` | Spins up a git worktree, implements the change, opens a PR. |
+| **super-qa** | `QA` → `Review` | Crawls routes, captures screenshots/logs/HARs, comments on the PR, or bounces the card back with a rebuild label. |
+| **super-review** | `Review` → `Done` | Re-runs the Tester's tests, adversarial truth-check, merges or hands to a human gate. |
+
+Lane skills run as workflow agents inside `super-board-wave` by default, or as headless `claude -p` workers on the legacy backend. Same lifecycles either way.
 
 ## The five verbs
 
@@ -55,7 +81,11 @@ The board is the only state in both backends — every agent re-reads it, so run
 
 ## The six agentic patterns, mapped
 
-The patterns live in the workflow script (`workflows/super-board-wave.js`) — the conductor. The skills (`super-build` / `super-qa` / `super-review`) are the sheet music each lane agent reads. The workflow spawns a fresh agent per lane whose prompt says: *"Run super-build on issue #N, follow run.md's Builder lifecycle exactly."*
+```
+  workflows/super-board-wave.js   the conductor — owns the patterns
+  skills/super-{build,qa,review}  the sheet music — one lane agent each
+  the prompt it spawns            "Run super-build on #N, follow run.md exactly"
+```
 
 One card's journey (#47, starting in `Ready`):
 
@@ -131,56 +161,49 @@ Variants:
 
 ## How workers decide what test to write
 
-Every worker that writes a test — Builder fixing an issue, Tester pinning a
-bug-bash finding — runs the same three layers. They answer different questions
-and none of them substitutes for another.
+Three layers, three different questions. None substitutes for another.
 
 ```
-  discipline   mattpocock-skills:tdd      how do I write a test that is worth having?
-       ↓                                   seams · red-green · assertion anti-patterns
-  placement    the localisation ladder    which layer does this defect actually live at?
-       ↓                                   unit → integration → e2e → contract gap
-  mechanics    vitest | playwright-       how do I express it in this repo's tooling?
-               best-practices
+  tdd          →  how do I write a test worth having?     discipline
+  the ladder   →  which layer does the defect live at?    placement
+  vitest |        how do I express it in this repo?       mechanics
+  playwright
 ```
 
-**The middle layer is the one people skip, and it is the one that matters.**
+**The middle one is what everyone skips.** A Tester finds every bug through a
+browser — that is what a route crawler does. Where you *observed* a bug says
+nothing about where it *lives*.
 
-A Tester finds every bug through a browser — that is what a route crawler does.
-It is tempting to leave the regression as a Playwright spec because that is
-where it was observed. That is the wrong instinct: *where you observed a bug
-says nothing about where it lives.* Workers walk down a ladder and stop at the
-first rung that still reproduces the failure:
+```
+  ┌─ found here ─┐
+  │   browser    │  every bug-bash finding enters at the top
+  └──────┬───────┘
+         │   walk DOWN — stop at the first rung that still reproduces
+         ▼
+  ╔═══════════════════════════════════╤══════════════╤═════════════╗
+  ║ 1  call the module directly       │ unit         │ Vitest      ║
+  ║ 2  wire the real collaborators    │ integration  │ Vitest      ║
+  ║ 3  drive a real browser           │ e2e          │ Playwright  ║
+  ║ 4  needs a live third party       │ NOT a test   │ file a gap  ║
+  ╚═══════════════════════════════════╧══════════════╧═════════════╝
+         ▲
+         └── write it HERE, not where you found it
+```
 
-| Rung | Reproduces when you… | Test |
-| --- | --- | --- |
-| 1 | call the function/module directly with the same inputs | unit — Vitest |
-| 2 | wire the real collaborators together (handler + db, service + repo) | integration — Vitest |
-| 3 | drive a real browser (hydration, focus, navigation, CSS, client race) | e2e — Playwright |
-| 4 | hit a live third party | not a test — file a mock/contract gap |
+Locality of failure is the point: an e2e pinning a pure-logic defect is slower,
+flakier, and goes red pointing at a page instead of a function — so the next
+person debugs the wrong file.
 
-The test is written at the rung it **stopped on**, not the rung it was **found
-on**. The reason is locality of failure: a test should go red in the same place
-the bug lives. An e2e pinning a pure-logic defect is slower, flakier, and when
-it breaks it points at a page instead of at the function, so the next person
-debugs the wrong file.
+```
+  ✓ red for the right reason   run against UNFIXED code — a timeout or missing
+                               selector means you pinned the harness, not the bug
+  ✓ refactor-survivable        behaviour-preserving rewrite must still pass
+```
 
-Two gates before a test counts as done:
-
-- **Red for the right reason.** Run it against the *unfixed* code and read the
-  message. It must name the defect. Red from a timeout or a missing selector
-  means you pinned your harness, not the bug.
-- **Refactor-survivable.** Rewrite the implementation with behaviour unchanged
-  — does it still pass? If not, it is coupled to internals.
-
-`testing-strategy` sits alongside as the reference for *what is worth covering*
-per component type and what to skip (trivial getters, framework code, one-off
-scripts). It informs coverage, not placement.
-
-Contract testing is deliberately not in the default set. Pact-style contracts
-solve consumer/provider drift across independently deployed services; adding
-them to a single-app repo is ceremony with nothing to verify. Turn them on when
-a service is genuinely split out.
+`testing-strategy` informs *coverage* — what a component type is worth testing,
+what to skip. It does not decide placement; the ladder does. Contract testing
+stays out of the default set: Pact solves consumer/provider drift across
+independently deployed services, which a single-app repo does not have.
 
 ## Requirements
 
@@ -192,7 +215,14 @@ a service is genuinely split out.
 
 ## Skill structure
 
-Each skill lives under `skills/<name>/` with a `SKILL.md` (the agent-facing prompt) and optional `references/` and `scripts/` directories. Drop the whole `.claude/` tree into your project and Claude Code picks them up automatically.
+```
+  skills/<name>/
+    SKILL.md        the agent-facing prompt
+    references/     detail the prompt points at, loaded on demand
+    scripts/        anything the lane shells out to
+```
+
+Drop the whole `.claude/` tree into your project — Claude Code picks them up automatically.
 
 ## What this is NOT
 
