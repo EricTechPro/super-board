@@ -3,14 +3,19 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
 ## Decision policy (mandatory)
 
 1. **For ANY decision point, AskUserQuestion-style prompt, or "should I X or Y?" branch:**
-   - Run the advisor panel described in `references/decision-policy.md`. It needs no external CLI:
-     - `mattpocock-skills:grilling` — stress-test the options before you pick one.
-     - `mattpocock-skills:code-review` — technical/architecture judgment on a concrete diff.
-     - Inline role-play for the roles with no skill of their own (product/scope, security/risk, UX/UI).
-   - Use only the roles that apply to the decision at hand.
-   - Adopt the option recommended by the **MAJORITY** of roles.
-   - Tie → pick the option with the **smallest blast radius** (least irreversible, smallest scope, easiest to revert).
-   - Log the vote tally + rationale in the session output and in the commit trailer.
+   Walk the **decision ladder** in `references/decision-policy.md` and stop at the
+   first rung that answers the question. Do not climb past a rung that gave you an answer.
+   1. **Acceptance criteria** — the issue body already says which behaviour is correct.
+   2. **Repo precedent** — an existing pattern in this codebase already does this.
+   3. **Smallest blast radius** — neither settles it, so take the least irreversible,
+      smallest-scope, easiest-to-revert option. Record it under a `--- decision ---`
+      commit trailer (format in `decision-policy.md`) and in the session output.
+   4. **Human gate** — the fork is not yours to make. See rule 3 below.
+
+   There is no advisor panel and no vote. `mattpocock-skills:grilling` is
+   **forbidden inside a worker** — its contract is to ask the user and wait, which
+   this run cannot do. Ambiguous tickets are `super-board lint`'s job, upstream of
+   this loop; if you want to grill the ticket, that is a rule-3 human gate.
 
 2. **NEVER call `AskUserQuestion`. NEVER block waiting for the user.**
 
@@ -37,7 +42,10 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
 5. **Honor the per-issue 14-gate contract** (TDD, atomic commits, lint/typecheck/test green, etc.). Plan-only issues skip gates 3-7 (execution + tests). Review-only issues skip gates 1-7. Do not expand product scope beyond the issue body; when scope is missing or unsafe, use WIP-PARTIAL or HUMAN GATE instead of guessing.
 
 6. **After completing all issue work, you MUST:**
-   a. Verify all applicable gates green (lint, typecheck, tests for execute issues).
+   a. Verify all applicable gates green (lint, typecheck, tests for execute issues), then run
+      `mattpocock-skills:code-review` against your own diff with the merge-base as the fixed
+      point (`git merge-base HEAD origin/<base>`) — it never prompts when the fixed point is
+      supplied. Fix its Standards findings; a Spec finding you cannot close in scope is a HUMAN GATE.
    b. Make a final commit using the correct format for what you delivered:
       - **Full delivery** → `chore(loop): close #<N> — <one-line summary>` ONLY if EVERY acceptance-criterion checkbox in the issue body is satisfied by code, schema, migration, UI, i18n, and tests committed in this branch. The `close #N` syntax auto-links; the orchestrator will merge + auto-close. Your final assistant message should be a short summary; no special prefix needed.
       - **Intentional partial** → `wip(loop): #<N> partial — <slice-summary>` if you deliberately landed a subset (foundation/scaffolding, single layer of the feature) AND the partial is type-checked, linted, and tested in isolation AND merging it to the base branch is safe (no broken imports, no half-wired routes). Then:
