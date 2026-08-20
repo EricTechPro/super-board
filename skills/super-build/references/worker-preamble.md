@@ -25,19 +25,38 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
    - Exit non-zero.
    - The orchestrator will detect this in the log, add the `human-gated` label to the issue, and notify the user.
 
-4. **Skill selection.** Parse the issue body for a `Skills:` line. Examples:
+4. **Skill selection.** Resolve in this order, and stop at the first that applies.
+
+   **a. An explicit `Skills:` line in the issue body wins outright.** It replaces
+   the label row below; it does not extend it. Examples:
    - `Skills: mattpocock-skills:tdd, verification-before-completion`
    - `Skills: mattpocock-skills:to-spec, mattpocock-skills:diagnosing-bugs`
-   If no `Skills:` line is present, default to:
-   - `mattpocock-skills:tdd` (for any feature/bugfix that touches code)
-   - `vitest` or `playwright-best-practices` — pick by walking the localisation
-     ladder in `references/decision-policy.md`, not by habit
-   - `testing-strategy` (when the issue leaves coverage scope open)
-   - `verification-before-completion` (always, before final commit)
-   Invoke each via the Skill tool BEFORE writing any code.
-   Skill vocabulary is pinned in `references/decision-policy.md` → "Skill map".
-   `tdd` tells you how to write a test worth having; the ladder tells you which
-   layer to write it at. Reaching straight for an e2e spec skips the ladder.
+
+   **b. Otherwise route on the issue's type label** — the full table with its
+   caveats is `references/decision-policy.md` → "Label routing":
+
+   | Type label | Load, in this order |
+   | --- | --- |
+   | `bug` | `diagnosing-bugs` → `tdd` |
+   | `feature` | `implement` → `tdd` → `codebase-design` |
+   | `ux` | `implement` → `tdd` |
+   | `refactor` / `tech-debt` | `codebase-design` → `tdd` |
+   | `tests` | `tdd` |
+   | `docs` | none — **skip `tdd`**, there is no behaviour to pin |
+   | *(none)* | `tdd` |
+
+   Multiple type labels → first matching row, top to bottom.
+
+   **On top of the row, always:** `verification-before-completion` before the
+   final commit, and `mattpocock-skills:code-review` once against your own diff
+   (see 6a). **When the situation calls for it:** `vitest` or
+   `playwright-best-practices` — picked by the localisation ladder in
+   `references/decision-policy.md`, **never by label**; `testing-strategy` when
+   coverage scope is open; `resolving-merge-conflicts` on a live conflict.
+
+   Invoke each via the Skill tool BEFORE writing any code. `tdd` tells you how to
+   write a test worth having; the ladder tells you which layer to write it at.
+   Reaching straight for an e2e spec skips the ladder.
 
 5. **Honor the per-issue 14-gate contract** (TDD, atomic commits, lint/typecheck/test green, etc.). Plan-only issues skip gates 3-7 (execution + tests). Review-only issues skip gates 1-7. Do not expand product scope beyond the issue body; when scope is missing or unsafe, use WIP-PARTIAL or HUMAN GATE instead of guessing.
 
