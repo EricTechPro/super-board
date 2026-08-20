@@ -495,9 +495,9 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
   references (`core-expect`, `features-mocking`, `features-coverage`,
   `core-hooks`, `advanced-vi`).
 - `playwright-best-practices` — when writing or refactoring a spec. Reference
-  its `locators.md` (data-testid first, `getByRole` fallback),
-  `fixtures-hooks.md` (custom fixtures for auth, pre-test seeding, teardown),
-  `test-data.md` (test data factories), and `page-object-model.md` (POM for
+  its `core/locators.md` (data-testid first, `getByRole` fallback),
+  `core/fixtures-hooks.md` (custom fixtures for auth, pre-test seeding, teardown),
+  `core/test-data.md` (test data factories), and `core/page-object-model.md` (POM for
   reusable interactions). Keep specs reusable as the suite grows.
 
 ## Coexistence with `/super-build`
