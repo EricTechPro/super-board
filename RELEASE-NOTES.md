@@ -1,5 +1,20 @@
 # Release notes
 
+## v2.2.2 — 2026-08-20
+
+Docs fix, no behaviour change. super-qa cited five `playwright-best-practices`
+reference files by bare filename — `locators.md`, `fixtures-hooks.md`,
+`test-data.md`, `assertions-waiting.md`, `page-object-model.md`. The skill
+(`currents-dev/playwright-best-practices-skill`) ships them under `core/`.
+
+A worker told to read a path that does not resolve reads nothing and falls back
+to habit — which is the exact failure the citation exists to prevent. All five
+now point at `core/<name>.md`.
+
+The `vitest` citations were checked against the installed skill and are correct:
+19 references, and all five named ones (`core-expect`, `features-mocking`,
+`features-coverage`, `core-hooks`, `advanced-vi`) exist under `references/`.
+
 ## v2.2.1 — 2026-08-20
 
 **`super-qa-file-bug.sh` existed only in prose.** The preamble told workers to

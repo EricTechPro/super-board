@@ -51,10 +51,10 @@ worker memory creep:
 - `mattpocock-skills:diagnosing-bugs` (root-cause discipline for fixes)
 - `verification-before-completion` (before claiming a fix done — no Matt Pocock equivalent)
 - `playwright-best-practices` (load when writing or refactoring a spec).
-  Reference its `locators.md` (data-testid first, `getByRole` fallback),
-  `fixtures-hooks.md` (custom fixtures for auth and pre-test seeding/teardown),
-  `test-data.md` (test data factories), `assertions-waiting.md` (avoid
-  explicit waits), and `page-object-model.md` (POM for reusable interactions).
+  Reference its `core/locators.md` (data-testid first, `getByRole` fallback),
+  `core/fixtures-hooks.md` (custom fixtures for auth and pre-test seeding/teardown),
+  `core/test-data.md` (test data factories), `core/assertions-waiting.md` (avoid
+  explicit waits), and `core/page-object-model.md` (POM for reusable interactions).
   The `[data-testid]` rule below is reinforced there; fixture-based setup
   and POM are the path to keep specs reusable as the suite grows.
 
