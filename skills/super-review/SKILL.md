@@ -47,6 +47,13 @@ If the input is ambiguous, default to reviewing the current branch against its u
 
 2. **Inspect changes**
    - Read the diff and the affected modules.
+   - Load `mattpocock-skills:codebase-design` and read the diff through its vocabulary
+     — **module**, **interface**, **depth**, **seam**, **adapter**, **leverage**,
+     **locality**. Ask the shape question the diff raises: does this land behind a
+     small interface, or does it widen one? Apply the deletion test to anything the
+     diff adds that looks shallow.
+   - Scope is the diff, **never the whole codebase**. A hot spot three modules away
+     is not this PR's problem.
    - Check app-specific conventions from the nearest `CLAUDE.md` / `AGENTS.md`, especially:
      - `clock.now()` instead of `new Date()`;
      - services own business logic, repositories own data access;
@@ -60,12 +67,17 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - **Blocker:** correctness, data loss, security, auth, migrations, money, customer-visible broken behavior, or failing required tests.
    - **Should fix:** maintainability, missing tests, risky edge cases, accessibility, i18n, observability, or design drift that is clearly in scope.
    - **Nit / optional:** style or cleanup that does not block merge.
+   - **Deepening opportunity:** the diff is correct but leaves a shallow module, a
+     seam in the wrong place, or behaviour spread across call sites. **This never
+     blocks a merge.** A green PR does not get held for architecture taste — file it
+     and merge. See "Deepening opportunities" below.
    - **Human gate:** product/design/ops decision that cannot be safely guessed.
 
 4. **Route fixes**
    - If a blocker is an implementation task, hand it to **Super Build**.
    - If a blocker is a functional regression, hand it to **Super QA**.
    - If a blocker is visual/design fidelity, hand it to **Super UX**.
+   - If it is a deepening opportunity, file it with `scripts/super-review-file-refactor.sh` and carry on to the merge decision. Do not open a PR thread for it; do not bounce the card.
    - If the user explicitly authorizes Super Review to fix, make the smallest safe patch, verify it, and clearly report that review also changed code.
 
 5. **Verify evidence**
@@ -94,6 +106,9 @@ If the input is ambiguous, default to reviewing the current branch against its u
 
 ### Should fix
 - [ ] <finding> → route to <workflow>
+
+### Deepening opportunities (filed, not blocking)
+- #<issue> <one-line shape problem> — `refactor` / Backlog
 
 ### Human gates
 - <decision needed>
@@ -141,6 +156,55 @@ Super Review is done when one of these is true:
 - all unresolved findings are explicitly human-gated;
 - required evidence cannot be collected because tooling/service access is unavailable, and the output clearly marks the result as unverified.
 
+## Skill dependencies
+
+The reviewer loads two skills, both scoped to the diff:
+
+- `mattpocock-skills:code-review` — the two-axis review. **Standards** (does the diff
+  follow this repo's documented standards, plus the Fowler smell baseline) and **Spec**
+  (does it implement the originating issue's acceptance criteria). Always pass the fixed
+  point explicitly — `git merge-base HEAD origin/<base>` — so it never stops to ask for
+  one. A Spec-axis finding that contradicts the AC is a Blocker, not a nit.
+- `mattpocock-skills:codebase-design` — the deep-module vocabulary used in step 2 and in
+  every deepening opportunity written below. It is vocabulary, not a workflow: no report,
+  no prompts, nothing to wait on.
+
+**Never load inside the lane:** `mattpocock-skills:improve-codebase-architecture`. It
+scans the whole codebase rather than the diff, writes a Tailwind/Mermaid HTML report and
+shells out to `open`, then asks the user which candidate to explore and hands off to
+`grilling`. Every one of those is fatal to an unattended reviewer. It is a
+you-at-the-keyboard tool — run it yourself against the cards this lane files.
+
+## Deepening opportunities
+
+Architecture taste is real, and it is not a merge gate. The reviewer's job is
+merge-or-bounce; a shallow module in an otherwise-correct diff is a **future ticket**,
+not a reason to hold a green PR hostage.
+
+```
+  diff is correct + tests green + threads clean
+            │
+            ├─→ merge protocol                       ← the gate
+            │
+            └─→ shape friction noticed in the diff
+                      │
+                      └─→ super-review-file-refactor.sh
+                              label: refactor · column: Backlog
+                              → you run improve-codebase-architecture
+                                against it later, at a desk
+```
+
+File one when the diff leaves a module whose **interface is nearly as complex as its
+implementation**, puts a **seam** somewhere a caller has to work around, or spreads
+behaviour across call sites so a future fix has no **locality**. Use the
+`codebase-design` glossary terms exactly — a card that says "this feels messy" is a card
+nobody can action.
+
+Do **not** file one for: style, naming a future refactor might rename anyway, anything an
+existing ADR in `docs/adr/` already settled, or a shape the issue's acceptance criteria
+explicitly asked for. The script dedupes by fingerprint, so re-reviewing a bounced card
+will not stack duplicates.
+
 ## super-board integration
 
 When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "super-board run"):
@@ -170,6 +234,7 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of 8 su
    - Green → continue. Red → open new `[QA]`-prefixed thread quoting failure, move card Review → QA with `loop:rebuild-N`, exit.
 6. **Adversarial mode** (per `config.truth_gate` — `off` / `non-trivial` / `always`, default `non-trivial`): see section below.
 7. Decide per finding:
+   - **Deepening opportunity** → `scripts/super-review-file-refactor.sh`, then keep going. It is not a finding for merge purposes and never bounces a card.
    - **No findings + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
    - **Test-side new finding** → new `[QA]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).

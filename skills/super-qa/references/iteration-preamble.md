@@ -33,10 +33,12 @@ worker memory creep:
 2. **Do NOT read every prior `iteration-*.md`.** `docs/super-qa/report/QA-REPORT.md` is
    the rolled-up dashboard — read that. Read individual iteration files only
    if you need a specific bug's full repro.
-3. **Use ONE advisor role by default (eng, via `mattpocock-skills:code-review`).**
-   Escalate to a second role only on a high-priority finding or when
-   priority/category disagreement is material. Panel rules:
-   `.claude/skills/super-build/references/decision-policy.md`.
+3. **Judgment calls use the decision ladder, not a panel.** Walk
+   acceptance criteria → repo precedent → smallest blast radius → human gate
+   and stop at the first rung that answers the question:
+   `.claude/skills/super-build/references/decision-policy.md`. The one
+   technical check that still runs is `mattpocock-skills:code-review` against
+   a concrete diff, with the merge-base passed as the fixed point.
 4. **Per-iteration cap: 30 screenshots.** Re-use steps between TCs that share
    prefixes.
 5. **`--max-turns 250` is your hard ceiling.** Past turn 200, finish what
@@ -49,10 +51,10 @@ worker memory creep:
 - `mattpocock-skills:diagnosing-bugs` (root-cause discipline for fixes)
 - `verification-before-completion` (before claiming a fix done — no Matt Pocock equivalent)
 - `playwright-best-practices` (load when writing or refactoring a spec).
-  Reference its `locators.md` (data-testid first, `getByRole` fallback),
-  `fixtures-hooks.md` (custom fixtures for auth and pre-test seeding/teardown),
-  `test-data.md` (test data factories), `assertions-waiting.md` (avoid
-  explicit waits), and `page-object-model.md` (POM for reusable interactions).
+  Reference its `core/locators.md` (data-testid first, `getByRole` fallback),
+  `core/fixtures-hooks.md` (custom fixtures for auth and pre-test seeding/teardown),
+  `core/test-data.md` (test data factories), `core/assertions-waiting.md` (avoid
+  explicit waits), and `core/page-object-model.md` (POM for reusable interactions).
   The `[data-testid]` rule below is reinforced there; fixture-based setup
   and POM are the path to keep specs reusable as the suite grows.
 
@@ -571,15 +573,17 @@ items that match these rules — and **only** these:
 
 ### Filing bugs to GitHub (mandatory for every `[b]` cell + every regression red)
 
-Bugs are tracked in **GitHub Issues, on the project board's `Ready` column**,
+Bugs are tracked in **GitHub Issues, in the `Bug` column of the resolved
+**Super Ultimate QA** project** (override the column with
+`SUPER_QA_TARGET_OPTION_NAME`),
 not in markdown files. The `iteration-N.md` bug section is the per-iter audit
 trail; the GH issue is the persistent tracker that you, the human, and any
 future `/super-build` worker can pick up.
 
 **This is a carved exception to the project rule "ask before
 `gh issue create`":** the loop is autonomous and runs unattended, so it is
-authorized to auto-file issues — but ONLY with the `super-qa` label
-so the human can triage them all with `gh issue list -l super-qa`.
+authorized to auto-file issues — but ONLY with the `source:qa` label
+so the human can triage them all with `gh issue list -l source:qa`.
 
 **For each bug** (regression red OR explore `[b]`), do this immediately on
 detection (do NOT batch at end of iter):
@@ -614,8 +618,9 @@ detection (do NOT batch at end of iter):
    The issue title will be board-readable, for example `🐛 Bug /imports — CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
 
    The script prints the new issue number on stdout and drops the issue card
-   in the `Ready` column of the Fitbox Admin project board (#2). Capture
-   `$ISSUE_N` and reference it everywhere downstream:
+   in the `Bug` column of the resolved **Super Ultimate QA** project (see
+   `../SKILL.md` → "Project resolution"). Capture `$ISSUE_N` and reference it
+   everywhere downstream:
    - In `queue.md` line: `[b] /foo → BUG-N.M → #${ISSUE_N} (iter:N)`
    - In `iteration-N.md` Section 3 YAML: `gh_issue: ${ISSUE_N}`
    - In any fix commit message: `fix(super-qa): ... (closes #${ISSUE_N})`

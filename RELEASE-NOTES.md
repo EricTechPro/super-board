@@ -1,5 +1,151 @@
 # Release notes
 
+## v2.3.0 — 2026-08-20
+
+**Skills are assigned when the ticket is written, not re-derived at runtime.**
+super-build defaulted every card to the same `tdd` + testing set regardless of
+what the card was. A docs ticket got told to write a failing test first; a
+refactor got no design vocabulary; and `implement` — whose description is
+literally "implement a piece of work based on a spec or set of tickets" — never
+fired once, because it is `disable-model-invocation: true` and nothing ever
+pinned it.
+
+Rule 4 now routes on the issue's **type label**:
+
+| Type label | Loads, in order |
+| --- | --- |
+| `bug` | `diagnosing-bugs` → `tdd` |
+| `feature` | `implement` → `tdd` → `codebase-design` |
+| `ux` | `implement` → `tdd` |
+| `refactor` / `tech-debt` | `codebase-design` → `tdd` |
+| `tests` | `tdd` |
+| `docs` | none — skip `tdd`, there is no behaviour to pin |
+| *(none)* | `tdd` |
+
+No new label vocabulary: these are the types `super-qa` already files via
+`--kind`, plus `refactor` from `super-review`.
+
+- **Order inside a row is load-bearing** — diagnose before writing the red test,
+  implement against the spec before reaching for design vocabulary.
+- **Always, on top of the row:** `verification-before-completion` before the
+  final commit, and one `code-review` pass on the worker's own diff.
+- **Test mechanics stay off the label.** `vitest` / `playwright-best-practices`
+  are picked by walking the localisation ladder — a `ux` ticket whose defect
+  reproduces in a pure function gets a unit test, not a browser spec.
+- **Precedence:** an explicit `Skills:` line replaces the row outright rather
+  than extending it. Multiple type labels → first matching row, top to bottom.
+- `implement` was missing from the Skill map it is now routed to; added.
+
+## v2.2.2 — 2026-08-20
+
+Docs fix, no behaviour change. super-qa cited five `playwright-best-practices`
+reference files by bare filename — `locators.md`, `fixtures-hooks.md`,
+`test-data.md`, `assertions-waiting.md`, `page-object-model.md`. The skill
+(`currents-dev/playwright-best-practices-skill`) ships them under `core/`.
+
+A worker told to read a path that does not resolve reads nothing and falls back
+to habit — which is the exact failure the citation exists to prevent. All five
+now point at `core/<name>.md`.
+
+The `vitest` citations were checked against the installed skill and are correct:
+19 references, and all five named ones (`core-expect`, `features-mocking`,
+`features-coverage`, `core-hooks`, `advanced-vi`) exist under `references/`.
+
+## v2.2.1 — 2026-08-20
+
+**`super-qa-file-bug.sh` existed only in prose.** The preamble told workers to
+call it, documented its eleven flags, its dedupe policy, and four distinct exit
+codes — and the file was never in the repo. Every QA finding that hit that line
+died there. It is now written to the spec that was already on the page, and
+tested.
+
+- **Body guardrails.** Rejects a body missing any of Summary / Repro steps /
+  Expected behavior / Actual behavior / Evidence / Suggested fix path /
+  Acceptance criteria, and sweeps for unfilled `TBD`, `TODO:`, and
+  `<placeholder>` leftovers outside fenced code — a HAR snippet has angle
+  brackets, an unfilled template line has them too, and only one of those should
+  block. `SUPER_QA_ALLOW_WEAK_BODY=1` bypasses, as documented.
+- **Machinery, not evidence.** The agent writes the findings; the script
+  prepends `## Board summary`, appends the hidden `super-qa-meta` block, and
+  derives a fingerprint when none is passed. Derivation deliberately excludes
+  the iteration number, so the same finding seen on iter 9 dedupes against the
+  card filed on iter 3.
+- **Project resolution per spec** — `SUPER_QA_PROJECT_OWNER` then the repo
+  owner, `SUPER_QA_PROJECT_TITLE` then `Super Ultimate QA`. It halts rather than
+  falling back to the repo's primary project, whose columns mean different
+  things.
+- **The exit-71 contract holds.** When the issue is filed but the board promote
+  fails, the number still reaches stdout — the caller logs "manual move
+  required" and carries on instead of losing the finding.
+- `tests/test-file-bug.sh` — 33 assertions, `gh` stubbed, no network.
+
+**Three doc contradictions the implementation surfaced**, all in
+`super-qa/references/iteration-preamble.md`, all resolved toward
+`super-qa/SKILL.md` as the more detailed spec:
+
+- Destination column was `Ready` in the preamble and `Bug` in SKILL.md → `Bug`.
+- Triage label was `super-qa` in the preamble's carved-exception paragraph and
+  `source:qa` everywhere else → `source:qa`.
+- The board was named "Fitbox Admin project board (#2)", a leftover from another
+  project → the resolved Super Ultimate QA project.
+
+## v2.2.0 — 2026-08-20
+
+**The advisor panel is removed from super-build and super-qa.** It convened
+`mattpocock-skills:grilling` inside a worker whose own preamble forbids asking
+the user anything — and grilling's contract is "put each question to them and
+wait." In practice the worker either stalled or answered its own questions,
+which is inline reasoning wearing a costume.
+
+- **New: the decision ladder.** Acceptance criteria → repo precedent → smallest
+  blast radius → human gate. Walk it, stop at the first rung that answers the
+  question. Replaces "poll five roles, take the majority, tie → smallest blast
+  radius" with the tiebreak that was doing the work anyway.
+- **`grilling`, `shape`, and `clarify` are now worker-forbidden** and documented
+  as `super-board lint`-only. Reaching for one inside a lane is itself a human
+  gate — it means the ticket should have been caught upstream, while a human was
+  still at the keyboard.
+- **`code-review` survives, with a fixed point.** It runs once against the
+  worker's own diff before the final commit, with `git merge-base HEAD
+  origin/<base>` supplied so it never prompts. Standards findings are fixed in
+  place; a Spec finding that contradicts the issue's AC is a human gate.
+- **Commit trailer: `--- decision-vote ---` → `--- decision ---`.** Records the
+  question, the choice, and which rung settled it. Only rung-3 decisions need
+  one; AC and precedent are their own record.
+- **Human gates gained two entries** — public-contract breaks, and "you wanted
+  to grill the ticket."
+
+**super-review had no skills at all — now it has two.** The reviewer was running
+on its own prompt while every other lane loaded a process stack.
+
+- **`code-review` in the Review lane**, both axes. Standards against the repo's
+  documented rules plus the Fowler smell baseline; Spec against the originating
+  issue's acceptance criteria. The merge-base is always passed as the fixed point
+  so it never stops to ask for one. A Spec finding that contradicts the AC is a
+  Blocker.
+- **`codebase-design` as review vocabulary.** The reviewer now reads the diff for
+  shape — module, interface, depth, seam, adapter, leverage, locality — and applies
+  the deletion test to anything shallow the diff adds. Scoped to the diff, never the
+  whole codebase.
+- **New finding class: deepening opportunity.** It never blocks a merge. A green PR
+  does not get held for architecture taste.
+- **New: `scripts/super-review-file-refactor.sh`.** Files shape problems as
+  `refactor` cards in **Backlog** (not Ready — an unrefined card must not feed the
+  build lane), deduped by fingerprint, labelled `source:review` and
+  `strength:<strong|worth-exploring|speculative>`. It degrades to warnings on every
+  failure past issue-create: a board hiccup must never strand a mergeable PR in
+  Review. Covered by `tests/test-file-refactor.sh` (17 assertions, gh stubbed).
+- **`improve-codebase-architecture` is documented as lane-forbidden.** It scans the
+  whole codebase rather than the diff, writes an HTML report and shells out to
+  `open`, then asks which candidate to explore and hands off to `grilling`. It is a
+  desk tool — point it at the cards this lane files.
+
+Files touched: `super-build/references/decision-policy.md` (rewritten),
+`super-build/references/worker-preamble.md`, `super-build/SKILL.md`,
+`super-qa/references/iteration-preamble.md`, `super-review/SKILL.md`,
+`scripts/super-review-file-refactor.sh` (new),
+`tests/test-file-refactor.sh` (new), `install.sh`, `README.md`.
+
 ## v2.1.1 — 2026-08-07
 
 Docs only, no behaviour change. The README explained itself in paragraphs where
