@@ -34,7 +34,9 @@ Progress: 🛠 onboard (you are here)  →  🧹 lint  →  🤖 run
 0. SILENT DETECT (no questions yet)
    ├─ CWD: git repo? any commits? remote URL?
    ├─ Existing configs in .claude/super-board/configs/?
-   └─ Existing PROJECT.md?
+   ├─ Existing PROJECT.md?
+   └─ Workflow runtime present? .claude/workflows/super-board-wave.js
+      (installed in step 12 — detect now, don't ask)
 
 1. ONE BIG QUESTION — "What do you want to run in a loop?"
    ├─ A) Test a live URL (staging/prod, no code access)
@@ -130,7 +132,33 @@ Progress: 🛠 onboard (you are here)  →  🧹 lint  →  🤖 run
     ├─ Write .claude/super-board/configs/<slug>.json (committed)
     └─ Write .claude/super-board/active ← <slug> (gitignored)
 
-12. SUMMARY
+12. INSTALL / VERIFY WORKFLOW RUNTIME
+    (Skip only when the config sets worker_backend: "claude-p".)
+    The default backend launches the Workflow tool with scriptPath
+    .claude/workflows/super-board-wave.js. That file IS the dynamic
+    workflow — Classify → Build → QA → Review, lane agents and schemas.
+    Without it `super-board run` dies at its precondition #4, so onboard
+    must never hand back a config that cannot run.
+    ├─ Present? → syntax-check it (same command run.md uses) and move on:
+    │    { echo '(async function(){'; \
+    │      sed 's/^export const meta/const meta/' \
+    │        .claude/workflows/super-board-wave.js; \
+    │      echo '})'; } | node --check --input-type=module
+    ├─ Missing → self-heal. Take the first hit, nearest first:
+    │    a. `<git-root>/.claude/workflows/super-board-wave.js` — a project
+    │       nested inside a larger repo that already installed it
+    │    b. a super-board checkout above CWD:
+    │       `find <up to 4 parents> -maxdepth 6 \
+    │          -path '*/super-board/workflows/super-board-wave.js' -print -quit`
+    │    → `mkdir -p .claude/workflows && cp <hit> .claude/workflows/`
+    │    → then syntax-check the copy as above
+    └─ No hit → HALT (the config is already written, so nothing is lost):
+       "🛑 Missing .claude/workflows/super-board-wave.js — the dynamic
+        workflow itself. Your config is saved. Re-run the installer from
+        your super-board checkout: `./install.sh <this-dir>`, then re-run
+        `super-board onboard`."
+
+13. SUMMARY
     "✅ Onboard complete.
      📋 Go write your tickets here: <project URL>
      🧹 Then run `super-board lint` to make sure each issue has clear
@@ -155,6 +183,8 @@ Every onboard step that touches GitHub or the filesystem has a defined recovery 
 | 7. PROJECT.md autogen | Sub-agent timeout / empty draft | `📝 Couldn't auto-draft PROJECT.md. Skip for now, or write one paragraph and I'll seed from that.` |
 | 8. base branch | gh API rate limit on protection-rule lookup | Soft-fail production detection, warn the user, fall back to asking. Do not halt. |
 | 11. write config | File system not writable | Halt with the exact path: `🛑 Can't write to .claude/super-board/configs/<slug>.json — check permissions.` |
+| 12. workflow runtime | `super-board-wave.js` missing and no copy found to self-heal from | `🛑 Missing .claude/workflows/super-board-wave.js — the dynamic workflow itself. Config is saved. Run \`./install.sh <this-dir>\` from your super-board checkout, then re-run super-board onboard.` |
+| 12. workflow runtime | `node --check` fails on the installed script | `🛑 .claude/workflows/super-board-wave.js is corrupt or truncated. Re-copy it from your super-board checkout (\`./install.sh <this-dir>\`) — don't hand-edit it.` |
 
 Every onboard halt comment includes (a) what the bot tried, (b) what failed, (c) the exact command or click the user can do, (d) how to resume (always: "re-run `super-board onboard`").
 
@@ -184,8 +214,12 @@ Before exiting `onboard` successfully, the worker MUST verify:
    - QA-only: `Ready, QA, Review, Done, Blocked, Skipped`
 4. **PROJECT.md exists** — when `paths.project_md` is non-null (i.e. any flow with
    a local repo), the file at that path exists and is non-empty.
+5. **Workflow runtime is installed** — unless `worker_backend` is `"claude-p"`,
+   `.claude/workflows/super-board-wave.js` exists and passes the `node --check`
+   from step 12. This is the file `run` launches; a config without it is a
+   config that cannot run.
 
-If any of these four checks fail, do NOT print the step-12 summary. Instead, surface
+If any of these five checks fail, do NOT print the step-13 summary. Instead, surface
 the specific failed check and tell the user to re-run `super-board onboard`. A
 partial config is worse than no config — the lint and run verbs depend on these
 invariants.
