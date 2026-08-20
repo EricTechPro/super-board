@@ -62,7 +62,7 @@ The legacy dispatcher refuses to run (exit 78) unless the config explicitly sets
 |---|---|---|
 | **super-board** | — | Orchestrator. Validates preconditions, plans waves, launches them. Holds NO product context. |
 | **super-build** | `Ready` → `QA` | Spins up a git worktree, implements the change, opens a PR. |
-| **super-qa** | `QA` → `Review` | Crawls routes, captures screenshots/logs/HARs, comments on the PR, or bounces the card back with a rebuild label. |
+| **super-qa** | `QA` → `Review` | Crawls routes, captures screenshots/logs/HARs, comments on the PR, or bounces the card back with a rebuild label. Findings file as `source:qa` cards. |
 | **super-review** | `Review` → `Done` | Re-runs the Tester's tests, adversarial truth-check, merges or hands to a human gate. Shape problems in the diff get filed to `Backlog`, never blocked on. |
 
 Lane skills run as workflow agents inside `super-board-wave` by default, or as headless `claude -p` workers on the legacy backend. Same lifecycles either way.

@@ -1,5 +1,43 @@
 # Release notes
 
+## v2.2.1 — 2026-08-20
+
+**`super-qa-file-bug.sh` existed only in prose.** The preamble told workers to
+call it, documented its eleven flags, its dedupe policy, and four distinct exit
+codes — and the file was never in the repo. Every QA finding that hit that line
+died there. It is now written to the spec that was already on the page, and
+tested.
+
+- **Body guardrails.** Rejects a body missing any of Summary / Repro steps /
+  Expected behavior / Actual behavior / Evidence / Suggested fix path /
+  Acceptance criteria, and sweeps for unfilled `TBD`, `TODO:`, and
+  `<placeholder>` leftovers outside fenced code — a HAR snippet has angle
+  brackets, an unfilled template line has them too, and only one of those should
+  block. `SUPER_QA_ALLOW_WEAK_BODY=1` bypasses, as documented.
+- **Machinery, not evidence.** The agent writes the findings; the script
+  prepends `## Board summary`, appends the hidden `super-qa-meta` block, and
+  derives a fingerprint when none is passed. Derivation deliberately excludes
+  the iteration number, so the same finding seen on iter 9 dedupes against the
+  card filed on iter 3.
+- **Project resolution per spec** — `SUPER_QA_PROJECT_OWNER` then the repo
+  owner, `SUPER_QA_PROJECT_TITLE` then `Super Ultimate QA`. It halts rather than
+  falling back to the repo's primary project, whose columns mean different
+  things.
+- **The exit-71 contract holds.** When the issue is filed but the board promote
+  fails, the number still reaches stdout — the caller logs "manual move
+  required" and carries on instead of losing the finding.
+- `tests/test-file-bug.sh` — 33 assertions, `gh` stubbed, no network.
+
+**Three doc contradictions the implementation surfaced**, all in
+`super-qa/references/iteration-preamble.md`, all resolved toward
+`super-qa/SKILL.md` as the more detailed spec:
+
+- Destination column was `Ready` in the preamble and `Bug` in SKILL.md → `Bug`.
+- Triage label was `super-qa` in the preamble's carved-exception paragraph and
+  `source:qa` everywhere else → `source:qa`.
+- The board was named "Fitbox Admin project board (#2)", a leftover from another
+  project → the resolved Super Ultimate QA project.
+
 ## v2.2.0 — 2026-08-20
 
 **The advisor panel is removed from super-build and super-qa.** It convened
