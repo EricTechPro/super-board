@@ -1,5 +1,41 @@
 # Release notes
 
+## v2.3.0 — 2026-08-20
+
+**Skills are assigned when the ticket is written, not re-derived at runtime.**
+super-build defaulted every card to the same `tdd` + testing set regardless of
+what the card was. A docs ticket got told to write a failing test first; a
+refactor got no design vocabulary; and `implement` — whose description is
+literally "implement a piece of work based on a spec or set of tickets" — never
+fired once, because it is `disable-model-invocation: true` and nothing ever
+pinned it.
+
+Rule 4 now routes on the issue's **type label**:
+
+| Type label | Loads, in order |
+| --- | --- |
+| `bug` | `diagnosing-bugs` → `tdd` |
+| `feature` | `implement` → `tdd` → `codebase-design` |
+| `ux` | `implement` → `tdd` |
+| `refactor` / `tech-debt` | `codebase-design` → `tdd` |
+| `tests` | `tdd` |
+| `docs` | none — skip `tdd`, there is no behaviour to pin |
+| *(none)* | `tdd` |
+
+No new label vocabulary: these are the types `super-qa` already files via
+`--kind`, plus `refactor` from `super-review`.
+
+- **Order inside a row is load-bearing** — diagnose before writing the red test,
+  implement against the spec before reaching for design vocabulary.
+- **Always, on top of the row:** `verification-before-completion` before the
+  final commit, and one `code-review` pass on the worker's own diff.
+- **Test mechanics stay off the label.** `vitest` / `playwright-best-practices`
+  are picked by walking the localisation ladder — a `ux` ticket whose defect
+  reproduces in a pure function gets a unit test, not a browser spec.
+- **Precedence:** an explicit `Skills:` line replaces the row outright rather
+  than extending it. Multiple type labels → first matching row, top to bottom.
+- `implement` was missing from the Skill map it is now routed to; added.
+
 ## v2.2.2 — 2026-08-20
 
 Docs fix, no behaviour change. super-qa cited five `playwright-best-practices`

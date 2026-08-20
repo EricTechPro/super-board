@@ -25,6 +25,7 @@ column is the skill to invoke.
 | --- | --- |
 | Which skill / flow fits this situation | `mattpocock-skills:ask-matt` |
 | Build a feature or fix a bug test-first | `mattpocock-skills:tdd` |
+| Deliver a ticket against a spec or acceptance criteria | `mattpocock-skills:implement` |
 | Root-cause a hard bug or perf regression | `mattpocock-skills:diagnosing-bugs` |
 | Review a diff before approving it | `mattpocock-skills:code-review` |
 | Turn a settled discussion into a spec | `mattpocock-skills:to-spec` |
@@ -72,6 +73,55 @@ Two gates before a test counts as done: it must go **red for the right reason**
 against the unfixed code (a timeout or missing selector means you pinned the
 harness, not the bug), and it must **survive a refactor** that leaves behaviour
 unchanged.
+
+## Label routing
+
+A ticket already declares what kind of work it is. Reading that label is cheaper
+and more reliable than having every worker re-derive its own skill set from the
+issue prose — and it means the assignment happens when the ticket is written,
+where a human can see it.
+
+The type labels below are the ones this system already files: `super-qa` stamps
+`bug`, `feature`, `ux`, `tests`, `docs`, `tech-debt`; `super-review` stamps
+`refactor`. No new vocabulary.
+
+| Type label | Skills the worker loads |
+| --- | --- |
+| `bug` | `mattpocock-skills:diagnosing-bugs` → `mattpocock-skills:tdd` |
+| `feature` | `mattpocock-skills:implement` → `mattpocock-skills:tdd` → `mattpocock-skills:codebase-design` |
+| `ux` | `mattpocock-skills:implement` → `mattpocock-skills:tdd` |
+| `refactor` | `mattpocock-skills:codebase-design` → `mattpocock-skills:tdd` |
+| `tech-debt` | `mattpocock-skills:codebase-design` → `mattpocock-skills:tdd` |
+| `tests` | `mattpocock-skills:tdd` (no product code — mechanics only) |
+| `docs` | none of the above; **skip `tdd`** — there is no behaviour to pin |
+| *(no type label)* | `mattpocock-skills:tdd` |
+
+Order matters where it is listed: diagnose before you write the red test, and
+implement against the spec before you reach for design vocabulary.
+
+**On top of the row, always:**
+
+- `verification-before-completion` — before the final commit, no exceptions.
+- `mattpocock-skills:code-review` — once against your own diff, merge-base as
+  the fixed point. See "The decision ladder" above.
+
+**On top of the row, when the situation calls for it:**
+
+- `vitest` or `playwright-best-practices` — picked by walking the localisation
+  ladder, never by label. A `ux` ticket whose defect reproduces in a pure
+  function gets a unit test.
+- `testing-strategy` — when the issue leaves coverage scope open.
+- `mattpocock-skills:resolving-merge-conflicts` — on an in-progress conflict.
+- `mattpocock-skills:domain-modeling` — when the change names a concept the
+  domain glossary does not have.
+
+**Precedence.** An explicit `Skills:` line in the issue body wins outright — it
+replaces the row, it does not extend it. Label routing applies only when no
+`Skills:` line is present. The always-list applies in both cases.
+
+**Multiple type labels** — take the first row that matches, reading the table
+top to bottom. A card labelled both `bug` and `refactor` is a bug first; the
+refactor is a separate card.
 
 ## The decision ladder
 

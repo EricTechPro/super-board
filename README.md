@@ -75,12 +75,15 @@ is a skill that hangs.
 
 | Lane | Loads |
 |---|---|
-| **super-build** | `tdd` · `implement` · `diagnosing-bugs` · `resolving-merge-conflicts` · `code-review` (own diff, pre-commit) · `vitest` / `playwright-best-practices` · `testing-strategy` · `verification-before-completion` |
+| **super-build** | Routed by the ticket's type label — `bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`. Always `verification-before-completion` + `code-review` on its own diff. Mechanics (`vitest` / `playwright-best-practices` / `testing-strategy`) by the localisation ladder, never by label. |
 | **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · same four testing skills |
 | **super-review** | `code-review` (Standards + Spec, merge-base as fixed point) · `codebase-design` (deep-module vocabulary) |
 
-Pin per-ticket overrides with a `Skills:` line in the issue body — super-build parses
-it and skips the defaults.
+Assignment happens when the ticket is written, not at runtime: super-build routes on
+the issue's **type label** — the same `bug` / `feature` / `ux` / `tests` / `docs` /
+`tech-debt` labels super-qa already files, plus `refactor` from super-review. Override
+any single ticket with a `Skills:` line in its body; that replaces the label's row
+rather than extending it.
 
 **Interactive-only, never in a lane:** `grilling`, `shape`, `clarify`, and
 `improve-codebase-architecture`. They prompt, wait, or open a browser. They belong to
