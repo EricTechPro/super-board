@@ -33,10 +33,12 @@ worker memory creep:
 2. **Do NOT read every prior `iteration-*.md`.** `docs/super-qa/report/QA-REPORT.md` is
    the rolled-up dashboard — read that. Read individual iteration files only
    if you need a specific bug's full repro.
-3. **Use ONE advisor role by default (eng, via `mattpocock-skills:code-review`).**
-   Escalate to a second role only on a high-priority finding or when
-   priority/category disagreement is material. Panel rules:
-   `.claude/skills/super-build/references/decision-policy.md`.
+3. **Judgment calls use the decision ladder, not a panel.** Walk
+   acceptance criteria → repo precedent → smallest blast radius → human gate
+   and stop at the first rung that answers the question:
+   `.claude/skills/super-build/references/decision-policy.md`. The one
+   technical check that still runs is `mattpocock-skills:code-review` against
+   a concrete diff, with the merge-base passed as the fixed point.
 4. **Per-iteration cap: 30 screenshots.** Re-use steps between TCs that share
    prefixes.
 5. **`--max-turns 250` is your hard ceiling.** Past turn 200, finish what

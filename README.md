@@ -63,9 +63,29 @@ The legacy dispatcher refuses to run (exit 78) unless the config explicitly sets
 | **super-board** | — | Orchestrator. Validates preconditions, plans waves, launches them. Holds NO product context. |
 | **super-build** | `Ready` → `QA` | Spins up a git worktree, implements the change, opens a PR. |
 | **super-qa** | `QA` → `Review` | Crawls routes, captures screenshots/logs/HARs, comments on the PR, or bounces the card back with a rebuild label. |
-| **super-review** | `Review` → `Done` | Re-runs the Tester's tests, adversarial truth-check, merges or hands to a human gate. |
+| **super-review** | `Review` → `Done` | Re-runs the Tester's tests, adversarial truth-check, merges or hands to a human gate. Shape problems in the diff get filed to `Backlog`, never blocked on. |
 
 Lane skills run as workflow agents inside `super-board-wave` by default, or as headless `claude -p` workers on the legacy backend. Same lifecycles either way.
+
+### Which skills each lane loads
+
+Every lane skill is scoped to the diff or the ticket in front of it. Nothing in a
+lane may ask the user a question — the run is unattended, and a skill that waits
+is a skill that hangs.
+
+| Lane | Loads |
+|---|---|
+| **super-build** | `tdd` · `implement` · `diagnosing-bugs` · `resolving-merge-conflicts` · `code-review` (own diff, pre-commit) · `vitest` / `playwright-best-practices` · `testing-strategy` · `verification-before-completion` |
+| **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · same four testing skills |
+| **super-review** | `code-review` (Standards + Spec, merge-base as fixed point) · `codebase-design` (deep-module vocabulary) |
+
+Pin per-ticket overrides with a `Skills:` line in the issue body — super-build parses
+it and skips the defaults.
+
+**Interactive-only, never in a lane:** `grilling`, `shape`, `clarify`, and
+`improve-codebase-architecture`. They prompt, wait, or open a browser. They belong to
+`super-board lint` and to you at a keyboard. A worker that wants one is telling you the
+ticket needed a human before the loop started — that is a human gate, not a skill to load.
 
 ## The five verbs
 
@@ -266,6 +286,8 @@ MIT. See [LICENSE](./LICENSE).
 Designed and maintained by Eric Tech. Skill structure originally inspired by [obra/superpowers](https://github.com/obra/superpowers).
 
 Workers run on the [mattpocock/skills](https://github.com/mattpocock/skills) process stack —
-`tdd`, `diagnosing-bugs`, `code-review`, `grilling`, `to-spec`, `ask-matt`. The full
-mapping (including the three skills that stayed because Matt's pack has no equivalent)
-is in [`skills/super-build/references/decision-policy.md`](./skills/super-build/references/decision-policy.md).
+`tdd`, `diagnosing-bugs`, `code-review`, `ask-matt`, `to-spec`. `grilling` is
+interactive by contract, so it runs in `super-board lint` (where a human is present),
+never inside an unattended worker. The full mapping — including the four skills that
+stayed because Matt's pack has no equivalent — is in
+[`skills/super-build/references/decision-policy.md`](./skills/super-build/references/decision-policy.md).

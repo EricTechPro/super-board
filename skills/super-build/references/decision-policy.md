@@ -1,12 +1,20 @@
 # Decision policy for super-board workers
 
 Workers run unattended. When the issue forces a judgment call the issue body
-does not settle, the worker resolves it with an **advisor panel** and records
-the result in the commit — it never blocks on the user.
+does not settle, the worker resolves it with the **decision ladder** below and
+records the choice in the commit — it never blocks on the user.
 
 This file replaces the former `gstack-voting.md`. The `gstack` CLI and the
 `superpowers` / `gsd` skill packs are no longer dependencies; everything below
 runs with the skills listed in the skill map or with plain inline reasoning.
+
+**The advisor panel is gone as of 2.2.0.** It convened `grilling` inside a
+worker that is forbidden to ask the user anything — and `grilling`'s own
+contract is "put each question to them and wait." A worker either stalled on
+it or answered its own questions, which is inline reasoning wearing a costume.
+Ticket ambiguity is now caught upstream, where a human is actually present:
+`super-board lint` routes vague and multi-interpretation issues through
+`mattpocock-skills:grilling` before the loop ever starts. See `../../super-board/references/lint.md`.
 
 ## Skill map
 
@@ -19,7 +27,6 @@ column is the skill to invoke.
 | Build a feature or fix a bug test-first | `mattpocock-skills:tdd` |
 | Root-cause a hard bug or perf regression | `mattpocock-skills:diagnosing-bugs` |
 | Review a diff before approving it | `mattpocock-skills:code-review` |
-| Stress-test a plan, decision, or ambiguous issue | `mattpocock-skills:grilling` |
 | Turn a settled discussion into a spec | `mattpocock-skills:to-spec` |
 | Break a spec into tracer-bullet tickets | `mattpocock-skills:to-tickets` |
 | Design a module interface / find deepening opportunities | `mattpocock-skills:codebase-design` |
@@ -29,11 +36,21 @@ column is the skill to invoke.
 | Decide *which kind* of test a change needs | `testing-strategy` |
 | Write a unit or integration test (TS/JS) | `vitest` |
 | Write a browser e2e spec | `playwright-best-practices` |
-| Feature ticket with undefined UX | `shape` |
-| Copy / microcopy / error-message wording | `clarify` |
 
-The last six have no equivalent in the Matt Pocock pack and are kept as-is.
+The last four have no equivalent in the Matt Pocock pack and are kept as-is.
 Everything else routes through `mattpocock-skills:*`.
+
+**Interactive-only, never inside a worker.** These need a human at the keyboard
+and belong to the `lint` verb, not to a lane:
+
+| Intent | Skill | Runs in |
+| --- | --- | --- |
+| Stress-test a vague or ambiguous ticket | `mattpocock-skills:grilling` | `super-board lint` |
+| Feature ticket with undefined UX | `shape` | `super-board lint` |
+| Copy / microcopy / error-message wording | `clarify` | `super-board lint` |
+
+If a worker reaches for one of these, that is the signal the ticket should have
+been caught by `lint`. Take the human gate instead — see below.
 
 **Testing is three layers, not one skill.** They answer different questions:
 
@@ -56,69 +73,65 @@ against the unfixed code (a timeout or missing selector means you pinned the
 harness, not the bug), and it must **survive a refactor** that leaves behaviour
 unchanged.
 
-## When to convene the panel
+## The decision ladder
 
-Convene it when the issue body or the in-flight implementation forces a
-non-obvious decision:
+Most forks in a worker run are not gray at all — they are already settled by
+something written down. Walk the ladder and **stop at the first rung that
+answers the question**. Do not climb past a rung that gave you an answer.
 
-- **Scope ambiguity** — the fix has multiple plausible boundaries (fix one
-  symptom vs. refactor the call site vs. rewrite the module).
-- **Compatibility tradeoff** — a fix is correct but would break a public
-  contract or a downstream consumer.
-- **Security-adjacent change** — touching auth, secrets, permissions, or any
-  data flow that crosses a trust boundary.
-- **Design choice with no precedent** — the codebase has no existing pattern
-  for what the issue asks for.
+```
+  1  acceptance criteria   the issue body says which behaviour is correct
+  2  repo precedent        an existing pattern in this codebase already does this
+  3  smallest blast radius  neither settles it → least irreversible, smallest
+                            scope, easiest to revert
+  4  human gate            the fork is not yours to make → stop, exit non-zero
+```
 
-Do **not** convene it for routine work:
+Rung 3 is the default resolution, not a coin flip: prefer the change that
+touches fewer files, adds no public surface, and can be reverted by dropping
+one commit. When two options tie on blast radius, take the one an existing test
+already constrains.
 
-- Mechanical fixes (typo, lint, off-by-one, missing import).
-- Bugs whose fix is dictated by an existing test or spec.
-- Issues with explicit acceptance criteria that leave no judgment call.
+**One technical check is still mandatory before the final commit:** run
+`mattpocock-skills:code-review` against your own working diff, passing the
+merge-base as the fixed point (`git merge-base HEAD origin/<base>`). It never
+asks the user anything when the fixed point is supplied. Findings on its
+Standards axis are yours to fix before you commit; findings on its Spec axis
+that contradict the issue's acceptance criteria are a rung-4 human gate.
 
-## How to run it
+## Recording the decision
 
-1. **Sharpen the question first.** Invoke `mattpocock-skills:grilling` on the
-   decision to force the real options out into the open. A panel voting on a
-   badly-framed question produces a confident wrong answer.
-2. **Poll the roles that apply.** Each returns one sentence and one option:
-   - **Eng** — invoke `mattpocock-skills:code-review` against the working diff
-     when one exists; otherwise reason inline about regression surface.
-   - **Product / scope** — inline: which option delivers the issue's acceptance
-     criteria with the least unasked-for scope?
-   - **Security / risk** — inline: does either option move data across a trust
-     boundary, widen a permission, or touch a secret?
-   - **Design / UX** — inline: which option matches an existing pattern in this
-     codebase?
-   - **QA** — inline: which option is easier to pin with a deterministic test?
-3. **Take the majority.** Tie → smallest blast radius (least irreversible,
-   smallest scope, easiest to revert).
-4. **Record the vote in the commit message** under a `--- decision-vote ---`
-   trailer so the orchestrator and downstream reviewers can audit the choice:
+Any fork you resolved at **rung 3** goes in the commit message under a
+`--- decision ---` trailer, so the orchestrator and downstream reviewers can
+audit it. Rungs 1 and 2 need no trailer — the AC or the precedent is the record.
 
 ```
 fix(orders): use idempotency key from request header (closes #123)
 
 <one-line summary>
 
---- decision-vote ---
-- Product: B (ship the smaller change, revisit later)
-- Eng: B (less surface area to regress)
-- Security: B (no auth boundary touched)
-- Design: A (matches existing pattern in /payments)
-- QA: B (easier to write a deterministic test)
-vote: B (4 of 5)
+--- decision ---
+question: reuse the request header key, or mint a server-side key per order?
+chose: request header — the client already retries with a stable key
+rung: 3 (blast radius — no schema change, revertable in one commit)
 ```
 
-## When to escalate to human instead
+## Hard human gates
 
-The panel is a tiebreaker for **gray decisions**, not a replacement for explicit
-policy. Escalate to human (print `HUMAN GATE TRIPPED: <reason>`, label the issue
-`human-gated`, leave the worktree intact, exit non-zero) when:
+The ladder resolves gray decisions. It is not a licence to guess at decisions
+that were never the worker's to make. Print `HUMAN GATE TRIPPED: <reason>`,
+label the issue `human-gated`, leave the worktree intact, and exit non-zero when:
 
 - The fix would require a production deploy or a destructive DB change.
-- The vote splits with no clear majority.
-- Any role raises an explicit deal-breaker (security flags an auth bypass, etc.).
+- The change touches auth, secrets, permissions, or moves data across a trust
+  boundary — and the issue body does not explicitly authorise it.
 - The issue itself is unclear about what "fixed" means.
+- The fix is correct but would break a public contract or a downstream consumer.
+- `code-review`'s Spec axis says the diff does not implement the stated AC and
+  you cannot close the gap within the issue's scope.
+- You find yourself wanting `grilling`, `shape`, or `clarify` — the ticket
+  needed a human before the loop started.
 
-Halts here cost less than a regression in production.
+Halts here cost less than a regression in production. When the work so far is
+salvageable but the gate blocks completion, prefer `WIP-PARTIAL` over a halt —
+see `worker-preamble.md` §6.

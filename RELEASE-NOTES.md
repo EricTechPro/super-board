@@ -1,5 +1,62 @@
 # Release notes
 
+## v2.2.0 — 2026-08-20
+
+**The advisor panel is removed from super-build and super-qa.** It convened
+`mattpocock-skills:grilling` inside a worker whose own preamble forbids asking
+the user anything — and grilling's contract is "put each question to them and
+wait." In practice the worker either stalled or answered its own questions,
+which is inline reasoning wearing a costume.
+
+- **New: the decision ladder.** Acceptance criteria → repo precedent → smallest
+  blast radius → human gate. Walk it, stop at the first rung that answers the
+  question. Replaces "poll five roles, take the majority, tie → smallest blast
+  radius" with the tiebreak that was doing the work anyway.
+- **`grilling`, `shape`, and `clarify` are now worker-forbidden** and documented
+  as `super-board lint`-only. Reaching for one inside a lane is itself a human
+  gate — it means the ticket should have been caught upstream, while a human was
+  still at the keyboard.
+- **`code-review` survives, with a fixed point.** It runs once against the
+  worker's own diff before the final commit, with `git merge-base HEAD
+  origin/<base>` supplied so it never prompts. Standards findings are fixed in
+  place; a Spec finding that contradicts the issue's AC is a human gate.
+- **Commit trailer: `--- decision-vote ---` → `--- decision ---`.** Records the
+  question, the choice, and which rung settled it. Only rung-3 decisions need
+  one; AC and precedent are their own record.
+- **Human gates gained two entries** — public-contract breaks, and "you wanted
+  to grill the ticket."
+
+**super-review had no skills at all — now it has two.** The reviewer was running
+on its own prompt while every other lane loaded a process stack.
+
+- **`code-review` in the Review lane**, both axes. Standards against the repo's
+  documented rules plus the Fowler smell baseline; Spec against the originating
+  issue's acceptance criteria. The merge-base is always passed as the fixed point
+  so it never stops to ask for one. A Spec finding that contradicts the AC is a
+  Blocker.
+- **`codebase-design` as review vocabulary.** The reviewer now reads the diff for
+  shape — module, interface, depth, seam, adapter, leverage, locality — and applies
+  the deletion test to anything shallow the diff adds. Scoped to the diff, never the
+  whole codebase.
+- **New finding class: deepening opportunity.** It never blocks a merge. A green PR
+  does not get held for architecture taste.
+- **New: `scripts/super-review-file-refactor.sh`.** Files shape problems as
+  `refactor` cards in **Backlog** (not Ready — an unrefined card must not feed the
+  build lane), deduped by fingerprint, labelled `source:review` and
+  `strength:<strong|worth-exploring|speculative>`. It degrades to warnings on every
+  failure past issue-create: a board hiccup must never strand a mergeable PR in
+  Review. Covered by `tests/test-file-refactor.sh` (17 assertions, gh stubbed).
+- **`improve-codebase-architecture` is documented as lane-forbidden.** It scans the
+  whole codebase rather than the diff, writes an HTML report and shells out to
+  `open`, then asks which candidate to explore and hands off to `grilling`. It is a
+  desk tool — point it at the cards this lane files.
+
+Files touched: `super-build/references/decision-policy.md` (rewritten),
+`super-build/references/worker-preamble.md`, `super-build/SKILL.md`,
+`super-qa/references/iteration-preamble.md`, `super-review/SKILL.md`,
+`scripts/super-review-file-refactor.sh` (new),
+`tests/test-file-refactor.sh` (new), `install.sh`, `README.md`.
+
 ## v2.1.1 — 2026-08-07
 
 Docs only, no behaviour change. The README explained itself in paragraphs where
