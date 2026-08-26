@@ -133,6 +133,8 @@ has "labels the qa category"     "$(cat "$GH_LOG")" "qa:functional"
 has "labels the owner"           "$(cat "$GH_LOG")" "skill:super-build"
 has "lands in Bug column"        "$(cat "$GH_LOG")" "opt_Bug"
 has "prepends Board summary"     "$(cat "$BODY_CAPTURE")" "## Board summary"
+has "appends Blocked by when absent" "$(cat "$BODY_CAPTURE")" "## Blocked by"
+has "states no blocker explicitly"  "$(cat "$BODY_CAPTURE")" "- None."
 has "embeds the meta block"      "$(cat "$BODY_CAPTURE")" "fingerprint: imports|tc-1|silent-drop"
 has "meta carries the spec"      "$(cat "$BODY_CAPTURE")" "spec: e2e/paths/imports.spec.ts"
 

@@ -1,0 +1,812 @@
+<title>The Blocked Column</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+  :root {
+    /* Drafting paper and signal ink. Neutrals carry a faint green-grey bias
+       so they read as chosen rather than inherited mid-grey. */
+    --paper:      #F1F3F1;
+    --card:       #FBFCFB;
+    --ink:        #14181A;
+    --ink-soft:   #4A5450;
+    --ink-faint:  #7C8681;
+    --rule:       #D6DBD8;
+    --rule-soft:  #E6EAE7;
+
+    --signal:     #00707B;   /* transit-line teal — the one bold colour */
+    --signal-ink: #004C54;
+    --signal-wash:#DDEBEC;
+
+    --stop:       #B23A2C;   /* semantic only, never the accent */
+    --stop-wash:  #F5E2DF;
+    --hold:       #9A6A12;
+    --hold-wash:  #F4EBD8;
+    --clear:      #4A7233;
+    --clear-wash: #E4EDDC;
+
+    --shadow: 0 1px 2px rgba(20,24,26,.05), 0 8px 24px -12px rgba(20,24,26,.16);
+
+    --measure: 68ch;
+    --step--1: .8125rem;
+    --step-0:  1.0625rem;
+    --step-1:  1.3rem;
+    --step-2:  1.75rem;
+    --step-3:  2.4rem;
+    --step-4:  clamp(2.6rem, 6vw, 4rem);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #121615;
+      --card:       #191E1D;
+      --ink:        #E8ECEA;
+      --ink-soft:   #A3ADA9;
+      --ink-faint:  #767F7B;
+      --rule:       #2C3433;
+      --rule-soft:  #222927;
+
+      --signal:     #4FC3CD;
+      --signal-ink: #8BDCE4;
+      --signal-wash:#152B2E;
+
+      --stop:       #E2796A;
+      --stop-wash:  #2E1D1A;
+      --hold:       #D9A94E;
+      --hold-wash:  #2B2418;
+      --clear:      #93BE72;
+      --clear-wash: #1D2618;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #121615;
+    --card:       #191E1D;
+    --ink:        #E8ECEA;
+    --ink-soft:   #A3ADA9;
+    --ink-faint:  #767F7B;
+    --rule:       #2C3433;
+    --rule-soft:  #222927;
+
+    --signal:     #4FC3CD;
+    --signal-ink: #8BDCE4;
+    --signal-wash:#152B2E;
+
+    --stop:       #E2796A;
+    --stop-wash:  #2E1D1A;
+    --hold:       #D9A94E;
+    --hold-wash:  #2B2418;
+    --clear:      #93BE72;
+    --clear-wash: #1D2618;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, "Times New Roman", serif;
+    font-size: var(--step-0);
+    line-height: 1.62;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 78ch;
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 2rem) 6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3.25rem;
+  }
+
+  h1, h2, h3, .eyebrow, .chip, .lane, th {
+    font-family: Archivo, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  code, kbd, .mono, .ver {
+    font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  /* ---------- masthead ---------- */
+
+  header { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .eyebrow {
+    font-size: var(--step--1);
+    font-weight: 600;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--signal);
+    margin: 0;
+  }
+
+  h1 {
+    font-size: var(--step-4);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -.025em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    font-size: var(--step-1);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .byline {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: var(--step--1);
+    color: var(--ink-faint);
+    border-top: 1px solid var(--rule);
+    padding-top: .9rem;
+    margin: .4rem 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem 1.4rem;
+  }
+
+  /* ---------- the chain ---------- */
+
+  .chain {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    box-shadow: var(--shadow);
+    padding: clamp(1.2rem, 3vw, 2rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+
+  .chain h2 { margin: 0; }
+
+  .chain-scroll { overflow-x: auto; padding-bottom: .3rem; }
+
+  .chain-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    min-width: 44rem;
+  }
+
+  .node {
+    flex: 1 1 0;
+    border: 1px solid var(--rule);
+    border-right: none;
+    padding: .8rem .85rem;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    background: var(--paper);
+  }
+  .node:last-child { border-right: 1px solid var(--rule); }
+  .node.is-stop  { background: var(--stop-wash);  border-color: var(--stop); }
+  .node.is-hold  { background: var(--hold-wash);  border-color: var(--hold); }
+
+  .node .n {
+    font-family: "JetBrains Mono", monospace;
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .06em;
+    color: var(--ink-faint);
+  }
+  .node.is-stop .n { color: var(--stop); }
+  .node.is-hold .n { color: var(--hold); }
+
+  .node .t {
+    font-family: Archivo, sans-serif;
+    font-size: .85rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .node .d {
+    font-size: .78rem;
+    line-height: 1.4;
+    color: var(--ink-soft);
+  }
+
+  .chain figcaption {
+    font-size: var(--step--1);
+    color: var(--ink-soft);
+    line-height: 1.55;
+    margin: 0;
+  }
+
+  /* ---------- findings ---------- */
+
+  section > h2 {
+    font-size: var(--step-2);
+    font-weight: 700;
+    letter-spacing: -.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0 0 .35rem;
+  }
+
+  .section-note {
+    color: var(--ink-soft);
+    max-width: var(--measure);
+    margin: 0 0 1.6rem;
+  }
+
+  .findings { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .finding {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule);
+    border-radius: 3px;
+    padding: 1.25rem clamp(1rem, 3vw, 1.6rem);
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+    box-shadow: var(--shadow);
+  }
+  .finding.p0 { border-left-color: var(--stop); }
+  .finding.p1 { border-left-color: var(--hold); }
+  .finding.p2 { border-left-color: var(--signal); }
+
+  .fhead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .6rem .8rem;
+  }
+
+  .finding h3 {
+    font-size: var(--step-1);
+    font-weight: 600;
+    letter-spacing: -.015em;
+    line-height: 1.25;
+    text-wrap: balance;
+    margin: 0;
+    flex: 1 1 18rem;
+  }
+
+  .chip {
+    font-size: .66rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    padding: .22rem .5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .chip.p0 { background: var(--stop-wash);   color: var(--stop); }
+  .chip.p1 { background: var(--hold-wash);   color: var(--hold); }
+  .chip.p2 { background: var(--signal-wash); color: var(--signal-ink); }
+
+  .finding p { margin: 0; max-width: var(--measure); }
+
+  .label {
+    font-family: Archivo, sans-serif;
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: .25rem;
+  }
+
+  .evidence {
+    background: var(--paper);
+    border: 1px solid var(--rule-soft);
+    border-radius: 2px;
+    padding: .7rem .85rem;
+    font-size: var(--step--1);
+    line-height: 1.55;
+    color: var(--ink-soft);
+  }
+  .evidence p { max-width: none; }
+
+  .fix { border-top: 1px dashed var(--rule); padding-top: .8rem; }
+
+  code {
+    font-size: .87em;
+    background: var(--signal-wash);
+    color: var(--signal-ink);
+    padding: .1em .34em;
+    border-radius: 2px;
+    word-break: break-word;
+  }
+  .evidence code { background: var(--rule-soft); color: var(--ink); }
+
+  .lands {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    font-family: Archivo, sans-serif;
+    font-size: .72rem;
+  }
+  .lands span {
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    padding: .18rem .6rem;
+    color: var(--ink-soft);
+  }
+
+  /* ---------- table ---------- */
+
+  .tablewrap {
+    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    background: var(--card);
+    box-shadow: var(--shadow);
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 34rem;
+    font-size: var(--step--1);
+  }
+
+  th, td {
+    text-align: left;
+    padding: .72rem .9rem;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  th {
+    font-size: .7rem;
+    font-weight: 600;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    background: var(--paper);
+    border-bottom-color: var(--rule);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  .ver { font-variant-numeric: tabular-nums; }
+
+  .state {
+    font-family: Archivo, sans-serif;
+    font-weight: 600;
+    font-size: .72rem;
+    letter-spacing: .04em;
+    padding: .16rem .5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+  .state.ok   { background: var(--clear-wash); color: var(--clear); }
+  .state.warn { background: var(--hold-wash);  color: var(--hold); }
+
+  /* ---------- outro ---------- */
+
+  .outcome {
+    background: var(--signal-wash);
+    border: 1px solid var(--signal);
+    border-radius: 3px;
+    padding: clamp(1.1rem, 3vw, 1.7rem);
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+  }
+  .outcome h2 { font-size: var(--step-1); margin: 0; color: var(--signal-ink); }
+  .outcome p { margin: 0; color: var(--ink); max-width: var(--measure); }
+
+  .tally {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.6rem;
+    font-family: "JetBrains Mono", monospace;
+    font-size: var(--step--1);
+    font-variant-numeric: tabular-nums;
+    border-top: 1px solid var(--signal);
+    padding-top: .8rem;
+    color: var(--signal-ink);
+  }
+  .tally b { font-size: var(--step-2); font-weight: 600; display: block; line-height: 1.1; }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.2rem;
+    font-family: "JetBrains Mono", monospace;
+    font-size: .76rem;
+    color: var(--ink-faint);
+    line-height: 1.6;
+  }
+
+  ol.steps { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: .45rem; }
+  ol.steps li { max-width: var(--measure); }
+
+  a { color: var(--signal-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .finding { transition: transform .18s ease, box-shadow .18s ease; }
+    .finding:hover { transform: translateY(-1px); }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">super-board · run post-mortem</p>
+    <h1>The Blocked Column</h1>
+    <p class="standfirst">
+      One purely additive merge conflict stranded five cards on the finfluencer board and held them
+      there after its own cause was gone. Nothing in the pipeline was wrong. What was missing was a
+      way back out.
+    </p>
+    <p class="byline">
+      <span>2026-08-20</span>
+      <span>board: EricTechPro/projects/15</span>
+      <span>super-board 2.3.0</span>
+    </p>
+  </header>
+
+  <figure class="chain">
+    <h2 class="eyebrow" style="color:var(--ink-faint)">How one conflict became five stuck cards</h2>
+    <div class="chain-scroll">
+      <div class="chain-row">
+        <div class="node">
+          <span class="n">#32 · built</span>
+          <span class="t">Price feed passes</span>
+          <span class="d">264 tests, truth gate 94/100. Reviewer approves the code.</span>
+        </div>
+        <div class="node is-stop">
+          <span class="n">#32 · blocked</span>
+          <span class="t">Merge refused</span>
+          <span class="d">13 hunks, 5 files. Reviewer may not push to a branch it judges.</span>
+        </div>
+        <div class="node is-hold">
+          <span class="n">#37 · #40</span>
+          <span class="t">Parked behind it</span>
+          <span class="d">Preflight fires correctly: a blocker is open, so stop.</span>
+        </div>
+        <div class="node is-hold">
+          <span class="n">#34 · #39</span>
+          <span class="t">A second wall</span>
+          <span class="d">A seam no card owned: <code>notBuiltYet('ingest')</code>.</span>
+        </div>
+        <div class="node is-stop">
+          <span class="n">after</span>
+          <span class="t">Nobody swept</span>
+          <span class="d">Blocked is terminal. The run ends; the cards stay.</span>
+        </div>
+      </div>
+    </div>
+    <figcaption>
+      Every lane made the right call in isolation. The board still drained to a stop, because no lane
+      owns the question <em>“is this still blocked?”</em>
+    </figcaption>
+  </figure>
+
+  <section>
+    <h2>Seven gaps, in the order they cost time</h2>
+    <p class="section-note">
+      Each one is drawn from this run, not from a checklist. The evidence line is what actually
+      happened; the fix is what would have prevented it.
+    </p>
+
+    <div class="findings">
+
+      <article class="finding p0">
+        <div class="fhead">
+          <h3>Blocked is a dead end — nothing re-checks a card whose blocker has closed</h3>
+          <span class="chip p0">P0 · stranding</span>
+        </div>
+        <p>
+          A card moves to <code>Blocked</code> with a comment naming the issue it waits on. That
+          issue later closes. Nothing reads the comment back. The card sits until a human opens the
+          board and notices.
+        </p>
+        <div class="evidence">
+          <span class="label">Evidence</span>
+          <p>
+            #37 and #40 both named #32 as their blocker and parked correctly. #32 was the only thing
+            they needed. <code>references/run.md:460</code> ends a run when “only Blocked/Skipped/Done
+            cards remain” — so the closing of #32 could never have woken them, even in a later wave.
+          </p>
+        </div>
+        <div class="fix">
+          <span class="label">Fix</span>
+          <p>
+            A sweep at the top of every wave. For each <code>Blocked</code> card, re-read its
+            <code>## Blocked by</code> list and run one <code>gh issue view … -q .state</code> per
+            entry. All CLOSED → move to <code>Ready</code>, comment what changed. No judgement, no
+            model call, ~1 API request per blocker. This is the highest-value change on the list.
+          </p>
+        </div>
+        <div class="lands"><span>run.md — new §wave-start sweep</span><span>wave-plan.sh</span></div>
+      </article>
+
+      <article class="finding p0">
+        <div class="fhead">
+          <h3><code>mergeable=CLEAN</code> is trusted, and it lies</h3>
+          <span class="chip p0">P0 · correctness</span>
+        </div>
+        <p>
+          GitHub only answers whether the text conflicts. It says nothing about whether the branch
+          still compiles against the base it is about to land on.
+        </p>
+        <div class="evidence">
+          <span class="label">Evidence</span>
+          <p>
+            This happened twice in one session, from the same cause. PR #89 read
+            <code>MERGEABLE / CLEAN</code> and failed <code>tsc</code> against current
+            <code>staging</code>, because #32 had grown <code>PriceRepository</code> and
+            <code>Dependencies</code> after #89 was tested. Had it merged on GitHub’s word,
+            <code>staging</code> would have gone red.
+          </p>
+        </div>
+        <div class="fix">
+          <span class="label">Fix</span>
+          <p>
+            A freshness gate in Review: merge the base into a scratch worktree, run typecheck and the
+            suite, <em>then</em> judge. Costs one worktree and one test run per card. A failure
+            bounces to Build as an ordinary pass — it never blocks.
+          </p>
+        </div>
+        <div class="lands"><span>super-review/SKILL.md §5</span><span>run.md:289</span></div>
+      </article>
+
+      <article class="finding p1">
+        <div class="fhead">
+          <h3>An additive conflict parks the whole downstream chain</h3>
+          <span class="chip p1">P1 · throughput</span>
+        </div>
+        <p>
+          <code>run.md:433</code> says a merge conflict “that lane can’t resolve safely” goes to
+          <code>Blocked</code>. In practice no lane is allowed to try, so <em>every</em> conflict is
+          unsafe by default.
+        </p>
+        <div class="evidence">
+          <span class="label">Evidence</span>
+          <p>
+            All 13 hunks in PR #84 were two tickets adding different members to the same interface on
+            purpose. The resolution was “keep both sides” in 12 of them, and one block of setup code
+            moved inside a function. The Reviewer called it “a design merge across two tickets” and
+            stopped — correctly, since it does not push to branches it judges. But three cards waited
+            on a mechanical edit.
+          </p>
+        </div>
+        <div class="fix">
+          <span class="label">Fix</span>
+          <p>
+            Add a rebase pass. On <code>mergeStateStatus=DIRTY</code>, bounce to <code>Ready</code>
+            with a <code>loop:rebase</code> label rather than to <code>Blocked</code>. The Builder
+            lane already routes <code>resolving-merge-conflicts</code> in
+            <code>decision-policy.md:35</code> — it is equipped and it is allowed to push. Reserve
+            <code>Blocked</code> for a rebase that fails, or a conflict that is genuinely semantic.
+          </p>
+        </div>
+        <div class="lands"><span>run.md:433</span><span>super-review/SKILL.md:260</span><span>super-build/SKILL.md:197</span></div>
+      </article>
+
+      <article class="finding p1">
+        <div class="fhead">
+          <h3>“Proved with a fake” leaves no card owning the real thing</h3>
+          <span class="chip p1">P1 · blind spot</span>
+        </div>
+        <p>
+          A ticket can legitimately close having proved its behaviour against a stub. Nothing then
+          guarantees the real implementation has a ticket number, so a refusing stub reaches the base
+          branch and waits to be discovered by whoever trips on it.
+        </p>
+        <div class="evidence">
+          <span class="label">Evidence</span>
+          <p>
+            #33’s sixth criterion was, deliberately, “proven through <code>app.request()</code> with a
+            fake repository.” It shipped <code>ingest: notBuiltYet('ingest')</code> to
+            <code>staging</code>. No card owned the Supabase writer. Two tickets later, #34’s Tester
+            hit the wall and had to stop. It was filed as #91 by hand, during this session.
+          </p>
+        </div>
+        <div class="fix">
+          <span class="label">Fix</span>
+          <p>
+            Two layers. In <code>lint</code>, a thirteenth criterion: a ticket whose ACs prove
+            behaviour against a fake must name the card that owns the real one, or lint offers to file
+            it. In the wave preflight, a repo-level grep for <code>notBuiltYet</code> /
+            <code>NotImplemented</code> / <code>TODO(#</code> on the base branch, asserting each hit
+            has an open card.
+          </p>
+        </div>
+        <div class="lands"><span>references/lint.md — criterion 13</span><span>run.md preflight</span></div>
+      </article>
+
+      <article class="finding p1">
+        <div class="fhead">
+          <h3>Second-order fallout is real work, and no lane budgets for it</h3>
+          <span class="chip p1">P1 · estimation</span>
+        </div>
+        <p>
+          When a shared interface grows on both sides of a merge, the files that <em>git merged
+          cleanly</em> are where most of the work is. A builder that stops at “no conflict markers
+          left” is not finished.
+        </p>
+        <div class="evidence">
+          <span class="label">Evidence</span>
+          <p>
+            13 conflict hunks across 5 files; then 10 further files on #32’s branch and 1 on #34’s
+            needed edits before <code>tsc</code> passed. The invisible work was roughly twice the
+            visible conflict.
+          </p>
+        </div>
+        <div class="fix">
+          <span class="label">Fix</span>
+          <p>
+            Mostly covered by the freshness gate above — but say it explicitly in the rebase
+            instructions, so a worker treats a green typecheck, not an empty
+            <code>git diff --diff-filter=U</code>, as the finish line.
+          </p>
+        </div>
+        <div class="lands"><span>super-build/references/worker-preamble.md</span></div>
+      </article>
+
+      <article class="finding p2">
+        <div class="fhead">
+          <h3>Blocker reasons are prose, so the graph can’t be queried</h3>
+          <span class="chip p2">P2 · ergonomics</span>
+        </div>
+        <p>
+          The block comments this run produced were genuinely good — they named the blocker, showed
+          the verification, and listed the steps out. But reconstructing the dependency chain meant
+          reading five long comments across five issues.
+        </p>
+        <div class="evidence">
+          <span class="label">Evidence</span>
+          <p>
+            The chain was <code>#91 → #34 → #39</code> and <code>#32 → #37, #40</code>. Nothing on the
+            board expressed that. Block comments already emit machine lines —
+            <code>root-cause-hash:</code>, <code>gh-quota-on-exit:</code>, <code>move-mutation-result:</code>
+            — so the convention exists and is simply not used for this.
+          </p>
+        </div>
+        <div class="fix">
+          <span class="label">Fix</span>
+          <p>
+            Keep the prose exactly as it is; add one line: <code>blocked-by: 32, 91</code>. The wave
+            sweep reads it instead of parsing the issue body, and
+            <code>/super-board status</code> can render the graph.
+          </p>
+        </div>
+        <div class="lands"><span>references/block-template.md</span><span>references/status.md</span></div>
+      </article>
+
+      <article class="finding p2">
+        <div class="fhead">
+          <h3>A stranger cloning the repo gets v2.0.0 and undocumented dependencies</h3>
+          <span class="chip p2">P2 · open source</span>
+        </div>
+        <p>
+          Two separate problems, both at the front door. The README’s Quickstart sends people to
+          Releases; Releases is three minor versions behind <code>main</code>. And the Requirements
+          list omits the skill pack the lanes route into.
+        </p>
+        <div class="evidence">
+          <span class="label">Evidence</span>
+          <p>
+            <code>main</code> is <span class="ver">2.3.0</span>; the latest GitHub release is
+            <span class="ver">v2.0.0</span>, cut 2026-08-07, <span class="ver">8</span> commits
+            behind. <code>RELEASE-NOTES.md</code> documents six versions that were never tagged.
+            Separately, the skill files carry <span class="ver">57</span> references across
+            <span class="ver">12</span> distinct <code>mattpocock-skills:*</code> skills, and
+            “Requirements” lists Claude Code, <code>gh</code>, <code>jq</code>, <code>bash</code> and a
+            Project board — the skill pack appears only in Credits, at the bottom.
+          </p>
+        </div>
+        <div class="fix">
+          <span class="label">Fix</span>
+          <p>
+            Tag <span class="ver">v2.3.0</span> and add the release cut to the repo’s own checklist.
+            Move <code>npx skills add mattpocock/skills</code> into Requirements as a first-class
+            install step. Pick one canonical install path — <code>install.sh</code> or the release
+            zip — rather than documenting both as equals.
+          </p>
+        </div>
+        <div class="lands"><span>README.md §Quickstart, §Requirements</span><span>upstream releases</span></div>
+      </article>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>The three install sites</h2>
+    <p class="section-note">
+      Checked all three. The code is identical everywhere — the drift is entirely in what the public
+      can download.
+    </p>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr><th>Site</th><th>Path</th><th>Version</th><th>State</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Local project</td>
+            <td class="mono">projects/finfluencer/.claude/skills/super-*</td>
+            <td class="ver">2.3.0</td>
+            <td><span class="state ok">in sync</span></td>
+          </tr>
+          <tr>
+            <td>EricOS vendor</td>
+            <td class="mono">_skills/vendor/super-board/</td>
+            <td class="ver">2.3.0</td>
+            <td><span class="state ok">in sync</span></td>
+          </tr>
+          <tr>
+            <td>Upstream <code>main</code></td>
+            <td class="mono">github.com/EricTechPro/super-board</td>
+            <td class="ver">2.3.0</td>
+            <td><span class="state ok">in sync</span></td>
+          </tr>
+          <tr>
+            <td>Upstream release</td>
+            <td class="mono">releases/latest</td>
+            <td class="ver">v2.0.0</td>
+            <td><span class="state warn">8 commits behind</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="section-note" style="margin-top:1rem;margin-bottom:0">
+      All four <code>SKILL.md</code> files are byte-identical between the local project and the
+      vendor copy, so a fix written once in <code>_skills/vendor/super-board/</code> and re-installed
+      lands everywhere except the release — which is a separate, manual step today.
+    </p>
+  </section>
+
+  <section>
+    <h2>What I would do first</h2>
+    <p class="section-note">
+      Ordered by what each buys. The first two are the ones that would have prevented this run
+      entirely.
+    </p>
+    <ol class="steps">
+      <li><b>The Blocked sweep.</b> Pure <code>gh</code> calls, no model judgement. Turns a terminal
+        column into a waiting room.</li>
+      <li><b>The freshness gate in Review.</b> One worktree, one test run. Stops a green
+        <code>staging</code> from going red on a merge GitHub called clean.</li>
+      <li><b>The rebase pass.</b> Moves mechanical conflicts back to the lane that is allowed to push
+        them.</li>
+      <li><b>The <code>blocked-by:</code> line and lint criterion 13.</b> Cheap, and they make the two
+        blind spots visible instead of discoverable.</li>
+      <li><b>Cut v2.3.0 and fix Requirements.</b> Nothing to do with the loop — everything to do with
+        whether anyone else can run it.</li>
+    </ol>
+  </section>
+
+  <div class="outcome">
+    <h2>Where the board ended up</h2>
+    <p>
+      All five cards cleared by hand during this session: #32 and #34 merged, #91 filed for the seam
+      nobody owned, #37, #39 and #40 released back into <code>Ready</code>. Three were picked up by
+      the next wave before this was written.
+    </p>
+    <div class="tally">
+      <div><b>5 → 0</b>blocked</div>
+      <div><b>17</b>done</div>
+      <div><b>30</b>ready</div>
+      <div><b>501</b>tests green</div>
+    </div>
+  </div>
+
+  <footer>
+    Sources: PRs #84 and #89; issues #32, #33, #34, #37, #39, #40, #91 on EricTechPro/finfluencer ·
+    <span class="mono">references/run.md</span>, <span class="mono">references/lint.md</span>,
+    <span class="mono">super-review/SKILL.md</span>,
+    <span class="mono">super-build/references/decision-policy.md</span> at super-board 2.3.0 ·
+    version drift measured against <span class="mono">releases/latest</span> on 2026-08-20.
+  </footer>
+
+</div>

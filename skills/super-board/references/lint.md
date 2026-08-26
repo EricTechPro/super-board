@@ -81,7 +81,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 12-criterion table
+## Lint criteria — 14-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -99,8 +99,42 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 10 | Title ↔ body mismatch | Title says login, body says signup | Ask which is correct |
 | 11 | Out-of-scope vs PROJECT.md | Backend AC for a URL-only QA project | Move to Skipped or rewrite |
 | 12 | Sub-agent ambiguity flag | "this could mean ≥2 different things" | Surface both interpretations |
+| 13 | `## Blocked by` missing, empty, or unparseable | No section; or `- None — but #26 must merge first` | Rewrite to `- #N — why` bullets, or a bare `- None.` |
+| 14 | An AC proves behaviour against a fake, and no card owns the real thing | "proven with a fake repository, no database" | Name the ticket that builds it, or offer to file one |
 
 ---
+
+## Criteria 13 and 14 — the two that cost the most
+
+Both were added on 2026-08-20 after a real board stalled on them. They are different from 1–12:
+those judge whether a **human** can act on a ticket, these judge whether the **loop** can.
+
+**13 — the dependency line.** The wave planner reads `## Blocked by` to decide what may start and to
+sweep cards whose blockers have closed. Three shapes defeat it, and all three were on the board:
+
+| On the ticket | A human reads | The planner reads |
+|---|---|---|
+| *(no section at all)* | "probably nothing blocks it" | unknown — fail safe, never starts |
+| `## Blocked by` then nothing | "nothing blocks it" | unknown — fail safe, never starts |
+| `- None — but #26 must merge first` | **one blocker** | **no blockers** — starts it early |
+
+The third is the dangerous one, because the two readings disagree and the planner's is the one that
+acts. Note the source: the `to-tickets` template offers *"None — can start immediately"* as its
+example, so this shape is produced by following the instructions. Lint must catch it on the way in.
+
+Accept exactly two forms. Bullets — `- #32 — the price feed` — or a single `- None.` on its own.
+Explanation goes in a blockquote **below** the bullet, never on it.
+
+**14 — the fake with no follow-up.** A ticket may legitimately close having proved its behaviour
+against a stub; that is often the right scope. What must not happen is the stub reaching the base
+branch with no card owning the real implementation. On the same board, a route shipped proven
+against a fake repository — its own stated sixth criterion, correct and deliberate — and the real
+writer had no ticket number. It was found two tickets later when another card's Tester hit the wall,
+and filed by hand.
+
+When an AC contains *fake*, *stub*, *mock*, `notBuiltYet`, or "no database / no network" as the
+proof method, ask one question: **which card builds the real one?** A number is an answer. "Later"
+is not.
 
 ## Phase 4 — skill routing
 

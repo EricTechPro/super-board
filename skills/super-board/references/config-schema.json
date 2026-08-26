@@ -105,6 +105,38 @@
   // Blocked with `🛡 truth-check failed (confidence X/100)`. See §7.
   "truth_threshold": 70,
 
+  // Shell commands proving the branch still BUILDS against the base branch as it
+  // is right now. Run by super-board-merge-gate.sh from the root of a scratch
+  // worktree that already has the current base merged in, inside the merge lock,
+  // immediately before the squash-merge. Any non-zero exit sends the card back
+  // to Build for a rebase pass; it never Blocks.
+  //
+  // Not optional in practice. GitHub's `mergeable: CLEAN` only answers "does the
+  // text conflict" — it says nothing about whether the result compiles. On
+  // 2026-08-20 two PRs read CLEAN and failed `tsc` against their own base,
+  // because a shared interface had grown after they were tested. Leave this
+  // empty and the gate still merges the base in and reports conflicts, but it
+  // says loudly that nothing proved the result builds.
+  //
+  // A fresh worktree has no node_modules, so install as part of the command.
+  "verify_commands": [
+    "cd server && npm ci --silent && npm run typecheck && npm test"
+  ],
+
+  // Optional throttle on how many cards a single wave dispatches. ABSENT OR 0
+  // MEANS UNLIMITED, which is the default and is usually what you want.
+  //
+  // Wave width is decided by the dependency graph, not by this number: the
+  // planner picks every Ready card whose `## Blocked by` issues have all closed,
+  // plus whatever is already in flight. The workflow runtime caps CONCURRENT
+  // agents at min(16, cpus-2) and queues the rest, so a 19-card wave is normal.
+  //
+  // Set it only to deliberately throttle a machine. A fixed cap used to do the
+  // wave sizing, and it sized it badly: on a board where 23 of 32 Ready cards
+  // were waiting on an open blocker, the cap spent its slots on cards that would
+  // hit their own preflight and park.
+  "max_workers": 0,
+
   // Max consecutive failures in the same lane on the same root-cause hash
   // before the card auto-moves to Blocked. Default `2`. Root-cause hash
   // defined in §7 Halt gates.

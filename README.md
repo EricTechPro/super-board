@@ -67,6 +67,18 @@ The legacy dispatcher refuses to run (exit 78) unless the config explicitly sets
 
 Lane skills run as workflow agents inside `super-board-wave` by default, or as headless `claude -p` workers on the legacy backend. Same lifecycles either way.
 
+**Waves are sized by your dependency graph, not by a worker count.** Before each wave the planner
+reads every card's `## Blocked by` section and dispatches every Ready card whose blockers have all
+closed — 3 on a chained board, 19 on a wide one. It also **sweeps `Blocked`**: a card parked on an
+issue that has since closed comes back to `Ready` on its own, which is the difference between a
+holding column and a dead end. A dependency line it cannot read confidently is never treated as
+free; it is flagged for a human instead.
+
+**Nothing merges on GitHub's word.** `mergeable: CLEAN` only means the text does not conflict. The
+merge gate takes a lock, merges the current base into a scratch worktree, runs your
+`verify_commands`, and only then squash-merges — so a branch that stopped compiling while it waited
+its turn goes back to Build for a rebase pass instead of turning your base branch red.
+
 ### Which skills each lane loads
 
 Every lane skill is scoped to the diff or the ticket in front of it. Nothing in a
@@ -260,8 +272,15 @@ independently deployed services, which a single-app repo does not have.
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (the host that loads the skills)
 - `gh` CLI authenticated against the GitHub org/account that owns the Project board
 - `jq`
-- `bash` 4+
+- `bash` 3.2+ (stock macOS is fine — the scripts avoid bash-4 syntax on purpose)
 - A GitHub Project (v2) with a `Status` single-select field
+- The [mattpocock/skills](https://github.com/mattpocock/skills) pack — **required, not optional**.
+  The lane skills route into `tdd`, `code-review`, `diagnosing-bugs`, `resolving-merge-conflicts`
+  and eight others by name; without them a worker fails when it reaches for one:
+  ```bash
+  npx skills@latest add mattpocock/skills
+  ```
+  `grilling` is interactive by contract, so it runs only in `super-board lint`, never in a worker.
 
 ## Skill structure
 

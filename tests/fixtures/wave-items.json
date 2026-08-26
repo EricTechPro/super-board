@@ -1,11 +1,94 @@
 {
   "items": [
-    { "status": "Ready",  "content": { "type": "Issue", "number": 11, "title": "assigned ready card", "assignees": ["someone"] } },
-    { "status": "Ready",  "content": { "type": "Issue", "number": 12, "title": "first free ready card", "assignees": [] } },
-    { "status": "Ready",  "content": { "type": "Issue", "number": 14, "title": "second free ready card", "assignees": [] } },
-    { "status": "QA",     "content": { "type": "Issue", "number": 13, "title": "qa card", "assignees": [] } },
-    { "status": "Review", "content": { "type": "Issue", "number": 10, "title": "review card", "assignees": [] } },
-    { "status": "Done",   "content": { "type": "Issue", "number": 9,  "title": "done card", "assignees": [] } },
-    { "status": "Ready",  "content": { "type": "DraftIssue", "title": "draft, not an issue" } }
+    {
+      "status": "Ready",
+      "content": {
+        "type": "Issue",
+        "number": 11,
+        "title": "assigned ready card",
+        "assignees": [
+          "someone"
+        ]
+      }
+    },
+    {
+      "status": "Ready",
+      "content": {
+        "type": "Issue",
+        "number": 12,
+        "title": "first free ready card",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Ready",
+      "content": {
+        "type": "Issue",
+        "number": 14,
+        "title": "second free ready card",
+        "assignees": []
+      }
+    },
+    {
+      "status": "QA",
+      "content": {
+        "type": "Issue",
+        "number": 13,
+        "title": "qa card",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Review",
+      "content": {
+        "type": "Issue",
+        "number": 10,
+        "title": "review card",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Done",
+      "content": {
+        "type": "Issue",
+        "number": 9,
+        "title": "done card",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Ready",
+      "content": {
+        "type": "DraftIssue",
+        "title": "draft, not an issue"
+      }
+    },
+    {
+      "status": "Ready",
+      "content": {
+        "type": "Issue",
+        "number": 15,
+        "title": "unreadable dependency line",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Blocked",
+      "content": {
+        "type": "Issue",
+        "number": 16,
+        "title": "blocker has since closed",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Blocked",
+      "content": {
+        "type": "Issue",
+        "number": 17,
+        "title": "blocker still open",
+        "assignees": []
+      }
+    }
   ]
 }

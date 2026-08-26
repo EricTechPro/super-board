@@ -150,6 +150,26 @@ trap 'rm -f "$BODY_TMP"' EXIT
   echo "**${PRIORITY}** ${KIND}${CATEGORY:+ (${CATEGORY})}${ROUTE:+ on \`${ROUTE}\`}${AREA:+ — area \`${AREA}\`} · owner \`${SUGGESTED_SKILL:-unassigned}\`"
   echo
   echo "$BODY_RAW"
+
+  # The wave planner reads `## Blocked by` to decide whether a card may start.
+  # A MISSING section is not the same as `- None.`: the planner cannot tell "free"
+  # from "nobody wrote it down", so it fail-safes and the card never gets picked
+  # up. Bugs filed mid-wave on 2026-08-21 all arrived without one and sat in the
+  # holding column until a human added the line by hand.
+  #
+  # `- None.` is the honest default here: a QA finding is reproducible against
+  # code that already exists, which is what makes it actionable now.
+  if ! echo "$BODY_RAW" | grep -qiE '^#{1,3}[[:space:]]+Blocked by[[:space:]]*$'; then
+    echo
+    echo "## Blocked by"
+    echo
+    echo "- None."
+    echo
+    echo "> Added by the filer. A QA finding reproduces against code that already ships, so"
+    echo "> nothing gates it. Stated rather than left silent — a missing section reads as"
+    echo "> unreadable to the wave planner, not as None."
+  fi
+
   echo
   echo "<!-- super-qa-meta"
   echo "route: ${ROUTE:-none}"
@@ -189,9 +209,24 @@ promote() {
   project_id=$(gh project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return 1
   field_json=$(gh project field-list "$NUMBER" --owner "$OWNER" --format json) || return 1
   field_id=$(echo "$field_json" | jq -r '.fields[] | select(.name=="Status") | .id')
-  option_id=$(echo "$field_json" | jq -r --arg c "$TARGET_COLUMN" \
-    '.fields[] | select(.name=="Status") | .options[]? | select(.name==$c) | .id')
-  [ -n "$option_id" ] && [ "$option_id" != "null" ] || { echo "warn: no '${TARGET_COLUMN}' option on the Status field" >&2; return 1; }
+  # The requested name first, then the conventional aliases. A QA bug arrives
+  # WITH a repro and evidence, so Ready is an honest fallback for it — unlike a
+  # reviewer-filed refactor, which has neither and must wait for lint.
+  #
+  # Without this, a board whose columns do not include `Bug` lost every finding
+  # to exit 71. Observed on a real board on 2026-08-20, whose Status options are
+  # Todo/Ready/Building/QA/Review/Done/Blocked/Skipped — no `Bug` among them.
+  local candidate
+  for candidate in "$TARGET_COLUMN" Bug Ready Todo Backlog Triage; do
+    option_id=$(echo "$field_json" | jq -r --arg c "$candidate" \
+      '.fields[] | select(.name=="Status") | .options[]? | select(.name==$c) | .id')
+    if [ -n "$option_id" ] && [ "$option_id" != "null" ]; then
+      [ "$candidate" = "$TARGET_COLUMN" ] || \
+        echo "note: no '${TARGET_COLUMN}' column on this board — filed the bug into '${candidate}'" >&2
+      break
+    fi
+  done
+  [ -n "$option_id" ] && [ "$option_id" != "null" ] || { echo "warn: no '${TARGET_COLUMN}' column and no alias (Bug, Ready, Todo, Backlog, Triage) on the Status field" >&2; return 1; }
   gh project item-edit --id "$item_id" --project-id "$project_id" \
     --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null || return 1
 }

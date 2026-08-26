@@ -286,10 +286,20 @@ on the base branch**.
      git fetch origin <base> && git merge-base --is-ancestor <sha> origin/<base>
 4. Only after step 3 passes: close the issue, move card Review → Done, post the ✅ comment
    citing the merge commit sha.
-5. If the merge is REFUSED (failing required checks, conflicts, branch protection):
-     → move the card Review → **Blocked** with the §4 Block template naming the blocker.
-     → do NOT leave it in Review. A card left in Review is re-picked next tick and
-       re-reviewed forever, which is the re-dispatch waste tracked in issue #10.
+5. Merge through the gate, never with a bare `gh pr merge`:
+     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N>
+   The gate takes the merge mutex, merges the CURRENT base into a scratch worktree,
+   runs `config.verify_commands`, and only then squash-merges. Route by exit code:
+     0 → merged; continue to step 4
+     2 → the branch no longer builds against the base → **rebase pass** (see below)
+     3 → GitHub refused after a green verify (branch protection, required check)
+          → Blocked with the §4 template; this one really is a human's
+     4 → another card holds the merge lock → leave the card in Review, next wave retries
+     5 → the base does not merge in cleanly → **rebase pass** (see below)
+   → do NOT leave a card in Review on exit 2, 3 or 5. A card left in Review is
+     re-picked next tick and re-reviewed forever, which is the re-dispatch waste
+     tracked in issue #10. Exit 4 is the one exception: nothing is wrong with the
+     card, it simply queued.
 ```
 
 **Ordering invariant.** `Done` means "merged". If step 3 cannot be satisfied, the card
@@ -430,10 +440,57 @@ The three locks (assignee, in-flight file, lane PID) are defense in depth: any o
 | No card progresses for 3 ticks AND no lane is idle | Halt, dump state |
 | Auth expires mid-run | Halt, ping user with refresh instruction |
 | Pre-flight check fails on re-validation | Halt with the specific missing item |
-| Merge conflict that lane can't resolve safely | Move card to Blocked (reason 🛡), continue run |
+| Merge conflict, or a stale branch the merge gate rejects | Move card to **`Ready`** with the `loop:rebase` label — NOT Blocked. See "The rebase pass" below |
 | User-defined time/budget window reached | Graceful halt: finish in-flight workers, no new dispatches |
 | Destructive action would be required (prod deploy, db drop, secret rotation) | Halt, never proceed; move card to Blocked with reason 🛡 |
 | Block-rate alert: Blocked count > `config.block_rate_alert_pct` of initial Ready | Send breakdown notification (Telegram/channel), continue run |
+
+### The rebase pass
+
+A merge conflict is not a human decision. It is a build task, and it belongs in the lane that is
+allowed to push.
+
+**Why this changed.** On 2026-08-20 a PR reached Review with 264 tests green and a 94/100 truth
+gate, and could not merge: eleven hunks across five files, every one of them two tickets adding
+members to the same interface on purpose. The Reviewer refused — correctly, because **the Reviewer
+never pushes to the branch it is judging** — and moved the card to `Blocked`. Two further cards
+were waiting on that one and parked behind it. The resolution, when a human finally did it, was
+"keep both sides" in twelve of the thirteen hunks and one block of setup code moved into a
+function. Three cards lost a wave to a mechanical edit.
+
+**The rule.** On merge-gate exit 2 or 5:
+
+```
+[ ] label the issue `loop:rebase`
+[ ] move the card Review → Ready  (NOT Blocked)
+[ ] comment on the PR: which files conflicted, or which verify command failed, and its output
+```
+
+The Builder picks it up as an ordinary pass, routes `mattpocock-skills:resolving-merge-conflicts`,
+and pushes. Its finish line is a **green verification**, not an empty `git diff --diff-filter=U`:
+when a shared interface grows on both sides, the files git merged cleanly are where most of the
+work is. In the run above, thirteen conflict hunks were followed by ten further files that merged
+without a marker and still failed to typecheck.
+
+`Blocked` is still correct when the rebase itself cannot be done: the two sides genuinely disagree
+about behaviour, or resolving requires a product decision. That is a `❓` or `🧑` block with the
+usual template — and, per §4, a `blocked-by:` line.
+
+### The wave-start sweep
+
+Before planning any wave, `super-board-wave-plan.sh` reports two lists the orchestrator must act on
+**before** launching:
+
+- **`sweep`** — `Blocked` cards whose blockers have all closed. Move each to `Ready` and comment
+  naming what cleared it (`clearedBy` carries the numbers). They then join this very wave.
+- **`flag`** — cards whose `## Blocked by` section could not be parsed. Leave them where they are
+  and comment asking for the line to be fixed, quoting the `why`. Never guess: a card treated as
+  free on an unreadable line gets built against a base that does not have what it needs.
+
+**Why the sweep exists.** `Blocked` used to be terminal. A card parked naming the issue it waited
+for, that issue later merged, and nothing ever read the note back — the run's own done-condition
+("only Blocked/Skipped/Done cards remain") meant a closing blocker could not wake anything. Five
+cards sat that way on a real board until a human opened it and noticed.
 
 ### Root-cause hash (used by the rebuild-cap gate)
 

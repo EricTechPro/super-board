@@ -11,7 +11,14 @@ Pointer: spec `docs/specs/2026-05-21-super-board-design.md` §4 "Cross-cutting: 
 | Blocked | Card needs human action                    | Any lane, from any workflow column           |
 | Skipped | Card isn't actionable in this loop         | Any lane, from any workflow column           |
 
-Once moved, the card is out of the loop. Human drags it back to `Ready` when unblocked.
+Once moved, the card waits. **A card blocked only on other cards no longer waits for a human:**
+the wave planner sweeps `Blocked` at the start of every wave, and any card whose `## Blocked by`
+issues have all closed is moved back to `Ready` automatically, with a comment saying what cleared
+it. Everything else — credentials, permissions, product decisions — still waits for a person.
+
+That sweep is why the `blocked-by:` line below is mandatory. Before it existed, `Blocked` was
+terminal: on 2026-08-20 five cards sat there long after their blockers had merged, because the only
+record of what they were waiting for was English prose in a comment nobody re-read.
 
 ## Required Block/Skip comment template (mandatory on every transition into Blocked or Skipped)
 
@@ -34,7 +41,27 @@ To unblock:  <concrete action the human can take, in their own checklist form>
              [ ] <step 1>
              [ ] <step 2>
 Move back:   drag this card to Ready after the steps above are done
+blocked-by:  <comma-separated issue numbers, or "-" if nothing on this board clears it>
 ```
+
+### The `blocked-by:` line is mandatory
+
+Last line of the block, always present, machine-read. It sits alongside the other machine lines the
+lanes already emit (`root-cause-hash:`, `gh-quota-on-exit:`, `move-mutation-result:`) and follows the
+same rule: **prose above for the human, one parseable line below for the loop.**
+
+- `blocked-by: 32, 91` — this card returns to `Ready` the moment both close. The sweep does it.
+- `blocked-by: -` — nothing on this board clears it. It waits for a person, and the sweep leaves it
+  alone. Use this for every `🔐`, `💳`, `🔑`, `🧑` and `🎨` block.
+
+Write the numbers alone. **Never `blocked-by: none — but #26 must merge first`**: a line that says
+none and then names an issue is read as *no blocker* by the sweep and as *one blocker* by a human,
+and the sweep is the one that acts. That exact shape shipped on a real board and is the reason
+`super-board-deps.sh` refuses to guess at it.
+
+The same rule governs the issue body's `## Blocked by` section, which is where the sweep looks when
+a card has no block comment yet. Bullets of the form `- #N — why`, or a single `- None.` — nothing
+else parses.
 
 Skipped comments use the same template with `🤷 super-board · <lane> · SKIPPED` and replace `Why blocked` with `Why parked`, `What blocks` with `Why out-of-scope for this loop`.
 

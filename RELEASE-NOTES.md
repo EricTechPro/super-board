@@ -1,5 +1,69 @@
 # Release notes
 
+## v2.4.0 — 2026-08-20
+
+The `Blocked` column stops being a dead end, and nothing merges on GitHub's word.
+
+Everything here came out of one real run in which five cards sat in `Blocked` long after their
+blockers had merged, and two PRs that GitHub called mergeable would have turned the base branch red.
+
+**Waves are sized by the dependency graph.** `super-board-wave-plan.sh` now dispatches every Ready
+card whose `## Blocked by` issues have all closed, plus whatever is already in flight. `max_workers`
+is demoted to an optional throttle — absent or `0` is unlimited, which is the new default. A fixed
+cap sized waves badly: on a board where 23 of 32 Ready cards were waiting on an open blocker, it
+spent its slots on cards that would hit their own preflight and park.
+
+**The Blocked sweep.** The planner returns a `sweep` list — cards whose blockers have all closed —
+and the orchestrator moves them back to `Ready` before launching, so they join that same wave. Cards
+gated on a person (`blocked-by: -`) are never swept.
+
+**New: `super-board-deps.sh`.** The dependency primitive. Reads the last `blocked-by:` line from a
+card's Block comments, falling back to the body's `## Blocked by` section, and answers
+`runnable` / `humanGated` / `parseable` per issue. It is deliberately fail-safe: three shapes that
+look like "no blockers" but are not — a missing section, an empty one, and `- None — but #26 must
+merge first` — are reported unreadable and flagged rather than guessed at. That third shape is
+produced by following the `to-tickets` template, so it is common.
+
+**New: `super-board-merge-gate.sh`.** Takes an atomic `mkdir` merge lock, merges the CURRENT base
+into a scratch worktree, runs `config.verify_commands`, and only then squash-merges. Exit codes
+route the caller: `2` and `5` mean a rebase pass for the Builder, `3` is a real human block, `4` is
+just "someone else is merging". `mergeable: CLEAN` answers only "does the text conflict"; it says
+nothing about whether the result compiles.
+
+**The Review lane is no longer serialised.** The promise-chain mutex around the whole Review lane is
+gone from `super-board-wave.js`. It guarded the right thing in the wrong place — reading the diff,
+rerunning the suite and the truth-check never touch the base branch. The mutex now sits at the merge
+step alone, where the race actually is, and is visible across processes and machines.
+
+**Merge conflicts are a rebase pass, not a Blocked card.** `run.md` routes a conflicting or stale
+branch back to `Ready` with `loop:rebase`. The Reviewer still never pushes to a branch it is judging
+— it hands the work to the lane that is allowed to.
+
+**Lint gains two criteria.** 13: the `## Blocked by` line must be machine-readable. 14: an
+acceptance criterion proved against a fake must name the card that builds the real thing, or lint
+offers to file it.
+
+### Fixes
+
+- `super-review-file-refactor.sh` and `super-qa-file-bug.sh` filed into hardcoded `Backlog` / `Bug`
+  columns. A board without them got cards with **no Status at all** — invisible in the Kanban view,
+  not merely misplaced. Both now fall back through the conventional aliases and say which they used.
+- `install.sh` handles a `.claude/skills/<name>` that is a **symlink** to a real tree elsewhere,
+  resolving it with `cd -P` and writing through it instead of failing with "Not a directory". It
+  also refuses any destination not named after the skill, and `test-install.sh` plants decoy
+  directories that must survive — because an earlier draft of this resolution deleted 190 of them
+  (`cd ""` succeeds in bash, so an empty `readlink` silently resolved to the parent).
+- `install.sh` never shipped `super-board-stop.sh`, so a fresh install had a broken `stop` verb.
+- README claimed `bash 4+`. Every script here is bash-3.2 clean, which is what stock macOS has.
+- README listed the `mattpocock/skills` pack under Credits rather than Requirements, though the lane
+  skills reference twelve of them by name and fail without them.
+
+### Tests
+
+`test-deps.sh` (17) and `test-merge-gate.sh` (7) and `test-install.sh` (5) are new.
+`test-wave-plan.sh` (15) was rewritten for the new wave contract. `test-file-refactor.sh` gained
+five. All offline — no `gh`, no network.
+
 ## v2.3.0 — 2026-08-20
 
 **Skills are assigned when the ticket is written, not re-derived at runtime.**

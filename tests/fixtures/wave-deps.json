@@ -1,0 +1,23 @@
+{
+  "$comment": [
+    "The dependency graph super-board-deps.sh would emit for wave-items.json.",
+    "Held as a fixture so the planner's tests need no network and no gh.",
+    "",
+    "The four shapes that matter, one card each:",
+    "  #12 free            — parseable, nothing open",
+    "  #14 waiting         — parseable, #12 still open, so NOT pickable",
+    "  #15 unreadable      — the 'None — but #9 must merge first' landmine",
+    "  #16 swept           — Blocked, but its only blocker (#9) is closed",
+    "Cards in QA/Review (#13, #10) carry entries too, but the planner does not",
+    "consult them: a card past preflight is mid-flight and the graph cannot",
+    "retroactively park it."
+  ],
+  "10": { "number": 10, "title": "review card",  "state": "OPEN", "blockers": [],   "openBlockers": [],   "parseable": true,  "runnable": true,  "why": "" },
+  "11": { "number": 11, "title": "assigned",     "state": "OPEN", "blockers": [],   "openBlockers": [],   "parseable": true,  "runnable": true,  "why": "" },
+  "12": { "number": 12, "title": "free ready",   "state": "OPEN", "blockers": [],   "openBlockers": [],   "parseable": true,  "runnable": true,  "why": "" },
+  "13": { "number": 13, "title": "qa card",      "state": "OPEN", "blockers": [],   "openBlockers": [],   "parseable": true,  "runnable": true,  "why": "" },
+  "14": { "number": 14, "title": "waiting ready","state": "OPEN", "blockers": [12], "openBlockers": [12], "parseable": true,  "runnable": false, "why": "" },
+  "15": { "number": 15, "title": "unreadable",   "state": "OPEN", "blockers": [],   "openBlockers": [],   "parseable": false, "runnable": false, "why": "the section says None and then names an issue — a planner reads no blocker, a human reads one" },
+  "16": { "number": 16, "title": "cleared block","state": "OPEN", "blockers": [9],  "openBlockers": [],   "parseable": true,  "runnable": true,  "why": "" },
+  "17": { "number": 17, "title": "still blocked","state": "OPEN", "blockers": [12], "openBlockers": [12], "parseable": true,  "runnable": false, "why": "" }
+}

@@ -1,52 +1,115 @@
 #!/usr/bin/env bash
-# Tests super-board-wave-plan.sh against fixtures. No gh calls.
+# Tests super-board-wave-plan.sh against fixtures. No gh calls, no network —
+# the dependency graph is injected with --deps.
+#
+# The contract these tests pin down changed on 2026-08-20. A wave used to be
+# "one card per column, then fill to max_workers". It is now "every Ready card
+# the dependency graph says is free, plus everything already in flight", with
+# max_workers demoted to an optional throttle. Several scenarios below exist
+# because the old contract shipped a board where five cards sat in Blocked long
+# after their blockers had closed.
 set -euo pipefail
 cd "$(dirname "$0")"
 PLAN="../scripts/super-board-wave-plan.sh"
+CFG=fixtures/wave-config.json
+ITEMS=fixtures/wave-items.json
+DEPS=fixtures/wave-deps.json
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
+plan() { "$PLAN" --config "$1" --items "$ITEMS" --deps "$DEPS"; }
 
-OUT=$("$PLAN" --config fixtures/wave-config.json --items fixtures/wave-items.json)
+# Uncapped is the default shape, so every scenario runs without a cap unless it
+# is specifically testing the throttle.
+NOCAP=$(jq 'del(.max_workers)' "$CFG")
+OUT=$(plan <(echo "$NOCAP"))
 
-# Scenario 1 — base picks, downstream-first order: Review #10, QA #13, Ready #12
+# 1 — width follows the graph, not a knob. Free Ready cards are #12 alone:
+#     #11 is assigned, #14 waits on open #12, #15 is unreadable, the draft is not
+#     an issue. In flight: Review #10 and QA #13. Total 3.
 echo "$OUT" | jq -e '.cards | length == 3' >/dev/null || fail "expected 3 cards, got: $OUT"
-echo "$OUT" | jq -e '.cards[0].number == 10 and .cards[0].status == "Review"' >/dev/null || fail "card[0] should be Review #10"
-echo "$OUT" | jq -e '.cards[1].number == 13 and .cards[1].status == "QA"' >/dev/null || fail "card[1] should be QA #13"
-echo "$OUT" | jq -e '.cards[2].number == 12 and .cards[2].status == "Ready"' >/dev/null || fail "card[2] should be Ready #12 (skip assigned #11)"
+echo "$OUT" | jq -e '[.cards[].number] | sort == [10,12,13]' >/dev/null || fail "wrong cards: $OUT"
 
-# Scenario 2 — qa-only variant: Review + Ready base picks, then backlog fill adds Ready #14
-QA_ONLY=$(jq '.variant = "qa-only"' fixtures/wave-config.json)
-OUT2=$("$PLAN" --config <(echo "$QA_ONLY") --items fixtures/wave-items.json)
-echo "$OUT2" | jq -e '.cards | length == 3' >/dev/null || fail "qa-only should select 3 cards (backlog fill), got: $OUT2"
-echo "$OUT2" | jq -e '[.cards[].status] == ["Review","Ready","Ready"]' >/dev/null || fail "qa-only columns should be Review,Ready,Ready"
+# 2 — downstream-first: in-flight cards lead, so work already begun finishes
+#     before new work starts.
+echo "$OUT" | jq -e '[.cards[].status] | index("Ready") > index("Review")' >/dev/null \
+  || fail "in-flight cards must precede Ready cards: $OUT"
 
-# Scenario 3 — max_workers cap
-CAPPED=$(jq '.max_workers = 1' fixtures/wave-config.json)
-OUT3=$("$PLAN" --config <(echo "$CAPPED") --items fixtures/wave-items.json)
-echo "$OUT3" | jq -e '.cards | length == 1 and .[0].number == 10' >/dev/null || fail "cap=1 should keep only Review #10"
+# 3 — a Ready card with an OPEN blocker is not dispatched. This is the whole
+#     point: #14 would previously have been picked as backlog fill, hit its own
+#     preflight, and parked in Blocked.
+echo "$OUT" | jq -e '[.cards[].number] | index(14) == null' >/dev/null \
+  || fail "#14 waits on open #12 and must not be dispatched: $OUT"
 
-# Scenario 4 — backlog fill on full variant: cap 5 adds Ready #14 after the base 3
-WIDE=$(jq '.max_workers = 5' fixtures/wave-config.json)
-OUT4=$("$PLAN" --config <(echo "$WIDE") --items fixtures/wave-items.json)
-echo "$OUT4" | jq -e '.cards | length == 4' >/dev/null || fail "cap=5 should select 4 cards (3 base + 1 backlog), got: $OUT4"
-echo "$OUT4" | jq -e '.cards[3].number == 14 and .cards[3].status == "Ready"' >/dev/null || fail "card[3] should be backlog-fill Ready #14"
+# 4 — an unreadable dependency line is fail-safe: never dispatched, always flagged.
+echo "$OUT" | jq -e '[.cards[].number] | index(15) == null' >/dev/null \
+  || fail "#15 has an unreadable Blocked-by line and must not be dispatched"
+echo "$OUT" | jq -e '[.flag[].number] == [15]' >/dev/null \
+  || fail "#15 must be flagged so a human can fix the line, got: $(echo "$OUT" | jq -c .flag)"
+echo "$OUT" | jq -e '.flag[0].why | test("None")' >/dev/null \
+  || fail "the flag must carry the reason, not just the number"
 
-# Scenario 5 — merge-race guard: extra Review cards excluded by default
-OUT5=$("$PLAN" --config fixtures/wave-config.json --items fixtures/wave-items-review-heavy.json)
-echo "$OUT5" | jq -e '[.cards[] | select(.status == "Review")] | length == 1' >/dev/null || fail "default config should allow only 1 Review card, got: $OUT5"
+# 5 — the sweep: a Blocked card whose blockers have all closed comes back.
+#     #16 waits on #9, which is closed. #17 waits on #12, which is open.
+echo "$OUT" | jq -e '[.sweep[].number] == [16]' >/dev/null \
+  || fail "expected only #16 swept, got: $(echo "$OUT" | jq -c .sweep)"
+echo "$OUT" | jq -e '.sweep[0].clearedBy == [9]' >/dev/null \
+  || fail "the sweep must name what cleared the card, for the comment it will post"
 
-# Scenario 6 — human_approves_merge=true unlocks extra Review cards
-HUMAN=$(jq '.human_approves_merge = true' fixtures/wave-config.json)
-OUT6=$("$PLAN" --config <(echo "$HUMAN") --items fixtures/wave-items-review-heavy.json)
-echo "$OUT6" | jq -e '[.cards[] | select(.status == "Review")] | length >= 2' >/dev/null || fail "human_approves_merge should allow extra Review cards, got: $OUT6"
+# 6 — a swept card is NOT also dispatched in the same plan. The orchestrator moves
+#     it to Ready first; dispatching it straight from Blocked would skip that move
+#     and leave the board lying about where the card is.
+echo "$OUT" | jq -e '[.cards[].number] | index(16) == null' >/dev/null \
+  || fail "#16 must be swept, not dispatched from Blocked"
 
-# Scenario 7 — invalid variant fails loudly (exit 65), never silently qa-only
-BAD=$(jq '.variant = "fulll"' fixtures/wave-config.json)
-RC=0; "$PLAN" --config <(echo "$BAD") --items fixtures/wave-items.json >/dev/null 2>&1 || RC=$?
+# 7 — max_workers still throttles when set. It is a safety valve now, not the
+#     wave-sizing mechanism.
+OUT7=$(plan <(jq '.max_workers = 1' "$CFG"))
+echo "$OUT7" | jq -e '(.cards | length) == 1 and .cards[0].number == 10' >/dev/null \
+  || fail "max_workers=1 should keep only the leading in-flight card, got: $OUT7"
+
+# 8 — the throttle does not suppress the sweep. A capped wave still frees cards,
+#     because sweeping is a board correction and costs no worker.
+echo "$OUT7" | jq -e '[.sweep[].number] == [16]' >/dev/null \
+  || fail "a capped wave must still sweep, got: $(echo "$OUT7" | jq -c .sweep)"
+
+# 9 — assignee is the cross-machine mutex and still wins over everything.
+echo "$OUT" | jq -e '[.cards[].number] | index(11) == null' >/dev/null \
+  || fail "#11 is assigned and must never be dispatched"
+
+# 10 — reviews are no longer gated behind human_approves_merge. The merge race is
+#      guarded where it happens (the merge lock plus the freshness gate inside the
+#      wave workflow), so a second Review card is free to run here.
+OUT10=$("$PLAN" --config <(echo "$NOCAP") --items fixtures/wave-items-review-heavy.json --deps "$DEPS")
+echo "$OUT10" | jq -e '[.cards[] | select(.status == "Review")] | length >= 2' >/dev/null \
+  || fail "reviews should run in parallel now, got: $OUT10"
+
+# 11 — qa-only has no Builder lane, so the QA column is not an in-flight source.
+OUT11=$("$PLAN" --config <(echo "$NOCAP" | jq '.variant = "qa-only"') --items "$ITEMS" --deps "$DEPS")
+echo "$OUT11" | jq -e '[.cards[].status] | index("QA") == null' >/dev/null \
+  || fail "qa-only must not select from the QA column, got: $OUT11"
+echo "$OUT11" | jq -e '[.cards[].number] | index(12) != null' >/dev/null \
+  || fail "qa-only must still select free Ready cards, got: $OUT11"
+
+# 12 — invalid variant fails loudly (exit 65), never silently qa-only.
+RC=0; "$PLAN" --config <(jq '.variant = "fulll"' "$CFG") --items "$ITEMS" --deps "$DEPS" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 65 ] || fail "invalid variant should exit 65, got $RC"
 
-# Scenario 8 — empty board → cards:[] (run-workflow.md done condition depends on this shape)
-OUT8=$("$PLAN" --config fixtures/wave-config.json --items <(echo '{"items":[]}'))
-echo "$OUT8" | jq -e '.cards == []' >/dev/null || fail "empty board should yield cards:[], got: $OUT8"
+# 13 — empty board → empty everything (run-workflow.md's done condition depends
+#      on this shape).
+OUT13=$("$PLAN" --config <(echo "$NOCAP") --items <(echo '{"items":[]}') --deps "$DEPS")
+echo "$OUT13" | jq -e '.cards == [] and .sweep == [] and .flag == []' >/dev/null \
+  || fail "empty board should yield empty cards/sweep/flag, got: $OUT13"
 
-echo "PASS: test-wave-plan.sh (8 scenarios)"
+# 14 — a card the graph has never heard of is not treated as free. An issue beyond
+#      the fetch limit, or closed out from under the board, must not be dispatched
+#      on the strength of a missing entry.
+OUT14=$("$PLAN" --config <(echo "$NOCAP") --items "$ITEMS" --deps <(echo '{}'))
+echo "$OUT14" | jq -e '[.cards[] | select(.status == "Ready")] | length == 0' >/dev/null \
+  || fail "an empty graph must yield no Ready picks, got: $OUT14"
+
+# 15 — a graph that cannot be derived is a hard failure, not an empty graph.
+#      Without --deps and without config.repo.remote there is nothing to derive from.
+RC=0; "$PLAN" --config <(jq 'del(.repo)' "$CFG") --items "$ITEMS" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 66 ] || fail "a missing repo remote should exit 66, got $RC"
+
+echo "PASS: test-wave-plan.sh (15 scenarios)"

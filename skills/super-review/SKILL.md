@@ -78,6 +78,12 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - If a blocker is a functional regression, hand it to **Super QA**.
    - If a blocker is visual/design fidelity, hand it to **Super UX**.
    - If it is a deepening opportunity, file it with `scripts/super-review-file-refactor.sh` and carry on to the merge decision. Do not open a PR thread for it; do not bounce the card.
+     **Write real acceptance criteria in the `--body-file`.** A card that carries an
+     `## Acceptance criteria` section is filed straight into `Ready` and the next wave builds it;
+     one without lands in the holding column and waits for `super-board lint`. That is the whole
+     difference between a finding that gets fixed this week and a note nobody grades. Two or three
+     checkable lines is enough — what must be true when this is done, in terms a test can assert.
+     The filer appends `## Blocked by` for you when you have not written one.
    - If the user explicitly authorizes Super Review to fix, make the smallest safe patch, verify it, and clearly report that review also changed code.
 
 5. **Verify evidence**

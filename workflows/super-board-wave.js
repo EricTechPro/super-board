@@ -57,17 +57,21 @@ const LANE = {
   review: { skill: 'super-review', section: 'Reviewer', phase: 'Review' },
 }
 
-// Merge-race guard, execution side: on auto-merge boards (humanApprovesMerge
-// false) Reviewer agents squash-merge into the same base branch, so Review
-// lanes must run one at a time even when card chains reach Review in the
-// same wave. Promise-chain mutex; the catch keeps one failed review from
-// poisoning the chain.
-let reviewLock = Promise.resolve()
-const withReviewLock = (fn) => {
-  const run = reviewLock.then(fn)
-  reviewLock = run.then(() => undefined, () => undefined)
-  return run
-}
+// The merge-race guard used to live here, as a promise chain around the whole
+// Review lane. It is gone on purpose (2026-08-20).
+//
+// It guarded the right thing in the wrong place. Squash-merges into one base
+// branch do race — but serialising the entire lane also serialised reading the
+// diff, rerunning the suite and the truth-check, none of which touch the base.
+// On a wide wave that made Review the throughput ceiling for work that could
+// have run in parallel. It was also invisible to the `claude-p` backend and to a
+// second orchestrator on another machine, because a JS promise cannot be seen
+// from another process.
+//
+// The mutex now sits at the merge step itself, in super-board-merge-gate.sh, as
+// an atomic mkdir lock the Reviewer takes for the seconds it needs — and the
+// freshness check runs INSIDE that lock, so nothing can move the base between
+// the proof and the merge. See run.md → Reviewer lifecycle step 5.
 
 const lanePrompt = (lane, card) => [
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
@@ -146,9 +150,9 @@ const results = await pipeline(
       at = 'Review'
     }
     if (at === 'Review') {
-      // Reviewer always on session model; serialized unless a human merges.
-      const review = () => runLane('review', card, undefined, history)
-      if (input.humanApprovesMerge) { await review() } else { await withReviewLock(review) }
+      // Reviewer always on session model. No lane-level serialisation: the merge
+      // gate holds the mutex for the merge alone (see the note above).
+      await runLane('review', card, undefined, history)
     }
     return { number: card.number, history }
   }

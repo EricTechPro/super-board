@@ -1,0 +1,184 @@
+#!/usr/bin/env bash
+# super-board-merge-gate.sh — take the merge mutex, prove the branch still works
+# against the base as it is RIGHT NOW, then merge. Release either way.
+#
+# WHY THIS EXISTS, MEASURED
+#
+# GitHub's `mergeable: MERGEABLE` / `mergeStateStatus: CLEAN` answers one
+# question: does the text conflict? It says nothing about whether the branch
+# still compiles against the base it is about to land on. On 2026-08-20 that gap
+# was hit twice in one session on the same repo:
+#
+#   PR #89 read MERGEABLE/CLEAN and failed `tsc` against current `staging`,
+#   because a PR that merged after #89 was tested had added a member to a shared
+#   interface. Eleven test files that git merged without a single conflict marker
+#   no longer typechecked. Merging on GitHub's word would have turned the base
+#   branch red.
+#
+# Nothing textual conflicted. Nothing was wrong with either branch. The two facts
+# were simply established at different times, and only one of them was rechecked.
+#
+# WHY THE CHECK IS INSIDE THE LOCK, NOT BEFORE IT
+#
+# A check that runs before the mutex proves the branch was good against a base
+# that another lane may replace while this one waits its turn — which is exactly
+# the stale-approval shape above, reintroduced one level down. Inside the lock,
+# nothing can move the base between the proof and the merge.
+#
+# The cost is one verification run serialised per merge. The alternative, paid
+# once, is a red base branch and every lane after it bouncing on someone else's
+# failure.
+#
+# WHY A DIRECTORY LOCK RATHER THAN THE ORCHESTRATOR'S PROMISE CHAIN
+#
+# The previous mutex lived in the wave workflow as a JS promise chain, which
+# serialised the WHOLE Review lane — reading the diff, rerunning the suite and
+# the truth-check all queued behind one card, not just the merge. It also could
+# not be seen by the `claude-p` backend or by a second orchestrator on another
+# machine. `mkdir` is atomic on every POSIX filesystem, so the lock is visible to
+# anything that can see the repo.
+#
+# CONFIG
+#
+#   verify_commands: ["cd server && npm run typecheck", "cd server && npm test"]
+#
+# Absent, the gate still merges the base in and reports conflicts, but CANNOT
+# prove the result builds — it says so loudly on stderr rather than implying a
+# check it did not run.
+#
+# Usage:
+#   super-board-merge-gate.sh --config <config.json> --pr <number>
+#                             [--lock-timeout 1800] [--stale-after 5400] [--dry-run]
+#
+# `--lock-timeout` is how long THIS caller waits for its turn. `--stale-after` is
+# how old a lock must be before it is presumed abandoned. They are deliberately
+# two numbers: collapsing them means a caller that waits 20 minutes will reap a
+# lock legitimately held for 20 minutes by a slow verification run — which is
+# exactly the merge it was waiting politely for.
+#
+# Exit codes, all meaningful to the caller:
+#   0  merged
+#   2  verification failed — branch needs a rebase pass, NOT a Blocked card
+#   3  merge refused by GitHub after a green verification (branch protection, checks)
+#   4  could not take the lock within the timeout
+#   5  the base could not be merged in (real conflict) — needs a rebase pass
+set -euo pipefail
+
+CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --config)        CONFIG="$2"; shift 2 ;;
+    --pr)            PR="$2"; shift 2 ;;
+    --lock-timeout)  LOCK_TIMEOUT="$2"; shift 2 ;;
+    --stale-after)   STALE_AFTER="$2"; shift 2 ;;
+    --dry-run)       DRY=1; shift ;;
+    *) echo "unknown arg: $1" >&2; exit 64 ;;
+  esac
+done
+[ -n "$CONFIG" ] && [ -e "$CONFIG" ] || { echo "config not found: ${CONFIG:-<unset>}" >&2; exit 66; }
+[ -n "$PR" ] || { echo "--pr <number> is required" >&2; exit 64; }
+# A lock is presumed abandoned only well past the point a caller stops waiting,
+# so a slow-but-alive merge is never stolen from. The floor matters as much as
+# the multiple: an impatient caller (say --lock-timeout 6 in a test) would
+# otherwise outlive 3x its own wait and reap a lock that was never abandoned.
+# Nothing this gate does legitimately exceeds half an hour, so half an hour is
+# the earliest anything may be presumed dead.
+STALE_FLOOR=1800
+if [ -z "$STALE_AFTER" ]; then
+  STALE_AFTER=$(( LOCK_TIMEOUT * 3 ))
+  [ "$STALE_AFTER" -lt "$STALE_FLOOR" ] && STALE_AFTER="$STALE_FLOOR"
+fi
+
+CONFIG_JSON=$(cat "$CONFIG")
+BASE=$(echo "$CONFIG_JSON" | jq -r '.base_branch // "main"')
+REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // ""' | sed -E 's#^https?://github\.com/##; s#\.git$##')
+REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
+# Read with a while-loop rather than `mapfile`: macOS ships bash 3.2 and every
+# other script in this repo runs there, so this one does too.
+VERIFY=()
+while IFS= read -r line; do
+  [ -n "$line" ] && VERIFY+=("$line")
+done < <(echo "$CONFIG_JSON" | jq -r '.verify_commands // [] | .[]')
+
+LOCK_DIR="${REPO_PATH}/.claude/super-board/inflight/merge.lock"
+mkdir -p "$(dirname "$LOCK_DIR")"
+
+say() { echo "[merge-gate #${PR}] $*" >&2; }
+
+# ---- the mutex -------------------------------------------------------------
+# mkdir is atomic: it succeeds for exactly one caller and fails for the rest.
+# The pid/date inside is for a human reading a stuck lock, never for logic.
+acquire() {
+  local waited=0
+  while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+    # A lock older than the timeout belongs to a process that died holding it.
+    # Reaping it is safe because the only thing it guards is a merge, and a dead
+    # merge has already either landed or not.
+    if [ -f "$LOCK_DIR/at" ]; then
+      local age=$(( $(date +%s) - $(cat "$LOCK_DIR/at" 2>/dev/null || echo 0) ))
+      if [ "$age" -gt "$STALE_AFTER" ]; then
+        say "reaping a lock abandoned ${age}s ago (stale-after ${STALE_AFTER}s) by pid $(cat "$LOCK_DIR/pid" 2>/dev/null || echo '?')"
+        rm -rf "$LOCK_DIR"; continue
+      fi
+    fi
+    [ "$waited" -ge "$LOCK_TIMEOUT" ] && return 1
+    sleep 5; waited=$(( waited + 5 ))
+  done
+  date +%s > "$LOCK_DIR/at"; echo "$$" > "$LOCK_DIR/pid"; echo "$PR" > "$LOCK_DIR/pr"
+  return 0
+}
+release() { rm -rf "$LOCK_DIR"; }
+
+acquire || { say "could not take the merge lock within ${LOCK_TIMEOUT}s"; exit 4; }
+trap release EXIT
+
+say "lock taken; verifying against ${BASE} as it is now"
+
+# ---- the freshness check ---------------------------------------------------
+# Done in a throwaway worktree so the branch under test is never mutated: the
+# gate proves a merge, it does not perform one locally and it never pushes.
+SCRATCH=$(mktemp -d)
+cleanup() { git -C "$REPO_PATH" worktree remove --force "$SCRATCH" 2>/dev/null || true; rm -rf "$SCRATCH"; release; }
+trap cleanup EXIT
+
+HEAD_REF=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName -q .headRefName)
+git -C "$REPO_PATH" fetch origin "$HEAD_REF" "$BASE" --quiet
+
+git -C "$REPO_PATH" worktree add --detach "$SCRATCH" "origin/${HEAD_REF}" --quiet 2>/dev/null || {
+  say "could not create a scratch worktree for ${HEAD_REF}"; exit 5; }
+
+if ! git -C "$SCRATCH" merge "origin/${BASE}" --no-edit --quiet 2>/dev/null; then
+  CONFLICTS=$(git -C "$SCRATCH" diff --name-only --diff-filter=U | tr '\n' ' ')
+  say "the base does not merge in cleanly — conflicts: ${CONFLICTS}"
+  say "this is a rebase pass for the Builder lane, not a Blocked card"
+  exit 5
+fi
+
+if [ "${#VERIFY[@]:-0}" -eq 0 ]; then
+  say "WARNING: config.verify_commands is empty — the base merges cleanly, but"
+  say "WARNING: nothing proved the result BUILDS. A clean merge is not a green build."
+else
+  for cmd in "${VERIFY[@]:-}"; do
+    say "verify: ${cmd}"
+    if ! ( cd "$SCRATCH" && eval "$cmd" ) >"$SCRATCH/.verify.log" 2>&1; then
+      say "FAILED: ${cmd}"
+      tail -30 "$SCRATCH/.verify.log" >&2
+      say "the branch is stale against ${BASE} — send it back to Build for a rebase pass"
+      exit 2
+    fi
+  done
+  say "verified green against ${BASE} (${#VERIFY[@]} command(s))"
+fi
+
+# ---- the merge -------------------------------------------------------------
+if [ "$DRY" -eq 1 ]; then
+  say "dry run: would squash-merge PR #${PR}"
+  exit 0
+fi
+
+if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch 2>&1 | tail -3 >&2; then
+  say "merged"
+  exit 0
+fi
+say "GitHub refused the merge after a green verification (branch protection or a required check)"
+exit 3

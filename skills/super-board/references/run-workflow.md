@@ -57,6 +57,14 @@ Repeat until a done condition or halt gate fires:
    reset (same thresholds as run.md).
 2. **Plan the wave** —
    `bash .claude/bin/super-board-wave-plan.sh --config <config-path>` →
+   The planner returns `cards`, `sweep` and `flag`. **Act on `sweep` and `flag`
+   BEFORE launching** (run.md → "The wave-start sweep"): move every swept card
+   to `Ready` with a comment naming what cleared it, and comment on every
+   flagged card asking for its `## Blocked by` line to be fixed. Swept cards
+   are already counted in `cards`, so the wave picks them up on this pass.
+   Wave width is not `max_workers` any more — it is however many cards the
+   dependency graph says are free. The runtime caps concurrency and queues the
+   rest, so a 19-card wave is normal and not a misconfiguration.
    `{cards: [...]}`. Selection is backlog-aware: one card per non-empty
    column downstream-first (Review → QA → Ready), then remaining
    `max_workers` slots fill from the most backlogged column; extra Review
