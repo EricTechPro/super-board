@@ -15,7 +15,7 @@ Either way, the design context arrives in your prompt. Do not rerun `impeccable 
 
 ## 2. Assessment A: design review
 
-Write A down in full before you run any detector, so detector output never anchors the design judgement. Do not spawn nested sub-agents; the loop's load budget is spent on you. Header line: `Method: super-refine critic (A then B, one context)`.
+Write A down in full before you run any detector, so detector output never anchors the design judgement. Do not spawn nested sub-agents; the loop's load budget is spent on you. Header line: `Method: ui-refine-loop critic (A then B, one context)`.
 
 Read every screenshot in your prompt and the source files in scope. Screenshots come one set per data state (for example `main`, `empty`, `dense`), each at desktop 1440 and mobile 390 in light theme. Judge the surface at every state it has. Score all ten Nielsen heuristics 0–4. Judge against **the brief first**. A finding that serves the brief outranks a generic one. If the repo documents a page-composition rule (look in `CLAUDE.md`, `AGENTS.md` and `docs/`), breaking it is a finding.
 

@@ -5,19 +5,23 @@
 # .claude/settings.json (backed up first, never duplicated).
 #
 # Usage:
-#   ./install.sh [--no-hooks] [target-project-dir]
+#   ./install.sh [--no-hooks] [--protect-main] [target-project-dir]
 # Defaults to the current working directory. --no-hooks skips the guard hooks
-# and leaves settings.json untouched.
+# and leaves settings.json untouched. --protect-main also wires the opt-in
+# guard that blocks direct and force pushes to main/master/base_branch
+# (super-board onboard offers the same thing as one question).
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS=1
+PROTECT=0
 TARGET=""
 for arg in "$@"; do
   case "$arg" in
     --no-hooks) HOOKS=0 ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    --protect-main) PROTECT=1 ;;
+    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     -*) echo "unknown option: $arg" >&2; exit 64 ;;
     *) TARGET="$arg" ;;
   esac
@@ -25,9 +29,10 @@ done
 TARGET="${TARGET:-$PWD}"
 
 # Primary: the board and its lanes. Secondary: standalone helpers the lanes
-# can call (visual, arch-loop) or that tidy up after them (cleanup-wt).
-PRIMARY_SKILLS="super-board super-build super-qa super-review super-collect super-refine"
-SECONDARY_SKILLS="visual arch-loop cleanup-wt"
+# can call (visual, ui-refine-loop, arch-loop). Worktree cleanup (cleanup-wt) is a
+# hook, not a skill: it ships with the guard hooks below.
+PRIMARY_SKILLS="super-board super-build super-qa super-review super-collect"
+SECONDARY_SKILLS="visual ui-refine-loop arch-loop"
 
 if [ ! -d "$TARGET" ]; then
   echo "target directory not found: $TARGET" >&2
@@ -95,7 +100,7 @@ done
 
 echo "→ installing dynamic workflows into $TARGET/.claude/workflows/"
 mkdir -p "$TARGET/.claude/workflows"
-for wf in super-board-wave.js super-refine.js; do
+for wf in super-board-wave.js ui-refine-loop.js; do
   if [ -f "$REPO_ROOT/workflows/$wf" ]; then
     cp "$REPO_ROOT/workflows/$wf" "$TARGET/.claude/workflows/"
     echo "    ✓ $wf"
@@ -105,6 +110,7 @@ done
 if [ "$HOOKS" -eq 1 ]; then
   echo "→ installing guard hooks into $TARGET/.claude/hooks/"
   mkdir -p "$TARGET/.claude/hooks"
+  # hooks/*.py only: hooks/dev/ holds gates for repos that author skills, never installed.
   for h in "$REPO_ROOT"/hooks/*.py; do
     [ -f "$h" ] || continue
     cp "$h" "$TARGET/.claude/hooks/"
@@ -115,10 +121,13 @@ if [ "$HOOKS" -eq 1 ]; then
   echo "→ merging hook settings into $TARGET/.claude/settings.json"
   # Stdlib-only merge: keeps every existing key and hook, adds each guard
   # command once per event + matcher, and backs the file up before writing.
-  python3 - "$REPO_ROOT/hooks/settings-snippet.json" "$TARGET/.claude/settings.json" <<'PY'
+  SNIPPETS="$REPO_ROOT/hooks/settings-snippet.json"
+  if [ "$PROTECT" -eq 1 ]; then SNIPPETS="$SNIPPETS $REPO_ROOT/hooks/settings-protect-main.json"; fi
+  # shellcheck disable=SC2086
+  python3 - "$TARGET/.claude/settings.json" $SNIPPETS <<'PY'
 import json, os, shutil, sys, time
-snippet_path, settings_path = sys.argv[1], sys.argv[2]
-snippet = json.load(open(snippet_path))
+settings_path, snippet_paths = sys.argv[1], sys.argv[2:]
+snippets = [json.load(open(p)) for p in snippet_paths]
 settings = {}
 if os.path.exists(settings_path):
     try:
@@ -131,7 +140,7 @@ if os.path.exists(settings_path):
         sys.exit(0)
 hooks = settings.setdefault("hooks", {})
 added = 0
-for event, entries in snippet["hooks"].items():
+for event, entries in [kv for s in snippets for kv in s["hooks"].items()]:
     current = hooks.setdefault(event, [])
     for entry in entries:
         matcher = entry.get("matcher")
@@ -162,6 +171,7 @@ print(f"    ✓ {added} hook command(s) added")
 PY
 else
   echo "→ skipping guard hooks (--no-hooks)"
+  if [ "$PROTECT" -eq 1 ]; then echo "    ✗ --protect-main ignored: it is a hook, and --no-hooks skips hooks" >&2; fi
 fi
 
 echo

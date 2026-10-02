@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Tests skills/cleanup-wt/scripts/cleanup-wt.py on a throwaway repo with a bare origin.
+# Tests hooks/cleanup-wt.py on a throwaway repo with a bare origin.
 # Pins: merged work goes (fast-forward, squash, merged into a non-default base),
 # unmerged work and the current worktree stay, dirty state is wip-committed, a stray
 # worktree loses its folder but keeps its branch, and the recovery TSV restores.
 set -euo pipefail
 cd "$(dirname "$0")"
-CW="$(pwd)/../skills/cleanup-wt/scripts/cleanup-wt.py"
+CW="$(pwd)/../hooks/cleanup-wt.py"
 fail() { echo "FAIL: $1" >&2; exit 1; }
 
 T=$(mktemp -d); T=$(cd "$T" && pwd -P)

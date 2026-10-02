@@ -1,7 +1,7 @@
 export const meta = {
-  name: 'super-refine',
+  name: 'ui-refine-loop',
   description: 'Critique → refine loop on one UI target: a fresh critic and a fresh refiner each round, a two-line ledger between them',
-  whenToUse: 'Launched by the super-refine skill (manual or qa-hook mode) after it has built the worktree, started the dev server and taken BEFORE shots. Not for direct ad-hoc use.',
+  whenToUse: 'Launched by the ui-refine-loop skill (manual or qa-hook mode) after it has built the worktree, started the dev server and taken BEFORE shots. Not for direct ad-hoc use.',
   phases: [
     { title: 'Critique', detail: 'fresh critic: Impeccable critique/detect/audit (or the built-in rubric), ranked P0–P3, DONE/CONTINUE' },
     { title: 'Refine', detail: 'fresh refiner: fixes the findings, keeps checks green or reverts, one commit, AFTER shots' },
@@ -17,7 +17,7 @@ export const meta = {
 //   rounds: 10,                                 // qa-hook default 3
 //   worktree: '/abs/…/refine-<slug>',           // qa-hook: the QA lane's worktree
 //   runDir: '/abs/…/refine-<slug>.run',
-//   skillDir: '/abs/…/skills/super-refine',
+//   skillDir: '/abs/…/skills/ui-refine-loop',
 //   critic: 'impeccable' | 'rubric',            // rubric = built-in fallback when Impeccable is not installed
 //   impeccable: '/abs/…/impeccable/scripts/impeccable',   // required when critic = impeccable
 //   tasteFile: '/abs/…/taste.md',               // project taste file, or the skill's references/taste.md
@@ -37,12 +37,12 @@ const input = (() => {
   try { return JSON.parse(args) } catch { return args }
 })()
 for (const k of ['slug', 'target', 'scope', 'prompt', 'worktree', 'runDir', 'skillDir', 'checks', 'shootCmd', 'baseUrl', 'route', 'beforeShots']) {
-  if (!input || input[k] == null) throw new Error(`super-refine needs args.${k} — see the header comment`)
+  if (!input || input[k] == null) throw new Error(`ui-refine-loop needs args.${k} — see the header comment`)
 }
 const MODE = input.mode ?? 'manual'
-if (!['manual', 'qa-hook'].includes(MODE)) throw new Error(`super-refine: unknown mode "${MODE}" — use manual | qa-hook`)
+if (!['manual', 'qa-hook'].includes(MODE)) throw new Error(`ui-refine-loop: unknown mode "${MODE}" — use manual | qa-hook`)
 const CRITIC_KIND = input.critic ?? (input.impeccable ? 'impeccable' : 'rubric')
-if (CRITIC_KIND === 'impeccable' && !input.impeccable) throw new Error('super-refine: critic "impeccable" needs args.impeccable')
+if (CRITIC_KIND === 'impeccable' && !input.impeccable) throw new Error('ui-refine-loop: critic "impeccable" needs args.impeccable')
 const ROUNDS = input.rounds ?? (MODE === 'qa-hook' ? 3 : 10)
 const TASTE = input.tasteFile ?? `${input.skillDir}/references/taste.md`
 

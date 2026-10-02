@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Tests skills/super-refine/scripts/refine-setup.sh `detect` (config → package.json
+# Tests skills/ui-refine-loop/scripts/refine-setup.sh `detect` (config → package.json
 # → defaults) and shoot.mjs state parsing. No dev server, no browser.
 #
-#   bash tests/test-refine-setup.sh
+#   bash tests/test-ui-refine-loop-setup.sh
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SETUP="$REPO_ROOT/skills/super-refine/scripts/refine-setup.sh"
-SHOOT="$REPO_ROOT/skills/super-refine/scripts/shoot.mjs"
+SETUP="$REPO_ROOT/skills/ui-refine-loop/scripts/refine-setup.sh"
+SHOOT="$REPO_ROOT/skills/ui-refine-loop/scripts/shoot.mjs"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -86,5 +86,5 @@ is "shoot parseStates" '[[{"name":"main"}],[{"name":"main"},{"name":"empty"}],[{
 node "$SHOOT" >/dev/null 2>&1; is "shoot usage error exits 1" 1 $?
 
 echo
-echo "test-refine-setup.sh: $PASS passed, $FAIL failed"
+echo "test-ui-refine-loop-setup.sh: $PASS passed, $FAIL failed"
 [ "$FAIL" -eq 0 ]

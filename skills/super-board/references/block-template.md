@@ -1,7 +1,5 @@
 # Block & Skip exit template
 
-Pointer: spec `docs/specs/2026-05-21-super-board-design.md` §4 "Cross-cutting: Block & Skip exits".
-
 `Blocked` and `Skipped` sit AFTER `Done` on the board — they're not workflow steps, they're exit ramps.
 
 ## When / who moves cards there

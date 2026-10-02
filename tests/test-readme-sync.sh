@@ -45,8 +45,9 @@ mkdir -p "$T/skills/new-one"
 printf -- '---\nname: new-one\ndescription: >-\n  Does a new thing. Then more.\n---\n' > "$T/skills/new-one/SKILL.md"
 fam 'd["secondary"]["skills"]["new-one"] = ""'
 python3 "$SYNC" >/dev/null
-grep -q '\*\*10 skills\*\* — 6 primary, 4 secondary' "$T/README.md" || fail "pitch counts not updated"
-grep -q 'badge/skills-10-' "$T/README.md" || fail "skills badge not updated"
+read -r NP NS <<<"$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(len(d["primary"]["skills"]), len(d["secondary"]["skills"]))' "$T/skills/families.json")"
+grep -q "\*\*$((NP + NS)) skills\*\* — $NP primary, $NS secondary" "$T/README.md" || fail "pitch counts not updated"
+grep -q "badge/skills-$((NP + NS))-" "$T/README.md" || fail "skills badge not updated"
 grep -q '| \[`/new-one`\](skills/new-one/SKILL.md) | Does a new thing. |' "$T/README.md" || fail "empty brief should fall back to the description's first sentence"
 rm -rf "$T"; ok
 

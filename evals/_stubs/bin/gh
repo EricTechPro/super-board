@@ -2,7 +2,8 @@
 # Offline `gh` stand-in for evals. Reads fixtures from <repo>/.git/gh-fixture/ (out of
 # the agent's sight in `ls`), logs every call to <repo>/.gh-log, and never touches the
 # network. `pr merge` is a logged no-op.
-# Fixtures: pr.json (the `gh pr view --json` object, incl. comments) and diff.patch.
+# Fixtures: pr.json (the `gh pr view --json` object, incl. comments), diff.patch, and
+# optionally issue.json (the `gh issue view --json` object; without it a cart-discount issue).
 set -uo pipefail
 ROOT="$PWD"
 while [ "$ROOT" != / ] && [ ! -d "$ROOT/.git" ]; do ROOT="$(dirname "$ROOT")"; done
@@ -38,7 +39,7 @@ case "${1:-} ${2:-}" in
   "pr checks"*) echo "no checks reported (eval stub)" ;;
   "pr merge"*) echo "merge recorded, not performed (eval stub)" ;;
   "pr comment"*|"pr review"*|"pr edit"*|"pr ready"*|"issue comment"*|"issue edit"*) echo "ok (eval stub)" ;;
-  "issue view"*) emit "$(jq '{number: 7, title: .title, body: "Cart discount. AC: discount percent is clamped to 0-100; an empty cart totals 0.", labels: [], comments: []}' "$FX/pr.json")" ;;
+  "issue view"*) if [ -f "$FX/issue.json" ]; then emit "$(cat "$FX/issue.json")"; else emit "$(jq '{number: 7, title: .title, body: "Cart discount. AC: discount percent is clamped to 0-100; an empty cart totals 0.", labels: [], comments: []}' "$FX/pr.json")"; fi ;;
   "api "*) if [ -n "$jq_arg" ]; then echo '{}' | jq -r "$jq_arg" 2>/dev/null; else echo '{}'; fi ;;
   *) echo "ok (eval stub)" ;;
 esac

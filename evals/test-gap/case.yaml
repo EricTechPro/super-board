@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: test-gap
+description: >
+  First QA pass on PR #31 (slugify). Three ACs; the builder tested AC 1 and AC 3 but not AC 2
+  (a slug is never longer than 50 characters), though the code implements it. super-qa's test-gap
+  check must list AC 2 as a High gap (an AC with no test at any rung) and act on it: write the
+  test red-first, or bounce to the builder with the gap.
+tags: [super-qa, test-gap]
+runs: 3
+expected_outcome: AC 2 listed as a High test gap, then a test written for it (or a bounce to Build).
+execution:
+  max_turns: 50
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash, Write, Edit]
+context:
+  scaffold_script: seed.sh

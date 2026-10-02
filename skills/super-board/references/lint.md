@@ -1,8 +1,6 @@
 # super-board lint — 7-phase interactive ticket clarifier
 
-> Reference for the `super-board lint` verb. See spec §6 of
-> `docs/specs/2026-05-21-super-board-design.md` for the full
-> design rationale. This file is the worker-facing playbook.
+> Reference for the `super-board lint` verb. This file is the worker-facing playbook.
 
 **Where it runs:** current Claude Code session. Interactive. Single-pass.
 **Purpose:** clarify issues so a headless worker won't hallucinate. Every

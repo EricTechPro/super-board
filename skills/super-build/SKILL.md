@@ -27,9 +27,9 @@ Reads `Ready` from the repo's feature project. Resolution order:
 
 1. **`BUILD_LOOP_PROJECT`** env var — project number (e.g. `2`)
 2. **`BUILD_LOOP_OWNER`** env var — project owner (e.g. `EricTechPro`)
-3. **Auto-discovery fallback:** if env vars unset, run `gh project list --owner $(gh repo view --json owner -q .owner.login) --format json` and pick the project whose `title` matches the repo name (`Fitbox Admin` for this project), or the only open project if there's exactly one.
+3. **Auto-discovery fallback:** if env vars unset, run `gh project list --owner $(gh repo view --json owner -q .owner.login) --format json` and pick the project whose `title` matches the repo name, or the only open project if there's exactly one.
 
-Surface: `🎯 Reading project: EricTechPro/Fitbox Admin (#2), column "Ready"`.
+Surface: `🎯 Reading project: <owner>/<title> (#<n>), column "Ready"`.
 
 ## Algorithm
 
@@ -95,11 +95,11 @@ gh issue comment N --body "🤖 Dispatched by /super-build — worker spinning u
 
 c. **Dispatch:**
 ```bash
-bash scripts/super-build-dispatch.sh N
+bash .claude/skills/super-build/scripts/super-build-dispatch.sh N
 ```
 …via Bash with `run_in_background: true`. Capture each shell ID.
 
-The dispatcher (at `scripts/super-build-dispatch.sh`) handles:
+The dispatcher (this skill's `scripts/super-build-dispatch.sh`) handles:
 - `git worktree add -b loop/issue-N .worktrees/issue-N <base-branch>`
 - `gh issue view N --json title,body,labels` to compose the worker prompt
 - prepend `references/worker-preamble.md` + append working-directory footer
@@ -119,7 +119,7 @@ Poll BashOutput on each in-flight shell. As each finishes:
 - `gh issue edit N --remove-label loop:in-progress`
 - `gh issue comment N --body "🔨 PR opened by /super-build: <PR URL>"`
 - Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
-- Leave the worktree in place — `/cleanup-wt` (or the merge gate, after the merge) removes it once the work is on the base branch.
+- Leave the worktree in place — the merge gate (after the merge) or the cleanup-wt SessionStart hook removes it once the work is on the base branch.
 - Report: `✅ Super Build issue #N → PR <URL>, card in QA`
 - Recompute ready set; if new issues are now unblocked, dispatch in the next wave (respecting the worker cap)
 
@@ -146,7 +146,7 @@ Poll BashOutput on each in-flight shell. As each finishes:
 
 ### 5. Final report
 
-When the selected GitHub Project `Ready` queue is empty, or only blocked/skipped cards remain: report a summary (also to Telegram if the config enables `notifications`) listing PRs opened this run (cards in `QA`), issues still skipped (`human-gated` / `loop:halted` / blocked dependencies), and any halts. Suggest: "Run `super-board run` to test, review and merge them."
+When the selected GitHub Project `Ready` queue is empty, or only blocked/skipped cards remain: report a summary listing PRs opened this run (cards in `QA`), issues still skipped (`human-gated` / `loop:halted` / blocked dependencies), and any halts. Suggest: "Run `super-board run` to test, review and merge them."
 
 ## Issue contract
 
@@ -174,7 +174,7 @@ Super Build treats acceptance criteria as the completion contract. Workers must 
 - **Never auto-touch issues with `human-gated` label** (production cutover, secrets, irreversible ops).
 - **Never modify code in the main worktree** while workers are running. Only run `gh` commands and push/PR operations.
 - **Conflicts** between concurrent workers' branches are not resolved here — they surface at the merge gate, and the card comes back to the Builder for a rebuild. Don't auto-resolve.
-- **Report cadence** (to the user, and Telegram only if `notifications` are enabled): 1 message at start, 1 per dispatch wave, 1 per completion (success/fail), 1 final summary. Don't spam.
+- **Report cadence** (to the user, in the session): 1 message at start, 1 per dispatch wave, 1 per completion (success/fail), 1 final summary. Don't spam.
 - **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present; otherwise they route on the issue's **type label** (`bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`), always adding `ponytail:ponytail` (simplest solution first, before any code; inline fallback when the plugin is absent), `verification-before-completion` and a `code-review` pass on their own diff. Test mechanics are picked by the localisation ladder, never by label. Decision points walk the decision ladder — acceptance criteria → repo precedent → smallest blast radius → human gate — and stop at the first rung that answers the question. No panel, no vote; `mattpocock-skills:grilling` is forbidden inside a worker (it waits on a user who is not there) and lives in `super-board lint` instead. `mattpocock-skills:code-review` runs once against the worker's own diff before the final commit. See `references/decision-policy.md` for the skill map, the ladder, the human gates, and the `--- decision ---` commit trailer.
 
 ## Worker preamble

@@ -1,7 +1,6 @@
 # super-board onboard — verb reference
 
-Source of truth: `docs/specs/2026-05-21-super-board-design.md` §5
-(with §4 config schema and field notes referenced from `config-schema.json`).
+Config schema and field notes: `config-schema.json`.
 
 This file documents the interactive setup wizard. It is loaded by `SKILL.md`
 when the user invokes `super-board onboard …`.
@@ -120,8 +119,22 @@ Progress: 🛠 onboard (you are here)  →  🧹 lint  →  🤖 run
        and tell the user: "Auto-merge to production is disabled. Approved
        PRs will be marked ready for review; you click merge."
 
-10. RECORD NOTIFICATION CHANNEL
-    └─ Auto-detect from the current session; allow override.
+9b. PROTECT THE BASE BRANCH (any flow with a local repo; one question, asked once)
+    ├─ Skip if `.claude/settings.json` already wires `guard-protected-push.py`.
+    ├─ Ask: "Block direct/force pushes to main? Recommended for existing
+    │        apps; skip for brand-new repos."
+    ├─ Yes → merge the entry from the pack's `hooks/settings-protect-main.json`
+    │        (PreToolUse `Bash` → `python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/guard-protected-push.py`)
+    │        into `.claude/settings.json`: keep every existing key, add the command
+    │        once under the existing `Bash` matcher, back the file up first.
+    │        The script is already in `.claude/hooks/` (install.sh copies it).
+    │        It protects main, master and the config's base_branch.
+    └─ No → nothing. Re-run later with `./install.sh --protect-main <dir>`.
+
+10. NOTIFICATIONS (no question)
+    └─ Write notifications.channel = "session". super-board sends no
+       messages of its own; reports go to the session and the issue/PR
+       timeline.
 
 11. WRITE CONFIG + ACTIVE POINTER
     ├─ Generate `description` (short, scannable)

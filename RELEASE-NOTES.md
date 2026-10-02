@@ -1,5 +1,77 @@
 # Release notes
 
+## v2.6.0 — 2026-10-02
+
+Cleanup release: one renamed skill, one skill turned into a hook, three new guards, two new evals,
+and a sweep of stale docs.
+
+### Skills
+
+**ui-refine-loop, renamed from super-refine.** Same skill, now a standalone public helper
+(secondary) under `/ui-refine-loop`: `skills/ui-refine-loop/`, `workflows/ui-refine-loop.js`,
+`tests/test-ui-refine-loop-{setup,workflow}.sh`. The QA lane's qa-hook (run.md Tester step 5b)
+calls it by the new name; the config's `refine` block is unchanged.
+
+**cleanup-wt is a hook now, not a skill.** The script moved to `hooks/cleanup-wt.py` and ships
+with the guard hooks. The merge gate still runs it with `--post-merge` after every merge, and the
+`SessionStart` `--auto` sweep is now part of the default `hooks/settings-snippet.json` (it was an
+opt-in block). It leaves the skill tables and is listed under Guards. An old install's
+`.claude/skills/cleanup-wt/` can be deleted by hand.
+
+### Guards
+
+**No deleting outside the project (on by default).** `hooks/guard-delete-outside.py` denies `rm`,
+`rmdir`, `unlink`, `find … -delete` / `-exec rm` and `git clean` aimed outside
+`$CLAUDE_PROJECT_DIR`, and always `/` or `~`. Temp dirs stay deletable inside.
+
+**Protected-branch push guard (opt-in).** `hooks/guard-protected-push.py` denies direct and force
+pushes (`-f`, `--force`, `--force-with-lease`, `+ref`, `--delete`, `--all`/`--mirror`) to main,
+master and the config's `base_branch`; force pushes to feature branches stay allowed.
+`super-board onboard` asks once (step 9b) and `install.sh --protect-main` wires it
+(`hooks/settings-protect-main.json`).
+
+**Skill-eval gate (pack and EricOS only).** `hooks/dev/gate-skill-evals.py`, a Stop hook adapted
+from the starter kit's `gate-skill-evals.sh`: a skill changed this session (uncommitted or
+unpushed) with no newer `claude plugin eval` result blocks the stop and names the command. A changed
+reference or workflow counts only for a skill with an eval case; a `SKILL.md` with no case only
+warns. Never installed into targets; wired in this pack's `.claude/settings.json`.
+
+Tests: `tests/test-guard-hooks.sh` grows from 25 to 77 cases; `tests/test-install.sh` gains
+scenario 10 (`--protect-main`) and checks that `hooks/dev/` is never installed.
+
+### Evals
+
+Two new `claude plugin eval` cases beside `review-remembers`, same offline `gh` stub and scaffold:
+
+- **`ponytail-overengineering`** — a correct, tested PR wraps a one-line price formatter in a
+  strategy class, registry, factory and JSON config. super-review must report an Over-engineering
+  finding routed to Super Build and still call the PR merge-ready. 3/3 runs passed ($0.82).
+- **`test-gap`** — AC 2 of a slugify PR (≤ 50 characters) has no test. super-qa's test-gap check
+  must rank it High and write the test red-first or bounce to Build. 3/3 runs passed ($1.21).
+
+The `gh` stub now serves a per-case `issue.json` for `gh issue view`.
+
+### Stale docs swept
+
+- **Telegram** is gone from every lane and reference: super-board sends no messages of its own.
+  `notifications.channel` is now `"session"` and `chat_id` is reserved (config-schema, onboard
+  step 10, run.md block-rate alert, run-workflow.md wave report, super-build, super-qa, super-review).
+- **super-qa standalone loop** no longer calls `scripts/super-qa-dispatch.sh`, which never shipped:
+  each iteration is a sub-agent launched in-session, with the same 0/2/3/4/5 statuses. Dropped the
+  missing `docs/super-orchestrator/STAGING-ENV.md` link, the leftover app-specific spec list, and
+  "phone-only via Telegram".
+- **super-ux** (never a skill) → `ui-refine-loop` as a suggested owner in super-qa, its preamble and
+  `super-qa-file-bug.sh --suggested-skill`.
+- **super-board SKILL.md** said `run` is headless via `super-board-run.sh`; it is in-session by
+  default. Removed every pointer to `docs/specs/2026-05-21-super-board-design.md`, which does not
+  ship (SKILL.md, onboard, lint, status, stop, run, block-template, config-schema), and the
+  `super-work-trader` line. run.md now says it holds the lane lifecycles plus the legacy runner.
+- **super-build** dispatcher path is `.claude/skills/super-build/scripts/super-build-dispatch.sh`;
+  removed the `Fitbox Admin` example. super-review is "the super-board reviewer", not EricTechOS's.
+- **CLAUDE.md**: eight skills, not nine; product work goes to workflow lane agents, not only
+  `claude -p`; the install contract matches what `install.sh` copies; script paths are `.claude/bin/`.
+- Version 2.6.0 in `VERSION`, `skills/super-board/VERSION`, `plugin.json` and the README badge.
+
 ## v2.5.0 — 2026-10-02
 
 Review remembers, sharper lanes, five new skills, guard hooks, and a pack that installs and
@@ -55,8 +127,8 @@ ranks gaps (folded from post-tdd). High gaps are written red-first through `tdd`
 app code changed bounces to Builder. Medium/Low are listed and never block (run.md Tester step 4b).
 
 **UI polish in QA.** A UI card (label `ui`, `design` or `frontend`, or a visual AC) whose AC tests
-passed now gets super-refine in qa-hook mode, 3 rounds by default (run.md Tester step 5b,
-`skills/super-refine/references/qa-hook.md`). AC tests re-run after it; red resets to the pre-hook
+passed now gets ui-refine-loop in qa-hook mode, 3 rounds by default (run.md Tester step 5b,
+`skills/ui-refine-loop/references/qa-hook.md`). AC tests re-run after it; red resets to the pre-hook
 commit. It never moves the card, comments or blocks. The wave's QA prompt carries the condition.
 
 **Tighter writing.** Lane comments follow five rules (run.md → Commenting cadence): outcome first,
@@ -85,7 +157,7 @@ Test: `tests/test-usage.sh`.
 `.claude/skills/cleanup-wt/` is installed. Local only; a cleanup failure never changes the exit.
 Tests 12-13 in `tests/test-merge-gate.sh`.
 
-**Config.** `config-schema.json` gains optional `refine` (super-refine settings) and `collect`
+**Config.** `config-schema.json` gains optional `refine` (ui-refine-loop settings) and `collect`
 (`window_days`, `errors`, `feedback_paths`, `lookback_runs`) blocks.
 
 ### New skills
@@ -93,9 +165,9 @@ Tests 12-13 in `tests/test-merge-gate.sh`.
 - **super-collect** (primary): files app errors, unboarded issues, feedback and repeat failures
   from past runs into Backlog, deduped, dry-run by default. Adapted from BuilderIO/skills (MIT).
   Test: `tests/test-collect-file.sh`.
-- **super-refine** (primary): unattended critique → refine loop on one page or component, with its
-  own worktree, dev server, before/after shots and `workflows/super-refine.js`. Adapted from
-  BookKeepingApp. Tests: `tests/test-refine-setup.sh`, `tests/test-refine-workflow.sh`.
+- **ui-refine-loop** (primary): unattended critique → refine loop on one page or component, with its
+  own worktree, dev server, before/after shots and `workflows/ui-refine-loop.js`. Adapted from
+  BookKeepingApp. Tests: `tests/test-ui-refine-loop-setup.sh`, `tests/test-ui-refine-loop-workflow.sh`.
 - **visual** (secondary): one self-contained HTML page for a branch recap, a plan or a codebase
   map. Adapted from BuilderIO/skills (MIT), diagrams after tt-a1i/archify (MIT).
 - **arch-loop** (secondary): architecture review loop, one verified commit per pass.

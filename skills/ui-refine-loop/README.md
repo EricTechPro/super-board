@@ -1,4 +1,4 @@
-# /super-refine
+# /ui-refine-loop
 
 An unattended critique → refine loop for one page or component. A fresh critic scores the surface each round, a fresh refiner fixes what it found, and you come back to a branch of small green commits with before/after screenshots.
 
@@ -25,13 +25,13 @@ It is not for redesigns or new pages. The loop preserves the existing visual wor
 
 | Command | Does |
 |---|---|
-| `/super-refine <route>` | loop on that page, 10 rounds |
-| `/super-refine <component path> "<brief>"` | loop on a component, judged against your brief |
+| `/ui-refine-loop <route>` | loop on that page, 10 rounds |
+| `/ui-refine-loop <component path> "<brief>"` | loop on a component, judged against your brief |
 | `... --rounds N` | change the round cap |
 | qa-hook | the super-board Tester calls it on a UI card's branch, 3 rounds by default; see `references/qa-hook.md` |
 
 ## Install
 
-Ships in the super-board pack. Copy `skills/super-refine/` to `.claude/skills/super-refine/` and `workflows/super-refine.js` to `.claude/workflows/`. You need `git`, `node`, and Playwright resolvable from your repo (`npx playwright install chromium`). Impeccable is optional. If your app needs a sign-in, data states or an unusual dev command, add a `refine` block to your super-board config (`references/config.md`). Everything else is auto-detected from `package.json`.
+Ships in the super-board pack. Copy `skills/ui-refine-loop/` to `.claude/skills/ui-refine-loop/` and `workflows/ui-refine-loop.js` to `.claude/workflows/`. You need `git`, `node`, and Playwright resolvable from your repo (`npx playwright install chromium`). Impeccable is optional. If your app needs a sign-in, data states or an unusual dev command, add a `refine` block to your super-board config (`references/config.md`). Everything else is auto-detected from `package.json`.
 
-Test: `bash tests/test-refine-workflow.sh && bash tests/test-refine-setup.sh`
+Test: `bash tests/test-ui-refine-loop-workflow.sh && bash tests/test-ui-refine-loop-setup.sh`

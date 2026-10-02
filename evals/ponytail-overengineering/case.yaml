@@ -1,0 +1,16 @@
+schema_version: "1.1"
+name: ponytail-overengineering
+description: >
+  First review of a correct, tested PR that wraps a one-line price formatter in a strategy
+  registry, a factory and a JSON config. super-review must report an Over-engineering finding
+  (Should fix, routed to the builder / Super Build) and still call the PR merge-ready: an
+  Over-engineering finding never blocks a merge on its own.
+tags: [super-review, ponytail-overengineering]
+runs: 3
+expected_outcome: Over-engineering finding routed to the builder; verdict merge-ready, not blocked.
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash]
+context:
+  scaffold_script: seed.sh

@@ -24,7 +24,7 @@ plant_decoys() { for d in decoy-one decoy-two decoy-three; do mkdir -p "$1/.clau
 decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
 
 SKILLS="super-board super-build super-qa super-review"
-ALL_SKILLS="$SKILLS super-collect super-refine visual arch-loop cleanup-wt"
+ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual arch-loop"
 
 # 1 — a fresh project: plain directories, nothing to preserve. Every primary and
 #     secondary skill lands, and both workflows.
@@ -33,7 +33,7 @@ T=$(mktemp -d)
 for s in $ALL_SKILLS; do
   [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "plain layout: $s/SKILL.md missing"
 done
-for w in super-board-wave.js super-refine.js; do
+for w in super-board-wave.js ui-refine-loop.js; do
   [ -f "$T/.claude/workflows/$w" ] || fail "workflow $w was not installed"
 done
 rm -rf "$T"
@@ -98,15 +98,21 @@ cat > "$T/.claude/settings.json" <<'JSON'
 {"permissions":{"allow":["Bash(ls:*)"]},"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"echo mine"}]}],"Stop":[{"hooks":[{"type":"command","command":"echo stop"}]}]}}
 JSON
 "$INSTALL" "$T" >/dev/null 2>&1
-for h in guard-worktree-path.py guard-secrets.py guard-key-literals.py; do
+for h in guard-worktree-path.py guard-secrets.py guard-key-literals.py guard-delete-outside.py guard-protected-push.py cleanup-wt.py; do
   [ -f "$T/.claude/hooks/$h" ] || fail "hook $h was not installed"
 done
+[ ! -e "$T/.claude/skills/cleanup-wt" ] || fail "cleanup-wt is a hook now, not a skill"
+[ ! -e "$T/.claude/hooks/dev" ] && [ ! -e "$T/.claude/hooks/gate-skill-evals.py" ] || fail "hooks/dev/ (skill-eval gate) must never be installed into a target"
 S="$T/.claude/settings.json"
 jq -e '.permissions.allow == ["Bash(ls:*)"]' "$S" >/dev/null || fail "existing permissions were lost"
 jq -e '[.hooks.PreToolUse[].hooks[].command] | index("echo mine") != null' "$S" >/dev/null || fail "existing PreToolUse hook was lost"
 jq -e '.hooks.Stop[0].hooks[0].command == "echo stop"' "$S" >/dev/null || fail "existing Stop hook was lost"
 jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash")] | length == 1' "$S" >/dev/null || fail "Bash matcher entry duplicated"
-for h in guard-worktree-path guard-secrets guard-key-literals; do
+jq -e '[.hooks.SessionStart[].hooks[].command | select(contains("cleanup-wt.py --auto"))] | length == 1' "$S" >/dev/null \
+  || fail "the cleanup-wt SessionStart hook is not wired by default"
+jq -e '[.hooks[][].hooks[].command | select(contains("guard-protected-push"))] | length == 0' "$S" >/dev/null \
+  || fail "the protected-push guard is opt-in: it must not be wired without --protect-main"
+for h in guard-worktree-path guard-secrets guard-key-literals guard-delete-outside; do
   jq -e --arg h "$h" '[.hooks[][].hooks[].command | select(contains($h))] | length > 0' "$S" >/dev/null || fail "$h not wired in settings"
 done
 ls "$T/.claude/" | grep -q '^settings.json.bak-' || fail "no backup written before changing settings.json"
@@ -134,6 +140,17 @@ OUT=$("$INSTALL" "$T" 2>&1 || true)
 echo "$OUT" | grep -q "not valid JSON" || fail "invalid settings.json should be reported, got: $OUT"
 rm -rf "$T"
 
+# 10 — --protect-main wires the opt-in push guard, once, next to the defaults.
+T=$(mktemp -d)
+"$INSTALL" --protect-main "$T" >/dev/null 2>&1
+S="$T/.claude/settings.json"
+jq -e '[.hooks.PreToolUse[].hooks[].command | select(contains("guard-protected-push.py"))] | length == 1' "$S" >/dev/null \
+  || fail "--protect-main did not wire guard-protected-push"
+jq -e '[.hooks.PreToolUse[] | select(.matcher == "Bash")] | length == 1' "$S" >/dev/null || fail "--protect-main duplicated the Bash matcher"
+OUT=$("$INSTALL" --protect-main "$T" 2>&1)
+echo "$OUT" | grep -q "already present" || fail "a second --protect-main install should change nothing"
+rm -rf "$T"
+
 # 9 — the snippet the installer merges is the one hooks/README.md documents.
 python3 - ../hooks/README.md ../hooks/settings-snippet.json <<'PY' || fail "hooks/README.md snippet and hooks/settings-snippet.json differ"
 import json, re, sys
@@ -141,4 +158,4 @@ doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
 sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
 PY
 
-echo "PASS: test-install.sh (9 scenarios)"
+echo "PASS: test-install.sh (10 scenarios)"

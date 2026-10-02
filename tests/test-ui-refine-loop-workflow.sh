@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests workflows/super-refine.js: it compiles as a workflow body, and its stop
+# Tests workflows/ui-refine-loop.js: it compiles as a workflow body, and its stop
 # rules fire on the right round. agent/phase/log are stubbed; no browser, no git.
 #
 # The script is a workflow body (top-level await + return), not a module, so
@@ -7,7 +7,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-node - ../workflows/super-refine.js <<'JS'
+node - ../workflows/ui-refine-loop.js <<'JS'
 const fs = require('fs')
 const src = fs.readFileSync(process.argv[2], 'utf8').replace(/^export const meta/m, 'const meta')
 const AsyncFunction = (async () => {}).constructor
@@ -104,4 +104,4 @@ const reverted = () => ({ status: 'reverted', commit: '', verbs: [], fixed: [], 
   eq(r.out.stopReason, 'ran all 1 rounds', 'string args')
 })().catch((e) => fail(e.stack))
 JS
-echo "PASS: test-refine-workflow.sh (10 scenarios)"
+echo "PASS: test-ui-refine-loop-workflow.sh (10 scenarios)"

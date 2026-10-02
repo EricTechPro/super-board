@@ -11,6 +11,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/hooks/dev/gate-skill-evals.py",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

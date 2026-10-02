@@ -210,10 +210,10 @@ if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
      --match-head-commit "$HEAD_SHA" 2>&1 | tail -3 >&2; then
   say "merged ${HEAD_SHA}"
   # Post-merge tidy-up: drop worktrees and local branches the merge just made
-  # redundant. Optional (only when cleanup-wt is installed), local-only, and it
+  # redundant. Optional (only when the cleanup-wt hook is installed), local-only, and it
   # can never fail the merge that already happened.
-  if [ -f "$REPO_PATH/.claude/skills/cleanup-wt/scripts/cleanup-wt.py" ]; then
-    ( cd "$REPO_PATH" && python3 .claude/skills/cleanup-wt/scripts/cleanup-wt.py --post-merge --base "$BASE" </dev/null ) >&2 || true
+  if [ -f "$REPO_PATH/.claude/hooks/cleanup-wt.py" ]; then
+    ( cd "$REPO_PATH" && python3 .claude/hooks/cleanup-wt.py --post-merge --base "$BASE" </dev/null ) >&2 || true
   fi
   exit 0
 fi

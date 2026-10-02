@@ -99,8 +99,8 @@ const REVIEW_MEMORY = [
 // UI polish (run.md → Tester step 5b): the wave never sees labels, so the lane
 // applies the condition itself. Bounded, never blocks, never moves the card.
 const QA_REFINE_HOOK = [
-  `UI card (label ui / design / frontend, or a visual AC) and your AC tests passed? Run super-refine in qa-hook mode`,
-  `per .claude/skills/super-refine/references/qa-hook.md (run.md → Tester step 5b) before you commit and move the card.`,
+  `UI card (label ui / design / frontend, or a visual AC) and your AC tests passed? Run ui-refine-loop in qa-hook mode`,
+  `per .claude/skills/ui-refine-loop/references/qa-hook.md (run.md → Tester step 5b) before you commit and move the card.`,
   `Re-run the AC tests after it; red → reset to the pre-hook commit and note it. Failing tests → skip the hook.`,
 ]
 

@@ -1,5 +1,3 @@
-// Source of truth: docs/specs/2026-05-21-super-board-design.md §4
-//
 // This file is a REFERENCE DOC, not parsed by the skill at runtime. It uses
 // JSON5-style `//` line comments to inline field notes from spec §4 alongside
 // the schema. Strip comments before validating an actual config file as JSON.
@@ -149,14 +147,14 @@
   "rebuild_cap": 2,
 
   // When the count of Blocked cards exceeds this percent of the initial Ready
-  // count, send a mid-run breakdown notification. Default `30`. Set to `0`
+  // count, post a mid-run breakdown in the run report. Default `30`. Set to `0`
   // to disable.
   "block_rate_alert_pct": 30,
 
-  // Optional. super-refine settings (manual runs and the QA lane's qa-hook,
+  // Optional. ui-refine-loop settings (manual runs and the QA lane's qa-hook,
   // run.md → Tester step 5b). Every key is optional; refine-setup.sh detect
   // resolves config key → auto-detection → default. Full notes and the auth
-  // script contract: skills/super-refine/references/config.md.
+  // script contract: skills/ui-refine-loop/references/config.md.
   "refine": {
     "dev_command": "npm run dev -- --port $PORT",
     "ready_path": "/",
@@ -185,9 +183,10 @@
   },
 
   "notifications": {
-    // Auto-detected during onboard; can be overridden.
-    "channel": "telegram",
-    "chat_id": "auto",
+    // super-board sends no messages of its own: reports go to the session and to
+    // the issue/PR timeline. `channel` and `chat_id` are reserved and unused.
+    "channel": "session",
+    "chat_id": null,
 
     // The assignee identity used as the claim mutex. Read by
     // `super-board status` and `super-board run`. Recorded during onboard

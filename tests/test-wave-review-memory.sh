@@ -40,9 +40,9 @@ const base = { configPath: 'c.json', variant: 'full' }
   ;/never blocks merge alone/.test(rp) || fail('review prompt must say Over-engineering never blocks alone')
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('ponytail-review') && fail(`${l} must not get the review pass`))
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('super-review:report') && fail(`${l} must not get review memory`))
-  // 1b — the QA lane carries the super-refine qa-hook condition; build and review do not.
+  // 1b — the QA lane carries the ui-refine-loop qa-hook condition; build and review do not.
   const qp = a.prompts['qa:#7']
-  ;/super-refine in qa-hook mode/.test(qp) || fail('qa prompt must run super-refine in qa-hook mode')
+  ;/ui-refine-loop in qa-hook mode/.test(qp) || fail('qa prompt must run ui-refine-loop in qa-hook mode')
   ;/ui \/ design \/ frontend/.test(qp) || fail('qa prompt must name the UI labels')
   ;/visual AC/.test(qp) || fail('qa prompt must name visual ACs')
   ;/tests passed/.test(qp) || fail('qa prompt must gate the hook on passing tests')

@@ -129,8 +129,7 @@ Repeat until a done condition or halt gate fires:
    Append one line per card to the run manifest
    `docs/super-board/runs/<date>-<slug>.md`:
    `| #N | <lanesRun> | <finalStatus> | <column> | <detail> |`.
-6. **Report** — one short block to the user per wave (and Telegram if
-   notifications are enabled; currently disabled per CLAUDE.md). Outcome
+6. **Report** — one short block to the user per wave, in the session. Outcome
    first, one line per card that needs a human, then what happens next:
 
    ```

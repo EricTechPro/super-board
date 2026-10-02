@@ -1,4 +1,4 @@
-# super-refine config: the `refine` block
+# ui-refine-loop config: the `refine` block
 
 These keys are optional and live in the active super-board config (`.claude/super-board/configs/<slug>.json`). `scripts/refine-setup.sh detect` resolves each one in this order: the config key, then auto-detection, then the default. Run `detect` and read its output before setup. Whatever it prints is what the loop will use.
 

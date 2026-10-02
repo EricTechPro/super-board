@@ -25,7 +25,7 @@ flowchart LR
   collect["/super-collect<br/>errors · issues · lookback"] --> backlog["Backlog"]
   backlog -->|"/super-board lint, then you"| ready["Ready"]
   ready --> build["Building<br/>super-build: worktree + draft PR"]
-  build --> qa["QA<br/>super-qa: tests, evidence,<br/>super-refine on UI cards"]
+  build --> qa["QA<br/>super-qa: tests, evidence,<br/>ui-refine-loop on UI cards"]
   qa --> review["Review<br/>super-review: own hypotheses,<br/>prior findings"]
   review --> gate{"merge gate<br/>base + verify_commands"}
   gate -->|green, head unchanged| done["Done (squash-merged)"]
@@ -49,8 +49,8 @@ merge with a hand-off; `variant: "qa-only"` skips Building.
 | `/super-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
 | `/super-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
 | `/super-collect` | Filling `Backlog` from errors, unboarded issues, feedback and repeat failures across past runs. |
-| `/super-refine` | Polishing one page or component; the Tester also calls it on UI cards (qa-hook). |
-| `/visual`, `/arch-loop`, `/cleanup-wt` | Secondary helpers: a visual recap or plan, an architecture loop, merged-worktree cleanup (the merge gate runs it after each merge when installed). |
+| `/ui-refine-loop` | Polishing one page or component; the Tester also calls it on UI cards (qa-hook). |
+| `/visual`, `/arch-loop` | Secondary helpers: a visual recap or plan, an architecture loop. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |
 
 ## Backends
 
@@ -96,7 +96,7 @@ user a question: the run is unattended, and a skill that waits is a skill that h
 | Lane | Loads |
 |---|---|
 | **super-build** | Routed by the ticket's type label: `bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`. Always `ponytail:ponytail` first (inline ladder if absent), `verification-before-completion`, and `code-review` on its own diff. Official docs first for third-party APIs, upgrades, auth/billing. Mechanics (`vitest` / `playwright-best-practices` / `testing-strategy`) by the localisation ladder, never by label. |
-| **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · the same testing skills · `super-refine` (qa-hook, UI cards whose tests passed) |
+| **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · the same testing skills · `ui-refine-loop` (qa-hook, UI cards whose tests passed) |
 | **super-review** | `code-review` (Standards + Spec, merge-base as fixed point) · `codebase-design` · `ponytail:ponytail-review` |
 
 Assignment happens when the ticket is written, not at runtime: super-build routes on the issue's
@@ -162,8 +162,10 @@ crash-recovery sweep of leaked assignees, the rate guard and the usage guard
 (`references/run-workflow.md`).
 
 Guard hooks, installed by `install.sh` unless `--no-hooks`: worktrees only under
-`.claude/worktrees/`, no reading of secret files, no API keys written into source
-(`hooks/README.md`).
+`.claude/worktrees/`, no reading of secret files, no API keys written into source, no deleting
+outside the project, and merged-worktree cleanup at session start. Blocking direct and force pushes
+to the base branch is opt-in (`onboard` asks once, or `install.sh --protect-main`). See
+`hooks/README.md`.
 
 ## Configuration
 
@@ -191,7 +193,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
   max_workers           optional wave throttle; absent or 0 = unlimited (claude-p defaults to 3)
   tick_seconds          claude-p GraphQL budget floor, default 120
   usage_pause_pct       pause new waves at this % of the Claude usage window, default 95
-  refine, collect       optional blocks for super-refine and super-collect
+  refine, collect       optional blocks for ui-refine-loop and super-collect
 ```
 
 ```
@@ -256,9 +258,9 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 
 ```
   skills/<name>/   SKILL.md (agent prompt) · README.md · references/ · scripts/
-  workflows/       super-board-wave.js, super-refine.js
+  workflows/       super-board-wave.js, ui-refine-loop.js
   scripts/         dispatcher, planner, merge gate, usage check, filers, README sync
-  hooks/           guard hooks + settings-snippet.json
+  hooks/           guard hooks, cleanup-wt, settings snippets; dev/ = skill-eval gate (never installed)
   tests/           bash/python tests, no network: bash tests/test-*.sh
   evals/           behavioural evals for `claude plugin eval` (evals/README.md)
 ```

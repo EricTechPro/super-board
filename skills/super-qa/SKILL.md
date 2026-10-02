@@ -32,7 +32,7 @@ The bootstrap is **non-interactive**. If the curl returns an existing-user error
 
 ## QA loop state board — GitHub Project as the state store
 
-State for the QA↔Build loop lives in a GitHub Project named **`Super Ultimate QA`** (auto-discovered by title at the user/org level). It has six Status columns matching the PDF model:
+State for the QA↔Build loop lives in a GitHub Project named **`Super Ultimate QA`** (auto-discovered by title at the user/org level). It has six Status columns:
 
 | Column   | Meaning                                              |
 |----------|------------------------------------------------------|
@@ -67,21 +67,21 @@ A `Flaky` retry-only finding goes to `Flaky`; out-of-scope routes go to `Skip`. 
 
 ## Algorithm overview
 
-You are the orchestrator. Your job: drive a BFS crawl of the target EricTechOS app
+You are the orchestrator. Your job: drive a BFS crawl of the target app
 that **builds `e2e/paths/` into a comprehensive Playwright suite** while
-fixing any bugs it stumbles on. Each iteration is a fresh headless
-`claude -p` worker that does ONE iter and exits. There is no worktree —
-the worker commits directly to the active branch (default `main`).
+fixing any bugs it stumbles on. Each iteration is a fresh worker — a sub-agent you launch in this
+session with the Agent tool — that does ONE iter and exits. There is no
+worktree: the worker commits directly to the active branch (default `main`).
+This pack ships no headless dispatcher for this loop.
 
 ## Autonomous mode — NO AskUserQuestion mid-loop
 
-`/super-qa` is invoked by an operator who walks away (often overnight,
-phone-only via Telegram). The loop must run end-to-end without the
+`/super-qa` is invoked by an operator who walks away (often overnight). The loop must run end-to-end without the
 orchestrator pausing on `AskUserQuestion`.
 
 **Decide-and-proceed, don't ask, on these classes of issue:**
 
-- Dispatcher / harness script bugs (parser errors, broken xargs, missing
+- Harness script bugs (parser errors, broken xargs, missing
   `chmod +x`, stale lock files). Fix locally, commit with a `fix(super-qa):`
   prefix, then continue.
 - Missing env auto-loads, leftover MCP zombies, log-dir creation.
@@ -91,10 +91,10 @@ orchestrator pausing on `AskUserQuestion`.
 
 **Still halt on these (real forks):**
 
-- Critical-path HUMAN GATE (dispatcher exit 4) — production money flow
+- Critical-path HUMAN GATE (worker status 4) — production money flow
   red >2 iters. Mandatory halt per skill contract.
-- Dispatcher exits 2 / 3 with a worker error that isn't a script bug
-  (e.g. Anthropic API down, prod Railway 503, auth credential rejected).
+- Worker status 2 / 3 with an error that isn't a script bug
+  (e.g. Anthropic API down, a production 503, auth credential rejected).
 - Working tree dirty with changes the orchestrator didn't make (could be
   user's in-flight work).
 - Anything that would delete or rewrite history (`git reset --hard`,
@@ -102,8 +102,7 @@ orchestrator pausing on `AskUserQuestion`.
 
 **Status updates instead of questions:** when you make an autonomous fix,
 report it in the next status message — what was broken, what you committed
-(with SHA), and a one-line revert path. Telegram is the channel; if it's
-down, log to terminal output and continue.
+(with SHA), and a one-line revert path, in the session output.
 
 After this loop has run for a while, `e2e/paths/` is the deliverable. CI runs
 `npm run test:e2e` on every PR. **No AI involvement in steady-state
@@ -174,7 +173,7 @@ Examples:
 - Priority: `priority:high`, `priority:medium`, or `priority:low`.
 - Area: `area:<product-area>` when known (`area:settings`, `area:imports`, `area:admin-shell`, etc.).
 - QA category when relevant: `qa:functional`, `qa:visual`, `qa:network`, `qa:console`, `qa:i18n`, `qa:a11y`, `qa:data`, `qa:testability`.
-- Suggested skill owner when helpful: `skill:super-build`, `skill:super-qa`, `skill:super-ux`, or `skill:super-review`.
+- Suggested skill owner when helpful: `skill:super-build`, `skill:super-qa`, `skill:ui-refine-loop`, or `skill:super-review`.
 
 The script adds the issue to the resolved `Super Ultimate QA` project and moves it into the `Bug` column (override with `SUPER_QA_TARGET_OPTION_NAME`) so a human (or `/super-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
 
@@ -214,7 +213,7 @@ Every auto-filed finding must give a future headless Claude/Super Build session 
 - Spec: `<e2e/paths/...spec.ts>`
 
 ## Suggested fix path
-- Suggested owner: `super-build` | `super-ux` | `super-qa` | `super-review`
+- Suggested owner: `super-build` | `ui-refine-loop` | `super-qa` | `super-review`
 - Suggested skills: `mattpocock-skills:diagnosing-bugs`, `mattpocock-skills:tdd`, `verification-before-completion`
 - Notes for implementer: <first suspected file/function, if known>
 
@@ -267,11 +266,9 @@ Per-spec forensics captured by `e2e/lib/report-fixture.ts`:
 The fixture (`e2e/lib/report-fixture.ts`) **already captures** console
 errors, page errors, failed requests, network summary, and Sentry events,
 plus HAR via `recordHar`. Disk writes are gated behind
-`SUPER_QA_FORENSICS=1`, which `scripts/super-qa-dispatch.sh` exports for
-every iter. Fixture exposes everything via `report.forensics.*` (e.g.
-`report.forensics.consoleErrors`). Iter 2's only fixture-related task is
-to retrofit the assertions onto the 5 existing specs (login, dashboard,
-orders, orders-new, order-detail) — see preamble Phase 1.
+`SUPER_QA_FORENSICS=1`; set it in every worker's environment. Fixture
+exposes everything via `report.forensics.*` (e.g.
+`report.forensics.consoleErrors`).
 
 ## Algorithm
 
@@ -282,7 +279,7 @@ orders, orders-new, order-detail) — see preamble Phase 1.
   share `queue.md`. To run parallel work, branch and run a second
   orchestrator.)
 
-Notify Telegram once: `🐛 Super QA starting — N iterations`.
+Report once: `🐛 Super QA starting — N iterations`.
 
 ### 2. For each iteration N (sequential)
 
@@ -294,33 +291,30 @@ Notify Telegram once: `🐛 Super QA starting — N iterations`.
   and report — the queue is hand-seeded once via this skill's setup
   (or already by the commit that introduced the skill).
 
-**2b. Dispatch iteration worker**
-```
-bash scripts/super-qa-dispatch.sh <next_n>
-```
-…via Bash with `run_in_background: true` (so the orchestrator can poll). The
-dispatcher:
-- Composes prompt = `references/iteration-preamble.md` + per-iteration footer
-  (iter num, base SHA, mandatory final-commit format).
-- Runs `claude -p --dangerously-skip-permissions --max-turns 250` in repo
-  root (no worktree creation).
-- Verifies the worker produced a `super-qa: iter N` commit on the
-  current branch.
-- Exit codes: `0` (iter complete) / `2` (worker non-zero) / `3` (no
-  done-commit) / `4` (HUMAN GATE) / `5` (WIP-CHECKPOINT — wall-clock hit
-  mid-fix, picks up next iter).
+**2b. Launch the iteration worker**
 
-Notify Telegram: `🔍 Iter N dispatched`.
+Launch one sub-agent (Agent tool) in the repo root, no worktree, with
+prompt = `references/iteration-preamble.md` + a per-iteration footer (iter
+num, base SHA, mandatory final-commit format) and `SUPER_QA_FORENSICS=1`.
+When it returns, classify the iteration:
+- `0` iter complete — a `super-qa: iter N` commit is on the current branch.
+- `2` worker failed — it errored and left no done or WIP marker.
+- `3` no done-commit — it finished but no `super-qa: iter N` commit exists.
+- `4` HUMAN GATE — its output contains `HUMAN GATE TRIPPED:`.
+- `5` WIP-CHECKPOINT — it hit its budget mid-fix and left a `wip:` commit;
+  the next iter picks it up.
+
+Report: `🔍 Iter N launched`.
 
 **2c. Wait, then advance**
 
-Poll BashOutput. On dispatcher exit 0:
+On status 0:
 - Read the close-out commit subject to extract `(X bugs, Y items)`.
-- Notify Telegram: `✅ Iter N done — X bugs, Y items processed`.
+- Report: `✅ Iter N done — X bugs, Y items processed`.
 - Loop to next iteration.
 
-On dispatcher exit 2 / 3 / 4 / 5:
-- Notify Telegram with `tail -50` of `.planning/super-build-logs/super-qa-iter-N.log`.
+On status 2 / 3 / 4 / 5:
+- Report the worker's last output (its final 50 lines).
 - Halt the loop (unless `--continue-on-error` was passed).
 - Exit 4 (HUMAN GATE) is mandatory halt regardless — see "critical paths"
   below.
@@ -333,11 +327,11 @@ Stop when **any** of:
 
 - Queue has no `[ ]` items left — natural completion.
 - User-supplied iteration count `N` is reached (the `N` in `/super-qa N`).
-- Dispatcher halt gate fires (HUMAN GATE, dirty tree, dispatcher exit 2/3/4).
+- A halt gate fires (HUMAN GATE, dirty tree, worker status 2/3/4).
 - User interrupts.
 
 **Notification trigger (NOT a stop):** after 3 consecutive iters with zero
-bugs found, send a Telegram summary like *"diminishing returns: 3 iters, 0
+bugs found, report a summary like *"diminishing returns: 3 iters, 0
 bugs, N items still in queue — continuing"*. The loop continues until the
 queue actually drains (or `N` is reached). The user can interrupt manually
 if they accept the diminishing returns.
@@ -353,7 +347,7 @@ Coverage % is reported every iter as a progress indicator, never a gate.
 After termination (or on halt):
 - Aggregate: total iters, items moved from `[ ]` → `[x]` / `[b]` / `[!]`,
   total bugs found, total fixed, queue size now.
-- Send Telegram summary linking to all `docs/super-qa/iter/iteration-*.md`
+- Report a summary linking to all `docs/super-qa/iter/iteration-*.md`
   and the current `docs/super-qa/report/QA-REPORT.md`.
 
 ## One iteration, in plain English
@@ -429,7 +423,7 @@ payment, run cutoff snapshot, send driver email). The user maintains it;
 the skill never auto-edits it.
 
 If any critical-path spec has been red for **>2 consecutive iters**, the
-dispatcher exits **4 (HUMAN GATE)**. The loop halts. A human investigates.
+the iteration ends with status **4 (HUMAN GATE)**. The loop halts. A human investigates.
 This protects production-critical flows from being silently broken by
 in-flight queue items.
 
@@ -532,16 +526,16 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
   `core/fixtures-hooks.md` (custom fixtures for auth, pre-test seeding, teardown),
   `core/test-data.md` (test data factories), and `core/page-object-model.md` (POM for
   reusable interactions). Keep specs reusable as the suite grows.
-- `super-refine` (in this pack), in `qa-hook` mode — only on a UI card (label `ui`,
+- `ui-refine-loop` (in this pack), in `qa-hook` mode — only on a UI card (label `ui`,
   `design` or `frontend`, or a visual AC) after its AC tests pass. It polishes the
   changed surface in a few rounds and never blocks the card. See
-  `skills/super-refine/references/qa-hook.md` and run.md → Tester step 5b.
+  `skills/ui-refine-loop/references/qa-hook.md` and run.md → Tester step 5b.
 
 ## Coexistence with `/super-build`
 
 `super-qa-file-bug.sh` files bugs into the **Super Ultimate QA** project's `Bug` column. This is a separate board from `/super-build`'s standalone feature queue (`BUILD_LOOP_PROJECT`), so the two skills can run concurrently without column races:
 
-- **Standalone `/super-build`** keeps reading `Ready` from its configured feature project (e.g. `Fitbox Admin #2`). Untouched by `/super-qa`.
+- **Standalone `/super-build`** keeps reading `Ready` from its configured feature project. Untouched by `/super-qa`.
 - **`Bug` cards reach a builder** when someone moves them to `Ready`, or when `/super-build` runs with `BUILD_LOOP_SOURCE_COLUMN=Bug` against this board. Builds go to `QA` as PRs; nothing moves to `Done` without the Reviewer's merge gate.
 
 If you intentionally want a single board for both lanes, set `BUILD_LOOP_PROJECT=$SUPER_QA_PROJECT_NUMBER` and `BUILD_LOOP_SOURCE_COLUMN=Bug`. Don't do this by accident — the column semantics differ.
@@ -555,8 +549,8 @@ Safety rails (enforced by the iteration preamble):
 - All written test data is prefixed `[TEST] ` so it's greppable.
 - Sentry tag `source=super-qa` on errors.
 - DB resets DISABLED (`RESET_DB=false`) — would wipe prod.
-- Email sending mocked via `RESEND_API_KEY=mock_<anything>`. **Required:** run against a staging deploy (`NODE_ENV=staging`, `EMAIL_DRY_RUN=1`) — not prod. See `docs/super-orchestrator/STAGING-ENV.md` for the 7-step playbook. If no staging URL is configured, halt with `STATUS: halt (no-staging-env)`.
-- Override the target via `BASE_URL=…` env var on the dispatcher.
+- Email sending mocked via `RESEND_API_KEY=mock_<anything>`. **Required:** run against a staging deploy (`NODE_ENV=staging`, `EMAIL_DRY_RUN=1`) — not prod. If no staging URL is configured, halt with `STATUS: halt (no-staging-env)`.
+- Override the target via `BASE_URL=…` in the worker's environment.
 
 ## Files involved
 
@@ -566,8 +560,7 @@ Safety rails (enforced by the iteration preamble):
 └─ references/
    └─ iteration-preamble.md            ← worker contract (verbatim prompt)
 
-scripts/
-└─ super-qa-dispatch.sh         ← thin dispatcher
+scripts/super-qa-file-bug.sh           ← files a red spec onto the QA board (installed to .claude/bin/)
 
 docs/super-qa/
 ├─ README.md                           ← operator's guide
@@ -590,7 +583,7 @@ docs/super-qa/report/
 - Default: starts a new batch numbered after the last `iteration-*.md`
   (e.g. if iters 1-5 exist, the next batch starts at 6).
 - `--resume`: only run iters whose number is greater than `max(existing)`.
-- A leftover `wip:` commit on the current branch (from a dispatcher exit 5)
+- A leftover `wip:` commit on the current branch (from a status-5 iteration)
   is OK — the next iter's regression phase finds the red spec and finishes
   the fix.
 
@@ -598,11 +591,11 @@ docs/super-qa/report/
 
 - Queue empty (no `[ ]` items left) — natural completion.
 - Iteration count reached (the user-supplied `N`).
-- Dispatcher exit 2 / 3 / 4 — halt and notify.
+- Worker status 2 / 3 / 4 — halt and report.
 - User interrupts.
 
 **Note:** "3 consecutive zero-bug iters" is **no longer** a stop condition.
-It triggers a Telegram notification ("diminishing returns") but the loop
+It triggers a "diminishing returns" report but the loop
 continues exploring the rest of the queue. See "Termination check" above
 for rationale.
 

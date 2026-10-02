@@ -1,9 +1,9 @@
 # super-board
 
-Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **9 skills** — 6 primary, 3 secondary — 10 commands, 5 guards.
+Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **8 skills** — 5 primary, 3 secondary — 9 commands, 8 guards.
 
-![Skills](https://img.shields.io/badge/skills-9-000000?style=flat-square)
-![Version](https://img.shields.io/badge/version-2.5.0-000000?style=flat-square)
+![Skills](https://img.shields.io/badge/skills-8-000000?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.6.0-000000?style=flat-square)
 ![Host](https://img.shields.io/badge/host-Claude%20Code-000000?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-000000?style=flat-square)
 
@@ -13,7 +13,7 @@ Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **9
 
 ```bash
 git clone https://github.com/EricTechPro/super-board /tmp/super-board   # or download a release zip
-/tmp/super-board/install.sh /path/to/your-project                       # --no-hooks to skip the guards
+/tmp/super-board/install.sh /path/to/your-project                       # --no-hooks skips the guards; --protect-main adds the push guard
 npx skills@latest add mattpocock/skills                                 # required: lanes call these by name
 ```
 
@@ -31,15 +31,14 @@ Then, inside Claude Code in your project: `/super-board onboard`, move cards to 
 | [`/super-qa`](skills/super-qa/README.md) | Tester lane: evidence, test-gap check, screenshots, or bounce to Build. |
 | [`/super-review`](skills/super-review/README.md) | Reviewer lane: own hypotheses, remembers prior findings, merge gate. |
 | [`/super-collect`](skills/super-collect/README.md) | Turns errors, issues and past-run failures into deduped Backlog cards. |
-| [`/super-refine`](skills/super-refine/README.md) | Critique → refine loop that polishes one page or component. |
 
 **Secondary — standalone helpers**
 
 | Skill | What it does |
 |---|---|
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
+| [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/arch-loop`](skills/arch-loop/README.md) | Architecture review loop: find one deepening, implement, verify, repeat. |
-| [`/cleanup-wt`](skills/cleanup-wt/README.md) | Removes merged worktrees and branches, with a recovery file. |
 <!-- skills:end -->
 
 Each name links to that skill's README. Lane skills run as agents inside the `super-board-wave` workflow.
@@ -54,10 +53,9 @@ Each name links to that skill's README. Lane skills run as agents inside the `su
 | `/super-board run <slug> [--low\|--high]` | The loop, until the board drains or a halt gate fires; also resumes |
 | `/super-board stop` | Posts "stopped mid-flight" notes, releases claims, stops workers |
 | `/super-collect [intake\|lookback]` | Files errors, unboarded issues and repeat failures into Backlog (dry-run first) |
-| `/super-refine <route>` | Polishes one page or component in critique → refine rounds |
+| `/ui-refine-loop <route>` | Polishes one page or component in critique → refine rounds |
 | `/visual [recap\|plan\|<path>]` | One HTML page of a branch, a plan, or part of the codebase |
 | `/arch-loop` | Architecture improvements, one verified commit per pass |
-| `/cleanup-wt` | Dry-run, then remove merged worktrees and branches |
 
 ## Guards
 
@@ -68,7 +66,10 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | [guard-worktree-path](hooks/guard-worktree-path.py) | Blocks `git worktree add` outside `.claude/worktrees/` |
 | [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files |
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
+| [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
+| [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `install.sh --protect-main`): blocks direct and force pushes to main/master/base |
 | [README sync](scripts/super-board-readme-sync.py) | Regenerates this skill table; pre-commit and PostToolUse hooks keep it fresh |
+| [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |
 | [merge gate](scripts/super-board-merge-gate.sh) | Merges only after the current base plus your `verify_commands` pass, pinned to the reviewed commit |
 
 ## Setup notes
@@ -92,7 +93,7 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 - Skill structure inspired by [obra/superpowers](https://github.com/obra/superpowers).
 - Lanes run on the [mattpocock/skills](https://github.com/mattpocock/skills) process stack.
 - super-collect and visual adapt [BuilderIO/skills](https://github.com/BuilderIO/skills) (MIT); visual's diagrams follow [tt-a1i/archify](https://github.com/tt-a1i/archify) (MIT).
-- super-refine, arch-loop, cleanup-wt and guard-worktree-path come from Eric Tech's BookKeepingApp.
+- ui-refine-loop, arch-loop, the cleanup-wt hook and guard-worktree-path come from Eric Tech's BookKeepingApp.
 
 ---
 

@@ -1,0 +1,1 @@
+Run super-review on PR #21. This is a standalone review, not a board run: give your verdict and the review report, but do not merge, move cards or post comments. The PR's branch is checked out in this repo; `gh` is available.

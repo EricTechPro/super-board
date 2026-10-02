@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-refine setup: resolve the pluggable settings, build the worktree, start
+# ui-refine-loop setup: resolve the pluggable settings, build the worktree, start
 # the dev server on a free port, and tear it down again. Run from the repo root.
 #
 #   refine-setup.sh detect [--config <path>]

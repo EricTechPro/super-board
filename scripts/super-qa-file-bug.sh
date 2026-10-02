@@ -18,7 +18,7 @@
 #     [--category functional|visual|network|console|i18n|a11y|data|testability] \
 #     [--area <area>] [--route <route>] [--spec <path>] [--iter <n>] \
 #     [--fingerprint "<slug>|<tc>|<signature>"] \
-#     [--suggested-skill super-build|super-qa|super-ux|super-review]
+#     [--suggested-skill super-build|super-qa|ui-refine-loop|super-review]
 #
 # Project resolution (per super-qa/SKILL.md → "Project resolution"):
 #   owner  $SUPER_QA_PROJECT_OWNER, else the current repo's owner
@@ -69,8 +69,8 @@ if [ -n "$CATEGORY" ]; then
     *) die "--category must be one of functional|visual|network|console|i18n|a11y|data|testability (got: $CATEGORY)" 64 ;; esac
 fi
 if [ -n "$SUGGESTED_SKILL" ]; then
-  case "$SUGGESTED_SKILL" in super-build|super-qa|super-ux|super-review) ;;
-    *) die "--suggested-skill must be super-build|super-qa|super-ux|super-review (got: $SUGGESTED_SKILL)" 64 ;; esac
+  case "$SUGGESTED_SKILL" in super-build|super-qa|ui-refine-loop|super-review) ;;
+    *) die "--suggested-skill must be super-build|super-qa|ui-refine-loop|super-review (got: $SUGGESTED_SKILL)" 64 ;; esac
 fi
 
 BODY_RAW=$(cat "$BODY_FILE")

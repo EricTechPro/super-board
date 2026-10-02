@@ -120,7 +120,7 @@ one-liner. Escalate per the budget rule above.
 
 The default target is configured by `BASE_URL`. Treat production URLs as production.
 
-- `BASE_URL=<target-app-url>` must be supplied by the dispatcher environment or local config; do NOT hardcode it in committed code.
+- `BASE_URL=<target-app-url>` must be supplied by the orchestrator environment or local config; do NOT hardcode it in committed code.
 - Test user lives in env (`QA_BOT_EMAIL` / `QA_BOT_PASSWORD`). The loop logs in as this user when the app requires auth. If missing, document in
   `iteration-N.md` and exit non-zero — do NOT make up a password.
 - All written test data MUST be prefixed `[TEST] ` (e.g. customer name
@@ -132,7 +132,7 @@ The default target is configured by `BASE_URL`. Treat production URLs as product
   NEVER `truncate`, `drop table`, run a destructive seed, or hit any
   endpoint that resets state. If your test plan needs a reset, mark the cell
   `[!]` with reason "needs-db-reset-not-allowed-on-prod" and continue.
-- **Email sending — HARD SKIP unless staging URL is configured.** Worker must read `BASE_URL` and verify it does NOT match the production origin. If `BASE_URL` is missing or matches prod, mark all email-triggering cells `[!]` with reason `no-staging-env`. See `docs/super-orchestrator/STAGING-ENV.md` for setup. Email-triggering actions include (non-exhaustive):
+- **Email sending — HARD SKIP unless staging URL is configured.** Worker must read `BASE_URL` and verify it does NOT match the production origin. If `BASE_URL` is missing or matches prod, mark all email-triggering cells `[!]` with reason `no-staging-env`. Email-triggering actions include (non-exhaustive):
   - "Send delivery email" buttons (production / deliveries pages)
   - "Reset password" / "Invite user" flows
   - Order confirmation / receipt email triggers
@@ -196,8 +196,7 @@ For every spec run, the report-fixture must capture and persist:
 
 The fixture **already captures** all of the above via
 `e2e/lib/report-fixture.ts`. Disk writes are gated behind
-`SUPER_QA_FORENSICS=1`, which `scripts/super-qa-dispatch.sh` exports for
-every iter. The Sentry probe needs `SENTRY_AUTH_TOKEN`; if missing, it
+`SUPER_QA_FORENSICS=1`, which the orchestrator sets for every iter. The Sentry probe needs `SENTRY_AUTH_TOKEN`; if missing, it
 logs `sentryProbeSkippedReason` and continues.
 
 **API:** access via `report.forensics.{consoleErrors, pageErrors,
@@ -359,7 +358,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 - Wall-clock cap 30 min from iter start.
 - When wall-clock hits mid-cell, finish the current cell, write the report,
   exit. When wall-clock hits mid-fix, commit a `wip:` checkpoint with the
-  failing spec still red and exit (dispatcher recognizes this as exit 5).
+  failing spec still red and exit (the orchestrator records this as status 5).
 
 **Per cell:**
 
@@ -528,7 +527,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    - If "no UX issues" → log one line in `iteration-N.md` Section 6:
      `<slug>: UX clean`. Continue.
    - For each finding → file a GH issue via `super-qa-file-bug.sh` with
-     kind `ux`, category `visual`, priority per the agent's call, and suggested owner `super-ux`. Body includes
+     kind `ux`, category `visual`, priority per the agent's call, and suggested owner `ui-refine-loop`. Body includes
      the finding's location + why + suggested fix. The cell still counts
      as `[x]` (functional green); UX bugs are a separate stream from
      functional bugs.
@@ -596,7 +595,7 @@ detection (do NOT batch at end of iter):
    - **Actual behavior:** what happened instead.
    - **Evidence:** screenshot path/link, console log summary, page error summary, network JSON/HAR path, and spec path. If an artifact is not captured, write `not captured` and why.
    - **First-suspect file:** `client/path/file.tsx:42` if identifiable.
-   - **Suggested fix path:** `super-build` for implementation, `super-ux` for design polish, `super-qa` for harness/test-only fixes, or `super-review` for release-readiness judgment.
+   - **Suggested fix path:** `super-build` for implementation, `ui-refine-loop` for design polish, `super-qa` for harness/test-only fixes, or `super-review` for release-readiness judgment.
    - **Fingerprint:** a stable dedupe key such as `<slug>|<test-case>|<failure-signature>`.
    - **Acceptance criteria:** user-visible fix + regression coverage + Super QA rerun.
 
@@ -768,9 +767,9 @@ STOP. Do NOT advance to a next iteration.
   commit with the failing spec still red. Then make the close-out
   `super-qa: iter N (X bugs, Y items, Z PRs opened)` commit anyway, noting in
   `iteration-N.md` Section 1 that one fix is in flight. Exit 0. The
-  dispatcher will see the `wip:` and the close-out and treat it as a
+  orchestrator will see the `wip:` and the close-out and treat it as a
   successful iter (not exit 5 — exit 5 is for missing close-out commits
-  that the dispatcher infers were time-clipped).
+  that the orchestrator infers were time-clipped).
 
 ## HUMAN GATE (do not trip on routine work)
 
