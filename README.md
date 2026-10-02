@@ -63,7 +63,7 @@ The legacy dispatcher refuses to run (exit 78) unless the config explicitly sets
 | **super-board** | — | Orchestrator. Validates preconditions, plans waves, launches them. Holds NO product context. |
 | **super-build** | `Ready` → `QA` | Spins up a git worktree, implements the change, opens a PR. |
 | **super-qa** | `QA` → `Review` | Crawls routes, captures screenshots/logs/HARs, comments on the PR, or bounces the card back with a rebuild label. Findings file as `source:qa` cards. |
-| **super-review** | `Review` → `Done` | Re-runs the Tester's tests, adversarial truth-check, merges or hands to a human gate. Shape problems in the diff get filed to `Backlog`, never blocked on. |
+| **super-review** | `Review` → `Done` | Re-runs the Tester's tests, adversarial truth-check, merges or hands to a human gate. On a re-review it first checks every finding from its last report — fixed, not fixed, or no longer applies — and bounces again on anything unfixed. Shape problems in the diff get filed to `Backlog`, never blocked on. |
 
 Lane skills run as workflow agents inside `super-board-wave` by default, or as headless `claude -p` workers on the legacy backend. Same lifecycles either way.
 
@@ -292,6 +292,10 @@ independently deployed services, which a single-app repo does not have.
 ```
 
 Drop the whole `.claude/` tree into your project — Claude Code picks them up automatically.
+
+Behavioural evals live in `evals/` and run with `claude plugin eval` (the minimal
+`.claude-plugin/plugin.json` exists only for that; `install.sh` stays the install path). See
+`evals/README.md`.
 
 ## What this is NOT
 

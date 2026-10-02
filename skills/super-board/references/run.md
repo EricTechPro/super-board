@@ -186,6 +186,7 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
 2. Read PR review threads on this branch's PR; filter `[builder]` prefix.
 3. For each unresolved `[builder]` thread: read file:line + suggested fix, apply, resolve thread via graphql mutation.
 4. Address any new failure feedback from Tester's latest `❌` comment.
+   (A Reviewer bounce reaches you as those same `[builder]` threads, listed in the latest `<!-- super-review:report -->` comment. A finding the Reviewer re-opened as `not fixed` was resolved without a fix last time — fix the code, not just the thread.)
 5. Commit + push to same branch.
 6. Verify ALL `[builder]` threads are resolved. If not, return to step 3.
 7. Post 🔨 PR + issue comments. Move Building → QA. Clean up worktree.
@@ -243,6 +244,15 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - Both open → bounce to whichever is older; the other gets picked up later.
    - Clean up worktree, exit.
 3. Read PR (code + test files + description), spot-check Tester's evidence (one screenshot at least), read CLAUDE.md / AGENTS.md.
+3b. **Prior-report check (review remembers — added 2.5.0).** Load the last Reviewer report on this PR as `prior_report`. One call:
+   ```
+   gh pr view <PR> --json comments \
+     --jq '[.comments[] | select(.body | contains("<!-- super-review:report -->"))] | last | .body // ""'
+   ```
+   - Empty → first review of this card. Skip to step 4; behave exactly as before.
+   - Non-empty → the card was bounced and rebuilt. **Round 1** walks every finding in `prior_report` and marks each one `fixed` / `not fixed` / `no longer applies` (code it pointed at is gone or the AC changed), citing the file:line that proves it. A resolved thread is not proof — check the code.
+   - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[QA]` → QA, both → `[builder]` first), `loop:rebuild-N`, and post the Reviewer report listing them under `Prior findings`. Skip the fresh pass; it would review code that is about to change.
+   - All `fixed` / `no longer applies` → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 4. Review the code (logic, conventions). Review the tests (right thing tested? testable assertions? meaningful coverage?).
 5. **Reviewer-side test rerun** (always — closes the Tester self-verification gap):
    - Pull `issue-<N>-<slug>` into the review worktree.
@@ -263,7 +273,22 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - **Test-side new finding** → open new `[QA]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
    - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[QA]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Add a `🛡 → ✅ CI-budget bypass` comment to both the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
    - **Human-gate / Blocker (schema, API contract, money, auth, migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked.
-8. Clean up worktree.
+8. Post the **Reviewer report** PR timeline comment on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and posts none). It is what step 3b reads next time, so the first line is the stable marker and every finding gets an id:
+
+   ```
+   <!-- super-review:report -->
+   🧐 Reviewer — <bounced | blocked | human-gated | merged>
+   Round:     <N>   (1 = first review)
+   Prior findings:            # omit on round 1
+     • R1 fixed            src/api/stream.ts:54
+     • R2 not fixed        e2e/streaming/ttfb.spec.ts:18
+   Findings:
+     • R3 [builder] src/api/stream.ts:61 — <one line>
+     • R4 [QA] e2e/streaming/ttfb.spec.ts:30 — <one line>
+   Next:      <Ready | QA | Blocked | Done>
+   ```
+   Carry an unfixed prior finding forward under its old id; number new findings after the highest id used so far.
+9. Clean up worktree.
 
 ### Merge protocol (Reviewer only — added 2026-08-06, issue #9)
 

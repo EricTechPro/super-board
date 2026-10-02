@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# macOS: /usr/bin/git and /usr/bin/python3 are xcrun shims that write a cache file
+# under /var/folders, which the eval sandbox forbids — git then fails outright.
+# Invoked through the git/python3 symlinks beside it, this execs the real binary:
+# the first non-/usr/bin one on PATH, else the active developer dir's copy.
+name="$(basename "$0")"
+here="$(cd "$(dirname "$0")" && pwd)"
+IFS=: read -ra dirs <<<"$PATH"
+for d in "${dirs[@]}"; do
+  [ "$d" = "$here" ] || [ "$d" = /usr/bin ] && continue
+  [ -x "$d/$name" ] && exec "$d/$name" "$@"
+done
+dev="$(xcode-select -p 2>/dev/null)"
+[ -n "$dev" ] && [ -x "$dev/usr/bin/$name" ] && exec "$dev/usr/bin/$name" "$@"
+exec "/usr/bin/$name" "$@"

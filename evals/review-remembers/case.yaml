@@ -1,0 +1,15 @@
+schema_version: "1.1"
+name: review-remembers
+description: >
+  Re-review of a bounced PR. The prior Reviewer report (marker comment) lists R1 and R2;
+  the rebuild fixed R1 but only resolved R2's thread. super-review must load the prior
+  report, mark R1 fixed and R2 not fixed with file:line proof, bounce again, and not merge.
+tags: [super-review, review-remembers]
+runs: 3
+expected_outcome: R1 fixed, R2 not fixed, card bounced back to the builder; no merge.
+execution:
+  max_turns: 40
+  timeout_seconds: 900
+  allowed_tools: [Read, Glob, Grep, Skill, Bash]
+context:
+  scaffold_script: seed.sh

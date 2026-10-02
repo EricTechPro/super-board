@@ -47,6 +47,15 @@ const STAGE_SCHEMA = {
     detail: { type: 'string' },
     prUrl: { type: 'string' },
     branch: { type: 'string' },
+    // Review lane only, on a re-review: how round 1 graded the prior report.
+    priorFindings: {
+      type: 'object',
+      properties: {
+        fixed: { type: 'integer' },
+        notFixed: { type: 'integer' },
+        noLongerApplies: { type: 'integer' },
+      },
+    },
   },
   required: ['status', 'column', 'detail'],
 }
@@ -73,11 +82,21 @@ const LANE = {
 // freshness check runs INSIDE that lock, so nothing can move the base between
 // the proof and the merge. See run.md → Reviewer lifecycle step 5.
 
+// Review remembers: a card back in Review after a bounce is graded against the
+// last Reviewer report first (run.md → Reviewer step 3b). The lookup is one gh
+// call by marker, so the lane does it — this script never sees PR comments.
+const REVIEW_MEMORY = [
+  `Before reviewing, load prior_report: the newest PR comment containing "<!-- super-review:report -->" (run.md → Reviewer step 3b).`,
+  `None → first review, behave as usual. Found → round 1 marks each prior finding fixed / not fixed / no longer applies;`,
+  `any not fixed → bounce again listing them. Report the counts as priorFindings.`,
+]
+
 const lanePrompt = (lane, card) => [
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
+  ...(lane === 'review' ? REVIEW_MEMORY : []),
   ``,
   `Report your exit via structured output:`,
   `- status=advanced  → card moved forward (Building→QA, QA→Review, Review→Done/merged)`,
@@ -168,6 +187,7 @@ const summary = results.filter(Boolean).map((r) => {
     column: last.column,
     detail: last.detail,
     prUrl: last.prUrl || null,
+    priorFindings: last.priorFindings || null,
     lanesRun: r.history.map((h) => `${h.lane}:${h.status}`).join(' → ') || 'none',
   }
 })

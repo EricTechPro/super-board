@@ -1,0 +1,6 @@
+{
+  "name": "super-board",
+  "version": "2.5.0",
+  "description": "Autonomous GitHub Project board runner: super-board, super-build, super-qa, super-review. This manifest exists so `claude plugin eval` can load the pack; install.sh remains the real install path.",
+  "experimental": { "evals": "evals" }
+}

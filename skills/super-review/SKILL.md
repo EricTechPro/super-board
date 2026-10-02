@@ -34,7 +34,8 @@ Accept any of these inputs:
 - commit range;
 - user-provided file list;
 - QA report, screenshots, or Super Orchestrator manifest;
-- release goal / done definition.
+- release goal / done definition;
+- `prior_report` — the previous review's findings on this PR (see "Review remembers"). Empty on a first review.
 
 If the input is ambiguous, default to reviewing the current branch against its upstream/base branch. Ask only when the base branch, PR, or target scope materially changes the result.
 
@@ -44,6 +45,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - Identify branch, base branch, PR, changed files, and user goal.
    - Check working tree status before reviewing.
    - If there are unrelated dirty files, stop and ask before touching them.
+   - Load `prior_report`. If one exists, run round 1 of "Review remembers" before step 2.
 
 2. **Inspect changes**
    - Read the diff and the affected modules.
@@ -101,14 +103,19 @@ If the input is ambiguous, default to reviewing the current branch against its u
 ## Output format
 
 ```markdown
+<!-- super-review:report -->
 ## Super Review result: <merge-ready | blocked | human-gated | unverified>
 
 - Scope: <branch/PR/files reviewed>
 - Base: <base branch/commit if known>
 - Verification: <commands + pass/fail/skipped>
 
+### Prior findings (omit on a first review)
+- R1 fixed — <file:line that proves it>
+- R2 not fixed — <file:line> → route to <workflow>
+
 ### Blockers
-- [ ] <finding> → route to <Super Build | Super QA | Super UX | human>
+- [ ] R3 <finding> → route to <Super Build | Super QA | Super UX | human>
 
 ### Should fix
 - [ ] <finding> → route to <workflow>
@@ -141,10 +148,38 @@ When Super Orchestrator runs **Review Loop**, use this sequence:
 1. Super Review inspects branch/PR and writes findings.
 2. Super Orchestrator routes each actionable finding to Super Build, Super QA, or Super UX.
 3. The owning workflow fixes and verifies its scope.
-4. Super Review runs again against the updated branch.
+4. Super Review runs again against the updated branch, with its last report as `prior_report` — round 1 checks those findings before any fresh pass.
 5. Stop only when no blocking review findings remain, or unresolved items are explicitly human-gated.
 
 Super Review should not silently push fixes during Review Loop unless the user or orchestrator explicitly grants that authority.
+
+## Review remembers
+
+A re-review starts from the last one. Without it, a rebuilt card gets a fresh reviewer who
+re-litigates settled points, misses that a finding was "resolved" without a fix, and can
+bounce forever on a moving target.
+
+**Lookup — one call, by marker.** Every report starts with `<!-- super-review:report -->`.
+`prior_report` is the newest PR comment carrying it:
+
+```bash
+gh pr view <PR> --json comments \
+  --jq '[.comments[] | select(.body | contains("<!-- super-review:report -->"))] | last | .body // ""'
+```
+
+Outside super-board (no PR), `prior_report` is whatever earlier review the caller hands you.
+
+**No prior report** → first review. Behave exactly as before.
+
+**Round 1 — check each prior finding before anything else.** Mark every one:
+
+- `fixed` — cite the file:line that shows it.
+- `not fixed` — still true of the code. A resolved thread is not evidence; read the code.
+- `no longer applies` — the code it pointed at is gone, or the AC changed. Do not re-raise it.
+
+Any `not fixed` → **bounce again** with them listed under `Prior findings`, keeping their
+original ids and routes. Skip the fresh pass; it would review code that is about to change.
+All clear → round 2 is the normal fresh pass. New findings take ids after the highest one used.
 
 ## Common pitfalls
 
@@ -153,6 +188,7 @@ Super Review should not silently push fixes during Review Loop unless the user o
 - Mixing reviewer findings with broad refactors.
 - Creating duplicate GitHub issues without checking whether the finding is already tracked.
 - Letting Super Review become another alias for Super Build; keep review authority separate from implementation authority.
+- Re-reviewing a bounced card from scratch and ignoring `prior_report` — that is how a finding gets "resolved" without a fix and slips through.
 
 ## Done condition
 
@@ -224,7 +260,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 - **QA-only variant:** review the QA report quality, not the code diff. (No diff exists in QA-only-URL.)
 
 ### Lifecycle (Reviewer)
-See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of 8 sub-steps:
+See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the sub-steps:
 
 1. Worktree from current state of `issue-<N>-<slug>`.
 2. **Gate 1 — thread scan.** If ANY unresolved PR thread:
@@ -233,6 +269,7 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of 8 su
    - Both open → bounce to whichever is older.
    - Clean up worktree, exit.
 3. Read PR + spot-check Tester evidence + read CLAUDE.md / AGENTS.md.
+   **3b. Prior-report check** — load `prior_report` (see "Review remembers"); if present, round 1 checks each prior finding; any `not fixed` → re-open its thread, bounce by prefix, post the report, exit.
 4. Review code + tests.
 5. **Reviewer-side test rerun (always — closes Tester self-verification gap):**
    - Pull `issue-<N>-<slug>` into review worktree.
@@ -245,7 +282,8 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of 8 su
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
    - **Test-side new finding** → new `[QA]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).
    - **Blocker (schema, contract, money, auth, migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked.
-8. Clean up worktree.
+8. Post the Reviewer report (marker `<!-- super-review:report -->`, ids on every finding) — the next re-review's `prior_report`.
+9. Clean up worktree.
 
 ### Merge protocol — Done means merged
 

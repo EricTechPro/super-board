@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Offline `gh` stand-in for evals. Reads fixtures from <repo>/.git/gh-fixture/ (out of
+# the agent's sight in `ls`), logs every call to <repo>/.gh-log, and never touches the
+# network. `pr merge` is a logged no-op.
+# Fixtures: pr.json (the `gh pr view --json` object, incl. comments) and diff.patch.
+set -uo pipefail
+ROOT="$PWD"
+while [ "$ROOT" != / ] && [ ! -d "$ROOT/.git" ]; do ROOT="$(dirname "$ROOT")"; done
+[ -d "$ROOT/.git" ] || ROOT="$PWD"
+FX="$ROOT/.git/gh-fixture"
+LOG="$ROOT/.gh-log"
+printf '%q ' gh "$@" >>"$LOG"; echo >>"$LOG"
+
+jq_arg="" json_fields=""
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case "${args[$i]}" in
+    --jq|-q) jq_arg="${args[$((i + 1))]:-}" ;;
+    --jq=*) jq_arg="${args[$i]#--jq=}" ;;
+    --json) json_fields="${args[$((i + 1))]:-}" ;;
+    --json=*) json_fields="${args[$i]#--json=}" ;;
+  esac
+done
+
+emit() { # emit <json>: apply --json field selection, then --jq
+  local data="$1"
+  if [ -n "$json_fields" ]; then
+    data=$(jq -c --arg f "$json_fields" '. as $o | ($f | split(",")) | map({(.): $o[.]}) | add' <<<"$data")
+  fi
+  if [ -n "$jq_arg" ]; then jq -r "$jq_arg" <<<"$data"; else jq . <<<"$data"; fi
+}
+
+case "${1:-} ${2:-}" in
+  "auth status"*) echo "Logged in to github.com (eval stub)" ;;
+  "pr view"*) emit "$(cat "$FX/pr.json")" ;;
+  "pr list"*) emit "[$(cat "$FX/pr.json")]" ;;
+  "pr diff"*) cat "$FX/diff.patch" ;;
+  "pr checks"*) echo "no checks reported (eval stub)" ;;
+  "pr merge"*) echo "merge recorded, not performed (eval stub)" ;;
+  "pr comment"*|"pr review"*|"pr edit"*|"pr ready"*|"issue comment"*|"issue edit"*) echo "ok (eval stub)" ;;
+  "issue view"*) emit "$(jq '{number: 7, title: .title, body: "Cart discount. AC: discount percent is clamped to 0-100; an empty cart totals 0.", labels: [], comments: []}' "$FX/pr.json")" ;;
+  "api "*) if [ -n "$jq_arg" ]; then echo '{}' | jq -r "$jq_arg" 2>/dev/null; else echo '{}'; fi ;;
+  *) echo "ok (eval stub)" ;;
+esac
+exit 0

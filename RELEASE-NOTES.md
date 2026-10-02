@@ -1,5 +1,41 @@
 # Release notes
 
+## v2.5.0 — 2026-10-02
+
+Review remembers.
+
+A card that bounced out of Review and was rebuilt used to come back to a reviewer with no memory of
+the last pass. It re-litigated settled points, and a builder could resolve a thread without fixing
+the code and get away with it.
+
+**`prior_report`.** The Reviewer now loads the newest PR comment carrying
+`<!-- super-review:report -->` before reviewing — one `gh pr view` call, no thread walk. No such
+comment means a first review, which behaves exactly as before.
+
+**Round 1 checks the prior findings first.** Each one is marked `fixed`, `not fixed` or
+`no longer applies`, with the file:line that proves it; a resolved thread is not proof. Any
+`not fixed` bounces the card again with those findings listed, and the fresh pass is skipped.
+All clear → the normal fresh review runs as round 2. See `run.md` → Reviewer step 3b.
+
+**The Reviewer report.** Every Reviewer exit from step 3b on posts a PR comment that starts with the
+marker and gives every finding a stable id (`R1`, `R2`, …), carried forward across rounds. It is the
+next re-review's `prior_report`.
+
+**Builder unchanged.** A Review bounce already reaches the Builder as `[builder]` threads; `run.md`
+now just notes that a re-opened thread was resolved without a fix last time.
+
+**Wave script.** The Review lane prompt carries the prior-report step, and `STAGE_SCHEMA` gains an
+optional `priorFindings` count that the wave summary passes through. New test:
+`tests/test-wave-review-memory.sh`, which also doubles as the wave script's syntax check (plain
+`node --check` rejects a workflow body's top-level `return`).
+
+`skills/super-board/VERSION` was stale at 2.0.0; both VERSION files now read 2.5.0.
+
+**Eval.** `evals/review-remembers/` checks the behaviour end to end with `claude plugin eval`: an
+offline `gh` stub serves a PR whose prior report lists R1 (really fixed) and R2 (thread resolved,
+code unchanged); the reviewer must load the report, mark R1 fixed and R2 not fixed with file:line
+proof, bounce, and never call `gh pr merge`. 3/3 runs passed on release. See `evals/README.md`.
+
 ## v2.4.0 — 2026-08-20
 
 The `Blocked` column stops being a dead end, and nothing merges on GitHub's word.
