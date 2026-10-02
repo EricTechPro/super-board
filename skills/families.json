@@ -1,0 +1,21 @@
+{
+  "primary": {
+    "title": "Primary — the board and its lanes",
+    "skills": {
+      "super-board": "Orchestrator: plans waves, runs Build → QA → Review, merges when green.",
+      "super-build": "Builder lane: worktree, smallest safe change, tests, draft PR.",
+      "super-qa": "Tester lane: evidence, test-gap check, screenshots, or bounce to Build.",
+      "super-review": "Reviewer lane: own hypotheses, remembers prior findings, merge gate.",
+      "super-collect": "Turns errors, issues and past-run failures into deduped Backlog cards.",
+      "super-refine": "Critique → refine loop that polishes one page or component."
+    }
+  },
+  "secondary": {
+    "title": "Secondary — standalone helpers",
+    "skills": {
+      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams.",
+      "arch-loop": "Architecture review loop: find one deepening, implement, verify, repeat.",
+      "cleanup-wt": "Removes merged worktrees and branches, with a recovery file."
+    }
+  }
+}

@@ -1,27 +1,27 @@
 ---
 name: super-build
-description: Super Build canonical workflow. Headless parallel GitHub Project executor that reads issues whose `Status` field is `Ready`, dispatches each as a headless `claude -p` worker in its own git worktree (max 3 in parallel), merges results back, closes the issue, moves the project card to `Done`, and notifies Telegram on each completion. The project board is the single curation surface — drag a card to `Ready` and Super Build picks it up. Use when the user says "Super Build", "run the build loop", "/super-build", or invokes the skill.
+description: Builder lane of the super-board pipeline — takes a `Ready` GitHub Project card into its own per-issue git worktree, makes the smallest safe change test-first (TDD, `ponytail` simplest-first, official docs first for third-party APIs, upgrades and auth/billing), opens a draft PR and hands it to QA and Review through the board; it never merges — merges go through the Reviewer's merge gate. Inside `super-board run` it runs as a lane agent in the in-session wave workflow (`workflows/super-board-wave.js`, no worker cap unless `max_workers` is set); standalone headless `claude -p` dispatch is legacy opt-in. Use when the user says "Super Build", "run the build loop", "/super-build", or invokes the skill.
 ---
 
-# Super Build / Super Build — Headless Parallel GitHub-Project Executor
+# Super Build — Builder lane and legacy headless GitHub-Project executor
 
-You are the orchestrator. The source of truth is the **`Ready` column of the configured GitHub Project board**. Your job: dispatch every issue in `Ready` (in board order) as a parallel headless `claude -p` worker in a git worktree, merge results back to the active branch, close the issue, advance its project card to `Done`, and ping Telegram on each completion.
+Inside `super-board run`, Super Build is the Builder lane: a lane agent in the in-session wave workflow (`workflows/super-board-wave.js`) that follows "super-board integration" below. Run on its own, `/super-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Super Build never merges — merging happens only through the Reviewer's merge gate (`scripts/super-board-merge-gate.sh`).
 
 **Curation contract:** the human moves cards into `Ready` when they should be worked. The loop never reads `Backlog`, `In Progress`, or `Done` cards. If `Ready` is empty, the loop reports "queue empty" and exits cleanly — no error.
 
-**This skill is single-purpose: EXECUTE curated GitHub Project `Ready` issues.** It is INDEPENDENT of `/super-qa` / **Super QA** (the autonomous bug-bash loop that hardens shipped code). They share no state unless **Super Orchestrator** explicitly sequences them. Run **Super Build** to make forward progress on the issue queue; run **Super QA** to bug-bash the existing codebase. They CAN run concurrently in different orchestrator sessions, but expect merge conflicts if both touch the same files.
+**This skill is single-purpose: EXECUTE curated GitHub Project `Ready` issues.** It is INDEPENDENT of `/super-qa` / **Super QA** (the autonomous bug-bash loop that hardens shipped code). They share no state unless a `super-board run` sequences them through the board. Run **Super Build** to make forward progress on the issue queue; run **Super QA** to bug-bash the existing codebase. They CAN run concurrently in different orchestrator sessions, but expect merge conflicts if both touch the same files.
 
 ## Role boundary
 
 Super Build is the canonical builder. Do not use a separate `build-feature` workflow. If the user wants a one-off feature, first create or curate a GitHub issue/card with clear acceptance criteria, move it to `Ready`, then let Super Build execute it.
 
-Super Build may implement, test, commit, merge worker branches, close completed issues, and move project cards to `Done`. It should not invent new product scope beyond the issue body. If the issue needs product/design/security judgment, apply the human-gate or WIP-partial path instead of guessing.
+Super Build may implement, test, commit, push, open PRs, and move project cards to `QA`. It never merges, closes issues, or moves cards to `Done` — the Reviewer does that through the merge gate. It should not invent new product scope beyond the issue body. If the issue needs product/design/security judgment, apply the human-gate or WIP-partial path instead of guessing.
 
 ## Configuration
 
-The orchestrator needs to know which project board to read. There are two modes:
+The orchestrator needs to know which project board to read.
 
-### Standalone mode (default — feature queue)
+### Standalone mode (legacy)
 
 Reads `Ready` from the repo's feature project. Resolution order:
 
@@ -30,23 +30,6 @@ Reads `Ready` from the repo's feature project. Resolution order:
 3. **Auto-discovery fallback:** if env vars unset, run `gh project list --owner $(gh repo view --json owner -q .owner.login) --format json` and pick the project whose `title` matches the repo name (`Fitbox Admin` for this project), or the only open project if there's exactly one.
 
 Surface: `🎯 Reading project: EricTechPro/Fitbox Admin (#2), column "Ready"`.
-
-### QA-loop mode (orchestrator-driven — drain `Bug` column)
-
-When invoked by `super-orchestrator` as part of the QA↔Build loop, Super Build drains the `Bug` column on the **Super Ultimate QA** project rather than `Ready` on the feature project. Enabled by:
-
-- `BUILD_LOOP_QA_MODE=1` env var, **or**
-- `super-orchestrator` exporting it via the dispatch wrapper.
-
-Resolution:
-
-1. Project resolved by `SUPER_QA_PROJECT_TITLE` (default: `Super Ultimate QA`) at the configured owner — same logic as super-qa.
-2. Source column: `Bug` (override with `BUILD_LOOP_SOURCE_COLUMN`).
-3. Target column on success: `Done` on the same QA project.
-
-Surface: `🎯 QA-loop mode — reading project: EricTechPro/Super Ultimate QA (#5), column "Bug"`.
-
-Standalone and QA-loop mode never run in the same orchestrator session by default — pick one per run. They can run concurrently in different sessions because they read different boards.
 
 ## Algorithm
 
@@ -59,15 +42,13 @@ Before reading the board:
 - Confirm `jq`, `git`, and `claude` are available.
 - Resolve and print `BUILD_LOOP_OWNER` and `BUILD_LOOP_PROJECT`.
 - Run `git fetch origin` and identify the base branch from the current checkout; do **not** assume `main`.
-- If this run is part of Super Orchestrator, update the run manifest with preset `Build Queue`, input project, base branch, and done definition.
 
 ### 1. Read the source column
 
-Source column is `Ready` in standalone mode, `Bug` in QA-loop mode (override with `BUILD_LOOP_SOURCE_COLUMN`):
+Source column is `Ready` (override with `BUILD_LOOP_SOURCE_COLUMN`):
 
 ```bash
-SOURCE_COLUMN="${BUILD_LOOP_SOURCE_COLUMN:-${BUILD_LOOP_QA_MODE:+Bug}}"
-SOURCE_COLUMN="${SOURCE_COLUMN:-Ready}"
+SOURCE_COLUMN="${BUILD_LOOP_SOURCE_COLUMN:-Ready}"
 
 gh project item-list "$BUILD_LOOP_PROJECT" --owner "$BUILD_LOOP_OWNER" --limit 200 --format json \
   | jq --arg col "$SOURCE_COLUMN" '.items[] | select(.status == $col and .content.type == "Issue")'
@@ -94,11 +75,13 @@ gh label create loop:halted --color B60205 --description "Manually paused — /s
 gh label create human-gated --color B60205 --description "Requires manual handling — /super-build will not auto-execute" 2>/dev/null || true
 ```
 
-### 3. Dispatch wave (max 3 concurrent)
+### 3. Dispatch wave (worker cap)
 
-Notify Telegram once per wave: `▶️ Super Build dispatching: Issues [#N1, #N2, #N3] (parallel)`
+Worker cap on this legacy path: `max_workers` from the super-board config when set, otherwise 3.
 
-For each issue N in the ready set (up to 3 at a time):
+Report once per wave: `▶️ Super Build dispatching: Issues [#N1, #N2, #N3] (parallel)`
+
+For each issue N in the ready set (up to the cap at a time):
 
 a. **Lock the issue:**
 ```bash
@@ -131,43 +114,39 @@ The dispatcher (at `scripts/super-build-dispatch.sh`) handles:
 Poll BashOutput on each in-flight shell. As each finishes:
 
 **On dispatcher exit 0 (success):**
-- `cd <repo-root>`
-- `git merge --no-ff loop/issue-N -m "merge: loop/issue-N (closes #N)"`
-- `gh issue close N --comment "Closed by /super-build in $(git rev-parse --short HEAD)"`
+- `git -C .worktrees/issue-N push -u origin loop/issue-N`
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<issue title>" --body "Closes #N …"` (PR description template from `skills/super-board/references/run.md`, including `Docs consulted`)
 - `gh issue edit N --remove-label loop:in-progress`
-- `git worktree remove .worktrees/issue-N`
-- `git branch -D loop/issue-N`
-- Move the project item/card to `Done` if GitHub does not do it automatically on issue close.
-- Notify Telegram: `✅ Super Build issue #N closed (merged)`
-- Recompute ready set; if new issues are now unblocked, dispatch in the next wave (respecting the 3-concurrent throttle)
+- `gh issue comment N --body "🔨 PR opened by /super-build: <PR URL>"`
+- Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
+- Leave the worktree in place — `/cleanup-wt` (or the merge gate, after the merge) removes it once the work is on the base branch.
+- Report: `✅ Super Build issue #N → PR <URL>, card in QA`
+- Recompute ready set; if new issues are now unblocked, dispatch in the next wave (respecting the worker cap)
 
-**On dispatcher exit 5 (intentional WIP-PARTIAL — merge as partial, do NOT close):**
-- `cd <repo-root>`
-- `git merge --no-ff loop/issue-N -m "merge: loop/issue-N partial — <slice from worker's final message> (#N)"` — the issue number reference (no `closes #` keyword) means GitHub will not auto-close the issue.
+**On dispatcher exit 5 (intentional WIP-PARTIAL — open a partial PR, do NOT close):**
+- `git -C .worktrees/issue-N push -u origin loop/issue-N`
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "partial: <slice from worker's final message> (#N)"` — reference `#N` without a `Closes` keyword so the merge does not close the issue.
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
-- `gh issue comment N --body "✅ Foundation/partial slice merged to main as $(git rev-parse --short HEAD). Issue stays open with \`human-gated\` label until the rest of the implementation lands. Worker's reason for stopping at a partial:\n\n> $(<final assistant message excerpt>)"`
-- Before cleanup, archive the branch as a tag: `git tag archive/loop-issue-N-$(date +%Y%m%d-%H%M%S) loop/issue-N` (so `git branch -D` is recoverable)
-- `git worktree remove .worktrees/issue-N`
-- `git branch -D loop/issue-N`
-- Notify Telegram: `🟡 Issue #N partial merged — issue stays open (human-gated)`
+- `gh issue comment N --body "🟡 Partial slice opened as <PR URL>. Issue stays open with \`human-gated\` until the rest lands. Worker's reason for stopping at a partial:\n\n> $(<final assistant message excerpt>)"`
+- Report: `🟡 Issue #N partial PR opened — issue stays open (human-gated)`
 - **Continue dispatching the next issue in the wave.** A WIP-PARTIAL is NOT a halt. The worker did intentional, scoped work and the orchestrator advances.
 
 **On dispatcher exit 2 or 3 (worker failed or no done-commit):**
 - `gh issue edit N --remove-label loop:in-progress`
 - `gh issue comment N --body "❌ /super-build worker failed (exit code <X>). Last 50 lines of log:\n\n\`\`\`\n$(tail -50 .planning/super-build-logs/issue-N.log)\n\`\`\`\nWorktree at \`.worktrees/issue-N\` left intact for human inspection."`
-- Notify Telegram with `tail -50` of `.planning/super-build-logs/issue-N.log`
-- Do NOT merge; leave the worktree intact for human inspection
+- Report to the user with `tail -50` of `.planning/super-build-logs/issue-N.log`
+- Do NOT open a PR; leave the worktree intact for human inspection
 - Halt the loop
 
 **On dispatcher exit 4 (HUMAN GATE TRIPPED):**
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
 - `gh issue comment N --body "🔴 HUMAN GATE TRIPPED — needs manual handling. See worktree \`.worktrees/issue-N\`."`
-- Notify Telegram: `🔴 Issue #N tripped HUMAN GATE — needs manual handling`
+- Report: `🔴 Issue #N tripped HUMAN GATE — needs manual handling`
 - Halt the loop
 
 ### 5. Final report
 
-When the selected GitHub Project `Ready` queue is empty, or only blocked/skipped cards remain: send a Telegram summary listing issues closed this run, issues still skipped (`human-gated` / `loop:halted` / blocked dependencies), and any halts. Suggest: "Run Super QA to confirm closed issues are truly complete."
+When the selected GitHub Project `Ready` queue is empty, or only blocked/skipped cards remain: report a summary (also to Telegram if the config enables `notifications`) listing PRs opened this run (cards in `QA`), issues still skipped (`human-gated` / `loop:halted` / blocked dependencies), and any halts. Suggest: "Run `super-board run` to test, review and merge them."
 
 ## Issue contract
 
@@ -191,11 +170,11 @@ Super Build treats acceptance criteria as the completion contract. Workers must 
 
 ## Constraints
 
-- **Maximum 3 parallel workers** at a time (resource throttle).
+- **Worker cap:** `max_workers` from the config when set, otherwise 3 on this legacy path (resource throttle). The workflow backend has no cap unless `max_workers` is set.
 - **Never auto-touch issues with `human-gated` label** (production cutover, secrets, irreversible ops).
-- **Never modify code in the main worktree** while workers are running. Only run `gh issue` commands and merge/cleanup operations.
-- **Merge conflicts** between concurrent workers' branches → halt loop, notify Telegram with conflict files, leave `loop:in-progress` label so a human can resolve. Don't auto-resolve.
-- **Telegram cadence:** 1 message at start, 1 per dispatch wave, 1 per completion (success/fail), 1 final summary. Don't spam.
+- **Never modify code in the main worktree** while workers are running. Only run `gh` commands and push/PR operations.
+- **Conflicts** between concurrent workers' branches are not resolved here — they surface at the merge gate, and the card comes back to the Builder for a rebuild. Don't auto-resolve.
+- **Report cadence** (to the user, and Telegram only if `notifications` are enabled): 1 message at start, 1 per dispatch wave, 1 per completion (success/fail), 1 final summary. Don't spam.
 - **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present; otherwise they route on the issue's **type label** (`bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`), always adding `ponytail:ponytail` (simplest solution first, before any code; inline fallback when the plugin is absent), `verification-before-completion` and a `code-review` pass on their own diff. Test mechanics are picked by the localisation ladder, never by label. Decision points walk the decision ladder — acceptance criteria → repo precedent → smallest blast radius → human gate — and stop at the first rung that answers the question. No panel, no vote; `mattpocock-skills:grilling` is forbidden inside a worker (it waits on a user who is not there) and lives in `super-board lint` instead. `mattpocock-skills:code-review` runs once against the worker's own diff before the final commit. See `references/decision-policy.md` for the skill map, the ladder, the human gates, and the `--- decision ---` commit trailer.
 
 ## Worker preamble
@@ -214,10 +193,10 @@ If the user invokes `/super-build` after a partial run:
 - Selected GitHub Project `Ready` queue is empty, or all remaining Ready cards are blocked / `human-gated` / `loop:halted`.
 - Any worker fails (dispatcher exit 2 or 3).
 - HUMAN GATE TRIPPED (dispatcher exit 4).
-- Merge conflict.
+- Push or PR creation fails.
 - User interrupts.
 
-**Not a stop condition:** WIP-PARTIAL (dispatcher exit 5). The orchestrator merges the partial, leaves the issue open with `human-gated`, and continues dispatching the next issue in the wave. WIP-PARTIAL is intentional, bounded work.
+**Not a stop condition:** WIP-PARTIAL (dispatcher exit 5). The orchestrator opens a partial PR, leaves the issue open with `human-gated`, and continues dispatching the next issue in the wave. WIP-PARTIAL is intentional, bounded work.
 
 ## Invocation patterns
 
@@ -227,7 +206,7 @@ If the user invokes `/super-build` after a partial run:
 
 ## Companion skill
 
-`/super-qa` / **Super QA** is the autonomous bug-bash iteration loop. It is **independent of this skill** unless Super Orchestrator explicitly sequences them. Run **Super Build** for forward progress on Ready issues; run **Super QA** to harden the existing codebase by hunting bugs.
+`/super-qa` / **Super QA** is the autonomous bug-bash iteration loop. It is **independent of this skill** unless a `super-board run` sequences them through the board. Run **Super Build** for forward progress on Ready issues; run **Super QA** to harden the existing codebase by hunting bugs.
 
 ## super-board integration
 

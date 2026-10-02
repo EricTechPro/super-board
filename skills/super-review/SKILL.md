@@ -1,6 +1,6 @@
 ---
 name: super-review
-description: Super Review canonical workflow for PR/code/architecture readiness across EricTechOS apps. Use when the user says "Super Review", "review this branch", "review loop", "make sure this is merge-ready", "PR review", or asks for code, architecture, security, QA evidence, or release-readiness judgment. Produces findings and routes fixes to Super Build, Super QA, or Super UX instead of silently pushing changes unless explicitly authorized.
+description: Reviewer lane of the super-board pipeline and standalone PR/branch readiness review — forms its own hypotheses before reading the builder's summary, remembers prior findings and re-checks each with file:line proof, runs an adversarial truth-check on non-trivial diffs, and classes every finding (Gap, Bug, Verification miss, Scope drift, Over-engineering via `ponytail:ponytail-review`). Merges only through `super-board-merge-gate.sh`, pinned to the reviewed head SHA, and routes other fixes to Super Build or Super QA via the board. Use when the user says "Super Review", "review this branch", "review loop", "make sure this is merge-ready", "PR review", or asks for code, architecture, security, QA evidence, or release-readiness judgment.
 ---
 
 # Super Review — PR/code readiness reviewer
@@ -15,15 +15,15 @@ Use this skill for:
 
 - PR or branch review before merge.
 - Code, architecture, security, data-model, or migration judgment.
-- Release-readiness checks after Super Build, Super QA, or Super UX.
-- The **Review Loop** preset in Super Orchestrator.
+- Release-readiness checks after Super Build, Super QA, or Super Refine.
+- The Review lane of a `super-board run`.
 - A final pass that needs risks, blockers, and human gates summarized.
 
 Do **not** use this as the primary implementation workflow. Route fixes to:
 
 - **Super Build** for feature/task implementation from GitHub Project `Ready` issues.
 - **Super QA** for functional bugs, broken behavior, failing Playwright paths, or missing QA coverage.
-- **Super UX** for visual fidelity, layout, screenshots, wireframes, or design-system drift.
+- **Super Refine** (`/super-refine`) for visual fidelity, layout, screenshots, wireframes, or design-system drift.
 
 ## Inputs
 
@@ -33,7 +33,7 @@ Accept any of these inputs:
 - GitHub PR number or URL;
 - commit range;
 - user-provided file list;
-- QA report, screenshots, or Super Orchestrator manifest;
+- QA report, screenshots, or super-board wave report;
 - release goal / done definition;
 - `prior_report` — the previous review's findings on this PR (see "Review remembers"). Empty on a first review.
 
@@ -105,7 +105,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
 4. **Route fixes**
    - If a blocker is an implementation task, hand it to **Super Build**.
    - If a blocker is a functional regression, hand it to **Super QA**.
-   - If a blocker is visual/design fidelity, hand it to **Super UX**.
+   - If a blocker is visual/design fidelity, hand it to **Super Refine**.
    - If it is a deepening opportunity, file it with `scripts/super-review-file-refactor.sh` and carry on to the merge decision. Do not open a PR thread for it; do not bounce the card.
      **Write real acceptance criteria in the `--body-file`.** A card that carries an
      `## Acceptance criteria` section is filed straight into `Ready` and the next wave builds it;
@@ -142,7 +142,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
 - R2 not fixed — <file:line> → route to <workflow>
 
 ### Blockers
-- [ ] R3 <Gap | Bug | Verification miss | Scope drift> <file:line> — <finding> → route to <Super Build | Super QA | Super UX | human>
+- [ ] R3 <Gap | Bug | Verification miss | Scope drift> <file:line> — <finding> → route to <Super Build | Super QA | Super Refine | human>
 
 ### Should fix
 - [ ] R4 <class> <file:line> — <finding> → route to <workflow>
@@ -166,7 +166,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
 <clear statement of whether this can merge now, and why>
 ```
 
-For Telegram summaries, keep it short and phone-friendly:
+For short summaries (wave reports, or Telegram when the config enables notifications), keep it phone-friendly:
 
 ```markdown
 **Super Review: blocked ⚠️**
@@ -179,15 +179,15 @@ For Telegram summaries, keep it short and phone-friendly:
 
 ## Review Loop behavior
 
-When Super Orchestrator runs **Review Loop**, use this sequence:
+In a `super-board run` the loop runs through the board:
 
 1. Super Review inspects branch/PR and writes findings.
-2. Super Orchestrator routes each actionable finding to Super Build, Super QA, or Super UX.
-3. The owning workflow fixes and verifies its scope.
+2. Each actionable finding becomes a prefixed PR thread (`[builder]`, `[QA]`) and the card bounces to the owning lane — Super Build or Super QA; visual polish goes to Super Refine.
+3. The owning lane fixes and verifies its scope.
 4. Super Review runs again against the updated branch, with its last report as `prior_report` — round 1 checks those findings before any fresh pass.
-5. Stop only when no blocking review findings remain, or unresolved items are explicitly human-gated.
+5. Stop only when no blocking review findings remain, or unresolved items are explicitly human-gated. A clean review merges through `scripts/super-board-merge-gate.sh`, pinned to the head SHA it reviewed.
 
-Super Review should not silently push fixes during Review Loop unless the user or orchestrator explicitly grants that authority.
+Super Review should not silently push fixes during the loop unless the user explicitly grants that authority.
 
 ## Review remembers
 

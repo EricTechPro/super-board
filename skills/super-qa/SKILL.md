@@ -43,7 +43,7 @@ State for the QA↔Build loop lives in a GitHub Project named **`Super Ultimate 
 | Flaky    | Only passes on retry; quarantine + investigate       |
 | Skip     | Out of scope; documented and parked                  |
 
-This board is the durable, machine-readable state for the loop. `docs/super-qa/queue.md` remains the BFS route seed and audit log, but **all actionable findings land on the project board** so `super-orchestrator` can gate on `Bug` column non-empty without parsing markdown.
+This board is the durable, machine-readable state for the loop. `docs/super-qa/queue.md` remains the BFS route seed and audit log, but **all actionable findings land on the project board** so the build lane can pick them up without parsing markdown.
 
 ### Project resolution
 
@@ -176,7 +176,7 @@ Examples:
 - QA category when relevant: `qa:functional`, `qa:visual`, `qa:network`, `qa:console`, `qa:i18n`, `qa:a11y`, `qa:data`, `qa:testability`.
 - Suggested skill owner when helpful: `skill:super-build`, `skill:super-qa`, `skill:super-ux`, or `skill:super-review`.
 
-The script adds the issue to the resolved `Super Ultimate QA` project and moves it into the `Bug` column (override with `SUPER_QA_TARGET_OPTION_NAME`) so `super-build` in QA-loop mode (or a human) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
+The script adds the issue to the resolved `Super Ultimate QA` project and moves it into the `Bug` column (override with `SUPER_QA_TARGET_OPTION_NAME`) so a human (or `/super-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
 
 The `iteration-N.md` Section 3 is the per-iter audit (with `gh_issue: <N>` back-references); the GH issue is the durable tracker. The fix-commit message includes `(closes #<N>)` so the issue auto-closes on merge.
 
@@ -542,9 +542,9 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
 `super-qa-file-bug.sh` files bugs into the **Super Ultimate QA** project's `Bug` column. This is a separate board from `/super-build`'s standalone feature queue (`BUILD_LOOP_PROJECT`), so the two skills can run concurrently without column races:
 
 - **Standalone `/super-build`** keeps reading `Ready` from its configured feature project (e.g. `Fitbox Admin #2`). Untouched by `/super-qa`.
-- **Orchestrator-driven `/super-build` in QA-loop mode** drains the `Bug` column on `Super Ultimate QA` and moves cards to `Done`. `super-orchestrator` gates on this column being empty before kicking off the next QA wave.
+- **`Bug` cards reach a builder** when someone moves them to `Ready`, or when `/super-build` runs with `BUILD_LOOP_SOURCE_COLUMN=Bug` against this board. Builds go to `QA` as PRs; nothing moves to `Done` without the Reviewer's merge gate.
 
-If you intentionally want a single board for both lanes, set `BUILD_LOOP_PROJECT=$SUPER_QA_PROJECT_NUMBER` and `BUILD_LOOP_QA_MODE=1`. Don't do this by accident — the column semantics differ.
+If you intentionally want a single board for both lanes, set `BUILD_LOOP_PROJECT=$SUPER_QA_PROJECT_NUMBER` and `BUILD_LOOP_SOURCE_COLUMN=Bug`. Don't do this by accident — the column semantics differ.
 
 ## Test target & safety rails
 

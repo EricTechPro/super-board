@@ -2,95 +2,124 @@
 
 ## v2.5.0 — 2026-10-02
 
-Review remembers.
+Review remembers, sharper lanes, five new skills, guard hooks, and a pack that installs and
+documents itself.
 
-A card that bounced out of Review and was rebuilt used to come back to a reviewer with no memory of
-the last pass. It re-litigated settled points, and a builder could resolve a thread without fixing
-the code and get away with it.
+### Review
 
-**`prior_report`.** The Reviewer now loads the newest PR comment carrying
-`<!-- super-review:report -->` before reviewing — one `gh pr view` call, no thread walk. No such
-comment means a first review, which behaves exactly as before.
-
-**Round 1 checks the prior findings first.** Each one is marked `fixed`, `not fixed` or
-`no longer applies`, with the file:line that proves it; a resolved thread is not proof. Any
-`not fixed` bounces the card again with those findings listed, and the fresh pass is skipped.
-All clear → the normal fresh review runs as round 2. See `run.md` → Reviewer step 3b.
-
-**The Reviewer report.** Every Reviewer exit from step 3b on posts a PR comment that starts with the
-marker and gives every finding a stable id (`R1`, `R2`, …), carried forward across rounds. It is the
-next re-review's `prior_report`.
-
-**Builder unchanged.** A Review bounce already reaches the Builder as `[builder]` threads; `run.md`
-now just notes that a re-opened thread was resolved without a fix last time.
-
-**Wave script.** The Review lane prompt carries the prior-report step, and `STAGE_SCHEMA` gains an
-optional `priorFindings` count that the wave summary passes through. New test:
-`tests/test-wave-review-memory.sh`, which also doubles as the wave script's syntax check (plain
+**Review remembers.** A card rebuilt after a Review bounce used to meet a reviewer with no memory of
+the last pass: settled points were re-litigated, and a builder could resolve a thread without
+fixing the code. The Reviewer now loads `prior_report`, the newest PR comment carrying
+`<!-- super-review:report -->` (one `gh pr view` call). Round 1 marks each prior finding `fixed`,
+`not fixed` or `no longer applies` with the file:line that proves it; a resolved thread is not
+proof. Any `not fixed` bounces the card again and the fresh pass is skipped; all clear → the normal
+review runs as round 2 (run.md → Reviewer step 3b). Every Reviewer exit from step 3b posts a report
+with stable finding ids (`R1`, `R2`, …) carried across rounds. No report means a first review,
+unchanged. The Builder side only gains a note that a re-opened thread was resolved without a fix.
+The wave's Review prompt carries the step and `STAGE_SCHEMA` gains an optional `priorFindings`
+count. Test: `tests/test-wave-review-memory.sh` (also the wave script's syntax check: plain
 `node --check` rejects a workflow body's top-level `return`).
 
-`skills/super-board/VERSION` was stale at 2.0.0; both VERSION files now read 2.5.0.
-
-**Eval.** `evals/review-remembers/` checks the behaviour end to end with `claude plugin eval`: an
+**Eval.** `evals/review-remembers/` runs the behaviour end to end with `claude plugin eval`: an
 offline `gh` stub serves a PR whose prior report lists R1 (really fixed) and R2 (thread resolved,
-code unchanged); the reviewer must load the report, mark R1 fixed and R2 not fixed with file:line
+code unchanged). The reviewer must load the report, mark R1 fixed and R2 not fixed with file:line
 proof, bounce, and never call `gh pr merge`. 3/3 runs passed on release. See `evals/README.md`.
 
-### Also in 2.5.0
+**Fairer review.** The Reviewer reads the ACs and the raw diff and writes 2-4 hypotheses before it
+reads the builder's summary, then checks the builder's claims the same way. Findings are classed
+Gap / Bug / Verification miss / Scope drift / Over-engineering. Checks that held go under
+`Verified`, coverage gaps under `Not verified`, and `Next` names the owner. Marker, R-ids and Prior
+findings are unchanged.
 
-**Merge pinned to the reviewed head.** The Reviewer records the PR's `headRefOid` when review
-passes and passes it to `super-board-merge-gate.sh --expect-head`. The gate verifies that exact
-commit and merges with `--match-head-commit`. A push after review (or during verify) now exits 6:
-the evidence is void and the card stays in Review for a fresh pass. Tests 8-11 in
-`tests/test-merge-gate.sh`.
+**Merge pinned to the reviewed head.** The Reviewer records `headRefOid` when review passes and
+passes it to `super-board-merge-gate.sh --expect-head`. The gate verifies that commit and merges
+with `--match-head-commit`. A push after review, or during verify, exits 6: the evidence is void
+and the card stays in Review. Tests 8-11 in `tests/test-merge-gate.sh`.
 
-**Stranded Building cards come back.** Nothing selects from Building, so a wave stopped mid-build
-left its card there until someone dragged it (run-workflow.md said so). The planner now reports
-unclaimed Building cards in `stranded`; the orchestrator removes the leftover build worktree, keeps
-the branch, moves the card to Ready and comments. The legacy dispatcher does the same once at start
-(`reclaim_stranded_building`), and Builder step 2 continues on an existing branch. Tests: scenarios
-16-17 in `test-wave-plan.sh`, six checks in `test-run-gates.sh`.
-
-**Usage guard before each wave.** New `scripts/super-board-usage.sh`. Claude Code exposes plan
-usage only in the `rate_limits` JSON it pipes to the status line. The script's `record` mode saves
-that JSON from the status-line command, and `check` compares the 5-hour and weekly windows against
-`usage_pause_pct` (default 95). At or over the threshold the orchestrator launches no new wave,
-lets the running one finish, posts a resume note and, if a wake tool exists, schedules a re-check
-at the reset. Limits: Pro/Max only, fresh only while an interactive session's status line is
-recording, and an unknown reading never halts a run. Test: `tests/test-usage.sh`.
+### Lanes
 
 **Docs before outside-tool code.** When a ticket touches a third-party API or SDK, an upgrade, or
 auth/billing, the Builder reads the current official docs for the installed version (context7,
-else the vendor's site) before writing code, and cites them in a new `Docs consulted` PR section.
-Unreachable docs are named, and the code they cover is marked unverified. In super-build's
-super-board integration, the worker preamble and run.md Builder step 3b.
-
-**Fairer review.** The Reviewer reads the ACs and the raw diff and writes 2-4 hypotheses of its
-own before it reads the builder's summary, then checks the builder's claims the same way. Every
-finding is classed Gap / Bug / Verification miss / Scope drift. Checks that held go under a new
-`Verified` list, gaps in coverage under `Not verified`, and `Next` names the owner. The marker,
-R-ids and Prior findings are unchanged, so review remembers still reads the report.
-
-**Tighter writing.** Lane comments follow five rules (run.md → Commenting cadence). The first line
-is the outcome. Evidence (command, sha, file:line) comes before prose, each comment says what was
-verified and what was not, and it ends with `Next:` naming the owner, in 12 lines or fewer. The PR
-body opens with a status line pinned to the head sha and gains a `Not verified` section. The Block
-template gains `Evidence`, `Checked` and `Owner` lines. The wave report and halt note now have
-fixed short formats in which only cards that need a human get their own line.
+else the vendor's site) first and cites them in a `Docs consulted` PR section. Unreachable docs are
+named and the code they cover is marked unverified (run.md Builder step 3b, super-build).
 
 **Simplest solution first.** Builders invoke `ponytail:ponytail` (full) before the first line of
-code, on every type label; when the plugin is not installed they apply a five-line inline ladder
-(decision-policy.md → "Simplest solution first") that never cuts validation, security, data-loss
-protection or accessibility. The Reviewer runs `ponytail:ponytail-review` on the merge-base diff
-and files a new **Over-engineering** class: Should fix, routed to Builder, and it never blocks or
-bounces a card on its own. Assertions added to `tests/test-wave-review-memory.sh`.
+code on every type label, or a five-line inline ladder when the plugin is absent
+(decision-policy.md → "Simplest solution first"); it never cuts validation, security, data-loss
+protection or accessibility. The Reviewer runs `ponytail:ponytail-review` on the merge-base diff;
+an **Over-engineering** finding is Should fix, routed to Builder, and never blocks or bounces alone.
 
-**Test-gap check in QA.** The Tester now runs a post-build gap hunt (folded from post-tdd) before
-its test run: every AC mapped to unit / component / e2e tests, edge cases marked with exact
-witness values, weak tests and surviving mutants named, gaps ranked. High gaps are written
-red-first through `tdd`; one that needs app code changed bounces to Builder with the list.
-Medium/Low are listed in the handoff and never block. super-qa → "Test-gap check (after build)",
-run.md Tester step 4b.
+**Test-gap check in QA.** Before its test run the Tester maps every AC to unit / component / e2e
+tests, marks edge cases with exact witness values, names weak tests and surviving mutants, and
+ranks gaps (folded from post-tdd). High gaps are written red-first through `tdd`; one that needs
+app code changed bounces to Builder. Medium/Low are listed and never block (run.md Tester step 4b).
+
+**UI polish in QA.** A UI card (label `ui`, `design` or `frontend`, or a visual AC) whose AC tests
+passed now gets super-refine in qa-hook mode, 3 rounds by default (run.md Tester step 5b,
+`skills/super-refine/references/qa-hook.md`). AC tests re-run after it; red resets to the pre-hook
+commit. It never moves the card, comments or blocks. The wave's QA prompt carries the condition.
+
+**Tighter writing.** Lane comments follow five rules (run.md → Commenting cadence): outcome first,
+evidence (command, sha, file:line) before prose, what was and was not verified, and a closing
+`Next:` naming the owner, in 12 lines or fewer. The PR body opens with a status line pinned to the
+head sha and gains `Not verified`. The Block template gains `Evidence`, `Checked` and `Owner`. The
+wave report and halt note have fixed short formats; only cards that need a human get their own line.
+
+### Run loop
+
+**Stranded Building cards come back.** The planner reports unclaimed Building cards in `stranded`;
+the orchestrator removes the leftover build worktree, keeps the branch, moves the card to Ready and
+comments. The legacy dispatcher does the same once at start (`reclaim_stranded_building`), and
+Builder step 2 continues on an existing branch. Tests: scenarios 16-17 in `test-wave-plan.sh`, six
+checks in `test-run-gates.sh`.
+
+**Usage guard before each wave.** New `scripts/super-board-usage.sh`. Claude Code exposes plan
+usage only in the `rate_limits` JSON it pipes to the status line: `record` saves it from your
+status-line command, and `check` compares the 5-hour and weekly windows against `usage_pause_pct`
+(default 95). At or over it, no new wave launches, the running one finishes, a resume note is
+posted and, if a wake tool exists, a re-check is scheduled at the reset. Pro/Max only, fresh only
+while an interactive status line records, and an unknown reading never halts a run.
+Test: `tests/test-usage.sh`.
+
+**Post-merge cleanup.** After a merge the gate runs `cleanup-wt --post-merge --base <base>` when
+`.claude/skills/cleanup-wt/` is installed. Local only; a cleanup failure never changes the exit.
+Tests 12-13 in `tests/test-merge-gate.sh`.
+
+**Config.** `config-schema.json` gains optional `refine` (super-refine settings) and `collect`
+(`window_days`, `errors`, `feedback_paths`, `lookback_runs`) blocks.
+
+### New skills
+
+- **super-collect** (primary): files app errors, unboarded issues, feedback and repeat failures
+  from past runs into Backlog, deduped, dry-run by default. Adapted from BuilderIO/skills (MIT).
+  Test: `tests/test-collect-file.sh`.
+- **super-refine** (primary): unattended critique → refine loop on one page or component, with its
+  own worktree, dev server, before/after shots and `workflows/super-refine.js`. Adapted from
+  BookKeepingApp. Tests: `tests/test-refine-setup.sh`, `tests/test-refine-workflow.sh`.
+- **visual** (secondary): one self-contained HTML page for a branch recap, a plan or a codebase
+  map. Adapted from BuilderIO/skills (MIT), diagrams after tt-a1i/archify (MIT).
+- **arch-loop** (secondary): architecture review loop, one verified commit per pass.
+- **cleanup-wt** (secondary): removes merged worktrees and branches with a recovery TSV.
+  Test: `tests/test-cleanup-wt.sh`.
+
+### Guards, install and docs
+
+**Guard hooks.** `hooks/guard-worktree-path.py`, `guard-secrets.py` and `guard-key-literals.py`
+(Python stdlib). Test: `tests/test-guard-hooks.sh`.
+
+**install.sh** installs all nine skills, both workflows and the guard hooks, and merges
+`hooks/settings-snippet.json` into `.claude/settings.json`: existing keys kept, each command added
+once, the file backed up first, invalid JSON left untouched. `--no-hooks` skips the hooks.
+`tests/test-install.sh` grows to 9 scenarios. `plugin.json` lists the full pack.
+
+**README.** Rewritten as a short front door; the long material moved to
+`docs/super-board/README.md`. Every skill has a README. `scripts/super-board-readme-sync.py`
+regenerates the skill tables and counts from SKILL.md frontmatter and `skills/families.json`
+(`--check` exits 1 when stale), run by a git pre-commit hook (`hooks/pre-commit-readme.sh`) and a
+Claude Code PostToolUse hook (`.claude/settings.json`). Test: `tests/test-readme-sync.sh`.
+
+**Versions.** `skills/super-board/VERSION` was stale at 2.0.0; `VERSION`, `skills/super-board/VERSION`
+and `plugin.json` all read 2.5.0.
 
 ## v2.4.0 — 2026-08-20
 

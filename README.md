@@ -1,319 +1,99 @@
 # super-board
 
-An autonomous GitHub Project board executor for Claude Code. Drag a card into the `Ready` column, walk away, come back to merged PRs.
+Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **9 skills** — 6 primary, 3 secondary — 10 commands, 5 guards.
 
-## At a glance
-
-| | |
-|---|---|
-| **What it does** | Watches a GitHub Project, runs Build → QA → Review per card, merges when green |
-| **What you get** | Merged PRs with evidence — screenshots, test reruns, review findings on the PR |
-| **How you start** | `/super-board run <slug>` — drag cards into `Ready`, walk away |
-| **What holds state** | The board itself. Ctrl-C, restart, resume — cards pick up from their column |
-| **Backend** | Dynamic workflows (in-session waves) by default; headless `claude -p` on opt-in |
-
-## Watch it run
+![Skills](https://img.shields.io/badge/skills-9-000000?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.5.0-000000?style=flat-square)
+![Host](https://img.shields.io/badge/host-Claude%20Code-000000?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-000000?style=flat-square)
 
 [![Watch the super-board walkthrough on YouTube](https://img.youtube.com/vi/nX_bGyIOFM4/maxresdefault.jpg)](https://youtu.be/nX_bGyIOFM4)
 
-▶ [https://youtu.be/nX_bGyIOFM4](https://youtu.be/nX_bGyIOFM4)
+## Install
 
-## Quickstart
-
-1. Download the latest release zip from [Releases](../../releases/latest).
-2. Unzip into your project's `.claude/` directory:
-   ```bash
-   cd your-project
-   unzip ~/Downloads/super-board-v*.zip -d .claude/
-   ```
-3. Wire up a GitHub Project board with a `Status` field whose columns are `Backlog`, `Ready`, `Building`, `QA`, `Review`, `Done`.
-4. Drop a config at `.claude/super-board/configs/<slug>.json` pointing at your board.
-5. From inside Claude Code, type `/super-board run <slug>`. The orchestrator plans a wave, launches the `super-board-wave` dynamic workflow, reconciles results, and repeats until the board is drained.
-
-That's it. Move cards into `Ready`, watch them flow through the board.
-
-**Backends** — lane lifecycles are identical in both:
-
-| | `workflow` (default since 1.6.0) | `claude-p` (opt-in) |
-|---|---|---|
-| Runs as | in-session dynamic workflow waves | headless `claude -p` workers |
-| Needs | dynamic workflows on in `/config` | nothing extra |
-| Reference | `skills/super-board/references/run-workflow.md` | `scripts/super-board-run.sh` |
-
-The legacy dispatcher refuses to run (exit 78) unless the config explicitly sets it.
-
-**Stop and resume** — `/super-board stop` posts a "stopped mid-flight" comment on every in-flight issue and PR (lane, last commit, resume hint), releases the assignee mutex, kills workers and dispatcher. Resume with `/super-board run <slug>`: the board is the state, so cards pick up from whichever column they were in.
-
-## How it works
-
-```
-  Backlog → Ready ─────→ Building ─────→ QA ──────────→ Review ────→ Done
-                             │             │                │          ▲
-                        super-build     super-qa      super-review     │
-                        worktree+PR     evidence      merge gate       │
-                             │             │                │     squash-merge
-                             └─────────────┴────────────────┘
-                                  bounce back on failure
-
-  ORCHESTRATOR (super-board) — plans waves, holds no product context, writes no code
+```bash
+git clone https://github.com/EricTechPro/super-board /tmp/super-board   # or download a release zip
+/tmp/super-board/install.sh /path/to/your-project                       # --no-hooks to skip the guards
+npx skills@latest add mattpocock/skills                                 # required: lanes call these by name
 ```
 
-| Skill | Lane | Does |
-|---|---|---|
-| **super-board** | — | Orchestrator. Validates preconditions, plans waves, launches them. Holds NO product context. |
-| **super-build** | `Ready` → `QA` | Spins up a git worktree, implements the change, opens a PR. |
-| **super-qa** | `QA` → `Review` | Crawls routes, captures screenshots/logs/HARs, comments on the PR, or bounces the card back with a rebuild label. Findings file as `source:qa` cards. |
-| **super-review** | `Review` → `Done` | Re-runs the Tester's tests, adversarial truth-check, merges or hands to a human gate. On a re-review it first checks every finding from its last report — fixed, not fixed, or no longer applies — and bounces again on anything unfixed. Shape problems in the diff get filed to `Backlog`, never blocked on. |
+Then, inside Claude Code in your project: `/super-board onboard`, move cards to `Ready`, `/super-board run <slug>`.
 
-Lane skills run as workflow agents inside `super-board-wave` by default, or as headless `claude -p` workers on the legacy backend. Same lifecycles either way.
+## Skills
 
-**Waves are sized by your dependency graph, not by a worker count.** Before each wave the planner
-reads every card's `## Blocked by` section and dispatches every Ready card whose blockers have all
-closed — 3 on a chained board, 19 on a wide one. It also **sweeps `Blocked`**: a card parked on an
-issue that has since closed comes back to `Ready` on its own, which is the difference between a
-holding column and a dead end. A dependency line it cannot read confidently is never treated as
-free; it is flagged for a human instead.
+<!-- skills:start -->
+**Primary — the board and its lanes**
 
-**Nothing merges on GitHub's word.** `mergeable: CLEAN` only means the text does not conflict. The
-merge gate takes a lock, merges the current base into a scratch worktree, runs your
-`verify_commands`, and only then squash-merges — so a branch that stopped compiling while it waited
-its turn goes back to Build for a rebase pass instead of turning your base branch red.
-
-### Which skills each lane loads
-
-Every lane skill is scoped to the diff or the ticket in front of it. Nothing in a
-lane may ask the user a question — the run is unattended, and a skill that waits
-is a skill that hangs.
-
-| Lane | Loads |
+| Skill | What it does |
 |---|---|
-| **super-build** | Routed by the ticket's type label — `bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`. Always `verification-before-completion` + `code-review` on its own diff. Mechanics (`vitest` / `playwright-best-practices` / `testing-strategy`) by the localisation ladder, never by label. |
-| **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · same four testing skills |
-| **super-review** | `code-review` (Standards + Spec, merge-base as fixed point) · `codebase-design` (deep-module vocabulary) |
+| [`/super-board`](skills/super-board/README.md) | Orchestrator: plans waves, runs Build → QA → Review, merges when green. |
+| [`/super-build`](skills/super-build/README.md) | Builder lane: worktree, smallest safe change, tests, draft PR. |
+| [`/super-qa`](skills/super-qa/README.md) | Tester lane: evidence, test-gap check, screenshots, or bounce to Build. |
+| [`/super-review`](skills/super-review/README.md) | Reviewer lane: own hypotheses, remembers prior findings, merge gate. |
+| [`/super-collect`](skills/super-collect/README.md) | Turns errors, issues and past-run failures into deduped Backlog cards. |
+| [`/super-refine`](skills/super-refine/README.md) | Critique → refine loop that polishes one page or component. |
 
-Assignment happens when the ticket is written, not at runtime: super-build routes on
-the issue's **type label** — the same `bug` / `feature` / `ux` / `tests` / `docs` /
-`tech-debt` labels super-qa already files, plus `refactor` from super-review. Override
-any single ticket with a `Skills:` line in its body; that replaces the label's row
-rather than extending it.
+**Secondary — standalone helpers**
 
-**Interactive-only, never in a lane:** `grilling`, `shape`, `clarify`, and
-`improve-codebase-architecture`. They prompt, wait, or open a browser. They belong to
-`super-board lint` and to you at a keyboard. A worker that wants one is telling you the
-ticket needed a human before the loop started — that is a human gate, not a skill to load.
-
-## The five verbs
-
-| Verb | What it does |
+| Skill | What it does |
 |---|---|
-| `/super-board onboard` | One-time setup wizard — points at your GitHub Project, checks the `Status` columns, writes `.claude/super-board/configs/<slug>.json`. |
-| `/super-board lint` | Pre-flight readiness — walks the active-pipeline issues, flags vague or missing acceptance criteria before agents burn tokens on them. |
-| `/super-board status` | Read-only snapshot — renders the board as an 80-column kanban with column counts and in-flight work (~1.3s, pure Python). |
-| `/super-board run <slug>` | The autonomous loop — plans waves, dispatches lane agents, repeats until the board is drained. Also the resume command: state lives on the board, so re-running picks up where things left off. |
-| `/super-board stop` | Graceful shutdown — posts "stopped mid-flight" comments on every in-flight issue + PR, releases assignee mutexes, kills any workers. Resume with `run`. |
+| [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
+| [`/arch-loop`](skills/arch-loop/README.md) | Architecture review loop: find one deepening, implement, verify, repeat. |
+| [`/cleanup-wt`](skills/cleanup-wt/README.md) | Removes merged worktrees and branches, with a recovery file. |
+<!-- skills:end -->
 
-The board is the only state in both backends — every agent re-reads it, so runs survive Ctrl-C, restarts, and rate-limit pauses without losing track of cards.
+Each name links to that skill's README. Lane skills run as agents inside the `super-board-wave` workflow.
 
-## The six agentic patterns, mapped
+## Commands
 
-```
-  workflows/super-board-wave.js   the conductor — owns the patterns
-  skills/super-{build,qa,review}  the sheet music — one lane agent each
-  the prompt it spawns            "Run super-build on #N, follow run.md exactly"
-```
+| | |
+| --- | --- |
+| `/super-board onboard` | One-time setup: checks the board's columns, writes `.claude/super-board/configs/<slug>.json` |
+| `/super-board lint` | Flags vague ACs and unreadable `Blocked by` lines before agents spend tokens |
+| `/super-board status` | Read-only board snapshot, column counts, in-flight work |
+| `/super-board run <slug> [--low\|--high]` | The loop, until the board drains or a halt gate fires; also resumes |
+| `/super-board stop` | Posts "stopped mid-flight" notes, releases claims, stops workers |
+| `/super-collect [intake\|lookback]` | Files errors, unboarded issues and repeat failures into Backlog (dry-run first) |
+| `/super-refine <route>` | Polishes one page or component in critique → refine rounds |
+| `/visual [recap\|plan\|<path>]` | One HTML page of a branch, a plan, or part of the codebase |
+| `/arch-loop` | Architecture improvements, one verified commit per pass |
+| `/cleanup-wt` | Dry-run, then remove merged worktrees and branches |
 
-One card's journey (#47, starting in `Ready`):
+## Guards
 
-```
-            ┌─ ROUTING ─────────────┐
- #47 Ready →│ classify agent (haiku)│→ "bug, low" → cheap model for lanes
-            └───────────────────────┘
-                       ↓
-            ┌─ PROMPT CHAINING ──────────────────────────────────┐
-            │ Build agent ──advanced?──→ QA agent ──→ Review agent│
-            │ (super-build)   │no        (super-qa)  (super-review)│
-            │                 ↓                                    │
-            │           chain stops; the board keeps the card      │
-            └─────────────────────────────────────────────────────┘
-```
+Run automatically once installed. Python stdlib, JSON in, JSON out.
 
-A wave (3 cards at once):
+| | |
+| --- | --- |
+| [guard-worktree-path](hooks/guard-worktree-path.py) | Blocks `git worktree add` outside `.claude/worktrees/` |
+| [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files |
+| [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
+| [README sync](scripts/super-board-readme-sync.py) | Regenerates this skill table; pre-commit and PostToolUse hooks keep it fresh |
+| [merge gate](scripts/super-board-merge-gate.sh) | Merges only after the current base plus your `verify_commands` pass, pinned to the reviewed commit |
 
-```
- ORCHESTRATOR (your session)           ← orchestrator–workers
-   │ plan wave → claim → launch
-   ▼
- #47: classify → build → qa → review   ┐
- #51:           qa → review            ├ parallelization (cards overlap)
- #52: classify → build ✗(bounced)      ┘
-                          │
- Review lanes: ──[mutex]── one merge at a time
-```
+## Setup notes
 
-When each pattern fires:
+- Needs Claude Code, `gh` (authenticated for the board's owner), `jq`, bash 3.2+ and Python 3.
+- The board is a GitHub Project (v2) with a `Status` field: `Ready, Building, QA, Review, Done, Blocked, Skipped` (`qa-only` drops `Building`), plus a holding column such as `Backlog` for filed cards.
+- Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
+- Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
+- Auto-merge on the workflow backend needs `Bash(gh pr merge:*)` in your allowlist; `human_approves_merge: true` keeps a person on every merge.
+- To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record` to your status-line script.
+- Cards need acceptance criteria: QA grades against them, and `lint` tells you which are missing.
 
-| Pattern | When |
-|---|---|
-| **Routing** | `Ready` cards only — classify picks haiku/sonnet/full model per card |
-| **Prompt chaining** | Every card — each lane runs only if the previous returned `advanced` |
-| **Parallelization** | Always — card A can be in Review while card B builds |
-| **Evaluator–optimizer** | QA/Review judge the Builder's work; a fail bounces the card to `Ready` and the next wave rebuilds with the comments as context |
-| **Orchestrator–workers** | Every wave — your session never codes; lane agents do all product work |
-| **Autonomous loop** | The wave loop repeats until the board is drained or a halt gate fires |
+## Learn more
 
-## Safety controls
-
-**Worker storms** are the failure mode that bit early users — 30 `Ready` cards
-starting 30 Builders. Six gates stand between you and that:
-
-```
-  spawn a worker?
-       │
-       ├─ 1  orphan scan ........... workers alive from a crashed run?  → refuse
-       ├─ 2  in-flight lockfile .... .claude/super-board/inflight/<N>   → skip
-       │       survives restart; gates the column even before GitHub catches up
-       ├─ 3  assignee claim ........ atomic, BEFORE spawn               → skip
-       │       closes the 10-30s claude -p cold-start race
-       ├─ 4  lane occupied? ........ 1 Builder · 1 Tester · 1 Reviewer  → wait
-       ├─ 5  GraphQL quota <200 .... sleep until reset                  → wait
-       └─ 6  tick not elapsed? ..... 120s floor                         → wait
-       │
-       ▼  all six clear
-     spawn
-```
-
-The 120-second tick holds ProjectsV2 query cost (~103 GraphQL pts/tick) to
-~3.1k/hr against a 5k budget. Raise `tick_seconds` in your config if you have
-headroom.
-
-## Configuration
-
-Minimal config at `.claude/super-board/configs/<slug>.json`:
-
-```json
-{
-  "variant": "full",
-  "worker_backend": "workflow",
-  "project": { "owner": "your-gh-login-or-org", "number": 12 },
-  "base_branch": "main",
-  "human_approves_merge": false,
-  "rebuild_cap": 2,
-  "tick_seconds": 120,
-  "max_workers": 3,
-  "notifications": { "bot_identity": "your-bot-login" }
-}
-```
-
-```
-  variant               full | qa-only
-  worker_backend        workflow | claude-p
-  human_approves_merge  true = never auto-merge, always hand to you
-  rebuild_cap           bounces allowed before a card goes Blocked
-  tick_seconds          GraphQL budget floor — raise if you have headroom
-  max_workers           one per lane; 3 for full, 2 for qa-only
-```
-
-```
-  variant       lanes                                    max workers
-  ─────────     ─────────────────────────────────────    ───────────
-  full          Ready → Building → QA → Review → Done         3
-  qa-only              Ready → QA → Review → Done              2
-                       └ hardening code that already exists
-```
-
-## How workers decide what test to write
-
-Three layers, three different questions. None substitutes for another.
-
-```
-  tdd          →  how do I write a test worth having?     discipline
-  the ladder   →  which layer does the defect live at?    placement
-  vitest |        how do I express it in this repo?       mechanics
-  playwright
-```
-
-**The middle one is what everyone skips.** A Tester finds every bug through a
-browser — that is what a route crawler does. Where you *observed* a bug says
-nothing about where it *lives*.
-
-```
-  ┌─ found here ─┐
-  │   browser    │  every bug-bash finding enters at the top
-  └──────┬───────┘
-         │   walk DOWN — stop at the first rung that still reproduces
-         ▼
-  ╔═══════════════════════════════════╤══════════════╤═════════════╗
-  ║ 1  call the module directly       │ unit         │ Vitest      ║
-  ║ 2  wire the real collaborators    │ integration  │ Vitest      ║
-  ║ 3  drive a real browser           │ e2e          │ Playwright  ║
-  ║ 4  needs a live third party       │ NOT a test   │ file a gap  ║
-  ╚═══════════════════════════════════╧══════════════╧═════════════╝
-         ▲
-         └── write it HERE, not where you found it
-```
-
-Locality of failure is the point: an e2e pinning a pure-logic defect is slower,
-flakier, and goes red pointing at a page instead of a function — so the next
-person debugs the wrong file.
-
-```
-  ✓ red for the right reason   run against UNFIXED code — a timeout or missing
-                               selector means you pinned the harness, not the bug
-  ✓ refactor-survivable        behaviour-preserving rewrite must still pass
-```
-
-`testing-strategy` informs *coverage* — what a component type is worth testing,
-what to skip. It does not decide placement; the ladder does. Contract testing
-stays out of the default set: Pact solves consumer/provider drift across
-independently deployed services, which a single-app repo does not have.
-
-## Requirements
-
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (the host that loads the skills)
-- `gh` CLI authenticated against the GitHub org/account that owns the Project board
-- `jq`
-- `bash` 3.2+ (stock macOS is fine — the scripts avoid bash-4 syntax on purpose)
-- A GitHub Project (v2) with a `Status` single-select field
-- The [mattpocock/skills](https://github.com/mattpocock/skills) pack — **required, not optional**.
-  The lane skills route into `tdd`, `code-review`, `diagnosing-bugs`, `resolving-merge-conflicts`
-  and eight others by name; without them a worker fails when it reaches for one:
-  ```bash
-  npx skills@latest add mattpocock/skills
-  ```
-  `grilling` is interactive by contract, so it runs only in `super-board lint`, never in a worker.
-
-## Skill structure
-
-```
-  skills/<name>/
-    SKILL.md        the agent-facing prompt
-    references/     detail the prompt points at, loaded on demand
-    scripts/        anything the lane shells out to
-```
-
-Drop the whole `.claude/` tree into your project — Claude Code picks them up automatically.
-
-Behavioural evals live in `evals/` and run with `claude plugin eval` (the minimal
-`.claude-plugin/plugin.json` exists only for that; `install.sh` stays the install path). See
-`evals/README.md`.
-
-## What this is NOT
-
-- Not a CI replacement. Workers commit and push branches; your existing CI still runs.
-- Not a free pass on review. Set `human_approves_merge: true` if you want a person to OK every merge.
-- Not for unreviewed AC-free issues. Cards need acceptance criteria — Super QA grades against them.
-
-## Licence
-
-MIT. See [LICENSE](./LICENSE).
+- [How it works, safety controls, configuration, limits](docs/super-board/README.md)
+- [Release notes](RELEASE-NOTES.md) · [Evals](evals/README.md) · [Config schema](skills/super-board/references/config-schema.json)
 
 ## Credits
 
-Designed and maintained by Eric Tech. Skill structure originally inspired by [obra/superpowers](https://github.com/obra/superpowers).
+- Designed and maintained by Eric Tech. MIT, see [LICENSE](LICENSE).
+- Skill structure inspired by [obra/superpowers](https://github.com/obra/superpowers).
+- Lanes run on the [mattpocock/skills](https://github.com/mattpocock/skills) process stack.
+- super-collect and visual adapt [BuilderIO/skills](https://github.com/BuilderIO/skills) (MIT); visual's diagrams follow [tt-a1i/archify](https://github.com/tt-a1i/archify) (MIT).
+- super-refine, arch-loop, cleanup-wt and guard-worktree-path come from Eric Tech's BookKeepingApp.
 
-Workers run on the [mattpocock/skills](https://github.com/mattpocock/skills) process stack —
-`tdd`, `diagnosing-bugs`, `code-review`, `ask-matt`, `to-spec`. `grilling` is
-interactive by contract, so it runs in `super-board lint` (where a human is present),
-never inside an unattended worker. The full mapping — including the four skills that
-stayed because Matt's pack has no equivalent — is in
-[`skills/super-build/references/decision-policy.md`](./skills/super-build/references/decision-policy.md).
+---
+
+Skills load on a description match. Commands you type. Guards run on their tool events. Adding a skill? Write its `SKILL.md` and `README.md`, add a line to `skills/families.json`, and the README updates itself.
