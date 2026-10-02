@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests super-board-merge-gate.sh — the merge mutex and the freshness gate.
-# Scenarios 1-7 stop at or before the first `gh pr view`. Scenarios 8-11 run past
+# Scenarios 1-7 stop at or before the first `gh pr view`. Scenarios 8-13 run past
 # it against a local bare `origin` and a `gh` stub on PATH, to pin the head guard.
 #
 # The gate exists because `mergeable: CLEAN` was trusted twice on 2026-08-20 and
@@ -146,4 +146,26 @@ RC=0; STUB_OID="$SHA" STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 
 [ "$RC" -eq 3 ] || fail "a refusal with an unchanged head should exit 3, got $RC"
 teardown
 
-echo "PASS: test-merge-gate.sh (11 scenarios)"
+# 12 — post-merge cleanup: when cleanup-wt is installed the gate runs it with
+#      --post-merge --base <base> after a merge, and its failure never fails the
+#      merge that already happened.
+head_setup
+mkdir -p "$TMP/.claude/skills/cleanup-wt/scripts"
+printf 'import sys\nopen("%s/cleanup.args","w").write(" ".join(sys.argv[1:]))\nsys.exit(1)\n' "$TMP" \
+  > "$TMP/.claude/skills/cleanup-wt/scripts/cleanup-wt.py"
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "a failing cleanup must not fail the merge, got $RC"
+grep -q -- "--post-merge --base staging" "$TMP/cleanup.args" 2>/dev/null \
+  || fail "cleanup-wt should run with --post-merge --base staging, got: $(cat "$TMP/cleanup.args" 2>/dev/null)"
+teardown
+
+# 13 — a refused merge never cleans up. (Scenario 9 is the no-cleanup-wt path.)
+head_setup
+mkdir -p "$TMP/.claude/skills/cleanup-wt/scripts"
+printf 'open("%s/cleanup.ran","w")\n' "$TMP" > "$TMP/.claude/skills/cleanup-wt/scripts/cleanup-wt.py"
+RC=0; STUB_OID="$SHA" STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 3 ] || fail "a refused merge should still exit 3, got $RC"
+[ ! -f "$TMP/cleanup.ran" ] || fail "cleanup must not run when the merge was refused"
+teardown
+
+echo "PASS: test-merge-gate.sh (13 scenarios)"

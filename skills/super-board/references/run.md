@@ -209,6 +209,7 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
 4. Build issue-scoped test plan: one observable test per AC.
 4b. **Test-gap check** (super-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
 5. Run the tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
+5b. **UI polish (super-refine qa-hook).** Only when the tests in step 5 **passed** and the card is UI — label `ui`, `design` or `frontend`, or at least one visual AC (layout, on-screen copy, a screenshot AC) — and `refine-setup.sh detect` prints a `devCommand`: run super-refine in `qa-hook` mode per `skills/super-refine/references/qa-hook.md` (`qa_hook_rounds`, default 3, from the config's `refine` block). Its round commits land on the issue branch. Re-run the AC tests after it; red → `git reset --hard $(cat <runDir>/base)` and note "refine reverted: broke AC tests". Add the `super-refine: …` line and the `after-refine-*.png` shots to the step-6 comment. It never moves the card, never comments, never blocks. Failing tests skip this step and go to step 7.
 6. **Pass** → commit test files + screenshots to same branch + push → 🔍 PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → 🔍 issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
 7. **Fail** → 🔍 PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → 🔍 issue comment with the same inline screenshots (showing what's wrong) → increment rebuild counter → move card QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
@@ -335,7 +336,8 @@ on the base branch**.
      bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD"
    The gate takes the merge mutex, checks the PR head is still $HEAD, merges the CURRENT
    base into a scratch worktree at $HEAD, runs `config.verify_commands`, and only then
-   squash-merges with `--match-head-commit $HEAD`. Route by exit code:
+   squash-merges with `--match-head-commit $HEAD`. After a merge it runs `cleanup-wt --post-merge`
+   when `.claude/skills/cleanup-wt/` is installed (local only; a cleanup failure never changes the exit). Route by exit code:
      0 → merged; continue to step 4
      2 → the branch no longer builds against the base → **rebase pass** (see below)
      3 → GitHub refused after a green verify (branch protection, required check)

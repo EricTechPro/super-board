@@ -96,12 +96,21 @@ const REVIEW_MEMORY = [
   `Run ponytail:ponytail-review on the merge-base diff (inline ladder if the plugin is absent); Over-engineering never blocks merge alone.`,
 ]
 
+// UI polish (run.md → Tester step 5b): the wave never sees labels, so the lane
+// applies the condition itself. Bounded, never blocks, never moves the card.
+const QA_REFINE_HOOK = [
+  `UI card (label ui / design / frontend, or a visual AC) and your AC tests passed? Run super-refine in qa-hook mode`,
+  `per .claude/skills/super-refine/references/qa-hook.md (run.md → Tester step 5b) before you commit and move the card.`,
+  `Re-run the AC tests after it; red → reset to the pre-hook commit and note it. Failing tests → skip the hook.`,
+]
+
 const lanePrompt = (lane, card) => [
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
+  ...(lane === 'qa' ? QA_REFINE_HOOK : []),
   ``,
   `Report your exit via structured output:`,
   `- status=advanced  → card moved forward (Building→QA, QA→Review, Review→Done/merged)`,

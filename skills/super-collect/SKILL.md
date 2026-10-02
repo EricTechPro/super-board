@@ -33,7 +33,9 @@ the dedupe.
 1. Resolve the active config: `.claude/super-board/active` → `.claude/super-board/configs/<slug>.json`
    (shape: `../super-board/references/config-schema.json`). Read `project.{owner,number,title}`,
    `repo.remote`, `paths.runs_dir` (default `docs/super-board/runs`). No config → stop and point
-   at `/super-board onboard`.
+   at `/super-board onboard`. An optional `collect` block overrides the defaults below:
+   `window_days` (14), `errors` (`"auto"`, a tool name, or `false` to skip), `feedback_paths`
+   (`docs/feedback`, `feedback`), `lookback_runs` (10).
 2. Source `.claude/bin/super-board-gh-guard.sh` and `sb_gh_guard_check 200` before each burst.
 3. Snapshot the board once: `gh project item-list <number> --owner <owner> --format json --limit 500`.
    That list is the dedupe set for the semantic pass and the "not on the board" set for intake.

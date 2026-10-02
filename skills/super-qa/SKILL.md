@@ -532,6 +532,10 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
   `core/fixtures-hooks.md` (custom fixtures for auth, pre-test seeding, teardown),
   `core/test-data.md` (test data factories), and `core/page-object-model.md` (POM for
   reusable interactions). Keep specs reusable as the suite grows.
+- `super-refine` (in this pack), in `qa-hook` mode — only on a UI card (label `ui`,
+  `design` or `frontend`, or a visual AC) after its AC tests pass. It polishes the
+  changed surface in a few rounds and never blocks the card. See
+  `skills/super-refine/references/qa-hook.md` and run.md → Tester step 5b.
 
 ## Coexistence with `/super-build`
 

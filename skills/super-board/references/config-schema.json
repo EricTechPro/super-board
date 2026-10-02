@@ -153,6 +153,37 @@
   // to disable.
   "block_rate_alert_pct": 30,
 
+  // Optional. super-refine settings (manual runs and the QA lane's qa-hook,
+  // run.md → Tester step 5b). Every key is optional; refine-setup.sh detect
+  // resolves config key → auto-detection → default. Full notes and the auth
+  // script contract: skills/super-refine/references/config.md.
+  "refine": {
+    "dev_command": "npm run dev -- --port $PORT",
+    "ready_path": "/",
+    "check_commands": ["npm run typecheck", "npm run lint"],
+    "env_files": [".env.local"],
+    "auth_script": "scripts/refine-auth.mjs",
+    "states": [{ "name": "main" }],
+    "taste_file": "docs/design/taste.md",
+    "impeccable": ".agents/skills/impeccable/scripts/impeccable",
+    // Manual-mode rounds (default 10) and qa-hook rounds (default 3).
+    "rounds": 10,
+    "qa_hook_rounds": 3
+  },
+
+  // Optional. super-collect bounds. Absent keys use the defaults shown.
+  "collect": {
+    // Intake window for errors, in days. Default 14.
+    "window_days": 14,
+    // Error source: "auto" (Sentry, else any wired error tool), a tool name
+    // such as "sentry", or false to skip errors. Default "auto".
+    "errors": "auto",
+    // Repo folders read as feedback. Default ["docs/feedback", "feedback"].
+    "feedback_paths": ["docs/feedback", "feedback"],
+    // Lookback reads this many newest run files. Default 10.
+    "lookback_runs": 10
+  },
+
   "notifications": {
     // Auto-detected during onboard; can be overridden.
     "channel": "telegram",
