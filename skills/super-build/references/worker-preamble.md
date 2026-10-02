@@ -47,7 +47,9 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
 
    Multiple type labels → first matching row, top to bottom.
 
-   **On top of the row, always:** `verification-before-completion` before the
+   **On top of the row, always:** `ponytail:ponytail` (full) before the first line of
+   code — if the plugin is not installed, apply the five-line fallback in
+   `references/decision-policy.md` → "Simplest solution first"; `verification-before-completion` before the
    final commit, and `mattpocock-skills:code-review` once against your own diff
    (see 6a). **When the situation calls for it:** `vitest` or
    `playwright-best-practices` — picked by the localisation ladder in
@@ -57,6 +59,12 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
    Invoke each via the Skill tool BEFORE writing any code. `tdd` tells you how to
    write a test worth having; the ladder tells you which layer to write it at.
    Reaching straight for an e2e spec skips the ladder.
+
+4b. **Docs before outside-tool code.** If the issue touches a third-party API/SDK/CLI/service,
+   a dependency or framework upgrade, or auth/billing, read the current official docs for the
+   installed version (context7, else web search to the vendor's docs) BEFORE writing code. Not
+   memory, not blog posts. Name each doc and the fact it settled in your final message; if the
+   docs were unreachable, say so and mark that code unverified.
 
 5. **Honor the per-issue 14-gate contract** (TDD, atomic commits, lint/typecheck/test green, etc.). Plan-only issues skip gates 3-7 (execution + tests). Review-only issues skip gates 1-7. Do not expand product scope beyond the issue body; when scope is missing or unsafe, use WIP-PARTIAL or HUMAN GATE instead of guessing.
 

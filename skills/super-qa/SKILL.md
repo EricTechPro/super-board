@@ -479,6 +479,39 @@ These run in Phase 1 regression alongside `e2e/paths/`.
   (/imports → /imports/preview → /orders)
 ```
 
+## Test-gap check (after build)
+
+Issue-scoped mode only (super-board Tester, or any run handed a finished diff). The
+Builder's tests answer "does it do what I built?"; this answers "what breaks silently?".
+Scope is the diff: `git diff --name-only $(git merge-base HEAD origin/<base>)...HEAD`.
+On auth, money, data-loss or security changes, hand steps 1-3 to a read-only sub-agent
+given only the ACs, the range and the changed-file list, so it is not anchored on the
+Builder's reasoning.
+
+1. **Ledger.** Every AC → the asserting `file:line` at unit, component and e2e, or `none`,
+   or `n/a: <reason>`. Fill the unit column for all ACs first, then component, then e2e.
+   A test that runs the code but asserts nothing about the AC is `none`.
+2. **Edge cases.** For each changed input or branch, mark each class pinned (`file:line`),
+   gap (exact witness value, never "consider edge cases") or n/a: boundaries (limit−1 /
+   limit / limit+1; 0 vs null vs empty), money and dates (rounding, timezone shift, month
+   end), input (unicode, very long, CSV injection), volume (0 / 1 / many, paging), auth
+   (logged out, another user's id, wrong tier), error paths (every catch and rejected
+   promise), idempotency and races (double-submit, replay), UI states (loading, empty,
+   error, disabled), accessibility (role + accessible name, focus).
+3. **Test the tests.** Flag a test that asserts on its own mock, recomputes the expected
+   value with the code under test, or cannot fail. For high-risk logic, name the surviving
+   mutant (`>` → `>=`, a dropped branch) no test would catch.
+4. **Rank.** High: an AC with no test at any rung; any gap in auth/ownership, money,
+   security or data loss. Medium: a partly covered branch, a surviving mutant, a missing
+   loading/empty/error state. Low: cosmetic, copy, logging.
+5. **Act.** Write every High gap now, red first, through `mattpocock-skills:tdd` (or
+   `tdd-v2` where the repo has it), at the rung the localisation ladder picks. A new test
+   that passes on its first run has not been seen to fail: break the guarded line, see
+   red, restore it, see green; the mutation never reaches a commit. A High gap that needs
+   app code changed to pass or to become testable is a **Fail**: bounce to Builder
+   (QA → Ready) with the list (witness, expected, rung, target file). Medium and Low go
+   in the handoff under `Test gaps (not written)` and never block.
+
 ## Skill dependencies
 
 The worker (per `references/iteration-preamble.md`) must load and follow:
@@ -600,6 +633,7 @@ See `.claude/skills/super-board/references/run.md` → Tester (first pass — re
 1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree (skip if URL-only).
 2. Read issue + PR + Builder's handoff.
 3. Build issue-scoped test plan: ONE observable test per AC.
+3b. Run the **Test-gap check** (above) against the Builder's diff; its High gaps join the plan.
 4. Run tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
 5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/super-board/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
 6. **Pass** → 🔍 PR comment with results + evidence path → 🔍 **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.

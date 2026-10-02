@@ -129,12 +129,25 @@ Repeat until a done condition or halt gate fires:
    Append one line per card to the run manifest
    `docs/super-board/runs/<date>-<slug>.md`:
    `| #N | <lanesRun> | <finalStatus> | <column> | <detail> |`.
-6. **Report** — one short status line to the user per wave (and Telegram if
-   notifications are enabled; currently disabled per CLAUDE.md). Surface any
-   `human-gate`/`blocked` cards explicitly — these are the human's queue.
+6. **Report** — one short block to the user per wave (and Telegram if
+   notifications are enabled; currently disabled per CLAUDE.md). Outcome
+   first, one line per card that needs a human, then what happens next:
+
+   ```
+   Wave 3 · 5 cards → 2 merged · 1 bounced · 1 blocked · 1 failed · usage 5h 62%
+     🛡 #15 Blocked 🔐 missing STRIPE_TEST_KEY — owner: Eric
+     ❌ #18 failed: build lane returned no result — retried next wave
+   Next: wave 4 (3 cards)   |   ⏸ paused until 14:05   |   ✅ board drained
+   ```
+   Merged and bounced cards are counts, not lines — they need nobody. Every
+   `human-gate`/`blocked` card gets its line and its owner: that is the
+   human's queue. Never report a card as done that is not on the base branch.
 7. **Halt gates** — stop with a report if: 3 consecutive waves made zero
    progress (every card bounced/failed); block-rate exceeds
-   `block_rate_alert_pct` of initial Ready; or the user says stop.
+   `block_rate_alert_pct` of initial Ready; or the user says stop. The halt
+   note is four lines: `🛑 halted — <gate>` · the evidence (counts, the cards
+   that kept bouncing) · what is left in flight or claimed · `Resume:
+   /super-board run <slug>` and who must act first.
 8. Loop to 1. For unattended cadence, the user may wrap this loop in /loop;
    the orchestrator must still stop at halt gates.
 

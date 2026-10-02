@@ -31,6 +31,8 @@ Card:        #<N> <title>
 PR:          #<P> (if exists)
 Reason tag:  <emoji from table below>
 Why blocked: <concrete; 1 line — name the specific thing that is missing or wrong>
+Evidence:    <the command + output, file:line, or error that shows it — not a paraphrase>
+Checked:     <what the bot verified before blocking, so nobody re-checks it — or "-">
 What blocks: <what specific external action would change this — credentials, perms, decisions>
 Why I (bot) cannot decide:
              <one line explaining the decision the bot refuses to make on its own —
@@ -40,9 +42,14 @@ Why I (bot) cannot decide:
 To unblock:  <concrete action the human can take, in their own checklist form>
              [ ] <step 1>
              [ ] <step 2>
+Owner:       <who acts next — "Eric", "repo admin", "design" — never "someone">
 Move back:   drag this card to Ready after the steps above are done
 blocked-by:  <comma-separated issue numbers, or "-" if nothing on this board clears it>
 ```
+
+One line per field. The reader is a human deciding in ten seconds whether this is theirs:
+lead with the fact, show the evidence, name the owner. No narration of what the bot tried
+in what order.
 
 ### The `blocked-by:` line is mandatory
 

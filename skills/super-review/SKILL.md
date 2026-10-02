@@ -47,7 +47,14 @@ If the input is ambiguous, default to reviewing the current branch against its u
    - If there are unrelated dirty files, stop and ask before touching them.
    - Load `prior_report`. If one exists, run round 1 of "Review remembers" before step 2.
 
-2. **Inspect changes**
+2. **Inspect changes — your own pass first**
+   - **Before reading the builder's account** (PR description summary, 🔨 comment, Tester
+     handoff), read the issue's acceptance criteria and the raw diff, and write down 2–4
+     hypotheses: what must be true for this to be right, and where it would most likely
+     break. Reading their summary first anchors you on their framing; the point of a
+     reviewer is a second, independent solver.
+   - Then read their claims and check each one against the code and test output, the same
+     way you check your own hypotheses. A claim is a lead, not evidence.
    - Read the diff and the affected modules.
    - Load `mattpocock-skills:codebase-design` and read the diff through its vocabulary
      — **module**, **interface**, **depth**, **seam**, **adapter**, **leverage**,
@@ -65,7 +72,27 @@ If the input is ambiguous, default to reviewing the current branch against its u
      - structured `AppError({ error_code, context })`;
      - jsonb writes are Zod-validated.
 
-3. **Classify findings**
+3. **Classify findings** — every finding gets a **class** (what kind of problem) and a
+   **severity** (does it block). Class:
+   - **Gap** — an acceptance criterion or requested behaviour is missing or incomplete.
+   - **Bug** — the code likely fails or regresses behaviour.
+   - **Verification miss** — the code may be right, but the evidence does not prove it
+     (missing test, test asserts the wrong thing, skipped rerun).
+   - **Scope drift** — the diff changes something the issue did not ask for, or skips a
+     stated constraint.
+   - **Over-engineering** — the diff works but builds more than the AC needs: a new
+     dependency, abstraction, config or file where the codebase, stdlib, a native feature
+     or one line already covered it. Find these with `ponytail:ponytail-review` on the
+     merge-base diff (`git merge-base HEAD origin/<base>`); plugin not installed → ask the
+     ponytail ladder of each addition yourself: needed at all? already in the codebase?
+     stdlib? native? an installed dep? one line? Always **Should fix**, routed to
+     Super Build — it **never blocks a merge on its own**. A simplification that would
+     cut validation, security, data-loss protection or accessibility is not a finding.
+   - **No issue** — you checked a hypothesis or claim and it holds. Not a finding: list it
+     under `Verified correct` with the file:line or command that showed it. Saying what is
+     right stops the next round re-litigating it.
+
+   Severity:
    - **Blocker:** correctness, data loss, security, auth, migrations, money, customer-visible broken behavior, or failing required tests.
    - **Should fix:** maintainability, missing tests, risky edge cases, accessibility, i18n, observability, or design drift that is clearly in scope.
    - **Nit / optional:** style or cleanup that does not block merge.
@@ -115,10 +142,19 @@ If the input is ambiguous, default to reviewing the current branch against its u
 - R2 not fixed — <file:line> → route to <workflow>
 
 ### Blockers
-- [ ] R3 <finding> → route to <Super Build | Super QA | Super UX | human>
+- [ ] R3 <Gap | Bug | Verification miss | Scope drift> <file:line> — <finding> → route to <Super Build | Super QA | Super UX | human>
 
 ### Should fix
-- [ ] <finding> → route to <workflow>
+- [ ] R4 <class> <file:line> — <finding> → route to <workflow>
+
+### Over-engineering (Should fix, never blocks alone)
+- [ ] R5 Over-engineering <file:line> — <what it builds> → <the smaller thing that covers it> → route to Super Build
+
+### Verified correct
+- <hypothesis or builder claim> — <file:line or command that showed it>
+
+### Not verified
+- <what you could not check, and why>   (omit when empty)
 
 ### Deepening opportunities (filed, not blocking)
 - #<issue> <one-line shape problem> — `refactor` / Backlog
@@ -174,10 +210,11 @@ Outside super-board (no PR), `prior_report` is whatever earlier review the calle
 **Round 1 — check each prior finding before anything else.** Mark every one:
 
 - `fixed` — cite the file:line that shows it.
-- `not fixed` — still true of the code. A resolved thread is not evidence; read the code.
+- `not fixed` — still true of the code. A resolved thread is not evidence, and neither is
+  the builder's reply saying it was fixed; read the code.
 - `no longer applies` — the code it pointed at is gone, or the AC changed. Do not re-raise it.
 
-Any `not fixed` → **bounce again** with them listed under `Prior findings`, keeping their
+Any `not fixed` (other than Over-engineering, which never bounces alone) → **bounce again** with them listed under `Prior findings`, keeping their
 original ids and routes. Skip the fresh pass; it would review code that is about to change.
 All clear → round 2 is the normal fresh pass. New findings take ids after the highest one used.
 
@@ -200,7 +237,7 @@ Super Review is done when one of these is true:
 
 ## Skill dependencies
 
-The reviewer loads two skills, both scoped to the diff:
+The reviewer loads three skills, all scoped to the diff:
 
 - `mattpocock-skills:code-review` — the two-axis review. **Standards** (does the diff
   follow this repo's documented standards, plus the Fowler smell baseline) and **Spec**
@@ -210,6 +247,9 @@ The reviewer loads two skills, both scoped to the diff:
 - `mattpocock-skills:codebase-design` — the deep-module vocabulary used in step 2 and in
   every deepening opportunity written below. It is vocabulary, not a workflow: no report,
   no prompts, nothing to wait on.
+- `ponytail:ponytail-review` — the Over-engineering pass in step 3, on the merge-base
+  diff. Optional plugin: when it is not installed, use the inline ladder in step 3.
+  Its findings are Should fix at most; it never decides merge-or-bounce.
 
 **Never load inside the lane:** `mattpocock-skills:improve-codebase-architecture`. It
 scans the whole codebase rather than the diff, writes a Tailwind/Mermaid HTML report and
@@ -278,7 +318,8 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the 
 6. **Adversarial mode** (per `config.truth_gate` — `off` / `non-trivial` / `always`, default `non-trivial`): see section below.
 7. Decide per finding:
    - **Deepening opportunity** → `scripts/super-review-file-refactor.sh`, then keep going. It is not a finding for merge purposes and never bounces a card.
-   - **No findings + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
+   - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
+   - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
    - **Test-side new finding** → new `[QA]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).
    - **Blocker (schema, contract, money, auth, migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked.
@@ -328,9 +369,14 @@ Activated per `config.truth_gate`:
 - `non-trivial` (default) — diff ≥10 lines OR labels in `{security, migration, payments, auth}` trigger adversarial.
 - `always` — every card.
 
-When activated, spawn 2 sub-agents in parallel:
+When activated, spawn 2 sub-agents in parallel. Give each the issue ACs and the diff
+first and have it form its own hypotheses; hand it the builder's summary only after, as
+claims to check — not as the frame:
 - **Code-grounder.** Verify cited file:line still exists and matches claims.
 - **Historian.** `git blame` the changed lines; check for ADRs / prior incidents.
+
+Each returns its findings with the same classes (Gap / Bug / Verification miss / Scope
+drift / Over-engineering / No issue).
 
 Each sub-agent returns a confidence score `0–100`.
 

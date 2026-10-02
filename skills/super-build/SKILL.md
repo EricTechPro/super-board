@@ -196,7 +196,7 @@ Super Build treats acceptance criteria as the completion contract. Workers must 
 - **Never modify code in the main worktree** while workers are running. Only run `gh issue` commands and merge/cleanup operations.
 - **Merge conflicts** between concurrent workers' branches → halt loop, notify Telegram with conflict files, leave `loop:in-progress` label so a human can resolve. Don't auto-resolve.
 - **Telegram cadence:** 1 message at start, 1 per dispatch wave, 1 per completion (success/fail), 1 final summary. Don't spam.
-- **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present; otherwise they route on the issue's **type label** (`bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`), always adding `verification-before-completion` and a `code-review` pass on their own diff. Test mechanics are picked by the localisation ladder, never by label. Decision points walk the decision ladder — acceptance criteria → repo precedent → smallest blast radius → human gate — and stop at the first rung that answers the question. No panel, no vote; `mattpocock-skills:grilling` is forbidden inside a worker (it waits on a user who is not there) and lives in `super-board lint` instead. `mattpocock-skills:code-review` runs once against the worker's own diff before the final commit. See `references/decision-policy.md` for the skill map, the ladder, the human gates, and the `--- decision ---` commit trailer.
+- **Workers MUST use the right skills.** The worker preamble enforces: workers parse the `Skills:` line from the issue body if present; otherwise they route on the issue's **type label** (`bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`), always adding `ponytail:ponytail` (simplest solution first, before any code; inline fallback when the plugin is absent), `verification-before-completion` and a `code-review` pass on their own diff. Test mechanics are picked by the localisation ladder, never by label. Decision points walk the decision ladder — acceptance criteria → repo precedent → smallest blast radius → human gate — and stop at the first rung that answers the question. No panel, no vote; `mattpocock-skills:grilling` is forbidden inside a worker (it waits on a user who is not there) and lives in `super-board lint` instead. `mattpocock-skills:code-review` runs once against the worker's own diff before the final commit. See `references/decision-policy.md` for the skill map, the ladder, the human gates, and the `--- decision ---` commit trailer.
 
 ## Worker preamble
 
@@ -242,11 +242,12 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` set by the runner, or invoc
 Follow spec `.claude/skills/super-board/references/run.md` → Builder (first pass). Summary:
 1. Worktree off `config.base_branch`.
 2. Branch `issue-<N>-<slug>` from `config.base_branch`.
-3. Implement smallest safe change covering ACs.
-4. Commit + push (always).
-5. Open **draft PR** with the PR description template from `run.md`.
-6. Post 🔨 PR timeline comment + short issue comment with PR URL.
-7. Move card Ready/Building → QA.
+3. Docs check (section below) — if the ticket touches a third-party surface, an upgrade, or auth/billing, read the current official docs first.
+4. Implement smallest safe change covering ACs.
+5. Commit + push (always).
+6. Open **draft PR** with the PR description template from `run.md` (including `Docs consulted`).
+7. Post 🔨 PR timeline comment + short issue comment with PR URL.
+8. Move card Ready/Building → QA.
 
 ### Lifecycle (Builder, rebuild)
 Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
@@ -258,6 +259,24 @@ Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
 3. Address any new failure feedback from Tester's latest ❌ comment.
 4. Commit + push to same branch. Verify ALL `[builder]` threads are resolved before exit.
 5. 🔨 PR + issue comments. Move card Ready/Building → QA.
+
+### Docs before outside-tool code (every ticket)
+Before writing code, decide whether the ticket touches any of:
+- a third-party API, SDK, library, CLI or cloud service (calling it, configuring it, adding it);
+- a dependency or framework **upgrade**;
+- **auth or billing** (OAuth/scopes, sessions, tokens, webhooks, payments, plans).
+
+If yes, read the **current official docs** for the exact surface and version first — context7
+when available, otherwise web search to the vendor's own docs, migration guide or changelog.
+Check the installed version (`package.json` / lockfile, `npm view <pkg> version` for a new dep)
+and read the docs for that major. Repo docs and existing call sites come first for how *this*
+repo uses it; vendor docs settle what the tool does. Not Stack Overflow, not old blog posts,
+not memory.
+
+Cite what you read in the PR body under `Docs consulted` (URL + the one fact it settled). Docs
+unreachable → say so in that section and in the 🔨 comment, mark the affected code
+`unverified against current docs`, and keep the change minimal. No outside tool touched →
+`Docs consulted: none needed (no third-party surface)`.
 
 ### Failure → handoff comment must include `root-cause-hash:` line
 On any failure-handoff comment, include:

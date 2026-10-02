@@ -59,6 +59,39 @@ lets the running one finish, posts a resume note and, if a wake tool exists, sch
 at the reset. Limits: Pro/Max only, fresh only while an interactive session's status line is
 recording, and an unknown reading never halts a run. Test: `tests/test-usage.sh`.
 
+**Docs before outside-tool code.** When a ticket touches a third-party API or SDK, an upgrade, or
+auth/billing, the Builder reads the current official docs for the installed version (context7,
+else the vendor's site) before writing code, and cites them in a new `Docs consulted` PR section.
+Unreachable docs are named, and the code they cover is marked unverified. In super-build's
+super-board integration, the worker preamble and run.md Builder step 3b.
+
+**Fairer review.** The Reviewer reads the ACs and the raw diff and writes 2-4 hypotheses of its
+own before it reads the builder's summary, then checks the builder's claims the same way. Every
+finding is classed Gap / Bug / Verification miss / Scope drift. Checks that held go under a new
+`Verified` list, gaps in coverage under `Not verified`, and `Next` names the owner. The marker,
+R-ids and Prior findings are unchanged, so review remembers still reads the report.
+
+**Tighter writing.** Lane comments follow five rules (run.md → Commenting cadence). The first line
+is the outcome. Evidence (command, sha, file:line) comes before prose, each comment says what was
+verified and what was not, and it ends with `Next:` naming the owner, in 12 lines or fewer. The PR
+body opens with a status line pinned to the head sha and gains a `Not verified` section. The Block
+template gains `Evidence`, `Checked` and `Owner` lines. The wave report and halt note now have
+fixed short formats in which only cards that need a human get their own line.
+
+**Simplest solution first.** Builders invoke `ponytail:ponytail` (full) before the first line of
+code, on every type label; when the plugin is not installed they apply a five-line inline ladder
+(decision-policy.md → "Simplest solution first") that never cuts validation, security, data-loss
+protection or accessibility. The Reviewer runs `ponytail:ponytail-review` on the merge-base diff
+and files a new **Over-engineering** class: Should fix, routed to Builder, and it never blocks or
+bounces a card on its own. Assertions added to `tests/test-wave-review-memory.sh`.
+
+**Test-gap check in QA.** The Tester now runs a post-build gap hunt (folded from post-tdd) before
+its test run: every AC mapped to unit / component / e2e tests, edge cases marked with exact
+witness values, weak tests and surviving mutants named, gaps ranked. High gaps are written
+red-first through `tdd`; one that needs app code changed bounces to Builder with the list.
+Medium/Low are listed in the handoff and never block. super-qa → "Test-gap check (after build)",
+run.md Tester step 4b.
+
 ## v2.4.0 — 2026-08-20
 
 The `Blocked` column stops being a dead end, and nothing merges on GitHub's word.

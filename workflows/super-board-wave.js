@@ -89,6 +89,11 @@ const REVIEW_MEMORY = [
   `Before reviewing, load prior_report: the newest PR comment containing "<!-- super-review:report -->" (run.md → Reviewer step 3b).`,
   `None → first review, behave as usual. Found → round 1 marks each prior finding fixed / not fixed / no longer applies;`,
   `any not fixed → bounce again listing them. Report the counts as priorFindings.`,
+  // Independent pass (run.md → Reviewer step 3): hypotheses before the builder's account.
+  `Read the issue ACs and the diff before the builder's PR summary; form your own hypotheses, then check their claims.`,
+  `Class every finding Gap / Bug / Verification miss / Scope drift / Over-engineering, and list what you verified correct.`,
+  // Simplest-solution pass (super-review step 3): Should fix at most, never a bounce on its own.
+  `Run ponytail:ponytail-review on the merge-base diff (inline ladder if the plugin is absent); Over-engineering never blocks merge alone.`,
 ]
 
 const lanePrompt = (lane, card) => [

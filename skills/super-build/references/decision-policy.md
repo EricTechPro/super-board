@@ -101,6 +101,8 @@ implement against the spec before you reach for design vocabulary.
 
 **On top of the row, always:**
 
+- `ponytail:ponytail` (full) — after you understand the problem, before you
+  write any code, whatever the label. See "Simplest solution first" below.
 - `verification-before-completion` — before the final commit, no exceptions.
 - `mattpocock-skills:code-review` — once against your own diff, merge-base as
   the fixed point. See "The decision ladder" above.
@@ -122,6 +124,23 @@ replaces the row, it does not extend it. Label routing applies only when no
 **Multiple type labels** — take the first row that matches, reading the table
 top to bottom. A card labelled both `bug` and `refactor` is a bug first; the
 refactor is a separate card.
+
+## Simplest solution first
+
+Invoke `ponytail:ponytail` (full) once the problem is understood and before the
+first line of code. The ponytail plugin may not be installed; if the Skill call
+fails, apply this fallback and carry on:
+
+1. Climb the ladder, stop at the first rung that holds: does it need to exist at
+   all? → already in this codebase? → stdlib? → native platform feature? →
+   an already-installed dependency? → one line? → only then the minimum code.
+2. No new dependency, abstraction, config or file the acceptance criteria do not need.
+3. Bug fix = root cause: one guard in the shared function beats one per caller.
+4. Never cut validation, security, data-loss protection or accessibility to shrink a diff.
+5. Mark a deliberate corner with a `ponytail:` comment naming its ceiling.
+
+Ponytail picks *how little* to write. It never overrides an acceptance
+criterion, the `tdd` red test, or the decision ladder below.
 
 ## The decision ladder
 

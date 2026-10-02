@@ -118,6 +118,8 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 Builder writes this when opening the PR. Each lane updates the relevant section on exit.
 
 ```markdown
+**Status:** <one line, rewritten by each lane on exit> · head `<sha>` · next: <lane | human | none>
+
 ## Issue
 Resolves #<N> — <title>
 
@@ -125,6 +127,9 @@ Resolves #<N> — <title>
 - [ ] AC1: <text>
 - [ ] AC2: <text>
 - ...
+
+## Docs consulted
+- <url> — <the one fact it settled>   (or: none needed — no third-party surface)
 
 ## Iteration history
 
@@ -138,11 +143,12 @@ Resolves #<N> — <title>
 - `docs/super-board/runs/issue-<N>-qa-v1/`
 - ...
 
-## Status
-<one-line current state, updated by each lane on exit>
+## Not verified
+- <what no lane has proven yet, and why>   (each lane edits this; "nothing" when empty)
 ```
 
-Tester ticks AC checkboxes on pass.
+Tester ticks AC checkboxes on pass. The status line leads because it is what a human reads
+first; it names the head commit so evidence is never read against a different one.
 
 ## PR review-comment threads — prefix + resolution protocol
 
@@ -174,6 +180,8 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
    (the card came back from Building after a stopped run): then check it out, keep its
    commits and open PR, and continue from where it stopped.
 3. Read issue body + ALL comments + PROJECT.md.
+3b. Touches a third-party API/SDK, an upgrade, or auth/billing? Read the current official docs
+    for the installed version first (super-build → "Docs before outside-tool code").
 4. Implement smallest safe change covering ACs.
 5. Commit + push (always).
 6. Open draft PR linked to the issue with the PR description template.
@@ -199,6 +207,7 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
 2. URL-only variant: skip worktree + pull, run a health-check on `target.url`. If unhealthy → Block.
 3. Read issue + PR + Builder's handoff comment.
 4. Build issue-scoped test plan: one observable test per AC.
+4b. **Test-gap check** (super-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
 5. Run the tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
 6. **Pass** → commit test files + screenshots to same branch + push → 🔍 PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → 🔍 issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
 7. **Fail** → 🔍 PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → 🔍 issue comment with the same inline screenshots (showing what's wrong) → increment rebuild counter → move card QA → Ready (label `loop:rebuild-N`). Clean up worktree.
@@ -245,7 +254,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - `[QA]` open → comment, move card Review → QA.
    - Both open → bounce to whichever is older; the other gets picked up later.
    - Clean up worktree, exit.
-3. Read PR (code + test files + description), spot-check Tester's evidence (one screenshot at least), read CLAUDE.md / AGENTS.md.
+3. Read the issue ACs and the raw diff (code + test files) FIRST and write 2–4 hypotheses of your own — what must hold, where it would break. Only then read the PR description, the 🔨 comment and Tester's handoff, and check each claim like a hypothesis. Spot-check Tester's evidence (one screenshot at least), read CLAUDE.md / AGENTS.md.
 3b. **Prior-report check (review remembers — added 2.5.0).** Load the last Reviewer report on this PR as `prior_report`. One call:
    ```
    gh pr view <PR> --json comments \
@@ -254,6 +263,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - Empty → first review of this card. Skip to step 4; behave exactly as before.
    - Non-empty → the card was bounced and rebuilt. **Round 1** walks every finding in `prior_report` and marks each one `fixed` / `not fixed` / `no longer applies` (code it pointed at is gone or the AC changed), citing the file:line that proves it. A resolved thread is not proof — check the code.
    - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[QA]` → QA, both → `[builder]` first), `loop:rebuild-N`, and post the Reviewer report listing them under `Prior findings`. Skip the fresh pass; it would review code that is about to change.
+   - An unfixed **Over-engineering** finding alone does not bounce; carry it into the new report's Findings.
    - All `fixed` / `no longer applies` → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 4. Review the code (logic, conventions). Review the tests (right thing tested? testable assertions? meaningful coverage?).
 5. **Reviewer-side test rerun** (always — closes the Tester self-verification gap):
@@ -270,7 +280,8 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - **Above threshold** — continue to step 7.
    - **No Reproducer needed** — Tester's tests were re-run in step 5.
 7. Decide per finding:
-   - **No findings + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
+   - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
+   - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
    - **Test-side new finding** → open new `[QA]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
    - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[QA]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Add a `🛡 → ✅ CI-budget bypass` comment to both the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
@@ -285,11 +296,15 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
      • R1 fixed            src/api/stream.ts:54
      • R2 not fixed        e2e/streaming/ttfb.spec.ts:18
    Findings:
-     • R3 [builder] src/api/stream.ts:61 — <one line>
-     • R4 [QA] e2e/streaming/ttfb.spec.ts:30 — <one line>
-   Next:      <Ready | QA | Blocked | Done>
+     • R3 [builder] Bug  src/api/stream.ts:61 — <one line>
+     • R4 [QA] Verification miss  e2e/streaming/ttfb.spec.ts:30 — <one line>
+     • R5 [builder] Over-engineering  src/api/retry.ts:1 — <what it builds → smaller thing> (Should fix, not blocking)
+   Verified:
+     • <hypothesis or builder claim> — <file:line or command>
+   Not verified: <what, and why — or "nothing">
+   Next:      <Ready | QA | Blocked | Done> · owner: <Builder | Tester | human>
    ```
-   Carry an unfixed prior finding forward under its old id; number new findings after the highest id used so far.
+   Carry an unfixed prior finding forward under its old id; number new findings after the highest id used so far. Every finding names its class — Gap / Bug / Verification miss / Scope drift (super-review → "Classify findings"); a checked hypothesis that held is not a finding, it goes under `Verified`.
 9. Clean up worktree.
 
 ### Merge protocol (Reviewer only — added 2026-08-06, issue #9)
@@ -342,7 +357,16 @@ landed-work progress signal — depends on Done meaning the code is on the base 
 
 ## Commenting cadence (issue + PR, every lane)
 
-Every lane writes BOTH on every exit:
+Every lane writes BOTH on every exit.
+
+**How to write them.** Short and evidence-first:
+- First line is the outcome (`Build done`, `QA fail v2`, `Blocked 🔐`) — never narration.
+- Evidence before prose: the command and its result, the commit sha, the file:line.
+- Say what was **verified** and what was **not** (skipped, unavailable, out of reach). An
+  unchecked thing is never implied to pass.
+- End with `Next:` — the lane or person who owns the card now.
+- No restating the issue, no adjectives, no "I have successfully…". A handoff is ≤ 12 lines.
+
 
 - **Issue comment**: short status, with the PR URL + (if applicable) the evidence folder path. The final ✅ comment also carries the full iteration path (e.g. `Build → QA fail v1 → Build → QA pass v2 → Review ✅`).
 - **PR timeline comment**: structured handoff for the next agent — issue ref, branch, commit, files, summary, evidence path, what-fixed-looks-like (on failure), next lane.
@@ -351,7 +375,7 @@ Sample issue comment (Builder exit):
 
 ```
 🔨 super-board · Build done
-   PR:  #87
+   PR:   #87 @ abc1234
    Next: QA
 ```
 
@@ -370,6 +394,8 @@ Files:
 Summary:      Added /api/stream endpoint + client-side SSE consumer.
               No schema changes. No new deps.
 Local tests:  npm test --run streaming  PASS (4 tests)
+Verified:     AC1 stream opens (streaming.test.ts:12) · typecheck clean
+Not verified: TTFB under load (no load harness) — Tester to measure
 Next:         Tester (QA)
 ```
 
