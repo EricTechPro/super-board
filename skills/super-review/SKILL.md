@@ -294,7 +294,11 @@ two complete builds. In order, no shortcuts:
 1. `gh pr ready <PR>` — idempotent, safe on an already-ready PR.
 2. `human_approves_merge: true` → stop; leave the card in **Review** with a `[review]`
    comment that the PR is ready for a human. Do not move it to Done.
-   `human_approves_merge: false` → `gh pr merge <PR> --squash --delete-branch`.
+   `human_approves_merge: false` → merge through the gate, pinned to the head you reviewed:
+   record `gh pr view <PR> --json headRefOid` when review passes, then
+   `super-board-merge-gate.sh --config <cfg> --pr <PR> --expect-head <sha>` (it merges with
+   `--match-head-commit`). Exit 6 = the head moved after review → your evidence is void;
+   leave the card in **Review** with a `[review]` comment naming both shas.
 3. **Confirm the merge landed** — never trust the merge command's exit code:
    `gh pr view <PR> --json state,mergeCommit` must report `MERGED` plus a commit sha,
    and that sha must be an ancestor of the base branch

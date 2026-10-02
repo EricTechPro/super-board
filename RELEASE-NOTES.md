@@ -36,6 +36,29 @@ offline `gh` stub serves a PR whose prior report lists R1 (really fixed) and R2 
 code unchanged); the reviewer must load the report, mark R1 fixed and R2 not fixed with file:line
 proof, bounce, and never call `gh pr merge`. 3/3 runs passed on release. See `evals/README.md`.
 
+### Also in 2.5.0
+
+**Merge pinned to the reviewed head.** The Reviewer records the PR's `headRefOid` when review
+passes and passes it to `super-board-merge-gate.sh --expect-head`. The gate verifies that exact
+commit and merges with `--match-head-commit`. A push after review (or during verify) now exits 6:
+the evidence is void and the card stays in Review for a fresh pass. Tests 8-11 in
+`tests/test-merge-gate.sh`.
+
+**Stranded Building cards come back.** Nothing selects from Building, so a wave stopped mid-build
+left its card there until someone dragged it (run-workflow.md said so). The planner now reports
+unclaimed Building cards in `stranded`; the orchestrator removes the leftover build worktree, keeps
+the branch, moves the card to Ready and comments. The legacy dispatcher does the same once at start
+(`reclaim_stranded_building`), and Builder step 2 continues on an existing branch. Tests: scenarios
+16-17 in `test-wave-plan.sh`, six checks in `test-run-gates.sh`.
+
+**Usage guard before each wave.** New `scripts/super-board-usage.sh`. Claude Code exposes plan
+usage only in the `rate_limits` JSON it pipes to the status line. The script's `record` mode saves
+that JSON from the status-line command, and `check` compares the 5-hour and weekly windows against
+`usage_pause_pct` (default 95). At or over the threshold the orchestrator launches no new wave,
+lets the running one finish, posts a resume note and, if a wake tool exists, schedules a re-check
+at the reset. Limits: Pro/Max only, fresh only while an interactive session's status line is
+recording, and an unknown reading never halts a run. Test: `tests/test-usage.sh`.
+
 ## v2.4.0 — 2026-08-20
 
 The `Blocked` column stops being a dead end, and nothing merges on GitHub's word.

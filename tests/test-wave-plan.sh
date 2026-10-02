@@ -97,8 +97,8 @@ RC=0; "$PLAN" --config <(jq '.variant = "fulll"' "$CFG") --items "$ITEMS" --deps
 # 13 — empty board → empty everything (run-workflow.md's done condition depends
 #      on this shape).
 OUT13=$("$PLAN" --config <(echo "$NOCAP") --items <(echo '{"items":[]}') --deps "$DEPS")
-echo "$OUT13" | jq -e '.cards == [] and .sweep == [] and .flag == []' >/dev/null \
-  || fail "empty board should yield empty cards/sweep/flag, got: $OUT13"
+echo "$OUT13" | jq -e '.cards == [] and .sweep == [] and .flag == [] and .stranded == []' >/dev/null \
+  || fail "empty board should yield empty cards/sweep/flag/stranded, got: $OUT13"
 
 # 14 — a card the graph has never heard of is not treated as free. An issue beyond
 #      the fetch limit, or closed out from under the board, must not be dispatched
@@ -112,4 +112,15 @@ echo "$OUT14" | jq -e '[.cards[] | select(.status == "Ready")] | length == 0' >/
 RC=0; "$PLAN" --config <(jq 'del(.repo)' "$CFG") --items "$ITEMS" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 66 ] || fail "a missing repo remote should exit 66, got $RC"
 
-echo "PASS: test-wave-plan.sh (15 scenarios)"
+# 16 — a Building card with no claim is stranded: a stopped wave left it there and
+#      no lane selects from Building. A claimed one (#19) has a live worker.
+echo "$OUT" | jq -e '[.stranded[].number] == [18]' >/dev/null \
+  || fail "expected only #18 stranded, got: $(echo "$OUT" | jq -c .stranded)"
+echo "$OUT" | jq -e '[.cards[].number] | index(18) == null' >/dev/null \
+  || fail "#18 must be moved to Ready first, not dispatched from Building"
+
+# 17 — qa-only boards have no Building lane, so nothing is ever stranded there.
+echo "$OUT11" | jq -e '.stranded == []' >/dev/null \
+  || fail "qa-only must report no stranded cards, got: $(echo "$OUT11" | jq -c .stranded)"
+
+echo "PASS: test-wave-plan.sh (17 scenarios)"

@@ -48,7 +48,15 @@
 #
 # Usage:
 #   super-board-merge-gate.sh --config <config.json> --pr <number>
+#                             [--expect-head <sha>]
 #                             [--lock-timeout 1800] [--stale-after 5400] [--dry-run]
+#
+# `--expect-head` is the PR head commit the Reviewer actually reviewed and
+# tested (its `headRefOid` when review passed). The gate pins everything to one
+# commit: it verifies that commit, and merges with `--match-head-commit`, so a
+# push that lands after review — or during verification — cannot ride in on
+# evidence gathered for a different commit. Without the flag the gate pins the
+# head it reads on entry and warns.
 #
 # `--lock-timeout` is how long THIS caller waits for its turn. `--stale-after` is
 # how old a lock must be before it is presumed abandoned. They are deliberately
@@ -62,13 +70,16 @@
 #   3  merge refused by GitHub after a green verification (branch protection, checks)
 #   4  could not take the lock within the timeout
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
+#   6  the PR head is not the commit that was reviewed — review evidence is void,
+#      the card goes back to Review (not Blocked, not a rebase pass)
 set -euo pipefail
 
-CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0
+CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --config)        CONFIG="$2"; shift 2 ;;
     --pr)            PR="$2"; shift 2 ;;
+    --expect-head)   EXPECT_HEAD="$2"; shift 2 ;;
     --lock-timeout)  LOCK_TIMEOUT="$2"; shift 2 ;;
     --stale-after)   STALE_AFTER="$2"; shift 2 ;;
     --dry-run)       DRY=1; shift ;;
@@ -141,11 +152,28 @@ SCRATCH=$(mktemp -d)
 cleanup() { git -C "$REPO_PATH" worktree remove --force "$SCRATCH" 2>/dev/null || true; rm -rf "$SCRATCH"; release; }
 trap cleanup EXIT
 
-HEAD_REF=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName -q .headRefName)
+# ---- the head guard --------------------------------------------------------
+# Review evidence belongs to one commit. If the branch moved after the Reviewer
+# passed it, the tests it reran and the diff it read describe something else.
+pr_head() { gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName,headRefOid \
+              -q '.headRefName + " " + .headRefOid'; }
+read -r HEAD_REF HEAD_SHA <<<"$(pr_head)"
+[ -n "${HEAD_SHA:-}" ] || { say "could not read the PR head from GitHub"; exit 1; }
+if [ -n "$EXPECT_HEAD" ]; then
+  case "$HEAD_SHA" in
+    "$EXPECT_HEAD"*) : ;;
+    *) say "head moved: reviewed ${EXPECT_HEAD}, PR head is now ${HEAD_SHA}"
+       say "the review evidence is void — send the card back to Review"
+       exit 6 ;;
+  esac
+else
+  say "WARNING: no --expect-head; pinning the head read now (${HEAD_SHA}), not the reviewed one"
+fi
+
 git -C "$REPO_PATH" fetch origin "$HEAD_REF" "$BASE" --quiet
 
-git -C "$REPO_PATH" worktree add --detach "$SCRATCH" "origin/${HEAD_REF}" --quiet 2>/dev/null || {
-  say "could not create a scratch worktree for ${HEAD_REF}"; exit 5; }
+git -C "$REPO_PATH" worktree add --detach "$SCRATCH" "$HEAD_SHA" --quiet 2>/dev/null || {
+  say "could not create a scratch worktree for ${HEAD_REF}@${HEAD_SHA}"; exit 5; }
 
 if ! git -C "$SCRATCH" merge "origin/${BASE}" --no-edit --quiet 2>/dev/null; then
   CONFLICTS=$(git -C "$SCRATCH" diff --name-only --diff-filter=U | tr '\n' ' ')
@@ -176,9 +204,18 @@ if [ "$DRY" -eq 1 ]; then
   exit 0
 fi
 
-if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch 2>&1 | tail -3 >&2; then
-  say "merged"
+# --match-head-commit makes GitHub refuse if anything was pushed after HEAD_SHA,
+# including during the verification run above.
+if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
+     --match-head-commit "$HEAD_SHA" 2>&1 | tail -3 >&2; then
+  say "merged ${HEAD_SHA}"
   exit 0
+fi
+read -r _ NOW_SHA <<<"$(pr_head 2>/dev/null || echo "? ?")"
+if [ "$NOW_SHA" != "$HEAD_SHA" ]; then
+  say "head moved during the gate: verified ${HEAD_SHA}, PR head is now ${NOW_SHA}"
+  say "the review evidence is void — send the card back to Review"
+  exit 6
 fi
 say "GitHub refused the merge after a green verification (branch protection or a required check)"
 exit 3

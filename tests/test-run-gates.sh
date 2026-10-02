@@ -31,6 +31,7 @@ case "$1 ${2:-}" in
   "project item-edit") exit 0 ;;
   "project view")      echo '{"id":"PVT_stub"}' ;;
   "issue edit")        exit 0 ;;
+  "issue comment")     exit 0 ;;
   "api graphql")
     cat <<'JSON'
 {"data":{"user":{"projectV2":{"field":{"id":"PVTSSF_stub",
@@ -60,11 +61,12 @@ WORKER_LOG_DIR="$STUB_DIR/workers"; mkdir -p "$WORKER_LOG_DIR"
 RUN_MANIFEST="$STUB_DIR/run.md"
 
 board() {
-  # $1..$n = "number:status" triples → project item-list JSON
-  local items="" n s
+  # $1..$n = "number:status[:assignee]" → project item-list JSON
+  local items="" n s a rest
   for pair in "$@"; do
-    n="${pair%%:*}"; s="${pair##*:}"
-    items="${items}{\"id\":\"item_${n}\",\"status\":\"${s}\",\"content\":{\"type\":\"Issue\",\"number\":${n},\"assignees\":[]}},"
+    n="${pair%%:*}"; rest="${pair#*:}"; s="${rest%%:*}"; a=""
+    [ "$rest" != "$s" ] && a="\"${rest#*:}\""
+    items="${items}{\"id\":\"item_${n}\",\"status\":\"${s}\",\"content\":{\"type\":\"Issue\",\"number\":${n},\"assignees\":[${a}]}},"
   done
   printf '{"items":[%s]}' "${items%,}"
 }
@@ -152,6 +154,32 @@ is "resolves 'Done' by name at runtime" "opt_done" "$(status_option_id Done)"
 out=$(status_option_id "Nonexistent"); rc=$?
 is "unknown option name fails loud (non-zero)" "1" "$rc"
 is "unknown option name emits nothing" "" "$out"
+
+echo
+echo "── reclaim_stranded_building (run start: Building with no live worker → Ready)"
+CLOSED_ISSUES=""; BOT_LOGIN="sb-bot"
+PROJECT_ITEMS_JSON=$(board 21:Building 22:Building:sb-bot 23:Building:human 24:Building 25:Ready)
+# #24 has a live worker (this shell's own pid) — not stranded.
+printf 'PID=%s\nLANE=build\n' "$$" > "$INFLIGHT_DIR/24"
+: > "$GH_LOG"
+# Outside any git repo, so the branch lookup cannot reach a real remote.
+( cd "$STUB_DIR" && reclaim_stranded_building >/dev/null 2>&1 )
+moved=$(grep -c 'project item-edit --id item_2[12] .*opt_ready' "$GH_LOG")
+is "unassigned and bot-only Building cards move to Ready" "2" "$moved"
+grep -q 'item-edit --id item_23' "$GH_LOG" \
+  && bad "a human-assigned Building card is left alone" "no item-edit for #23" "it was moved" \
+  || ok "a human-assigned Building card is left alone"
+grep -q 'item-edit --id item_24' "$GH_LOG" \
+  && bad "a card with a live in-flight lock is left alone" "no item-edit for #24" "it was moved" \
+  || ok "a card with a live in-flight lock is left alone"
+grep -q 'item-edit --id item_25' "$GH_LOG" \
+  && bad "Ready cards are untouched" "no item-edit for #25" "it was moved" \
+  || ok "Ready cards are untouched"
+is "every moved card gets a comment" "2" "$(grep -c '^issue comment 2[12] ' "$GH_LOG")"
+grep -q 'issue edit 22 --remove-assignee sb-bot' "$GH_LOG" \
+  && ok "the leaked bot claim is released" \
+  || bad "the leaked bot claim is released" "remove-assignee on #22" "$(tr '\n' '|' < "$GH_LOG")"
+rm -f "$INFLIGHT_DIR/24"; BOT_LOGIN=""
 
 echo
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"

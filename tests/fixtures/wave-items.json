@@ -89,6 +89,26 @@
         "title": "blocker still open",
         "assignees": []
       }
+    },
+    {
+      "status": "Building",
+      "content": {
+        "type": "Issue",
+        "number": 18,
+        "title": "stranded in building",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Building",
+      "content": {
+        "type": "Issue",
+        "number": 19,
+        "title": "building, claimed",
+        "assignees": [
+          "someone"
+        ]
+      }
     }
   ]
 }

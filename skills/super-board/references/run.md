@@ -170,7 +170,9 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
 ### Builder (first pass)
 
 1. Create worktree `.worktrees/issue-<N>-build/` off `config.base_branch`.
-2. Create branch `issue-<N>-<slug>` from `config.base_branch`.
+2. Create branch `issue-<N>-<slug>` from `config.base_branch` — unless one already exists
+   (the card came back from Building after a stopped run): then check it out, keep its
+   commits and open PR, and continue from where it stopped.
 3. Read issue body + ALL comments + PROJECT.md.
 4. Implement smallest safe change covering ACs.
 5. Commit + push (always).
@@ -304,27 +306,34 @@ on the base branch**.
      → stop here. Card Review → Done is NOT taken; leave the card in Review with a
        `[review]` comment saying the PR is ready for a human to merge.
    Branch B — human_approves_merge: false
-     → gh pr merge <PR> --squash --delete-branch
+     → merge through the gate (step 5), pinned to the reviewed head — never a bare
+       `gh pr merge`
 3. Confirm the merge LANDED, do not trust the exit code:
      gh pr view <PR> --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "none")'
      Expect: MERGED <sha>.  Then verify the sha is reachable from the base branch:
      git fetch origin <base> && git merge-base --is-ancestor <sha> origin/<base>
 4. Only after step 3 passes: close the issue, move card Review → Done, post the ✅ comment
    citing the merge commit sha.
-5. Merge through the gate, never with a bare `gh pr merge`:
-     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N>
-   The gate takes the merge mutex, merges the CURRENT base into a scratch worktree,
-   runs `config.verify_commands`, and only then squash-merges. Route by exit code:
+5. Merge through the gate, never with a bare `gh pr merge`. Record the head you
+   reviewed when review passes, and hand it to the gate:
+     HEAD=$(gh pr view <N> --json headRefOid -q .headRefOid)   # at the moment review passes
+     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD"
+   The gate takes the merge mutex, checks the PR head is still $HEAD, merges the CURRENT
+   base into a scratch worktree at $HEAD, runs `config.verify_commands`, and only then
+   squash-merges with `--match-head-commit $HEAD`. Route by exit code:
      0 → merged; continue to step 4
      2 → the branch no longer builds against the base → **rebase pass** (see below)
      3 → GitHub refused after a green verify (branch protection, required check)
           → Blocked with the §4 template; this one really is a human's
      4 → another card holds the merge lock → leave the card in Review, next wave retries
      5 → the base does not merge in cleanly → **rebase pass** (see below)
+     6 → the PR head is not the commit you reviewed (a push after review, or during
+          verify). Your evidence is void: leave the card in Review with a `[review]`
+          comment naming both shas; the next wave reviews the new head
    → do NOT leave a card in Review on exit 2, 3 or 5. A card left in Review is
      re-picked next tick and re-reviewed forever, which is the re-dispatch waste
-     tracked in issue #10. Exit 4 is the one exception: nothing is wrong with the
-     card, it simply queued.
+     tracked in issue #10. Exits 4 and 6 are the exceptions: 4 simply queued, and
+     6 needs a fresh review of a commit nobody has reviewed yet.
 ```
 
 **Ordering invariant.** `Done` means "merged". If step 3 cannot be satisfied, the card
@@ -503,11 +512,15 @@ usual template — and, per §4, a `blocked-by:` line.
 
 ### The wave-start sweep
 
-Before planning any wave, `super-board-wave-plan.sh` reports two lists the orchestrator must act on
+Before planning any wave, `super-board-wave-plan.sh` reports three lists the orchestrator must act on
 **before** launching:
 
 - **`sweep`** — `Blocked` cards whose blockers have all closed. Move each to `Ready` and comment
   naming what cleared it (`clearedBy` carries the numbers). They then join this very wave.
+- **`stranded`** — `Building` cards with no claim (full variant). Nothing selects from Building,
+  so a wave stopped mid-build leaves them there forever. Remove any leftover build worktree, keep
+  the branch, move the card to `Ready`, and comment naming the branch. The legacy dispatcher does
+  the same once at start (`reclaim_stranded_building`).
 - **`flag`** — cards whose `## Blocked by` section could not be parsed. Leave them where they are
   and comment asking for the line to be fixed, quoting the `why`. Never guess: a card treated as
   free on an unreadable line gets built against a base that does not have what it needs.

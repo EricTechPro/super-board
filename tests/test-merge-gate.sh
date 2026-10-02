@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests super-board-merge-gate.sh — the merge mutex and the freshness gate.
-# No gh calls: every scenario stops at or before the first `gh pr view`.
+# Scenarios 1-7 stop at or before the first `gh pr view`. Scenarios 8-11 run past
+# it against a local bare `origin` and a `gh` stub on PATH, to pin the head guard.
 #
 # The gate exists because `mergeable: CLEAN` was trusted twice on 2026-08-20 and
 # was wrong both times: the text did not conflict, but a shared interface had
@@ -87,4 +88,62 @@ RC=0; "$GATE" --config /nope/nope.json --pr 1 >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 66 ] || fail "a missing config should exit 66, got $RC"
 teardown
 
-echo "PASS: test-merge-gate.sh (7 scenarios)"
+# ── Head guard (8-11). A real git origin with a `staging` base and a `feat`
+#    branch; `gh` is a stub that reports feat's head and logs every call.
+#    STUB_OID       — headRefOid `gh pr view` reports
+#    STUB_OID_AFTER — headRefOid reported once a merge has been attempted
+#    STUB_MERGE_RC  — exit code of `gh pr merge`
+head_setup() {
+  setup '[]'
+  ORIGIN="$TMP/origin.git"; git init -q --bare "$ORIGIN"
+  git -C "$TMP" init -q -b staging 2>/dev/null || { git -C "$TMP" init -q; git -C "$TMP" checkout -q -b staging; }
+  git -C "$TMP" -c user.email=t@t -c user.name=t commit -q --allow-empty -m base
+  git -C "$TMP" remote add origin "$ORIGIN"; git -C "$TMP" push -q origin staging
+  git -C "$TMP" checkout -q -b feat
+  git -C "$TMP" -c user.email=t@t -c user.name=t commit -q --allow-empty -m feat
+  git -C "$TMP" push -q origin feat; git -C "$TMP" checkout -q staging
+  SHA=$(git -C "$TMP" rev-parse feat)
+  mkdir -p "$TMP/bin"; export GH_LOG="$TMP/gh.log"; : > "$GH_LOG"
+  cat > "$TMP/bin/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$GH_LOG"
+case "$1 $2" in
+  "pr view")
+    oid="$STUB_OID"; grep -q '^pr merge' "$GH_LOG" && oid="${STUB_OID_AFTER:-$STUB_OID}"
+    echo "feat $oid" ;;
+  "pr merge") exit "${STUB_MERGE_RC:-0}" ;;
+esac
+STUB
+  chmod +x "$TMP/bin/gh"
+}
+gate() { PATH="$TMP/bin:$PATH" "$GATE" --config "$TMP/c.json" --pr 1 --lock-timeout 6 "$@"; }
+
+# 8 — head moved after review: the reviewed sha no longer matches the PR head.
+#     Exit 6, and no merge is attempted on evidence gathered for another commit.
+head_setup
+RC=0; STUB_OID="$SHA" gate --expect-head deadbeef >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 6 ] || fail "a moved head should exit 6, got $RC"
+grep -q '^pr merge' "$GH_LOG" && fail "no merge may be attempted when the head moved"
+teardown
+
+# 9 — head unchanged: merge pins the reviewed commit with --match-head-commit.
+head_setup
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "a matching head should merge (exit 0), got $RC"
+grep -q -- "--match-head-commit $SHA" "$GH_LOG" || fail "merge must pass --match-head-commit $SHA, got: $(cat "$GH_LOG")"
+teardown
+
+# 10 — a push lands during verification: GitHub refuses the pinned merge and the
+#      head has moved, so this is void evidence (6), not branch protection (3).
+head_setup
+RC=0; STUB_OID="$SHA" STUB_OID_AFTER=cafef00d STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 6 ] || fail "a head that moved mid-gate should exit 6, got $RC"
+teardown
+
+# 11 — same refusal with the head unchanged is still GitHub saying no (3).
+head_setup
+RC=0; STUB_OID="$SHA" STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 3 ] || fail "a refusal with an unchanged head should exit 3, got $RC"
+teardown
+
+echo "PASS: test-merge-gate.sh (11 scenarios)"

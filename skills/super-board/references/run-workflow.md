@@ -55,13 +55,47 @@ Repeat until a done condition or halt gate fires:
 
 1. **Rate guard** — `gh api rate_limit`; if GraphQL remaining < 200, wait for
    reset (same thresholds as run.md).
+   **Usage guard** — `bash .claude/bin/super-board-usage.sh check --config <config-path>`
+   (Claude 5-hour and weekly plan usage; threshold `usage_pause_pct`, default 95):
+   - exit 0 → launch.
+   - exit 10 (pause) → launch nothing new. A wave already running finishes —
+     stopping it mid-lane loses work. Then release claims as usual, post the
+     resume note (one line to the user and the run manifest:
+     `⏸ paused at <window> <used>% — resets <local time>; remaining: <N> cards; resume: /super-board run <slug>`),
+     remove the wave lock, and wait for the reset. If a wake tool is available
+     (`ScheduleWakeup`, or a `/loop` re-entry), schedule
+     `min(3600, resets_at - now + 60)` seconds and chain until the reset; on
+     wake re-run the check — trust the reading, not the clock — and continue
+     only on exit 0. No wake tool → stop with the note; the user resumes.
+   - exit 3 (unknown) → launch, and say once per run why the guard is blind
+     (its `reason`). Do not halt a run on a missing signal.
+
+   The signal is the `rate_limits` block Claude Code pipes to the status line —
+   the only scriptable source of plan usage (`/usage` is interactive; `ccusage`
+   reports tokens and cost, not % of plan). It reaches the script only if the
+   user's status-line command records it; add one line after it reads stdin:
+   `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record`.
+   Pro/Max only (API-key sessions have no `rate_limits`); it refreshes on this
+   session's own turns. Claude Code's built-in pause at 100% remains the
+   backstop — the guard exists so a wave does not start that the limit would
+   cut off mid-lane. The legacy `claude-p` dispatcher does not run this guard.
 2. **Plan the wave** —
    `bash .claude/bin/super-board-wave-plan.sh --config <config-path>` →
-   The planner returns `cards`, `sweep` and `flag`. **Act on `sweep` and `flag`
-   BEFORE launching** (run.md → "The wave-start sweep"): move every swept card
-   to `Ready` with a comment naming what cleared it, and comment on every
-   flagged card asking for its `## Blocked by` line to be fixed. Swept cards
-   are already counted in `cards`, so the wave picks them up on this pass.
+   The planner returns `cards`, `sweep`, `flag` and `stranded`. **Act on
+   `sweep`, `flag` and `stranded` BEFORE launching** (run.md → "The wave-start
+   sweep"): move every swept card to `Ready` with a comment naming what cleared
+   it, comment on every flagged card asking for its `## Blocked by` line to be
+   fixed, and return every stranded Building card to `Ready` (below). Swept and
+   stranded cards are NOT in this pass's `cards`; they join the next wave.
+
+   **Stranded Building cards.** A card in Building with no assignee between
+   waves has no live worker — a stopped or crashed wave left it mid-build. For
+   each: find its branch (`git ls-remote --heads origin 'issue-<N>-*'`) and any
+   leftover `.worktrees/issue-<N>-build/`; remove the worktree (uncommitted work
+   in it is lost either way — say so if `git -C <wt> status --porcelain` was not
+   empty), keep the branch and PR, move the card to `Ready`, and comment:
+   `↩️ back to Ready — found in Building with no live worker. Branch: <name | none>
+   (kept). Next: Builder.` The next Builder continues on the branch.
    Wave width is not `max_workers` any more — it is however many cards the
    dependency graph says are free. The runtime caps concurrency and queues the
    rest, so a 19-card wave is normal and not a misconfiguration.
@@ -113,8 +147,9 @@ Repeat until a done condition or halt gate fires:
   mid-wave can also be resumed in-session via `resumeFromRunId` (completed
   lane agents return cached results).
 - Cards stranded in `Building` (wave stopped after the Builder moved
-  Ready → Building): the wave planner only selects from Review/QA/Ready,
-  so drag stranded Building cards back to Ready before re-running.
+  Ready → Building) come back by themselves: the next run's crash-recovery
+  sweep releases their claim and the planner reports them in `stranded`
+  (wave loop step 2). No manual drag.
 
 ## Mid-run permission prompts
 
@@ -130,6 +165,7 @@ don't stall on prompts:
     "Bash(git push:*)", "Bash(git pull:*)", "Bash(git fetch:*)", "Bash(git blame:*)",
     "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
     "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
+    "Bash(bash .claude/bin/super-board-usage.sh:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
 
 `gh pr merge` is deliberately NOT in the list — Reviewer merges remain

@@ -434,6 +434,40 @@ reap_finished_locks() {
   done
 }
 
+reclaim_stranded_building() {
+  # Run start only (no worker of ours is alive yet — the orphan guard proved it).
+  # A card in Building with no live in-flight lock and no assignee but ours was
+  # stranded by a run that stopped mid-build. No lane selects from Building, so
+  # left alone it sits there forever and the run can never reach "all columns
+  # empty". Move it back to Ready and say so; the issue branch is kept, so the
+  # next Builder continues on it instead of starting over.
+  local issue item_id branch wt
+  while IFS=$'\t' read -r issue item_id; do
+    [ -n "$issue" ] || continue
+    issue_locked "$issue" && continue
+    branch=$(git ls-remote --heads origin "issue-${issue}-*" 2>/dev/null | head -1 | sed 's#.*refs/heads/##')
+    for wt in .worktrees/issue-"${issue}"-build; do
+      [ -d "$wt" ] && { git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"; }
+    done
+    if ! set_card_status "$item_id" "Ready"; then
+      log "⚠ stranded #${issue} in Building — could not move it to Ready; drag it by hand"
+      continue
+    fi
+    [ -n "$BOT_LOGIN" ] && gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+    gh issue comment "$issue" --body "↩️ super-board · back to Ready
+Found in Building with no live worker — the last run stopped mid-build.
+Branch: ${branch:-none found (next Builder starts fresh)}${branch:+ (kept; next Builder continues on it)}
+Next: Builder, next tick." >/dev/null 2>&1 || true
+    log "↩ stranded #${issue}: Building → Ready (branch ${branch:-none})"
+  done <<EOF
+$(echo "$PROJECT_ITEMS_JSON" | jq -r --arg bot "$BOT_LOGIN" '
+    .items[]
+    | select(.status == "Building" and .content.type == "Issue")
+    | select(((.content.assignees // []) - [$bot]) | length == 0)
+    | [(.content.number | tostring), (.id // "")] | @tsv')
+EOF
+}
+
 # ───────────────────────── run counters (shared state) ─────────────────────────
 DISPATCH_COUNT=0
 REAP_COUNT=0
@@ -494,6 +528,7 @@ reap_finished_locks
 # ───────────────────────────── main loop ─────────────────────────────
 gh_rate_guard
 fetch_project_items
+if [ "$VARIANT" = "full" ]; then reclaim_stranded_building; fetch_project_items; fi
 INITIAL_READY=$(column_count "Ready")
 log "initial Ready count: $INITIAL_READY"
 

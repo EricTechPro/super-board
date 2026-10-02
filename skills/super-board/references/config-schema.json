@@ -119,6 +119,12 @@
   // says loudly that nothing proved the result builds.
   //
   // A fresh worktree has no node_modules, so install as part of the command.
+  // Claude plan-usage guard (workflow backend). Before each wave the
+  // orchestrator runs super-board-usage.sh check; if the 5-hour or weekly
+  // window is at or above this percentage, no new wave launches until it
+  // resets. Default 95. See references/run-workflow.md → wave loop step 1.
+  "usage_pause_pct": 95,
+
   "verify_commands": [
     "cd server && npm ci --silent && npm run typecheck && npm test"
   ],

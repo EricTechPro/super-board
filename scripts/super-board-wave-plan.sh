@@ -40,6 +40,14 @@
 # not have what it needs. See super-board-deps.sh for what "unreadable" means and
 # the three shapes that produce it.
 #
+# STRANDED BUILDING CARDS. No lane selects from Building: a Builder moves its card
+# Ready → Building and on to QA in one lifecycle. A wave stopped (or crashed) in
+# between leaves the card in Building, and nothing ever picks it up again. The
+# planner runs only between waves, after the crash-recovery sweep has stripped
+# leaked claims, so a Building card with no assignee has no live worker. It is
+# reported in `stranded` (full variant only); the orchestrator checks its branch
+# and worktree and moves it back to Ready, keeping the branch.
+#
 # Usage:
 #   super-board-wave-plan.sh --config <config.json> [--items <project-items.json>]
 #                            [--deps <deps.json>]
@@ -50,7 +58,8 @@
 # Stdout:
 #   { "cards": [ {"number":10,"status":"Review","title":"…"} ],
 #     "sweep": [ {"number":37,"title":"…","clearedBy":[32]} ],
-#     "flag":  [ {"number":82,"title":"…","why":"…"} ] }
+#     "flag":  [ {"number":82,"title":"…","why":"…"} ],
+#     "stranded": [ {"number":44,"title":"…"} ] }
 set -euo pipefail
 
 CONFIG=""; ITEMS_FILE=""; DEPS_FILE=""
@@ -106,7 +115,8 @@ fi
 # auto-merges into one base branch race. That guard now lives where the race
 # actually is — the merge step takes a lock inside the wave workflow and the
 # freshness gate re-verifies under it — so reviews may run in parallel here.
-echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" '
+echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" \
+                 --arg variant "$VARIANT" '
   def dep($n): $deps[($n | tostring)];
   # Unknown to the graph (closed, or beyond the fetch limit) is not "free".
   def free($n): (dep($n) | if . == null then false else .runnable end);
@@ -141,4 +151,9 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
       flag:  [ $all[]
                | select(.status as $s | ["Ready","Blocked"] | index($s))
                | select(dep(.number) != null and (dep(.number).parseable | not))
-               | { number, title, why: (dep(.number) | .why) } ] }'
+               | { number, title, why: (dep(.number) | .why) } ],
+
+      # Building with no claim between waves = no live worker. Back to Ready.
+      stranded: (if $variant == "full"
+                 then [ $all[] | select(.status == "Building") | { number, title } ]
+                 else [] end) }'

@@ -79,7 +79,7 @@ rm -rf "$T"
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
 for s in super-board-run.sh super-board-stop.sh super-board-wave-plan.sh \
-         super-board-deps.sh super-board-merge-gate.sh \
+         super-board-deps.sh super-board-merge-gate.sh super-board-usage.sh \
          super-review-file-refactor.sh super-qa-file-bug.sh; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
