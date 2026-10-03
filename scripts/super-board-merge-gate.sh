@@ -240,7 +240,7 @@ if ! git -C "$SCRATCH" merge "origin/${BASE}" --no-edit --quiet 2>/dev/null; the
   exit 5
 fi
 
-if [ "${#VERIFY[@]:-0}" -eq 0 ]; then
+if [ "${#VERIFY[@]}" -eq 0 ]; then
   say "WARNING: config.verify_commands is empty — the base merges cleanly, but"
   say "WARNING: nothing proved the result BUILDS. A clean merge is not a green build."
 else

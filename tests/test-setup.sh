@@ -73,7 +73,10 @@ echo "$OUT" | q '.changes == [] and .written == false' || fail "second migration
 
 # 4 — system tools are never installed silently: a missing one comes back in `needs`
 #     with the exact command for this OS.
-OUT=$(PATH="/usr/bin:/bin" python3 "$SETUP" check --root "$T" || true)
+#     A curated PATH, not "/usr/bin:/bin": GitHub's ubuntu runners ship gh in /usr/bin.
+NOBIN="$WORK/nobin"; mkdir -p "$NOBIN"
+for t in git apt-get dnf; do p=$(command -v "$t" || true); [ -n "$p" ] && ln -sf "$p" "$NOBIN/$t"; done
+OUT=$(PATH="$NOBIN" "$(command -v python3)" "$SETUP" check --root "$T" || true)
 echo "$OUT" | q '.needs | map(.name) | index("gh")' || fail "missing gh should be in needs: $OUT"
 case "$(uname)" in Darwin) echo "$OUT" | q '.needs[] | select(.name == "gh") | .command == "brew install gh"' || fail "mac command should be brew: $OUT" ;; esac
 echo "$OUT" | q '.needs[] | select(.name == "node") | .command | test("skills@latest add mattpocock/skills")' \
