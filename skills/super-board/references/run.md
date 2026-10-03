@@ -198,7 +198,7 @@ check in `risk` too.
 
 ## PR review-comment threads — prefix + resolution protocol
 
-Reviewer always uses **line-level review comments** (resolvable threads). Every thread MUST start with the lane that owns the fix — `[builder]`, `[qa]` or `[reviewer]` — then a label (`[blocker]`, `[issue]`, `[suggestion]`, `[nit]`, `[question]`, `[praise]`; writing-standard.md § 4). Read `[QA]` and `[review]` on older PRs as `[qa]` and `[reviewer]`.
+Reviewer findings use **line-level review comments** (resolvable threads). Each finding MUST start with the lane that owns the fix — `[builder]`, `[qa]` or `[reviewer]` — then a label (`[blocker]`, `[issue]`, `[suggestion]`, `[nit]`, `[question]`, `[praise]`; writing-standard.md § 4). Read `[QA]` and `[review]` on older PRs as `[qa]` and `[reviewer]`. [PR author notes](pr-author-notes.md) have their own format; read all replies before treating a thread as explanation only.
 
 Examples:
 
@@ -213,7 +213,7 @@ e2e/streaming/ttfb.spec.ts:18   [qa] [issue] spec asserts status only — add a 
 |---|---|---|
 | Builder (Building → QA) | All `[builder]` threads on this PR | Stay in Building, fix, then exit |
 | Tester (QA → Review) | All `[qa]` threads on this PR | Stay in QA, fix, then exit |
-| Reviewer (approving merge) | ALL threads on this PR | Bounce: `[builder]` open → Ready; `[qa]` open → QA |
+| Reviewer (approving merge) | All findings and human requests; any conversations GitHub requires resolved | Bounce: `[builder]` open → Ready; `[qa]` open → QA; unresolved human decision → Blocked |
 
 Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when the fix is committed.
 
@@ -284,7 +284,7 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
    move the card to Blocked `❓` — never push on past the cap (super-build → "Keep each PR small").
 5. Commit + push (always). Commits follow writing-standard.md § 1 (`✨ [feat] chat: stream replies` + short bullets).
 6. Open draft PR linked to the issue with the PR description template (title in commit-subject format, every block filled).
-7. Post the `[builder] [report]` PR comment (see "Commenting cadence").
+7. Follow [PR author notes](pr-author-notes.md), then post the `[builder] [report]` PR comment (see "Commenting cadence").
 8. Post a short status comment on the issue with the PR URL.
 9. Clean up worktree. Keep branch + PR open.
 10. Move card Building → QA.
@@ -298,7 +298,7 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
    (A Reviewer bounce reaches you as those same `[builder]` threads, listed in the latest `<!-- super-review:report -->` comment. A finding the Reviewer re-opened as `not fixed` was resolved without a fix last time — fix the code, not just the thread.)
 5. Commit + push to same branch.
 6. Verify ALL `[builder]` threads are resolved. If not, return to step 3.
-7. Rewrite `status`, `solution`, `history` blocks; post `[builder] [report]` PR + issue comments. Move Building → QA. Clean up worktree.
+7. Refresh [PR author notes](pr-author-notes.md), rewrite `status`, `solution`, `history` blocks; post `[builder] [report]` PR + issue comments. Move Building → QA. Clean up worktree.
 
 ### Tester (first pass — repo-backed)
 
@@ -347,7 +347,11 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
 ### Reviewer
 
 1. Worktree `.claude/worktrees/issue-<N>-review/` from current state of `issue-<N>-<slug>`.
-2. **Gate 1** — scan PR threads. If ANY unresolved:
+2. **Gate 1** — scan PR threads and their replies. [PR author notes](pr-author-notes.md)
+   alone are explanations, not findings. Human questions or change requests in those
+   threads still follow the normal review/blocking flow; the marker exempts no replies.
+   Never auto-resolve them or bypass GitHub's conversation-resolution requirements.
+   If ANY unresolved finding:
    - `[builder]` open → comment, move card Review → Ready.
    - `[qa]` open → comment, move card Review → QA.
    - Both open → bounce to whichever is older; the other gets picked up later.
@@ -580,7 +584,8 @@ Claim uses a **GitHub Issue assignee mutex** — atomic compare-and-set via `gh 
    │           move card to Blocked, continue with next card.
    └─ Present → proceed.
 3. Do the lane's work (build / QA / review).
-4. Comment evidence on issue + PR (writing-standard.md § 4) and rewrite your PR body blocks.
+4. If this lane opened a PR or pushed changes, refresh [PR author notes](pr-author-notes.md).
+   Comment evidence on issue + PR (writing-standard.md § 4) and rewrite your PR body blocks.
 5. Move card to next column (or Blocked with the full §4 template; dropped on purpose → closed, Done, 🤷 comment).
 6. RELEASE CLAIM (`gh issue edit --remove-assignee super-board-bot[bot]`) and remove descriptive label.
 ```

@@ -76,6 +76,7 @@ every project it is installed in.
 | PR body | marker blocks, one owner each: status · problem · solution · ac · history · visual · risk |
 | Ticket | Problem · Context · Fix · Acceptance Criteria · Risk · Blocked by (+ Evidence for bugs) |
 | Comment | `[role] [label] status` · Did · ✅ Done · ❌ Not done · Next · ≤ 8 lines |
+| PR author notes | Purpose · What changed · Why it matters, in native file/inline review comments; follow `skills/super-board/references/pr-author-notes.md` |
 
 - NEVER rewrite a whole PR body: `scripts/super-board-pr-body.sh` rewrites one block.
 - ALWAYS change a format in `writing-standard.md` first, then the templates and `tests/test_writing_format.py`.

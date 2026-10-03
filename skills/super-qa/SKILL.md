@@ -616,6 +616,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 ### State protocol (same as super-build)
 - Read from issue + PR comments + PR review threads.
 - Respect handed-down worktree + branch.
+- After pushing tests, evidence or fixes to a PR, refresh [PR author notes](../super-board/references/pr-author-notes.md) before the handoff. Keep file summaries current and explain critical changed sections on the PR.
 
 ### Card types
 - **Built card (`feature`, `bug`, no label):** worktree at `.claude/worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
