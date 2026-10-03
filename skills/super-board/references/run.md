@@ -4,6 +4,19 @@
 
 **Where the legacy runner runs:** headless. Spawned as a `nohup`-backgrounded process; the current Claude session exits immediately after dispatch. The runner script (`scripts/super-board-run.sh`) is a pure shell while-loop that dispatches one `claude -p` worker per lane and never holds Claude session state. Each `claude -p` worker is its own short-lived headless context — load this file at the start of every lane.
 
+## Required GitHub reads can pause a run
+
+Use `.claude/bin/super-board-github-read.py` for required API evidence. It retries
+one failed read at most twice (three total attempts); invalid queries or missing
+authority halt immediately. Exit **79** means stop dispatch and pause the current
+run. Never substitute an empty board, OPEN issue, full quota, or empty diff.
+Check the helper's `--check` before each write, migration, or merge. Preserve
+worktrees, claims, card/approval state, and the shared local halt record. Report
+the reason locally when GitHub cannot accept a comment. Do not blindly retry a
+mutation: a lost response may conceal a successful write. Confirm its remote
+outcome once service is available before resuming. Recovery and workflow
+checkpoint limitations: [run-workflow.md](run-workflow.md#required-github-evidence-and-a-paused-run).
+
 ## Orchestrator delegation contract (NON-NEGOTIABLE)
 
 **Super-board is an autonomous trader. The interactive Claude session that invokes `super-board run` is an orchestrator, NOT a worker.** Its only jobs are:
@@ -262,7 +275,7 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | `hold` — too big | move card to Blocked | `❓` · "too big — likely over <cap> changed lines / spans <areas>" · suggests splitting with `/to-tickets` into vertical slices, each under the cap · `blocked-by: -` |
 | `sequence` — `blockedBy` non-empty | move card to Blocked | `⏳` · the overlapping PR and files · `blocked-by: <blockedBy>` — the wave-start sweep frees it |
 | `sequence` — `blockedBy` empty | proceed (card stays Ready), comment `⚠️ expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
-| `skipped` | script exit 69 (pre-flight blind): leave the card in Ready, untouched, retried next wave | — |
+| `halted` | script exit 79: required evidence unavailable; leave the card untouched, stop this run, resume explicitly after recovery | — |
 
 A card the pre-flight agent returns no verdict for is treated as `skipped` (a verdict, not a
 column), never built unchecked. `qa` cards are not pre-flighted: nothing is built.
@@ -736,7 +749,7 @@ Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_g
 Before releasing the claim assignee and exiting, every worker MUST verify:
 
 - [ ] Issue comment AND PR comment both written (per "Commenting cadence" above).
-- [ ] Card column move's mutation returned success. **Do NOT re-query `gh project item-list` for verification** — trust the mutation exit code (the 500-item GraphQL refetch was the per-worker quota tax; see `rate-limit-etiquette.md` §3). If the mutation returned non-zero, call `sb_gh_guard_check 200`, retry the move ONCE, and if it still fails, leave the assignee in place and write a halt comment.
+- [ ] Card column move's mutation returned success. **Do NOT re-query `gh project item-list` for verification** — trust the mutation exit code (the 500-item GraphQL refetch was the per-worker quota tax; see `rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
 - [ ] Claim assignee released (`gh issue edit --remove-assignee <bot_identity>`) and the descriptive `loop:in-*` label removed.
 - [ ] On failure handoff: `root-cause-hash:` line is present in the PR handoff comment (per "Root-cause hash" above).
 - [ ] On Block/Skip exit: the full template from `block-template.md` is populated on BOTH the issue and the PR (if a PR exists); the reason emoji is one of the nine in the vocabulary table (🔐 💳 🔑 ❓ 🛡 🧑 🤷 📦 🎨).
@@ -749,12 +762,12 @@ A worker that cannot satisfy this checklist must NOT release its claim. It eithe
 During the 2026-05-21 production run, several workers exited cleanly (process terminated, in-flight lock reaped) but **had not moved their card to the next column**. The dispatcher correctly re-dispatched (lane idle + card still in source column = re-fire) — but each retry burned a full lane cycle (~10 min) before the next worker tried again. The #382 Reviewer took **5 attempts × ~10 min = ~50 min** to move a card that the first attempt should have moved.
 
 Suspected causes:
-- Worker hit a transient gh API error on the column-move mutation, didn't retry the mutation, exited "cleanly" thinking it had moved the card.
+- Worker lost the response to a column move and exited "cleanly" without confirming its outcome. Preserve the unknown outcome and pause; do not claim success or blindly repeat the mutation.
 - Worker's super-build/super-qa/super-review skill silently caught the move error and proceeded to assignee-release without surfacing the failure.
 
 **Mitigation for now:** the dispatcher's `reap_finished_locks` + assignee sweep + re-dispatch keep the pipeline rolling, so this is a wall-clock issue, not a correctness issue. A worker that doesn't move the card will eventually have another worker do it.
 
-**Real fix (TODO):** require workers to call `sb_gh_guard_check` (or equivalent retry-with-backoff) around the column-move mutation, and to write a `move-mutation-result: ok|err|skipped` line in the PR handoff comment so the dispatcher can log retries and budget for them. See follow-up issue (file via `/super-board run`-time review).
+**Required behavior:** check the shared halt record before a column move, attempt the mutation once, and preserve `move-mutation-result: ok|unknown|skipped` in the handoff. An uncertain outcome pauses the run for read-only reconciliation; it must never trigger blind replay.
 
 ### Known issue — lane-zombie workers (added 2026-05-24, auto-remediated)
 

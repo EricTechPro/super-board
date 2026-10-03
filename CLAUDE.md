@@ -29,6 +29,8 @@ If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Wan
 
 Workers (`super-build`, `super-qa`, `super-review`) share the dispatcher's `gh` token bucket. They MUST:
 
+- Required GitHub reads use `.claude/bin/super-board-github-read.py`; exit 79 stops the run.
+- Check its `--check` before GitHub writes, migrations, merges, and new dispatch; preserve work when halted.
 - Source `.claude/bin/super-board-gh-guard.sh` (`scripts/` in this repo) at worker start.
 - Call `sb_gh_guard_check 200` before any burst of `gh` calls.
 - Prefer local `git blame` / `git log` over `gh api graphql` for any sub-agent that doesn't need fresh state.

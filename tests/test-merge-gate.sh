@@ -16,6 +16,11 @@ fail() { echo "FAIL: $1" >&2; exit 1; }
 
 setup() {  # $1 = verify_commands JSON array
   TMP=$(mktemp -d)
+  export SB_GITHUB_HALT_FILE="$TMP/halt.json" SB_GITHUB_RETRY_DELAY=0
+  mkdir -p "$TMP/bin"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$TMP/bin/gh"
+  chmod +x "$TMP/bin/gh"
+  export PATH="$TMP/bin:$PATH"
   mkdir -p "$TMP/.claude/super-board/inflight"
   printf '{"base_branch":"staging","repo":{"path":"%s","remote":"https://github.com/x/y.git"},"verify_commands":%s}' \
     "$TMP" "${1:-[]}" > "$TMP/c.json"
@@ -109,19 +114,38 @@ head_setup() {
 printf '%s\n' "$*" >> "$GH_LOG"
 case "$1 $2" in
   "pr view")
+    case "$*" in *state,mergeCommit*)
+      [ "${STUB_STATE_FAIL:-0}" = 0 ] || { grep -q '^pr merge' "$GH_LOG" && exit 1; }
+      state="${STUB_STATE:-OPEN}"; oid="$STUB_OID"
+      if grep -q '^pr merge' "$GH_LOG"; then state="${STUB_STATE_AFTER:-OPEN}"; oid="${STUB_OID_AFTER:-$STUB_OID}"; fi
+      jq -n --arg state "$state" --arg head "$oid" '{state:$state,headRefOid:$head,mergeCommit:(if $state=="MERGED" then {oid:$head} else null end)}'; exit 0 ;;
+    esac
     case "$*" in *labels*)
       if [ -n "${STUB_META_AFTER:-}" ] && [ -f "$STUB_VERIFIED" ]; then printf '%s\n' "$STUB_META_AFTER"; exit 0; fi
-      if [ -n "${STUB_META:-}" ]; then printf '%s\n' "$STUB_META"; else echo '{"files":[],"labels":[]}'; fi
+      if [ -n "${STUB_META:-}" ]; then printf '%s\n' "$STUB_META"; else echo '{"files":[],"labels":[],"body":"","additions":0,"deletions":0,"changedFiles":0}'; fi
       exit 0 ;; esac
     oid="$STUB_OID"; grep -q '^pr merge' "$GH_LOG" && oid="${STUB_OID_AFTER:-$STUB_OID}"
     echo "feat $oid" ;;
   "pr merge") exit "${STUB_MERGE_RC:-0}" ;;
-  "pr diff") printf '%b' "${STUB_DIFF:-}" ;;
+  "pr diff")
+    [ "${STUB_DIFF_FAIL:-0}" = 0 ] || exit 1
+    if [ -n "${STUB_DIFF:-}" ]; then printf '%b' "$STUB_DIFF"; exit 0; fi
+    python3 - <<'DIFF'
+import json, os
+m = json.loads(os.environ.get('STUB_META') or '{"files":[],"additions":0,"deletions":0}')
+for i, f in enumerate(m.get('files', [])):
+    p = f['path']; print(f'diff --git a/{p} b/{p}\n--- a/{p}\n+++ b/{p}')
+    added = m.get('additions', 0) if i == 0 else 0
+    removed = m.get('deletions', 0) if i == 0 else 0
+    if added or removed:
+        print(f'@@ -1,{removed} +1,{added} @@')
+        print(''.join('-old\n' for _ in range(removed)) + ''.join('+new\n' for _ in range(added)), end='')
+DIFF
+    ;;
   "api graphql")
-    [ "${STUB_APPROVAL:-0}" = 1 ] || exit 1
     jq -n --arg head "$STUB_OID" '[{data:{repository:{pullRequest:{headRefOid:$head,state:"OPEN",closingIssuesReferences:{pageInfo:{hasNextPage:false,endCursor:null},nodes:[{number:42,repository:{nameWithOwner:"x/y"}}]}}}}}]' ;;
   "api --paginate")
-    [ "${STUB_APPROVAL:-0}" = 1 ] || exit 1
+    [ "${STUB_APPROVAL:-0}" = 1 ] || { echo '[[]]'; exit 0; }
     case "$*" in
       */issues/42/comments*) cat "$STUB_COMMENTS" ;;
       */issues/1/comments*) echo '[[]]' ;;
@@ -135,7 +159,7 @@ esac
 STUB
   chmod +x "$TMP/bin/gh"
 }
-gate() { PATH="$TMP/bin:$PATH" "$GATE" --config "$TMP/c.json" --pr 1 --lock-timeout 6 "$@"; }
+gate() { SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$TMP/halt.json" PATH="$TMP/bin:$PATH" "$GATE" --config "$TMP/c.json" --pr 1 --lock-timeout 6 "$@"; }
 
 # 8 — head moved after review: the reviewed sha no longer matches the PR head.
 #     Exit 6, and no merge is attempted on evidence gathered for another commit.
@@ -166,14 +190,26 @@ teardown
 # 10 — a push lands during verification: GitHub refuses the pinned merge and the
 #      head has moved, so this is void evidence (6), not branch protection (3).
 head_setup
-RC=0; STUB_OID="$SHA" STUB_OID_AFTER=cafef00d STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+RC=0; STUB_OID="$SHA" STUB_OID_AFTER=cafef00dcafef00dcafef00dcafef00dcafef00d STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 6 ] || fail "a head that moved mid-gate should exit 6, got $RC"
 teardown
 
 # 11 — same refusal with the head unchanged is still GitHub saying no (3).
 head_setup
 RC=0; STUB_OID="$SHA" STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 3 ] || fail "a refusal with an unchanged head should exit 3, got $RC"
+[ "$RC" -eq 79 ] || fail "unconfirmed merge must pause for reconciliation, got $RC"
+teardown
+
+# A lost merge response is reconciled, never blindly repeated.
+head_setup
+RC=0; STUB_OID="$SHA" STUB_STATE_AFTER=MERGED STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "GitHub-confirmed lost merge response must report merged"
+[ "$(grep -c '^pr merge' "$GH_LOG")" -eq 1 ] || fail "merge mutation must only run once"
+teardown
+head_setup
+RC=0; STUB_OID="$SHA" STUB_STATE_FAIL=1 STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 79 ] || fail "unreadable merge outcome must halt"
+[ "$(grep -c '^pr merge' "$GH_LOG")" -eq 1 ] || fail "unknown merge outcome must not replay mutation"
 teardown
 
 # 12 — post-merge cleanup: when the cleanup-wt hook is installed the gate runs it with
@@ -194,7 +230,7 @@ head_setup
 mkdir -p "$TMP/.claude/hooks"
 printf 'open("%s/cleanup.ran","w")\n' "$TMP" > "$TMP/.claude/hooks/cleanup-wt.py"
 RC=0; STUB_OID="$SHA" STUB_MERGE_RC=1 gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 3 ] || fail "a refused merge should still exit 3, got $RC"
+[ "$RC" -eq 79 ] || fail "an unconfirmed merge should halt, got $RC"
 [ ! -f "$TMP/cleanup.ran" ] || fail "cleanup must not run when the merge was refused"
 teardown
 
@@ -205,8 +241,18 @@ meta() {  # $1 labels csv, $2 files csv, $3 body, $4 size
   jq -cn --arg l "$1" --arg f "$2" --arg b "${3:-}" --argjson n "${4:-1}" \
     '{labels: ($l | split(",") | map(select(. != "") | {name: .})),
       files:  ($f | split(",") | map(select(. != "") | {path: .})),
-      additions: $n, deletions: 0, body: $b}'
+      additions: $n, deletions: 0, body: $b} | .changedFiles = (.files | length)'
 }
+
+# Required policy evidence: an unavailable diff must halt before migrations or merge.
+head_setup
+cfgset ".migrations = {allowed_envs: [\"staging\"], target_env: \"staging\", commands: {staging: \"touch $TMP/ran\"}}"
+RC=0; SB_GITHUB_RETRY_DELAY=0 STUB_DIFF_FAIL=1 STUB_OID="$SHA" STUB_META="$(meta "" supabase/migrations/1.sql)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 79 ] || fail "failed required diff must halt run (79), got $RC"
+[ ! -f "$TMP/ran" ] || fail "no migration may run without policy evidence"
+grep -q '^pr merge' "$GH_LOG" && fail "no merge may run without policy evidence"
+[ "$(grep -c '^pr diff' "$GH_LOG")" -eq 3 ] || fail "exactly three failed read attempts"
+teardown
 
 # 14 — a money label: a human merges. Exit 7, the category is named, no merge.
 head_setup
@@ -251,7 +297,7 @@ BIG=$(jq -cn '{labels: [], body: "", additions: 2300, deletions: 0, files: [
   {path: "package-lock.json", additions: 900, deletions: 0},
   {path: "src/__snapshots__/x.test.ts.snap", additions: 500, deletions: 0},
   {path: "src/api/__generated__/types.ts", additions: 400, deletions: 0},
-  {path: "db/migrations/001_add.sql", additions: 200, deletions: 0}]}')
+  {path: "db/migrations/001_add.sql", additions: 200, deletions: 0}], changedFiles: 5}')
 cfgset '.migrations = {allowed_envs: ["test"], target_env: "test", commands: {test: "true"}}'
 RC=0; STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] || fail "300 counted lines (rest excluded) should merge, got $RC"
@@ -268,9 +314,9 @@ teardown
 # 16 — a destructive keyword counts in an ADDED line only. Deleting a DROP TABLE
 #      is not adding one.
 head_setup
-RC=0; STUB_OID="$SHA" STUB_META="$(meta "" db/x.sql)" STUB_DIFF='+DROP TABLE users;\n' gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+RC=0; STUB_OID="$SHA" STUB_META="$(meta "" db/x.sql)" STUB_DIFF='diff --git a/src/x.ts b/src/x.ts\n--- a/src/x.ts\n+++ b/src/x.ts\n@@ -0,0 +1 @@\n+DROP TABLE users;\n' gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 7 ] || fail "an added DROP TABLE should exit 7 (schema), got $RC"
-RC=0; STUB_OID="$SHA" STUB_META="$(meta "" db/x.sql)" STUB_DIFF='-DROP TABLE users;\n' gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+RC=0; STUB_OID="$SHA" STUB_META="$(meta "" db/x.sql | jq ' .additions=0 | .deletions=1')" STUB_DIFF='diff --git a/db/x.sql b/db/x.sql\n--- a/db/x.sql\n+++ b/db/x.sql\n@@ -1 +0,0 @@\n-DROP TABLE users;\n' gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] || fail "a removed DROP TABLE must not gate, got $RC"
 teardown
 
@@ -309,7 +355,8 @@ grep -q '^pr merge' "$GH_LOG" && fail "old approval must never reach merge"
 REQUEST=$(echo "$REQUEST" | jq --arg head "$SHA" '.head=$head')
 make_approval
 RC=0; STUB_PERMISSION_FAIL=1 STUB_OID="$SHA" STUB_META="$(meta money src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 7 ] || fail "unreadable authority must hold, got $RC"
+[ "$RC" -eq 79 ] || fail "unreadable authority must halt, got $RC"
+rm -f "$SB_GITHUB_HALT_FILE"  # next test starts a separate recovered run
 jq '.[0] += [{id:3,body:"Reason tag: 🙋 new decision",created_at:"2026-10-03T00:00:03Z",updated_at:"2026-10-03T00:00:03Z",user:{login:"owner",type:"User"}}]' "$STUB_COMMENTS" > "$TMP/new.json"
 mv "$TMP/new.json" "$STUB_COMMENTS"
 RC=0; STUB_OID="$SHA" STUB_META="$(meta money,needs-you:done src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
@@ -409,7 +456,7 @@ teardown
 # 23 — metadata the gate cannot read fails safe to a human (7), never to merge.
 head_setup
 RC=0; STUB_OID="$SHA" STUB_META='not json' gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 7 ] || fail "unreadable PR metadata should exit 7, got $RC"
+[ "$RC" -eq 79 ] || fail "unreadable PR metadata should halt (79), got $RC"
 teardown
 
 # 24 — dry run: migrations are reported, never executed.

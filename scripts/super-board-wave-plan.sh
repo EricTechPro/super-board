@@ -86,6 +86,9 @@ done
 # Read the config ONCE — $CONFIG may be a process substitution (test mode),
 # which is a FIFO and cannot be read twice.
 CONFIG_JSON=$(cat "$CONFIG")
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+export SB_REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
+python3 "$HERE/super-board-github-read.py" --check
 VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant // ""')
 # 0 or absent = unlimited. A wave is sized by the dependency graph, not a knob.
 MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
@@ -95,7 +98,7 @@ NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 if [ -n "$ITEMS_FILE" ]; then
   ITEMS=$(cat "$ITEMS_FILE")
 else
-  ITEMS=$(gh project item-list "$NUMBER" --owner "$OWNER" --format json --limit 500)
+  ITEMS=$(python3 "$HERE/super-board-github-read.py" --kind items -- project item-list "$NUMBER" --owner "$OWNER" --format json --limit 500)
 fi
 
 # `variant` was removed in v3.0.0 (labels route cards now). Absent or "full" is
@@ -119,7 +122,7 @@ else
   # A graph we cannot fetch is not a graph of zero blockers. Fail rather than
   # plan a wave that treats every card as free.
   DEPS=$("$HERE/super-board-deps.sh" --repo "$REPO" --limit 300) || {
-    echo "could not derive the dependency graph for ${REPO}" >&2; exit 69; }
+    rc=$?; echo "could not derive the dependency graph for ${REPO}" >&2; exit "$rc"; }
 fi
 
 # Review extras used to be gated behind human_approves_merge, because concurrent

@@ -201,6 +201,9 @@ case "$TYPE" in
 esac
 cat "$ERR" >&2; rm -f "$ERR"
 N=$(echo "$OUT" | tail -1)
+# A child may have created the issue before a required placement read failed.
+# Preserve its identity without tagging or making further writes after the halt.
+if [ "$RC" -eq 79 ]; then [ -z "$N" ] || echo "$N"; exit 79; fi
 case "$N" in ''|*[!0-9]*) die "filer failed (exit ${RC})" "$([ "$RC" -ne 0 ] && echo "$RC" || echo 70)" ;; esac
 tag "$N" "source:collect" "collect:${SOURCE}" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"}
 echo "$N"

@@ -70,7 +70,8 @@ SRC="${BODY_FILE:-$APPEND_FILE}"
 [ -r "$SRC" ] || die "cannot read $SRC" 66
 [ "$DRY" -eq 1 ] || [ -n "$HEAD" ] || die "--expect-head <sha> is required (the PR head your edit is based on)" 64
 
-META=$(gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefOid,body 2>/dev/null) || die "cannot read PR #$PR" 70
+GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+META=$(python3 "$GITHUB_READ" --kind body -- pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefOid,body ) || exit $?
 NOW=$(printf '%s' "$META" | jq -r '.headRefOid // empty')
 if [ -n "$HEAD" ]; then
   # Short or full sha both work: the PR head must start with what you passed.
@@ -144,5 +145,6 @@ PY
 if [ "$DRY" -eq 1 ]; then cat "$NEW_TMP"; exit 0; fi
 # $(…) drops trailing newlines, which GitHub does not keep either.
 if [ "$(cat "$OLD_TMP")" = "$(cat "$NEW_TMP")" ]; then echo unchanged; exit 0; fi
-gh pr edit "$PR" ${REPO:+--repo "$REPO"} --body-file "$NEW_TMP" >/dev/null 2>&1 || die "gh pr edit failed for #$PR" 70
+python3 "$GITHUB_READ" --check || exit $?
+gh pr edit "$PR" ${REPO:+--repo "$REPO"} --body-file "$NEW_TMP" >/dev/null 2>&1 || { python3 "$GITHUB_READ" --halt "PR body update outcome unknown for #$PR; read the body before retrying"; exit 79; }
 echo updated

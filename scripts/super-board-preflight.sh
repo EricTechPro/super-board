@@ -39,7 +39,7 @@
 #             "evidence": ["#31 merged: Resolves #14"], "blockedBy": [31],
 #             "conflictWith": [52], "candidates": [{"ref":"#40","kind":"open-pr","sim":0.4,"title":"…"}] } }
 #
-# Exit 0 ok · 64 usage · 69 could not read GitHub (callers skip the card this wave;
+# Exit 0 ok · 64 usage · 79 required GitHub evidence unavailable (pause the run;
 # a blind pre-flight never says proceed).
 set -euo pipefail
 
@@ -61,19 +61,18 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 if [ -f "$HERE/super-board-gh-guard.sh" ]; then
   # shellcheck source=/dev/null
   . "$HERE/super-board-gh-guard.sh"
-  sb_gh_guard_check 200 || true
+  sb_gh_guard_check 200 || exit $?
 fi
 
-blind() { echo "pre-flight blind: could not read $1 for $REPO" >&2; exit 69; }
-MERGED=$(gh pr list --repo "$REPO" --state merged --limit 100 --json number,title,body,url 2>/dev/null) || blind "merged PRs"
-OPEN=$(gh pr list --repo "$REPO" --state open --limit 100 --json number,title,body,url,headRefName,files 2>/dev/null) || blind "open PRs"
-CLOSED=$(gh issue list --repo "$REPO" --state closed --limit 100 --json number,title,body,stateReason 2>/dev/null) || blind "closed issues"
+MERGED=$(python3 "$HERE/super-board-github-read.py" --kind prs-merged -- pr list --repo "$REPO" --state merged --limit 100 --json number,title,body,url ) || exit $?
+OPEN=$(python3 "$HERE/super-board-github-read.py" --kind prs-open -- pr list --repo "$REPO" --state open --limit 100 --json number,title,body,url,headRefName,files ) || exit $?
+CLOSED=$(python3 "$HERE/super-board-github-read.py" --kind issues-closed -- issue list --repo "$REPO" --state closed --limit 100 --json number,title,body,stateReason ) || exit $?
 CARDS="[]"
 [ -n "$INFLIGHT" ] && CARDS=$(cat "$INFLIGHT")
 
 TARGETS="[]"
 for n in ${ISSUES//,/ }; do
-  one=$(gh issue view "$n" --repo "$REPO" --json number,title,body 2>/dev/null) || blind "issue #$n"
+  one=$(python3 "$HERE/super-board-github-read.py" --kind issue -- issue view "$n" --repo "$REPO" --json number,title,body ) || exit $?
   TARGETS=$(jq -c --argjson one "$one" '. + [$one]' <<<"$TARGETS")
 done
 

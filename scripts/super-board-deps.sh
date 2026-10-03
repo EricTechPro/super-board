@@ -59,6 +59,7 @@
 # The sweep must never free one of those; only a person can.
 set -euo pipefail
 
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=""; LIMIT="200"; ONLY=""; FROM=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -80,7 +81,7 @@ else
   # lives in a COMMENT and the REST list cannot return comments. One query gets
   # bodies and comments together; `gh issue view` per issue would be one REST
   # call each, and a 35-card board burns that budget for no reason.
-  ISSUES=$(gh api graphql --paginate --slurp -f query='
+  PAGES=$(python3 "$HERE/super-board-github-read.py" --kind issues -- api graphql --paginate --slurp -f query='
     query($owner:String!,$repo:String!,$endCursor:String){
       repository(owner:$owner,name:$repo){
         issues(states:OPEN,first:100,after:$endCursor){
@@ -88,9 +89,8 @@ else
           nodes{ number title body state labels(first:30){ nodes{ name } } comments(last:8){ nodes{ body } } }
         }
       }
-    }' -F owner="${REPO%%/*}" -F repo="${REPO##*/}" 2>/dev/null \
-    | jq '[ .[].data.repository.issues.nodes[] ]') || {
-    echo "could not read issues for $REPO" >&2; exit 69; }
+    }' -F owner="${REPO%%/*}" -F repo="${REPO##*/}") || exit $?
+  ISSUES=$(printf '%s' "$PAGES" | jq '[ .[].data.repository.issues.nodes[] ]')
 fi
 
 APPROVAL_REPO="$REPO"

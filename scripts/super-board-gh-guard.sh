@@ -22,12 +22,16 @@ SB_GH_GUARD_BUDGET_DEFAULT=150     # per-worker soft cap on gh calls
 SB_GH_GUARD_SUBAGENT_BUDGET=50     # per adversarial-mode sub-agent cap
 SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/super-board-gh-budget-$$}"
 
+SB_GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+sb_gh_required_read() { local kind="$1"; shift; python3 "$SB_GITHUB_READ" --kind "$kind" -- "$@"; }
+sb_gh_halt_check() { python3 "$SB_GITHUB_READ" --check; }
+
 sb_gh_guard_check() {
   # Sleep until GraphQL quota recovers. Also checks REST.
   # Arg 1: optional minimum-remaining threshold (default 200).
   local min="${1:-$SB_GH_GUARD_MIN_REMAINING_DEFAULT}"
   local payload graphql_remaining graphql_reset rest_remaining now wait
-  payload=$(gh api rate_limit 2>/dev/null || echo '{"resources":{"graphql":{"remaining":5000,"reset":0},"core":{"remaining":5000,"reset":0}}}')
+  payload=$(sb_gh_required_read quota api rate_limit) || return $?
   graphql_remaining=$(echo "$payload" | jq -r '.resources.graphql.remaining // 5000')
   rest_remaining=$(echo "$payload" | jq -r '.resources.core.remaining // 5000')
 

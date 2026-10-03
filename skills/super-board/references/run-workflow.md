@@ -8,6 +8,35 @@ workers. Lane lifecycles, branch/PR model, comment cadence, Block
 templates, halt gates, and done conditions are all inherited from `run.md`
 unchanged.
 
+## Required GitHub evidence and a paused run
+
+Required reads use `.claude/bin/super-board-github-read.py --kind <shape> -- <gh args>`.
+Three total attempts means the first attempt plus two retries of that same read;
+unrelated successful calls do not reset its failures. Invalid GraphQL queries,
+authentication, and permission errors stop immediately. Do not retry mutations.
+
+Exit **79**, a workflow result with `halted: true`, or a failed `--check` ends this
+run. Check the helper's `--check` before claims, board/comment writes, each new
+lane/wave, and all migration/merge steps. The marker is shared through the main
+checkout's `.claude/super-board/github-halt.json`, including linked worktrees.
+Cancel active workflow agents using local workflow controls; do not launch more
+lanes. Already-running agents stop at their next checkpoint; this is not an
+instantaneous process-wide kill. Preserve worktrees, claims, card statuses, and
+approval evidence. Do not move cards to Done/Blocked or release claims using an
+unavailable GitHub API. Report the local saved reason and what remains in flight.
+
+After fixing access or the invalid query, explicitly resume with the helper's
+`--resume`. It rechecks the failed read before clearing the marker and archives
+the original reason. Failed recovery leaves the pause intact. When the caller's
+query was corrected or PR metadata changed, supply its current read explicitly:
+`--resume --kind <same-shape> [--meta <fresh-meta.json>] -- <corrected gh read args>`.
+The replacement must pass the same evidence validator; the broken saved query
+is retained in the archived record. This is a read-only recovery check. An uncertain write
+has no automatic recovery probe: inspect the remote outcome first, then archive
+the halt record explicitly; never rerun a migration/write as a health check. Then follow normal
+run preflight/reconcile, inspect preserved worktrees, and start a fresh wave.
+Do not schedule automatic retries of the stopped run.
+
 ## Orchestrator delegation contract (NON-NEGOTIABLE, adapted)
 
 The interactive session that runs this backend is the orchestrator. It:

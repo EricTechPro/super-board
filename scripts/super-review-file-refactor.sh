@@ -3,9 +3,9 @@
 #
 # Super Review's gate is merge-or-bounce. A shallow module in an otherwise-correct
 # diff is a future ticket, not a reason to hold a green PR — so this script files
-# the card and gets out of the way. It NEVER fails the review: every failure below
-# the issue-create call degrades to a warning on stderr, because a board-placement
-# hiccup must not strand a mergeable PR in Review.
+# the card and gets out of the way. Missing optional column configuration is a
+# warning; unavailable required evidence or an unknown write outcome pauses the
+# run (79) while preserving any issue already created. No mutation is retried.
 #
 # Cards land in Backlog, not Ready. A refactor the reviewer noticed has had no human
 # eyes on it and no acceptance criteria; auto-promoting it to Ready would feed the
@@ -74,22 +74,24 @@ else
   REPO_FLAG=()
 fi
 
+GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+python3 "$GITHUB_READ" --check || exit $?
+
 # --- dedupe -----------------------------------------------------------------
 # The fingerprint is stamped into the body as an HTML comment so it survives
 # edits to the prose and stays invisible on the rendered issue.
 STAMP="<!-- super-review-fingerprint: ${FINGERPRINT} -->"
-EXISTING=$(gh issue list "${REPO_FLAG[@]}" \
-  --label "source:review" --state open --limit 200 \
-  --json number,body \
-  --jq "[.[] | select(.body != null and (.body | contains(\"${FINGERPRINT}\"))) | .number] | first // empty" 2>/dev/null || true)
+ISSUES_JSON=$(python3 "$GITHUB_READ" --kind dedupe -- issue list "${REPO_FLAG[@]}" --label "source:review" --state open --limit 200 --json number,body) || exit $?
+EXISTING=$(printf '%s' "$ISSUES_JSON" | jq -r --arg fingerprint "$FINGERPRINT" '[.[] | select(.body | contains($fingerprint)) | .number] | first // empty')
 
 if [ -n "$EXISTING" ]; then
   # Same shape problem, seen again on a later PR. Add the sighting, don't stack cards.
+  python3 "$GITHUB_READ" --check || exit $?
   gh issue comment "$EXISTING" "${REPO_FLAG[@]}" \
     --body "Seen again during review${PR:+ of #${PR}}.
 
 $(cat "$BODY_FILE")" >/dev/null 2>&1 \
-    || echo "warn: could not comment on existing #${EXISTING}" >&2
+    || { python3 "$GITHUB_READ" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
   echo "$EXISTING"
   exit 0
 fi
@@ -166,6 +168,7 @@ if [ -n "$AREA" ]; then LABELS+=("area:${AREA}"); fi
 # Labels may not exist yet on a fresh repo. Create them best-effort; `gh issue
 # create` hard-fails on an unknown label, which would lose the finding entirely.
 for l in "${LABELS[@]}"; do
+  python3 "$GITHUB_READ" --check || exit $?
   gh label create "$l" "${REPO_FLAG[@]}" --color BFD4F2 --force >/dev/null 2>&1 || true
 done
 
@@ -175,17 +178,18 @@ for l in "${LABELS[@]}"; do LABEL_ARGS+=(--label "$l"); done
 # Title: `♻️ [refactor] <scope>: <title>`; scope = --area, else the fingerprint's module.
 SCOPE="${AREA:-${FINGERPRINT%%|*}}"
 SCOPE=$(echo "${SCOPE:-code}" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._/-]+#-#g; s#^-+|-+$##g')
+python3 "$GITHUB_READ" --check || exit $?
 ISSUE_URL=$(gh issue create "${REPO_FLAG[@]}" \
   --title "♻️ [refactor] ${SCOPE:-code}: ${TITLE}" \
   --body-file "$BODY_TMP" \
-  "${LABEL_ARGS[@]}")
+  "${LABEL_ARGS[@]}") || { python3 "$GITHUB_READ" --halt "Issue creation response failed; reconcile fingerprint ${FINGERPRINT} before retrying"; exit 79; }
 
 ISSUE_N=$(basename "$ISSUE_URL")
 
 # --- place on the board -----------------------------------------------------
 # The holding column is deliberately NOT in the config's managed `columns` list,
 # so the board may name it something else. Add the card either way and only then
-# try to set Status. Never exit non-zero from here down.
+# try to set Status. Exit 71 means filed but placement failed; 79 is a paused run.
 #
 # A CARD WITH NO STATUS IS NOT HARMLESS, which the first version of this comment
 # claimed. Observed on a real board on 2026-08-20: the board's holding column was
@@ -197,9 +201,10 @@ ISSUE_N=$(basename "$ISSUE_URL")
 place_card() {
   local item_id project_id field_json field_id option_id candidate
   local -a candidates
-  item_id=$(gh project item-add "$NUMBER" --owner "$OWNER" --url "$ISSUE_URL" --format json --jq '.id') || return 1
-  project_id=$(gh project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return 1
-  field_json=$(gh project field-list "$NUMBER" --owner "$OWNER" --format json) || return 1
+  python3 "$GITHUB_READ" --check || return $?
+  item_id=$(gh project item-add "$NUMBER" --owner "$OWNER" --url "$ISSUE_URL" --format json --jq '.id') || { python3 "$GITHUB_READ" --halt "Project item add outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }
+  project_id=$(python3 "$GITHUB_READ" --kind scalar -- project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return $?
+  field_json=$(python3 "$GITHUB_READ" --kind fields -- project field-list "$NUMBER" --owner "$OWNER" --format json) || return $?
   field_id=$(echo "$field_json" | jq -r '.fields[] | select(.name=="Status") | .id')
   # The requested name first, then the conventional aliases for "not started".
   # Ordered by intent: a holding column beats Ready, because a card filed by a
@@ -226,8 +231,9 @@ place_card() {
   done
 
   if [ -n "$option_id" ] && [ "$option_id" != "null" ]; then
+    python3 "$GITHUB_READ" --check || return $?
     gh project item-edit --id "$item_id" --project-id "$project_id" \
-      --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null || return 1
+      --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null || { python3 "$GITHUB_READ" --halt "Project column move outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }
   else
     echo "warn: this board has no '${COLUMN}' column and none of the usual aliases" >&2
     echo "warn: (Backlog, Todo, To do, Triage, Inbox) — #${ISSUE_N} is on the board with NO status," >&2
@@ -235,6 +241,11 @@ place_card() {
   fi
 }
 
-place_card || echo "warn: filed #${ISSUE_N} but could not place it on project ${OWNER}/${NUMBER}" >&2
+if ! place_card; then
+  echo "$ISSUE_N"
+  python3 "$GITHUB_READ" --check || exit 79
+  echo "warn: filed #${ISSUE_N} but could not place it on project ${OWNER}/${NUMBER}; inspect before retrying" >&2
+  exit 71
+fi
 
 echo "$ISSUE_N"
