@@ -103,4 +103,14 @@ get 24 '.blockers == [2] and .runnable == false' || fail "#24: the body should s
 #      Scenarios 1–11 above all use that shape, so reaching here proves it.
 get 1 '.blockers == [2]' || fail "a payload without a comments key must still parse"
 
-echo "PASS: test-deps.sh (17 scenarios)"
+# 18 — 🙋 needs you. A 🙋 Block comment marks the card needsYou and keeps it
+#      human-gated; "done" in a LATER comment, or the needs-you:done label,
+#      marks it needsYouDone. A "done" written before the block is history.
+get 25 '.needsYou == true and .needsYouDone == false and .runnable == false' || fail "#25 waits on a human"
+get 26 '.needsYouDone == true'  || fail "#26: a later 'Done' comment confirms the human step"
+get 27 '.needsYouDone == true'  || fail "#27: the needs-you:done label confirms the human step"
+get 28 '.needsYouDone == false' || fail "#28: a 'done' before the 🙋 block must not count"
+get 26 '.runnable == false'     || fail "#26: done goes through resume, never the Ready sweep"
+get 2  '.needsYou == false and .needsYouDone == false' || fail "an ordinary card is not needsYou"
+
+echo "PASS: test-deps.sh (18 scenarios)"

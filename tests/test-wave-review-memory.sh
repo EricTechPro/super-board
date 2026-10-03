@@ -27,7 +27,7 @@ const base = { configPath: 'c.json', variant: 'full' }
 
 ;(async () => {
   // 1 — the Review lane is told to load prior_report by its marker; other lanes are not.
-  const ok = (label) => ({ status: 'advanced', column: label.startsWith('review') ? 'Done' : 'next', detail: 'ok',
+  const ok = (label) => label.startsWith('preflight') ? { verdicts: [{ number: 7, verdict: 'proceed', detail: 'clean' }] } : ({ status: 'advanced', column: label.startsWith('review') ? 'Done' : 'next', detail: 'ok',
     ...(label.startsWith('classify') ? { kind: 'feature', complexity: 'low' } : {}) })
   const a = await run({ ...base, cards: [{ number: 7, status: 'Ready', title: 't' }] }, ok)
   const rp = a.prompts['review:#7'] || fail('review lane did not run')

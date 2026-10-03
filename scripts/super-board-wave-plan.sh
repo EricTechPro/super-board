@@ -58,6 +58,7 @@
 # Stdout:
 #   { "cards": [ {"number":10,"status":"Review","title":"…"} ],
 #     "sweep": [ {"number":37,"title":"…","clearedBy":[32]} ],
+#     "resume": [ {"number":51,"title":"…"} ],
 #     "flag":  [ {"number":82,"title":"…","why":"…"} ],
 #     "stranded": [ {"number":44,"title":"…"} ] }
 set -euo pipefail
@@ -145,6 +146,15 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
                | select(free(.number))
                | { number, title,
                    clearedBy: (dep(.number) | .blockers) } ],
+
+      # 🙋 Blocked cards whose human step is confirmed done (needs-you:done
+      # label, or a "done" comment after the 🙋 block). The orchestrator moves
+      # them to Review and labels the PR needs-you:done; the Reviewer re-runs
+      # the merge gate, which re-verifies and merges.
+      resume: [ $all[]
+                | select(.status == "Blocked")
+                | select(dep(.number) != null and (dep(.number).needsYouDone // false))
+                | { number, title } ],
 
       # Cards the graph could not read. Left where they are, reported so the
       # orchestrator can ask for the line to be fixed.

@@ -46,7 +46,7 @@ Progress: ✅ onboard  →  ✅ lint  →  🤖 run (you are here)
 | No issues missing ACs in active columns | Halt: "N issues need clarification. Run `super-board lint`." |
 | Full variant: clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
 | Stale worktree scan | Auto-clean: for each dir in `.worktrees/`, if its branch no longer exists OR no `loop:in-*` label on its issue, `git worktree remove --force` it. Log each removal in the run manifest. Halt only if a removal fails. |
-| Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND production-detection signals fire (see §5 step 8), halt with: `🛡 Refusing to start: would auto-merge to production main. Either set human_approves_merge: true or switch base_branch to staging.` |
+| Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `🛡 Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run super-board onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*super-board run'` must return zero. If any super-board worker is already alive from a prior crashed run, halt with: `🛑 ${N} super-board workers already running. Stop them first: pkill -f 'claude -p .*super-board run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
 | GraphQL rate-limit guard | Before each tick, query `gh api rate_limit`. If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
 
@@ -173,8 +173,55 @@ Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when th
 
 ## Lane lifecycles (Full variant, per card)
 
+### Builder pre-flight (before ANY card goes Ready → Building)
+
+Two agents must never build the same thing, and nothing already on the base branch gets built
+twice. So before a Builder starts, a **fresh, cheap sub-agent** (no code, no worktree) checks the
+card. Workflow backend: the wave's `Pre-flight` phase does it, one agent per batch of up to 5 Ready
+cards, before `runLane('build')`. Legacy `claude-p` backend: the Builder runs it as step 0 below,
+in a sub-agent, before touching a worktree.
+
+```
+[ ] source .claude/bin/super-board-gh-guard.sh; sb_gh_guard_check 200
+[ ] build the in-flight list: gh project item-list (one call) → [{number,title,status}] for
+    Building / QA / Review / Ready cards; save it to a temp file
+[ ] bash .claude/bin/super-board-preflight.sh --repo <owner/name> --issues <N[,M…]> \
+         --inflight <file> [--files <paths you expect to touch>]
+[ ] judge each card: the script's verdict, then its `candidates` (near-misses) semantically
+[ ] act on the outcome below, then return one verdict per card
+```
+
+The script asks four questions; the agent owns the judgement:
+
+| # | Question | Mechanical signal (script) | Agent adds |
+|---|---|---|---|
+| 1 | Already done? | merged PR closes `#N`; merged PR / closed issue with the same `fingerprint:` or title | a merged PR that delivers the same behaviour under other words |
+| 2 | Already in progress? | open PR on another branch closes `#N` or has the same title; a card in Building/QA/Review (or a lower-numbered Ready peer) with the same title | same feature, different words — not merely the same files |
+| 3 | File overlap? | open PR touches files the card names | expected files from reading the issue (`--files`) |
+| 4 | Unclear? | no `## Acceptance Criteria` bullets | AC that contradicts the current code (cite `file:line`) |
+
+The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanical `hold` into
+`proceed` only by naming why the match is a different feature. Its own branch's PR
+(`issue-<N>-*`) is the card coming back, never its own duplicate.
+
+**Outcomes — never drop a card silently:**
+
+| Verdict | Action | Block template (`block-template.md`) |
+|---|---|---|
+| `proceed` | nothing; the Builder starts | — |
+| `hold` — done | move card to Blocked | `👯` · names the merged PR / closed issue · Owner: Eric (close as duplicate) · `blocked-by: -` |
+| `hold` — in progress | move card to Blocked | `👯` · names the open PR / card · `blocked-by: <the issue that PR or card closes>` — the sweep returns it when that closes, and pre-flight then finds it done |
+| `hold` — unclear | move card to Blocked | `❓` · the missing AC or the contradiction with `file:line` · `blocked-by: -` |
+| `sequence` — `blockedBy` non-empty | move card to Blocked | `⏳` · the overlapping PR and files · `blocked-by: <blockedBy>` — the wave-start sweep frees it |
+| `sequence` — `blockedBy` empty | proceed (card stays Ready), comment `⚠️ expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
+| `skipped` | script exit 69 (pre-flight blind): leave the card in Ready, untouched, retried next wave | — |
+
+A card the pre-flight agent returns no verdict for is treated as `skipped`, never built unchecked.
+
 ### Builder (first pass)
 
+0. Legacy backend only: run the Builder pre-flight above in a sub-agent. Anything but `proceed`
+   (or a conflict-note `sequence`) → do what its row says, release the claim, exit.
 1. Create worktree `.worktrees/issue-<N>-build/` off `config.base_branch`.
 2. Create branch `issue-<N>-<slug>` from `config.base_branch` — unless one already exists
    (the card came back from Building after a stopped run): then check it out, keep its
@@ -285,7 +332,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
    - **Test-side new finding** → open new `[QA]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
    - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[QA]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Add a `🛡 → ✅ CI-budget bypass` comment to both the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
-   - **Human-gate / Blocker (schema, API contract, money, auth, migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked.
+   - **Human-gate / Blocker finding (schema, API contract, money, auth, migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
 8. Post the **Reviewer report** PR timeline comment on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and posts none). It is what step 3b reads next time, so the first line is the stable marker and every finding gets an id:
 
    ```
@@ -322,7 +369,9 @@ on the base branch**.
        `[review]` comment saying the PR is ready for a human to merge.
    Branch B — human_approves_merge: false
      → merge through the gate (step 5), pinned to the reviewed head — never a bare
-       `gh pr merge`
+       `gh pr merge`. The gate applies `merge_policy` (who merges) and
+       `migrations` (which databases the robot may migrate) itself; the Reviewer
+       does not second-guess either, it routes the exit code.
 3. Confirm the merge LANDED, do not trust the exit code:
      gh pr view <PR> --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "none")'
      Expect: MERGED <sha>.  Then verify the sha is reachable from the base branch:
@@ -346,7 +395,23 @@ on the base branch**.
      6 → the PR head is not the commit you reviewed (a push after review, or during
           verify). Your evidence is void: leave the card in Review with a `[review]`
           comment naming both shas; the next wave reviews the new head
-   → do NOT leave a card in Review on exit 2, 3 or 5. A card left in Review is
+     7 → merge_policy: a human merges this one. Stdout carries one
+          `human-gate: <money|auth|schema|size|default|policy> — <evidence>` line per
+          hit. Card Review → **Blocked** with the 🙋 template: `Why blocked` names the
+          category and evidence; `To unblock` = "[ ] review PR #<P> and merge it
+          yourself" OR "[ ] comment `done` to approve — the next wave merges it";
+          label `needs-you`, `blocked-by: -`. A human merge moves the card to Done the
+          usual way; a `done` brings it back through `resume`, and the gate skips the
+          policy check once the PR carries `needs-you:done`.
+     8 → 🙋 needs you. Stdout carries one `needs-you: <command>` line per human step
+          (migration for an env outside `migrations.allowed_envs`, an allowed migrate
+          command that failed, a `needs-you:` line in the PR body,
+          `migrations.human_steps`). Card Review → **Blocked** with the 🙋 template
+          (block-template.md → "🙋 Needs you"), the commands copied verbatim into
+          `To unblock`, label `needs-you` on issue and PR, `blocked-by: -`. When the
+          human comments `done` (or labels `needs-you:done`), the wave planner's
+          `resume` list brings it back to Review and this gate re-runs.
+   → do NOT leave a card in Review on exit 2, 3, 5, 7 or 8. A card left in Review is
      re-picked next tick and re-reviewed forever, which is the re-dispatch waste
      tracked in issue #10. Exits 4 and 6 are the exceptions: 4 simply queued, and
      6 needs a fresh review of a commit nobody has reviewed yet.
@@ -539,7 +604,7 @@ usual template — and, per §4, a `blocked-by:` line.
 
 ### The wave-start sweep
 
-Before planning any wave, `super-board-wave-plan.sh` reports three lists the orchestrator must act on
+Before planning any wave, `super-board-wave-plan.sh` reports four lists the orchestrator must act on
 **before** launching:
 
 - **`sweep`** — `Blocked` cards whose blockers have all closed. Move each to `Ready` and comment
@@ -548,6 +613,12 @@ Before planning any wave, `super-board-wave-plan.sh` reports three lists the orc
   so a wave stopped mid-build leaves them there forever. Remove any leftover build worktree, keep
   the branch, move the card to `Ready`, and comment naming the branch. The legacy dispatcher does
   the same once at start (`reclaim_stranded_building`).
+- **`resume`** — 🙋 `Blocked` cards (merge gate exit 7 or 8) whose human step is confirmed: the `needs-you:done` label, or a
+  comment after the 🙋 block that reads just `done`. Move each to **Review** (not Ready — the code
+  was already reviewed), add `needs-you:done` to its PR, and comment `↩️ back to Review — human step
+  confirmed; the merge gate re-verifies and merges. Next: Reviewer.` The Reviewer re-runs the gate,
+  which re-checks the head and the build, re-runs the allowed migrations and merges, or sends it
+  straight back to Blocked if a command still fails.
 - **`flag`** — cards whose `## Blocked by` section could not be parsed. Leave them where they are
   and comment asking for the line to be fixed, quoting the `why`. Never guess: a card treated as
   free on an unreadable line gets built against a base that does not have what it needs.

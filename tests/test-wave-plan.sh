@@ -123,4 +123,12 @@ echo "$OUT" | jq -e '[.cards[].number] | index(18) == null' >/dev/null \
 echo "$OUT11" | jq -e '.stranded == []' >/dev/null \
   || fail "qa-only must report no stranded cards, got: $(echo "$OUT11" | jq -c .stranded)"
 
-echo "PASS: test-wave-plan.sh (17 scenarios)"
+# 18 — resume: a 🙋 Blocked card whose human step is done (#20) is reported for
+#      the move back to Review; one still waiting (#21) is not. Neither is swept
+#      to Ready or dispatched from Blocked.
+echo "$OUT" | jq -e '[.resume[].number] == [20]' >/dev/null \
+  || fail "expected only #20 resumed, got: $(echo "$OUT" | jq -c .resume)"
+echo "$OUT" | jq -e '[.sweep[].number, .cards[].number] | (index(20) == null and index(21) == null)' >/dev/null \
+  || fail "🙋 cards must not be swept to Ready or dispatched"
+
+echo "PASS: test-wave-plan.sh (18 scenarios)"

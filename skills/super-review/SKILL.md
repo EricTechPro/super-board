@@ -322,7 +322,7 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the 
    - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
    - **Test-side new finding** → new `[QA]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).
-   - **Blocker (schema, contract, money, auth, migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked.
+   - **Blocker finding (schema, contract, money, auth, migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked. A *clean* PR that merely touches money, auth or schema is not a finding: run the merge protocol, and the gate's `merge_policy` hands it to a human (exit 7 → 🙋 Blocked).
 8. Post the Reviewer report (marker `<!-- super-review:report -->`, ids on every finding) — the next re-review's `prior_report`.
 9. Clean up worktree.
 
@@ -340,6 +340,21 @@ two complete builds. In order, no shortcuts:
    `super-board-merge-gate.sh --config <cfg> --pr <PR> --expect-head <sha>` (it merges with
    `--match-head-commit`). Exit 6 = the head moved after review → your evidence is void;
    leave the card in **Review** with a `[review]` comment naming both shas.
+   The gate owns the merge decision (config `merge_policy`, `migrations`):
+   - **Exit 7 — a human merges.** `merge_policy` matched (money / auth / schema label,
+     path or added-line keyword; a diff over `auto_max_lines`; `default: "human"`).
+     Card → **Blocked** with the 🙋 template: `Why blocked` quotes the gate's
+     `human-gate:` lines; `To unblock` = review PR #<P> and merge it yourself, OR comment
+     `done` to approve (the next wave re-runs the gate, which merges). Label `needs-you`.
+   - **Exit 8 — 🙋 needs you.** Migrations for a database outside
+     `migrations.allowed_envs`, an allowed migrate command that failed, or a declared
+     human-only step. Card → **Blocked** with the 🙋 template
+     (`block-template.md` → "🙋 Needs you"), the gate's `needs-you:` commands copied
+     verbatim into `To unblock`, label `needs-you`, `blocked-by: -`. After the human
+     comments `done` (or labels `needs-you:done`), the next wave moves it back to Review
+     and you re-run the gate; it re-verifies and merges.
+   - The rule in one line: the robot migrates the databases it was allowed to test its
+     work; live databases, money, auth and destructive schema changes wait for a person.
 3. **Confirm the merge landed** — never trust the merge command's exit code:
    `gh pr view <PR> --json state,mergeCommit` must report `MERGED` plus a commit sha,
    and that sha must be an ancestor of the base branch

@@ -81,12 +81,14 @@ Repeat until a done condition or halt gate fires:
    cut off mid-lane. The legacy `claude-p` dispatcher does not run this guard.
 2. **Plan the wave** —
    `bash .claude/bin/super-board-wave-plan.sh --config <config-path>` →
-   The planner returns `cards`, `sweep`, `flag` and `stranded`. **Act on
-   `sweep`, `flag` and `stranded` BEFORE launching** (run.md → "The wave-start
+   The planner returns `cards`, `sweep`, `resume`, `flag` and `stranded`. **Act on
+   `sweep`, `resume`, `flag` and `stranded` BEFORE launching** (run.md → "The wave-start
    sweep"): move every swept card to `Ready` with a comment naming what cleared
-   it, comment on every flagged card asking for its `## Blocked by` line to be
-   fixed, and return every stranded Building card to `Ready` (below). Swept and
-   stranded cards are NOT in this pass's `cards`; they join the next wave.
+   it, move every `resume` card (🙋 needs you, human said done) to `Review` and
+   label its PR `needs-you:done`, comment on every flagged card asking for its
+   `## Blocked by` line to be fixed, and return every stranded Building card to
+   `Ready` (below). Swept, resumed and stranded cards are NOT in this pass's
+   `cards`; they join the next wave.
 
    **Stranded Building cards.** A card in Building with no assignee between
    waves has no live worker — a stopped or crashed wave left it mid-build. For
@@ -96,6 +98,14 @@ Repeat until a done condition or halt gate fires:
    empty), keep the branch and PR, move the card to `Ready`, and comment:
    `↩️ back to Ready — found in Building with no live worker. Branch: <name | none>
    (kept). Next: Builder.` The next Builder continues on the branch.
+   **Builder pre-flight.** No card goes Ready → Building unchecked. The wave's first phase
+   (`Pre-flight` in `super-board-wave.js`, before `runLane('build')`) runs one cheap sub-agent per
+   batch of up to 5 Ready cards: already merged? already in progress (open PR or another card)?
+   same files as an open PR? unclear? It runs `super-board-preflight.sh`, posts the Block template
+   and moves held/sequenced cards to Blocked itself (run.md → "Builder pre-flight"). The summary
+   reports those as `preflight:blocked`; `preflight:failed` means pre-flight was blind and the card
+   stays in Ready for the next wave. Sequenced cards carry a `blocked-by:` line, so this same sweep
+   frees them when the overlapping PR's issue closes.
    Wave width is not `max_workers` any more — it is however many cards the
    dependency graph says are free. The runtime caps concurrency and queues the
    rest, so a 19-card wave is normal and not a misconfiguration.
@@ -177,17 +187,23 @@ don't stall on prompts:
     "Bash(git push:*)", "Bash(git pull:*)", "Bash(git fetch:*)", "Bash(git blame:*)",
     "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
     "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
+    "Bash(bash .claude/bin/super-board-preflight.sh:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
 
-`gh pr merge` is deliberately NOT in the list — Reviewer merges remain
-gated by an interactive prompt, and by `human_approves_merge` for boards
-that require a human click. Consequence: on auto-merge boards
-(`human_approves_merge: false`) every Reviewer squash-merge pauses for one
-interactive approval, so this backend is **attended-only** by default.
-For genuinely unattended auto-merge runs you must consciously add
-`"Bash(gh pr merge:*)"` yourself — doing so removes the last human gate
-before the base branch, so pair it with a non-production `base_branch`.
+Merging is NOT in the base list. On a board whose `merge_policy.default` is
+`"auto"`, `super-board onboard` offers the merge lines as a diff to approve
+up front (onboard → Permissions), so the first overnight run does not stall:
+
+    "Bash(bash .claude/bin/super-board-merge-gate.sh:*)", "Bash(gh pr merge:*)",
+    plus one line per configured migrate command in `migrations.commands`
+    for the envs in `migrations.allowed_envs`.
+
+Without them every Reviewer merge pauses for one interactive approval, so the
+backend is **attended-only**. With them, the gate still enforces
+`merge_policy` (money / auth / schema → human, exit 7) and `migrations`
+(live DB → 🙋 needs you, exit 8), so the allowlist removes the prompt, not
+the policy. Pair auto-merge with a non-production `base_branch`.
 
 > **Read this before starting an overnight wave (issue #9).** The two settings
 > interact, and the failure is silent. A board configured
@@ -201,8 +217,8 @@ before the base branch, so pair it with a non-production `base_branch`.
 > | Intent | `human_approves_merge` | Allowlist `gh pr merge` | Reviewer's terminal state |
 > | --- | --- | --- | --- |
 > | Attended — you click each merge | `false` | no | pauses on a prompt |
-> | Unattended auto-merge | `false` | **yes** | card → Done, merge confirmed |
-> | Human merges later, agent never does | `true` | no | card stays in Review |
+> | Unattended auto-merge | `false` | **yes** | card → Done, merge confirmed (money/auth/schema, live migrations → 🙋 Blocked for you) |
+> | Human merges later, agent never does | `true` (or `merge_policy.default: "human"`) | no | card stays in Review |
 >
 > Row 2 is the only combination that lands code with nobody watching, and it
 > requires a non-production `base_branch` — the run script's production-merge

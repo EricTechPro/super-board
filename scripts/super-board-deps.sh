@@ -43,7 +43,15 @@
 # Stdout, one object keyed by issue number:
 #   { "40": { "number": 40, "title": "…", "state": "OPEN",
 #             "blockers": [32,36], "openBlockers": [32],
-#             "parseable": true, "humanGated": false, "runnable": false, "why": "" } }
+#             "parseable": true, "humanGated": false, "runnable": false, "why": "",
+#             "needsYou": false, "needsYouDone": false } }
+#
+# `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
+# has the `needs-you` label: a human-only command is waiting (block-template.md).
+# `needsYouDone` — the human said it is done: the issue has the `needs-you:done`
+# label, or a comment AFTER that 🙋 comment reads just "done". The wave planner
+# reports these in `resume`; they go back to Review and the merge gate re-runs.
+# A 🙋 card stays humanGated either way — only the resume path moves it.
 #
 # `runnable` is true only when the line parses, no blocker is still open, AND the
 # card is not human-gated. `humanGated` comes from `blocked-by: -`, which means
@@ -77,7 +85,7 @@ else
       repository(owner:$owner,name:$repo){
         issues(states:OPEN,first:100,after:$endCursor){
           pageInfo{ hasNextPage endCursor }
-          nodes{ number title body state comments(last:8){ nodes{ body } } }
+          nodes{ number title body state labels(first:30){ nodes{ name } } comments(last:8){ nodes{ body } } }
         }
       }
     }' -F owner="${REPO%%/*}" -F repo="${REPO##*/}" 2>/dev/null \
@@ -130,6 +138,17 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
       | select(test("^[ \t]*blocked-by:"; "i")) ]
     | last // null;
 
+  def bodies: [ (.comments.nodes // .comments // [])[] | (.body // "") ];
+  def label_names: [ (.labels.nodes // .labels // [])[] | (.name // "") ];
+  # Index of the newest 🙋 Block comment, or null.
+  def needs_at: ( bodies | to_entries
+                  | map(select(.value | test("Reason tag:[^\n]*🙋"))) | last | .key ) // null;
+  def needs_you: (label_names | index("needs-you") != null) or (needs_at != null);
+  def needs_you_done:
+    (label_names | index("needs-you:done") != null)
+    or ( needs_at as $at | $at != null
+         and ( bodies[($at + 1):] | any(.[]; test("^[ \t\n]*done[.!]?[ \t\n]*$"; "i")) ) );
+
   ( [ .[] | .number ] ) as $open
   | ( if $only == "" then null else ($only / "," | map(tonumber)) end ) as $filter
   | [ .[]
@@ -169,7 +188,9 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           parseable: $p.parseable,
           humanGated: $p.human_gated,
           runnable: ($p.parseable and ($p.human_gated | not) and (($stillOpen | length) == 0)),
-          why: $p.why }
+          why: $p.why,
+          needsYou: ($i | needs_you),
+          needsYouDone: (($i | needs_you) and ($i | needs_you_done)) }
     ]
   | ( if $filter == null then . else map(select(.number as $n | $filter | index($n))) end )
   | INDEX(.number | tostring)'

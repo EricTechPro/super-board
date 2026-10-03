@@ -69,13 +69,83 @@
 
   // When `true`, Reviewer marks the PR ready but does NOT squash-merge; a
   // human must click merge. Card auto-moves to Done when the PR is merged
-  // externally. Default `false`. Onboard FORCES this to `true` when
-  // `base_branch` is `main` AND the repo has a deploy workflow detected.
+  // externally. Default `false`. Legacy switch: new configs leave it `false`
+  // and use `merge_policy` (default "human" = the same thing).
   //
-  // On the workflow backend, `false` ALSO requires "Bash(gh pr merge:*)" in the
-  // session allowlist — without it every Reviewer stalls on an approval prompt
+  // On the workflow backend, `false` ALSO requires
+  // "Bash(bash .claude/bin/super-board-merge-gate.sh:*)" and "Bash(gh pr merge:*)"
+  // in the session allowlist (onboard offers both as a diff) — without it every Reviewer stalls on an approval prompt
   // and nothing lands. See references/run-workflow.md → "Mid-run permission prompts".
   "human_approves_merge": false,
+
+  // Who merges what (v2.6.0). Evaluated by super-board-merge-gate.sh (via
+  // super-board-merge-policy.py) on every merge; `human_approves_merge: true`
+  // still overrides it and makes the Reviewer stop before the gate.
+  // Absent → the defaults below apply.
+  "merge_policy": {
+    // "auto" (default): normal changes merge on a clean review.
+    // "human": every PR waits for a human click (the old human_approves_merge).
+    // Onboard recommends "human" when base_branch is production-detected.
+    "default": "auto",
+    // > 0: a PR with more changed lines (additions + deletions) waits for a
+    // human. 0 (default) = no size cap.
+    "auto_max_lines": 0,
+    // ALWAYS human, whatever `default` says. A PR matching ANY label, path glob
+    // or keyword (case-insensitive, searched in the diff's ADDED lines only) of
+    // a category exits the gate 7: no merge, card → Blocked 🙋 (the human merges
+    // it, or comments "done" to approve and the next wave merges).
+    // Setting this key replaces the whole default set; {} turns it off.
+    // Globs: `**/` = any dirs (incl. none), `**` = anything, `*` = one segment.
+    "always_human": {
+      "money":  { "labels": ["money", "payments", "billing", "pricing"],
+                  "paths": ["**/billing/**", "**/payments/**", "**/stripe/**", "**/checkout/**"],
+                  "keywords": ["stripe.", "payment_intent", "price_id", "invoice.create"] },
+      "auth":   { "labels": ["auth", "security"],
+                  "paths": ["**/auth/**", "**/authz/**", "**/permissions/**"],
+                  "keywords": ["jwt.sign", "bcrypt", "password_hash", "service_role"] },
+      // Destructive schema changes. Additive migrations are not "schema": they
+      // go through `migrations` below, which keeps live databases human-only.
+      "schema": { "labels": ["schema", "destructive"],
+                  "paths": [],
+                  "keywords": ["drop table", "drop column", "truncate table", "rename column", "drop schema"] }
+    },
+    // true only when the user explicitly chose auto-merge onto a
+    // production-detected base in onboard. run.md's production-merge guard
+    // refuses to start otherwise.
+    "allow_auto_on_production": false
+  },
+
+  // Database migrations at merge time (v2.6.0). A PR touching `globs` is a
+  // migration PR. Inside the merge lock, after verify_commands pass, the gate
+  // runs commands[env] for every env in allowed_envs, then merges. It exits 8
+  // (🙋 needs you → Blocked, block-template.md) instead when: target_env is not
+  // in allowed_envs, an allowed command fails, target_env is allowed but has no
+  // command, or human_steps is non-empty. A `needs-you: <command>` line in the
+  // PR body does the same for any PR. The `needs-you:done` PR label (or a
+  // "done" comment, which the orchestrator turns into the label) clears the
+  // human steps; the next wave re-verifies and merges.
+  // In one line, for the user: the robot migrates the DBs you allow to test its
+  // work; a live database, or a destructive schema change, waits for you.
+  "migrations": {
+    "globs": ["supabase/migrations/**", "prisma/migrations/**", "drizzle/**",
+              "**/migrations/*.sql", "db/migrate/**", "alembic/versions/**"],
+    // Which databases the robot may migrate. Any of "test", "staging", "live".
+    // Default ["test", "staging"]. Onboard asks (multi-select).
+    "allowed_envs": ["test", "staging"],
+    // The env that merging into base_branch deploys to. Default: "live" when
+    // base_branch is main/master, else "staging".
+    "target_env": "staging",
+    // Run from the root of the verified scratch worktree. "-" = the deploy
+    // pipeline applies it, nothing to run. Secrets come from the environment,
+    // never from this file.
+    "commands": {
+      "test": "npm run db:migrate -- --env test",
+      "staging": "supabase db push --db-url \"$STAGING_DB_URL\"",
+      "live": "supabase db push --db-url \"$LIVE_DB_URL\""
+    },
+    // Extra human-only steps every migration PR needs (e.g. a backfill).
+    "human_steps": []
+  },
 
   // ── Runaway controls (v2.0.0).
   // Halt after this many consecutive dispatch cycles in which NO card reached

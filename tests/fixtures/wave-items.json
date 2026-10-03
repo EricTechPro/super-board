@@ -109,6 +109,24 @@
           "someone"
         ]
       }
+    },
+    {
+      "status": "Blocked",
+      "content": {
+        "type": "Issue",
+        "number": 20,
+        "title": "needs you, done",
+        "assignees": []
+      }
+    },
+    {
+      "status": "Blocked",
+      "content": {
+        "type": "Issue",
+        "number": 21,
+        "title": "needs you, waiting",
+        "assignees": []
+      }
     }
   ]
 }

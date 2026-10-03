@@ -3,6 +3,7 @@ export const meta = {
   description: 'Drain one super-board wave: classify, then build → qa → review per card (lifecycles per run.md)',
   whenToUse: 'Launched by the super-board run-workflow backend with args from super-board-wave-plan.sh. Not for direct ad-hoc use.',
   phases: [
+    { title: 'Pre-flight', detail: 'per Ready card: already done? in progress? file overlap? unclear? (run.md → Builder pre-flight)' },
     { title: 'Classify', detail: 'haiku router: kind + complexity per Ready card' },
     { title: 'Build', detail: 'Builder lifecycle (run.md): worktree, branch, draft PR' },
     { title: 'QA', detail: 'Tester lifecycle (run.md): test plan, evidence, screenshots' },
@@ -94,6 +95,9 @@ const REVIEW_MEMORY = [
   `Class every finding Gap / Bug / Verification miss / Scope drift / Over-engineering, and list what you verified correct.`,
   // Simplest-solution pass (super-review step 3): Should fix at most, never a bounce on its own.
   `Run ponytail:ponytail-review on the merge-base diff (inline ladder if the plugin is absent); Over-engineering never blocks merge alone.`,
+  // Merge policy + migrations live in the gate (run.md → Merge protocol step 5).
+  `Merge only via super-board-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
+  `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
 ]
 
 const lanePrompt = (lane, card) => [
@@ -140,6 +144,75 @@ const runLane = async (lane, card, model, history) => {
   return result
 }
 
+// Builder pre-flight (run.md → "Builder pre-flight"). Before ANY Ready card
+// reaches runLane('build'), a fresh cheap agent asks: already merged? already
+// being built (open PR or another card)? same files as an open PR? unclear?
+// One agent per batch of PREFLIGHT_BATCH cards, so the three gh list calls in
+// super-board-preflight.sh are paid once per batch, not once per card.
+// Outcomes: proceed · hold (agent wrote the Block template, card → Blocked) ·
+// sequence (card → Blocked with `blocked-by:` the overlapping PR's issue, so the
+// wave-start sweep frees it; or proceed with a conflict note when that PR closes
+// no issue) · skipped (pre-flight blind — card stays Ready for the next wave).
+// A card the agent did not answer for is skipped, never built unchecked.
+const PREFLIGHT_SCHEMA = {
+  type: 'object',
+  properties: {
+    verdicts: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          number: { type: 'integer' },
+          verdict: { type: 'string', enum: ['proceed', 'hold', 'sequence', 'skipped'] },
+          column: { type: 'string' },
+          detail: { type: 'string' },
+        },
+        required: ['number', 'verdict', 'detail'],
+      },
+    },
+  },
+  required: ['verdicts'],
+}
+const PREFLIGHT_BATCH = 5
+const preflightModel = (input.tier || 'medium') === 'low' ? 'haiku' : 'sonnet'
+const preflightPrompt = (batch) => [
+  `Builder pre-flight for issues ${batch.map((c) => `#${c.number} ("${c.title}")`).join(', ')}. Config: ${input.configPath}.`,
+  `Read .claude/skills/super-board/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
+  `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
+  `Run .claude/bin/super-board-preflight.sh once for the whole batch, then judge its candidates semantically.`,
+  `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,
+  `Return one verdict per issue: proceed | hold | sequence | skipped (pre-flight blind). Never drop a card silently.`,
+].join('\n')
+
+const ready = input.variant === 'full' ? input.cards.filter((c) => c.status === 'Ready') : []
+const verdicts = new Map()
+const batches = []
+for (let i = 0; i < ready.length; i += PREFLIGHT_BATCH) batches.push(ready.slice(i, i + PREFLIGHT_BATCH))
+await Promise.all(batches.map(async (batch) => {
+  const r = await agent(preflightPrompt(batch), {
+    label: `preflight:${batch.map((c) => '#' + c.number).join(',')}`,
+    phase: 'Pre-flight',
+    model: preflightModel,
+    schema: PREFLIGHT_SCHEMA,
+  })
+  for (const v of (r && r.verdicts) || []) verdicts.set(v.number, v)
+}))
+// sequence with nothing to wait on = proceed with a conflict note (the agent posted it).
+const preflightGo = (card) => {
+  const v = verdicts.get(card.number)
+  return !!v && (v.verdict === 'proceed' || (v.verdict === 'sequence' && v.column === 'Ready'))
+}
+const preflightExit = (card) => {
+  const v = verdicts.get(card.number) ||
+    { verdict: 'skipped', detail: 'pre-flight returned no verdict — not built unchecked; retried next wave' }
+  return {
+    lane: 'preflight',
+    status: v.verdict === 'skipped' ? 'failed' : 'blocked',
+    column: v.column || (v.verdict === 'skipped' ? 'Ready' : 'Blocked'),
+    detail: `${v.verdict}: ${v.detail}`,
+  }
+}
+
 const results = await pipeline(
   input.cards,
   // Stage 1: classify cards entering at Ready (router for model tiering)
@@ -161,6 +234,10 @@ const results = await pipeline(
     let at = card.status
 
     if (at === 'Ready' && input.variant === 'full') {
+      if (!preflightGo(card)) {
+        history.push(preflightExit(card))
+        return { number: card.number, history }
+      }
       const b = await runLane('build', card, model, history)
       if (b.status !== 'advanced') return { number: card.number, history }
       at = 'QA'

@@ -72,6 +72,33 @@
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
 #   6  the PR head is not the commit that was reviewed — review evidence is void,
 #      the card goes back to Review (not Blocked, not a rebase pass)
+#   7  merge policy says a human merges this one (money / auth / schema, a diff
+#      over auto_max_lines, or merge_policy.default "human"). Stdout lists each
+#      `human-gate: <category> — <evidence>`. Nothing ran, nothing merged; the
+#      card → Blocked with the 🙋 template: the human reviews and merges it, or
+#      comments "done" (label needs-you:done) to approve — the next wave re-runs
+#      the gate, which then skips the policy check and merges.
+#   8  🙋 needs you — the PR has migrations for a database the robot may not
+#      touch (merge_policy → migrations.allowed_envs), an allowed migrate command
+#      failed, or a human-only step is declared (`needs-you:` line in the PR body,
+#      or migrations.human_steps). Stdout lists the exact commands as
+#      `needs-you: <command>` lines. Card → Blocked with the 🙋 template; once the
+#      PR carries the `needs-you:done` label the next wave re-runs the gate and it
+#      merges.
+#
+# MERGE POLICY AND MIGRATIONS (config, all optional — defaults shown in
+# references/config-schema.json)
+#
+#   merge_policy: { default: "auto"|"human", auto_max_lines: 0,
+#                   always_human: { <category>: {labels, paths, keywords} } }
+#   migrations:   { globs, allowed_envs, target_env, commands: {<env>: cmd},
+#                   human_steps }
+#
+# Detection reads the PR's labels, changed paths and the diff's ADDED lines
+# (keywords, case-insensitive). The policy is checked before verification — a
+# card a human will merge does not need the gate's build proof spent on it —
+# and migrations run after verification, inside the lock, right before the
+# merge. `--dry-run` reports both and runs neither.
 set -euo pipefail
 
 CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""
@@ -149,7 +176,7 @@ say "lock taken; verifying against ${BASE} as it is now"
 # Done in a throwaway worktree so the branch under test is never mutated: the
 # gate proves a merge, it does not perform one locally and it never pushes.
 SCRATCH=$(mktemp -d)
-cleanup() { git -C "$REPO_PATH" worktree remove --force "$SCRATCH" 2>/dev/null || true; rm -rf "$SCRATCH"; release; }
+cleanup() { git -C "$REPO_PATH" worktree remove --force "$SCRATCH" 2>/dev/null || true; rm -rf "$SCRATCH" "${META:-}" "${DIFF:-}"; release; }
 trap cleanup EXIT
 
 # ---- the head guard --------------------------------------------------------
@@ -168,6 +195,29 @@ if [ -n "$EXPECT_HEAD" ]; then
   esac
 else
   say "WARNING: no --expect-head; pinning the head read now (${HEAD_SHA}), not the reviewed one"
+fi
+
+# ---- merge policy + migration plan ----------------------------------------
+# One read of the PR's labels, paths, size and body plus its diff, classified by
+# super-board-merge-policy.py (beside this script). Unreadable → human: a policy
+# the gate cannot evaluate must not default to "merge".
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# Outside $SCRATCH: `git worktree add` below needs that directory empty.
+META=$(mktemp); DIFF=$(mktemp)
+gh pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,body > "$META" 2>/dev/null || echo '{}' > "$META"
+gh pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF" 2>/dev/null || : > "$DIFF"
+PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
+  echo "human-gate: policy — could not classify the PR (unreadable metadata)"
+  say "merge policy could not be evaluated — a human merges this one"; exit 7; }
+
+HUMAN=$(echo "$PLAN" | jq -r '.human[] | "human-gate: \(.category) — \(.why)"')
+if [ -n "$HUMAN" ] && [ "$(echo "$PLAN" | jq -r '.done')" = "true" ]; then
+  say "needs-you:done is on the PR — a human approved the policy gate ($(echo "$PLAN" | jq -r '[.human[].category] | join(", ")'))"
+  HUMAN=""
+fi
+if [ -n "$HUMAN" ]; then
+  echo "$HUMAN"
+  say "merge policy: a human merges this PR"; exit 7
 fi
 
 git -C "$REPO_PATH" fetch origin "$HEAD_REF" "$BASE" --quiet
@@ -196,6 +246,34 @@ else
     fi
   done
   say "verified green against ${BASE} (${#VERIFY[@]} command(s))"
+fi
+
+# ---- migrations (inside the lock, after the build proof) -------------------
+# Run the configured migrate command for every allowed env, from the verified
+# scratch tree. Collect, never stop early, so a human gets every command at once.
+NEEDS=()
+while IFS= read -r line; do [ -n "$line" ] && NEEDS+=("$line"); done \
+  < <(echo "$PLAN" | jq -r '.needs_you[]')
+if [ "$(echo "$PLAN" | jq '.migrations | length')" -gt 0 ]; then
+  say "migrations in this PR: $(echo "$PLAN" | jq -r '.migrations | join(" ")')"
+  while IFS=$'\t' read -r env cmd; do
+    [ -n "$env" ] || continue
+    if [ "$DRY" -eq 1 ]; then say "dry run: would migrate ${env}: ${cmd}"; continue; fi
+    say "migrate ${env}: ${cmd}"
+    if ! ( cd "$SCRATCH" && eval "$cmd" ) >"$SCRATCH/.migrate.log" 2>&1; then
+      say "FAILED: migrate ${env}"; tail -20 "$SCRATCH/.migrate.log" >&2
+      NEEDS+=("${cmd}   # ${env}: failed in the merge gate — fix, run it, then mark done")
+    fi
+  done < <(echo "$PLAN" | jq -r '.run[] | [.env, .cmd] | @tsv')
+fi
+if [ "${#NEEDS[@]}" -gt 0 ]; then
+  if [ "$(echo "$PLAN" | jq -r '.done')" = "true" ] && [ "$(echo "$PLAN" | jq '.needs_you | length')" -eq "${#NEEDS[@]}" ]; then
+    say "needs-you:done is on the PR — the human steps are confirmed; merging"
+  else
+    for n in "${NEEDS[@]}"; do echo "needs-you: $n"; done
+    say "🙋 needs you before this merges — card → Blocked with the commands above"
+    exit 8
+  fi
 fi
 
 # ---- the merge -------------------------------------------------------------

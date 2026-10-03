@@ -24,6 +24,13 @@ SECRET_RE = re.compile("|".join([
     r"\.pem" + E,
 ]))
 
+# The one sanctioned way to ask "is KEY set?": super-board-env-check.sh prints
+# present / empty / missing per key and never a value. Allowed only as a single
+# plain call -- no pipe, redirect, chain or substitution can ride along.
+ENV_CHECK = re.compile(
+    r"^\s*(?:bash\s+|sh\s+)?(?:\S*/)?super-board-env-check\.sh"
+    r"(?:\s+[A-Za-z0-9_./=-]+)*\s*$")
+
 REASON = ("Blocked by guard-secrets: this touches a secret file. Read the checked-in example env "
           "file (.env.example) for the key names, or ask the user to run the command themselves "
           "with the ! prefix.")
@@ -44,7 +51,10 @@ def subject(payload):
 
 def main():
     try:
-        text = subject(json.loads(sys.stdin.read() or "{}"))
+        payload = json.loads(sys.stdin.read() or "{}")
+        text = subject(payload)
+        if payload.get("tool_name") == "Bash" and ENV_CHECK.match(text):
+            return
         if text and SECRET_RE.search(text):
             print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
                                                      "permissionDecision": "deny",

@@ -3,65 +3,65 @@
     "number": 1,
     "title": "clean, one blocker",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 \u2014 the thing it needs\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 — the thing it needs\n"
   },
   {
     "number": 2,
     "title": "clean, none",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n"
   },
   {
     "number": 3,
     "title": "two blockers, one closed",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 \u2014 open\n- #99 \u2014 closed, absent from this list\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 — open\n- #99 — closed, absent from this list\n"
   },
   {
     "number": 4,
     "title": "None but names an issue",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None \u2014 but #2 must be merged first.\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None — but #2 must be merged first.\n"
   },
   {
     "number": 5,
     "title": "no section at all",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\nNothing else here.\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\nNothing else here.\n"
   },
   {
     "number": 6,
     "title": "empty section",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n"
   },
   {
     "number": 7,
     "title": "section with prose only",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\nProbably nothing?\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\nProbably nothing?\n"
   },
   {
     "number": 8,
     "title": "trailing heading",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n\n## Notes\n\n- #2 is mentioned here but is not a blocker\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n\n## Notes\n\n- #2 is mentioned here but is not a blocker\n"
   },
   {
     "number": 9,
     "title": "none plus historical note",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n\n> Previously waited on #2, which is closed.\n"
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n\n> Previously waited on #2, which is closed.\n"
   },
   {
     "number": 20,
     "title": "comment names blockers",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n",
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n",
     "comments": {
       "nodes": [
         {
-          "body": "\ud83d\udee1 super-board \u00b7 Reviewer \u00b7 BLOCKED\n\nWhy blocked: waits on the writer\nblocked-by: 2, 99\n"
+          "body": "🛡 super-board · Reviewer · BLOCKED\n\nWhy blocked: waits on the writer\nblocked-by: 2, 99\n"
         }
       ]
     }
@@ -70,11 +70,11 @@
     "number": 21,
     "title": "human gated",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n",
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n",
     "comments": {
       "nodes": [
         {
-          "body": "\ud83d\udd10 super-board \u00b7 Builder \u00b7 BLOCKED\n\nWhy blocked: no API key\nblocked-by: -\n"
+          "body": "🔐 super-board · Builder · BLOCKED\n\nWhy blocked: no API key\nblocked-by: -\n"
         }
       ]
     }
@@ -83,7 +83,7 @@
     "number": 22,
     "title": "latest comment wins",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 \u2014 stale body\n",
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 — stale body\n",
     "comments": {
       "nodes": [
         {
@@ -99,7 +99,7 @@
     "number": 23,
     "title": "malformed line",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n",
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- None.\n",
     "comments": {
       "nodes": [
         {
@@ -112,9 +112,74 @@
     "number": 24,
     "title": "no comments",
     "state": "OPEN",
-    "body": "### \u26d4 Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 \u2014 from the body\n",
+    "body": "### ⛔ Preflight\n\nEvery issue listed under **`## Blocked by`** at the bottom of this ticket must read `CLOSED`:\n\n```bash\ngh issue view <N> --json state -q .state\n```\n\n---\n\n## What to build\n\nStuff.\n\n## Blocked by\n\n- #2 — from the body\n",
     "comments": {
       "nodes": []
+    }
+  },
+  {
+    "number": 25,
+    "title": "needs you, waiting",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "🛡 super-board · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+        }
+      ]
+    }
+  },
+  {
+    "number": 26,
+    "title": "needs you, done comment",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "🛡 super-board · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+        },
+        {
+          "body": "Done"
+        }
+      ]
+    }
+  },
+  {
+    "number": 27,
+    "title": "needs you, done label",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "labels": {
+      "nodes": [
+        {
+          "name": "needs-you:done"
+        }
+      ]
+    },
+    "comments": {
+      "nodes": [
+        {
+          "body": "🛡 super-board · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+        }
+      ]
+    }
+  },
+  {
+    "number": 28,
+    "title": "done before the block",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "done"
+        },
+        {
+          "body": "🛡 super-board · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+        }
+      ]
     }
   }
 ]

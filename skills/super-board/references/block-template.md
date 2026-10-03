@@ -57,7 +57,7 @@ same rule: **prose above for the human, one parseable line below for the loop.**
 
 - `blocked-by: 32, 91` — this card returns to `Ready` the moment both close. The sweep does it.
 - `blocked-by: -` — nothing on this board clears it. It waits for a person, and the sweep leaves it
-  alone. Use this for every `🔐`, `💳`, `🔑`, `🧑` and `🎨` block.
+  alone. Use this for every `🔐`, `💳`, `🔑`, `🧑`, `🎨` and `🙋` block.
 
 Write the numbers alone. **Never `blocked-by: none — but #26 must merge first`**: a line that says
 none and then names an issue is read as *no blocker* by the sweep and as *one blocker* by a human,
@@ -83,6 +83,49 @@ Skipped comments use the same template with `🤷 super-board · <lane> · SKIPP
 | 🤷    | Out-of-scope                | wrong project, deferred to other milestone, manual-only ticket           |
 | 📦    | Wrong-place                 | belongs on a different board / repo                                      |
 | 🎨    | Pure design                 | no measurable AC; needs design pass first                                |
+| 👯    | Duplicate                   | pre-flight: a merged PR already delivers it, or an open PR / card is building it |
+| ⏳    | Sequenced                   | pre-flight: an open PR touches the same files — waits on the issue that PR closes |
+| 🙋    | Needs you (human-only step) | merge gate exit 7 (merge_policy: money/auth/schema/size — review and merge it, or comment `done` to approve) or exit 8: a migration for a DB the robot may not touch, an allowed migrate command failed, a `needs-you:` step in the PR body, `migrations.human_steps` |
+
+## 🙋 Needs you — a command only a human may run
+
+There is no "Needs you" column: the card goes to **Blocked**, tagged 🙋, with the `needs-you`
+label on the issue and the PR. Use it whenever the next step is a command the robot must not run
+itself — the merge gate's exit 7 (merge_policy routes the merge to a human: review and merge
+it yourself, or comment `done` to approve and let the next wave merge it) and exit 8 (migrations against a database outside `migrations.allowed_envs`,
+an allowed migrate command that failed, a declared human step), or any lane that hits one.
+
+```
+🛡 super-board · Review · BLOCKED
+─────────────────────────────────────
+Card:        #<N> <title>
+PR:          #<P>
+Reason tag:  🙋 needs you
+Why blocked: <one line — e.g. "PR adds supabase/migrations/0042_add_plan.sql; live is not in allowed_envs">
+Evidence:    <the gate's `needs-you:` lines, verbatim>
+Checked:     <verify_commands green against <base>@<sha>; migrated: test, staging>
+What blocks: the command(s) below, run by a person against <env>
+Why I (bot) cannot decide:
+             <"live database; onboarding allowed test and staging only">
+To unblock:  [ ] <exact command 1, copy-paste ready>
+             [ ] <exact command 2>
+             [ ] comment `done` here (or add the `needs-you:done` label)
+Owner:       <Eric | repo admin>
+Move back:   automatic — the next wave sees `done`, moves the card to Review, and the merge gate re-verifies and merges
+blocked-by:  -
+```
+
+**The `To unblock` commands are exact.** Copy them from the gate's `needs-you: <command>` lines;
+never paraphrase ("run the migration on prod"). A placeholder such as `<your live migrate command>`
+means the config has no command for that env — say so in `Why blocked` and name the config key
+(`migrations.commands.live`).
+
+**Resume.** The wave planner's `resume` list carries every 🙋 card whose human said `done` (a
+comment after the 🙋 block that reads just `done`, or the `needs-you:done` label). The orchestrator
+moves it to **Review** and puts `needs-you:done` on the PR; the Reviewer re-runs the merge gate,
+which re-checks the head, re-verifies against the base, skips the merge-policy check (the human
+approved), re-runs the allowed migrations, and merges.
+A command that still fails puts the card straight back here.
 
 ## Hard rule
 
