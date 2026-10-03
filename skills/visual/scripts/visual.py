@@ -37,6 +37,22 @@ def git(*args: str, cwd: Path | None = None, check: bool = True) -> str:
     return r.stdout if r.returncode == 0 else ""
 
 
+def portable_path(p, root: Path) -> str:
+    """A path safe to publish: repo-relative inside `root`, `~/…` under home, else the bare name.
+    Never leaks a machine-local absolute path (user name, worktree, tmp dir) into a page."""
+    if not p:
+        return ""
+    p = Path(p)
+    if not p.is_absolute():
+        return p.as_posix()
+    for base, prefix in ((root, ""), (Path.home(), "~/")):
+        try:
+            return prefix + p.resolve().relative_to(Path(base).resolve()).as_posix()
+        except ValueError:
+            pass
+    return p.name
+
+
 def repo_root() -> Path | None:
     out = git("rev-parse", "--show-toplevel", check=False).strip()
     return Path(out) if out else None
@@ -271,9 +287,11 @@ def cmd_render(a) -> None:
             sys.exit("map model problems:\n  " + "\n  ".join(problems))
     data.setdefault("meta", {})["generated"] = dt.datetime.now().isoformat(timespec="minutes")
     data["meta"].setdefault("project", root.name)
-    data["meta"].setdefault("root", str(data.pop("_root", None) or root))
-
+    abs_root = Path(data.pop("_root", None) or root)
     out = Path(a.out) if a.out else output_path(root, data)
+    # repo root relative to the page, so source links resolve wherever the repo is checked out
+    data["meta"].setdefault("root", Path(os.path.relpath(abs_root.resolve(), out.resolve().parent)).as_posix())
+
     out.parent.mkdir(parents=True, exist_ok=True)
     write_page(out, data)
     baked = 0
@@ -335,7 +353,7 @@ def load_map(path: Path) -> dict:
     top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=path.resolve().parent,
                          capture_output=True, text=True).stdout.strip()
     data["_root"] = top or str(path.resolve().parent)
-    data.setdefault("source", str(path))
+    data.setdefault("source", portable_path(path.resolve(), Path(data["_root"])))
     return data
 
 
@@ -473,7 +491,7 @@ def cmd_skillmap(a) -> None:
             when = re.search(r"\bUse (?:it )?when (.*)$", desc, re.S)
             add_node({"id": did, "label": n, "kind": "external", "external": True, "origin": origin(n), "verbs": [],
                       "what": first_sentence(desc), "when": ("Use when " + when[1].strip()) if when else "",
-                      "how": "", "source": str(md) if md else ""})
+                      "how": "", "source": portable_path(md, top_p)})
         return did
 
     script_re = re.compile(r"(?<![\w/.-])((?:scripts|workflows|bin)/[\w.-]+\.(?:sh|py|js|mjs))")

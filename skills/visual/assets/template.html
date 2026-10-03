@@ -1360,7 +1360,13 @@
     const root = D.meta && D.meta.root ? D.meta.root.replace(/\/$/, '') : '';
     const base = D.sourcesBase ? String(D.sourcesBase).replace(/\/$/, '') + '/' : '';
     const srcPath = p => p.replace(/:\d+(-\d+)?$/, '');
-    const srcHref = p => /^https?:/.test(p) ? p : 'file://' + encodeURI((p.startsWith('/') ? '' : root + '/' + base) + srcPath(p));
+    // meta.root is the repo root relative to this page (older pages: absolute). `~/…` sources live
+    // outside the repo, so they get no link.
+    const srcHref = p => /^https?:/.test(p) ? p
+      : p.startsWith('~') ? ''
+      : p.startsWith('/') ? 'file://' + encodeURI(srcPath(p))
+      : root.startsWith('/') ? 'file://' + encodeURI(root + '/' + base + srcPath(p))
+      : encodeURI((root ? root + '/' : '') + base + srcPath(p));
     const srcList = n => (Array.isArray(n.source) ? n.source : n.source ? [n.source] : []);
 
     const app = document.getElementById('app'); app.className = 'mapapp';
@@ -1583,7 +1589,7 @@
         <div class="pb">
           ${sec('What it does', n.what)}${sec('When it triggers', n.when)}${sec('How it works', n.how)}
           ${!n.what && !n.when && !n.how ? '<div class="rel-none">No description yet — enrich <code>what</code>, <code>when</code>, <code>how</code> in the map model.</div>' : ''}
-          ${srcList(n).length ? `<section class="ps"><h4>Source</h4>${srcList(n).map(s => `<div class="src"><a href="${esc(srcHref(s))}" title="Open ${esc(base + s)}">${esc(s)}</a><button class="ibtn sm" data-copy="${esc(base + s)}" title="Copy path">⧉</button></div>`).join('')}</section>` : ''}
+          ${srcList(n).length ? `<section class="ps"><h4>Source</h4>${srcList(n).map(s => `<div class="src">${srcHref(s) ? `<a href="${esc(srcHref(s))}" title="Open ${esc(base + s)}">${esc(s)}</a>` : `<span>${esc(s)}</span>`}<button class="ibtn sm" data-copy="${esc(base + s)}" title="Copy path">⧉</button></div>`).join('')}</section>` : ''}
           <section class="ps"><h4>Upstream <span>${ups.length}</span></h4>${relRows(ups, 'up')}</section>
           <section class="ps"><h4>Downstream <span>${downs.length}</span></h4>${relRows(downs, 'down')}</section>
           ${vIn.length ? `<section class="ps"><h4>Also appears in</h4><div class="pviews">${vIn.map(v => `<button class="pview" data-v="${esc(v.id)}" data-sel="${esc(nid)}">${esc(v.title || v.id)}</button>`).join('')}</div></section>` : ''}

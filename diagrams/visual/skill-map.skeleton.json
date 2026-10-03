@@ -201,7 +201,7 @@
       "what": "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/spec asked for?).",
       "when": "Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\".",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/code-review/SKILL.md"
+      "source": ".agents/skills/code-review/SKILL.md"
     },
     {
       "id": "dep:codebase-design",
@@ -213,7 +213,7 @@
       "what": "Shared vocabulary for designing deep modules.",
       "when": "Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/codebase-design/SKILL.md"
+      "source": ".agents/skills/codebase-design/SKILL.md"
     },
     {
       "id": "dep:diagnosing-bugs",
@@ -225,7 +225,7 @@
       "what": "Diagnosis loop for hard bugs and performance regressions.",
       "when": "Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/diagnosing-bugs/SKILL.md"
+      "source": ".agents/skills/diagnosing-bugs/SKILL.md"
     },
     {
       "id": "dep:implement",
@@ -237,7 +237,7 @@
       "what": "Implement a piece of work based on a spec or set of tickets.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/implement/SKILL.md"
+      "source": ".agents/skills/implement/SKILL.md"
     },
     {
       "id": "dep:grilling",
@@ -249,7 +249,7 @@
       "what": "Grill the user relentlessly about a plan, decision, or idea.",
       "when": "Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/grilling/SKILL.md"
+      "source": ".agents/skills/grilling/SKILL.md"
     },
     {
       "id": "dep:ponytail",
@@ -261,7 +261,7 @@
       "what": "Lazy senior dev mode for any coding task (write, refactor, fix, review): YAGNI, stdlib first, no unrequested abstractions.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/.claude/plugins/cache/ponytail/ponytail/4.10.0/.openclaw/skills/ponytail/SKILL.md"
+      "source": "~/.claude/plugins/cache/ponytail/ponytail/4.10.0/.openclaw/skills/ponytail/SKILL.md"
     },
     {
       "id": "dep:tdd",
@@ -273,7 +273,7 @@
       "what": "Test-driven development.",
       "when": "Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/tdd/SKILL.md"
+      "source": ".agents/skills/tdd/SKILL.md"
     },
     {
       "id": "dep:verification-before-completion",
@@ -285,7 +285,7 @@
       "what": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
       "when": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/verification-before-completion/SKILL.md"
+      "source": ".agents/skills/verification-before-completion/SKILL.md"
     },
     {
       "id": "dep:improve-codebase-architecture",
@@ -297,7 +297,7 @@
       "what": "Scan a codebase for deepening opportunities, present them as a visual HTML report, then grill through whichever one you pick.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/improve-codebase-architecture/SKILL.md"
+      "source": ".agents/skills/improve-codebase-architecture/SKILL.md"
     },
     {
       "id": "dep:ponytail-audit",
@@ -309,7 +309,7 @@
       "what": "Audit the whole repo for over-engineering.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/.claude/plugins/cache/ponytail/ponytail/4.10.0/.openclaw/skills/ponytail-audit/SKILL.md"
+      "source": "~/.claude/plugins/cache/ponytail/ponytail/4.10.0/.openclaw/skills/ponytail-audit/SKILL.md"
     },
     {
       "id": "script:super-qa-file-bug.sh",
@@ -331,7 +331,7 @@
       "what": "Ask which skill or flow fits your situation.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/ask-matt/SKILL.md"
+      "source": ".agents/skills/ask-matt/SKILL.md"
     },
     {
       "id": "dep:tdd-v2",
@@ -343,7 +343,7 @@
       "what": "The EricOS testing ladder — which rung a test belongs at and what must be true before climbing to the next.",
       "when": "Use when writing any test, building a feature test-first, or choosing between a unit test, a component test, and a browser end-to-end spec. Supersedes any other TDD skill here; pairs with `tdd`, which owns the red-green discipline.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/tdd-v2/SKILL.md"
+      "source": ".agents/skills/tdd-v2/SKILL.md"
     },
     {
       "id": "script:super-review-file-refactor.sh",
@@ -365,7 +365,7 @@
       "what": "Review a diff for over-engineering.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/.claude/plugins/cache/ponytail/ponytail/4.10.0/.openclaw/skills/ponytail-review/SKILL.md"
+      "source": "~/.claude/plugins/cache/ponytail/ponytail/4.10.0/.openclaw/skills/ponytail-review/SKILL.md"
     },
     {
       "id": "script:context.mjs",
@@ -407,7 +407,7 @@
       "what": "Strip AI writing tells from any draft so it reads like a person wrote it.",
       "when": "Use when writing or rewriting emails, Skool posts, lessons, scripts, docs, or any prose Eric will publish or send, and when he says humanize, make this sound human, less AI, remove the AI tells, or de-slop this. Runs as a pass over a finished draft, with Eric Tech overrides so bold, bullets and emoji survive.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/humanizer/SKILL.md"
+      "source": ".agents/skills/humanizer/SKILL.md"
     },
     {
       "id": "dep:impeccable",
@@ -419,7 +419,7 @@
       "what": "Use when the user wants to design, redesign, shape, critique, audit, polish, clarify, distill, harden, optimize, adapt, animate, colorize, extract, or otherwise improve a frontend interface.",
       "when": "Use when the user wants to design, redesign, shape, critique, audit, polish, clarify, distill, harden, optimize, adapt, animate, colorize, extract, or otherwise improve a frontend interface. Covers websites, landing pages, dashboards, product UI, app shells, components, forms, settings, onboarding, and empty states. Handles UX review, visual hierarchy, information architecture, cognitive load, accessibility, performance, responsive behavior, theming, anti-patterns, typography, fonts, spacing, layout, alignment, color, motion, micro-interactions, UX copy, error states, edge cases, i18n, and reusable design systems or tokens. Also use for bland designs that need to become bolder or more delightful, loud designs that should become quieter, live browser iteration on UI elements, or ambitious visual effects that should feel technically extraordinary. Not for backend-only or non-UI tasks.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/impeccable/SKILL.md"
+      "source": ".agents/skills/impeccable/SKILL.md"
     },
     {
       "id": "script:visual.py",
@@ -541,7 +541,7 @@
       "what": "Configure this repo for the engineering skills — set up its issue tracker, triage label vocabulary, and domain doc layout.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/setup-matt-pocock-skills/SKILL.md"
+      "source": ".agents/skills/setup-matt-pocock-skills/SKILL.md"
     },
     {
       "id": "dep:domain-modeling",
@@ -553,7 +553,7 @@
       "what": "Build and sharpen a project's domain model.",
       "when": "Use when the user wants to pin down domain terminology or a ubiquitous language, record an architectural decision, or when another skill needs to maintain the domain model.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/domain-modeling/SKILL.md"
+      "source": ".agents/skills/domain-modeling/SKILL.md"
     },
     {
       "id": "dep:grill-me",
@@ -565,7 +565,7 @@
       "what": "A relentless interview to sharpen a plan or design.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/grill-me/SKILL.md"
+      "source": ".agents/skills/grill-me/SKILL.md"
     },
     {
       "id": "dep:grill-with-docs",
@@ -577,7 +577,7 @@
       "what": "A relentless interview to sharpen a plan or design, which builds the domain docs (glossary, ADRs) and checkpoints every answer to a durable capture file as we go.",
       "when": "Use when the user says grill-with-docs, grill me, grill me with checkpoints, wants to stress-test a plan, or needs messy thinking extracted into organized notes without losing context.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/grill-with-docs/SKILL.md"
+      "source": ".agents/skills/grill-with-docs/SKILL.md"
     },
     {
       "id": "dep:handoff",
@@ -589,7 +589,7 @@
       "what": "Compact the current conversation into a handoff document for another agent to pick up.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/handoff/SKILL.md"
+      "source": ".agents/skills/handoff/SKILL.md"
     },
     {
       "id": "dep:prototype",
@@ -601,7 +601,7 @@
       "what": "Build a throwaway prototype to answer a design question.",
       "when": "Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/prototype/SKILL.md"
+      "source": ".agents/skills/prototype/SKILL.md"
     },
     {
       "id": "dep:research",
@@ -613,7 +613,7 @@
       "what": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo.",
       "when": "Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/research/SKILL.md"
+      "source": ".agents/skills/research/SKILL.md"
     },
     {
       "id": "dep:resolving-merge-conflicts",
@@ -625,7 +625,7 @@
       "what": "Use when you need to resolve an in-progress git merge/rebase conflict.",
       "when": "Use when you need to resolve an in-progress git merge/rebase conflict.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/resolving-merge-conflicts/SKILL.md"
+      "source": ".agents/skills/resolving-merge-conflicts/SKILL.md"
     },
     {
       "id": "dep:teach",
@@ -637,7 +637,7 @@
       "what": "Teach the user a new skill or concept, within this workspace.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/teach/SKILL.md"
+      "source": ".agents/skills/teach/SKILL.md"
     },
     {
       "id": "dep:to-questionnaire",
@@ -649,7 +649,7 @@
       "what": "Turn a decision you can't fully answer into a questionnaire for someone else to fill in.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/to-questionnaire/SKILL.md"
+      "source": ".agents/skills/to-questionnaire/SKILL.md"
     },
     {
       "id": "dep:to-spec",
@@ -661,7 +661,7 @@
       "what": "Turn the current conversation into a spec and publish it to the project issue tracker — no interview, just synthesis of what you've already discussed.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/to-spec/SKILL.md"
+      "source": ".agents/skills/to-spec/SKILL.md"
     },
     {
       "id": "dep:to-tickets",
@@ -673,7 +673,7 @@
       "what": "Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker — edges as text in one file per ticket locally, or native blocking links on a real tracker.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/to-tickets/SKILL.md"
+      "source": ".agents/skills/to-tickets/SKILL.md"
     },
     {
       "id": "dep:triage",
@@ -685,7 +685,7 @@
       "what": "Move issues and external PRs through a state machine of triage roles — categorise, verify, grill if needed, and write agent-ready briefs.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/triage/SKILL.md"
+      "source": ".agents/skills/triage/SKILL.md"
     },
     {
       "id": "dep:wait-what",
@@ -697,7 +697,7 @@
       "what": "Stop.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/wait-what/SKILL.md"
+      "source": ".agents/skills/wait-what/SKILL.md"
     },
     {
       "id": "dep:wayfinder",
@@ -709,7 +709,7 @@
       "what": "Plan a huge chunk of work — more than one agent session can hold — as a shared map of decision tickets on your issue tracker, and resolve them one at a time until the way to the destination is clear.",
       "when": "",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/wayfinder/SKILL.md"
+      "source": ".agents/skills/wayfinder/SKILL.md"
     },
     {
       "id": "dep:wizard",
@@ -721,7 +721,7 @@
       "what": "Generate an interactive bash wizard that walks a human through steps only they can perform.",
       "when": "Use when provisioning infrastructure, setting up credentials or CI secrets, walking an unfamiliar third-party dashboard, or running a one-off migration or cutover. Don't invoke this for steps the agent can perform itself.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/wizard/SKILL.md"
+      "source": ".agents/skills/wizard/SKILL.md"
     },
     {
       "id": "dep:writing-for-agents",
@@ -733,7 +733,7 @@
       "what": "Writing documents for agents.",
       "when": "Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md.",
       "how": "",
-      "source": "/Users/erictech/Desktop/EricOS/.claude/worktrees/sb-cleanup/.agents/skills/writing-for-agents/SKILL.md"
+      "source": ".agents/skills/writing-for-agents/SKILL.md"
     }
   ],
   "edges": [
