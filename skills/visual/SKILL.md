@@ -34,7 +34,7 @@ For a skill pack or any system with nested levels. The page is a full-screen can
 
 1. **Skeleton.** `python3 scripts/visual.py skillmap <skills-dir> --deep --out map.json` reads SKILL.md frontmatter, `families.json`, `/skill` mentions, referenced scripts, and `hooks/settings-snippet.json`; `--deep` follows every external skill into the skills it triggers. Not a skill pack? Write `map.json` by hand.
 2. **Enrich.** Read the skills and fill every node's `what`, `when`, `how`, and real `source` — the panel shows all four, so none stays empty. Skills first, scripts second: a view shows the skills (and verbs) a node triggers; scripts are small detail nodes or live in `how`. Mark outside skills `kind: external` with `author` (GitHub login) and add `authors`; `render` embeds their avatars. Fix edges and give each view a short `caption`. `references/schema.md` § Map model is the contract.
-3. **Render:** `python3 scripts/visual.py render --map map.json`. It searches each view for a crossing-free layout and bakes it into the page, then runs the check. Finish with steps 4–5 of Run it.
+3. **Render:** `python3 scripts/visual.py render --map map.json`. It searches each view for a crossing-free layout and bakes it into the page, then runs the check. Publishing the page (GitHub Pages)? Add `--source-base https://github.com/OWNER/REPO/blob/main/` (and `--source-root <dir>` when the hosted repo is a subfolder) so Source links open the hosted file. Finish with steps 4–5 of Run it.
 
 ## Rules
 

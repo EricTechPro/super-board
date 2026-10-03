@@ -5,6 +5,7 @@
     visual.py facts  [--base REF]           # JSON: recap facts (commits, files +/-, areas)
     visual.py render DATA.json [--out PATH] [--no-open] [--no-check]
     visual.py render --map MAP.json [--out PATH] [--no-open] [--no-check]
+                     [--source-base URL [--source-root DIR]]   # link sources to e.g. GitHub blob URLs
     visual.py skillmap SKILLS_DIR [--out MAP.json]   # skeleton view model of a skill pack
     visual.py check PAGE.html [--shots DIR]          # headless Chrome: light+dark shots, label overlaps
 
@@ -289,6 +290,8 @@ def cmd_render(a) -> None:
     data["meta"].setdefault("project", root.name)
     abs_root = Path(data.pop("_root", None) or root)
     out = Path(a.out) if a.out else output_path(root, data)
+    if getattr(a, "source_base", None):
+        link_sources(data, abs_root, Path(a.source_root).resolve() if a.source_root else abs_root, a.source_base)
     # repo root relative to the page, so source links resolve wherever the repo is checked out
     data["meta"].setdefault("root", Path(os.path.relpath(abs_root.resolve(), out.resolve().parent)).as_posix())
 
@@ -316,6 +319,49 @@ def cmd_render(a) -> None:
         subprocess.run([opener, str(out)], capture_output=True)
     if result.get("check", {}).get("overlaps"):
         sys.exit(2)
+
+
+def link_sources(data: dict, repo: Path, src_root: Path, base: str) -> int:
+    """--source-base: rewrite each node `source` under `src_root` into `base + <path from src_root>`
+    (`file:12-20` → `#L12-L20`), so a page published away from the checkout (GitHub Pages) links to
+    the hosted file. Sources outside `src_root` keep their text and get no link. Returns the count."""
+    from urllib.parse import quote
+    base = base.rstrip("/") + "/"
+    prefix = (data.get("sourcesBase") or "").strip("/")
+
+    def one(s):
+        if not isinstance(s, str) or not s or re.match(r"https?:", s) or s.startswith("~"):
+            return s, 0
+        m = re.match(r"(.*?)(?::(\d+)(?:-(\d+))?)?$", s)
+        path, a, b = m[1], m[2], m[3]
+        full = (repo / prefix / path).resolve()
+        try:
+            rel = full.relative_to(src_root).as_posix()
+        except ValueError:
+            return s, 0
+        anchor = f"#L{a}" + (f"-L{b}" if b else "") if a else ""
+        return base + quote(rel) + anchor, 1
+
+    n = 0
+    for node in data.get("nodes", []):
+        src = node.get("source")
+        if isinstance(src, list):
+            pairs = [one(s) for s in src]
+            node["source"] = [p for p, _ in pairs]
+            n += sum(c for _, c in pairs)
+        elif src:
+            node["source"], c = one(src)
+            n += c
+    if isinstance(data.get("source"), str) and not data["source"].startswith("~"):
+        try:
+            data["source"] = (repo / data["source"]).resolve().relative_to(src_root).as_posix()
+        except ValueError:
+            pass
+    data["sourcesBase"] = ""
+    data.setdefault("meta", {})["sourceBase"] = base
+    data["meta"]["root"] = ""  # links are absolute now; don't publish the checkout's folder depth
+    data["meta"]["project"] = data.get("meta", {}).get("project") if src_root == repo else src_root.name
+    return n
 
 
 def write_page(out: Path, data: dict) -> None:
@@ -762,6 +808,8 @@ def main() -> None:
     r.add_argument("--no-open", action="store_true")
     r.add_argument("--no-check", action="store_true", help="skip the headless Chrome check")
     r.add_argument("--no-optimize", action="store_true", help="map: skip baking crossing-minimised layouts")
+    r.add_argument("--source-base", help="URL prefix for node sources (e.g. https://github.com/OWNER/REPO/blob/main/)")
+    r.add_argument("--source-root", help="with --source-base: folder the URL prefix maps to (default: the repo root)")
     m = sub.add_parser("skillmap")
     m.add_argument("skills_dir")
     m.add_argument("--out")

@@ -28,7 +28,7 @@ PY
 
 # 1 — a changed brief makes --check fail without writing; a sync fixes it.
 copy
-fam 'd["secondary"]["skills"]["visual"] = "A brand new brief."'
+fam 'd["you_type"]["skills"]["visual"] = "A brand new brief."'
 BEFORE=$(cat "$T/README.md")
 RC=0; python3 "$SYNC" --check 2>/dev/null || RC=$?
 [ "$RC" -eq 1 ] || fail "--check on a stale README should exit 1, got $RC"
@@ -38,16 +38,21 @@ grep -q "A brand new brief." "$T/README.md" || fail "sync did not write the new 
 python3 "$SYNC" --check || fail "--check after a sync should pass"
 rm -rf "$T"; ok
 
-# 2 — a new skill bumps the counts in the pitch line and badge, and its
-#     folded (>-) description is read when its brief is empty.
+# 2 — a new skill bumps every "N skills (N you type, N the board runs)" count, the
+#     family title and the badge, and its folded (>-) description is read when its
+#     brief is empty.
 copy
 mkdir -p "$T/skills/new-one"
 printf -- '---\nname: new-one\ndescription: >-\n  Does a new thing. Then more.\n---\n' > "$T/skills/new-one/SKILL.md"
-fam 'd["secondary"]["skills"]["new-one"] = ""'
+fam 'd["you_type"]["skills"]["new-one"] = ""'
 python3 "$SYNC" >/dev/null
-read -r NP NS <<<"$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(len(d["primary"]["skills"]), len(d["secondary"]["skills"]))' "$T/skills/families.json")"
-grep -q "\*\*$((NP + NS)) skills\*\* — $NP primary, $NS secondary" "$T/README.md" || fail "pitch counts not updated"
-grep -q "badge/skills-$((NP + NS))-" "$T/README.md" || fail "skills badge not updated"
+read -r NY NB <<<"$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(len(d["you_type"]["skills"]), len(d["board_runs"]["skills"]))' "$T/skills/families.json")"
+PHRASE="$((NY + NB)) skills ($NY you type, $NB the board runs)"
+[ "$(grep -cF "$PHRASE" "$T/README.md")" -ge 2 ] || fail "header and Skills counts not both updated to: $PHRASE"
+grep -qF "**You type — $NY skills**" "$T/README.md" || fail "family title count not updated"
+if grep -q "badge/skills-" README.md; then  # the badge is optional; when present it must follow
+  grep -q "badge/skills-$((NY + NB))-" "$T/README.md" || fail "skills badge not updated"
+fi
 grep -q '| \[`/new-one`\](skills/new-one/SKILL.md) | Does a new thing. |' "$T/README.md" || fail "empty brief should fall back to the description's first sentence"
 rm -rf "$T"; ok
 
@@ -58,14 +63,14 @@ RC=0; python3 "$SYNC" --check 2>/dev/null || RC=$?
 [ "$RC" -eq 2 ] || fail "an unlisted skill should exit 2, got $RC"
 rm -rf "$T"
 copy
-fam 'd["primary"]["skills"]["super-qa"] = " ".join(["word"] * 15)'
+fam 'd["board_runs"]["skills"]["super-qa"] = " ".join(["word"] * 15)'
 RC=0; python3 "$SYNC" 2>/dev/null || RC=$?
 [ "$RC" -eq 2 ] || fail "a 15-word brief should exit 2, got $RC"
 rm -rf "$T"; ok
 
 # 4 — --hook syncs only for an edit under skills/, and always exits 0.
 copy
-fam 'd["secondary"]["skills"]["visual"] = "Hook brief."'
+fam 'd["you_type"]["skills"]["visual"] = "Hook brief."'
 printf '{"tool_input":{"file_path":"%s/docs/x.md"}}' "$T" | python3 "$SYNC" --hook || fail "--hook must exit 0"
 grep -q "Hook brief." "$T/README.md" && fail "--hook must not sync for a path outside skills/"
 printf 'not json' | python3 "$SYNC" --hook || fail "--hook must exit 0 on bad input"
@@ -79,7 +84,7 @@ rm -rf "$T"; ok
 #     commit and regenerates README; once staged, the next run passes.
 copy
 ( cd "$T" && git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -q -m init )
-fam 'd["secondary"]["skills"]["visual"] = "Pre-commit brief."'
+fam 'd["you_type"]["skills"]["visual"] = "Pre-commit brief."'
 ( cd "$T" && git add skills/families.json )
 RC=0; ( cd "$T" && sh hooks/pre-commit-readme.sh >/dev/null 2>&1 ) || RC=$?
 [ "$RC" -eq 1 ] || fail "pre-commit should stop a commit with a stale README, got $RC"

@@ -67,6 +67,23 @@ QA → Review → Done (test what exists), `bug` and `feature` go through Buildi
 with no label is built (the classifier adds `feature` or `bug`). There is no Skipped column: a
 card dropped on purpose is closed as not planned and moved to Done with a 🤷 comment.
 
+## Setup notes
+
+- Needs Claude Code, `gh` (authenticated for the board's owner), `jq`, bash 3.2+ and Python 3.
+- Or install from a checkout: `./install.sh [--no-hooks] [--protect-main] /path/to/your-project`.
+- The board is a GitHub Project (v2) with a `Status` field: `Backlog, Ready, Building, QA, Review, Blocked, Done`. `onboard` reuses your best-matching board (adding what is missing, keeping every card) or creates one.
+- Three labels route cards: `qa` skips Building (test what exists), `bug` and `feature` are built first; no label is built too.
+- Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
+- Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
+- `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older super-board is upgraded in place (see [Upgrading from 2.x](../../RELEASE-NOTES.md#upgrading-from-2x)).
+- `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
+- Auto-merge needs the merge-gate and `gh pr merge` lines in your allowlist; `onboard` offers them as a diff.
+- `onboard` can make AGENTS.md the source of truth (CLAUDE.md becomes `@AGENTS.md`) and keeps a managed super-board section in it. Plugin install: the command is `/super-board:super-board onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
+- Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/super-collect` runs it like the built-ins.
+- Testing a live site with no repo is not a board: `/super-qa <url>` runs on its own.
+- To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record` to your status-line script.
+- Cards need acceptance criteria: QA grades against them, and `lint` tells you which are missing.
+
 ## Skills
 
 | Skill | Use it for |

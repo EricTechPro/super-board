@@ -1,0 +1,57 @@
+name: pages
+
+# Publishes the public pages to GitHub Pages, and nothing else:
+#   /                    diagrams/index.html (landing)
+#   /assets/             diagrams/assets/*.png (page-card screenshots)
+#   /skill-map/          diagrams/visual/skill-map.html
+#   /onboarding/         diagrams/onboarding/index.html (setup simulator)
+#   /impeccable/         diagrams/impeccable/index.html
+#   /writing-standard/   diagrams/writing-standard/reference.html (read-only reference)
+# Pick-a-design pages (choose, confirm, carousels, older simulator versions) stay out.
+# Only files in this repo are copied; no event input is interpolated.
+
+on:
+  push:
+    branches: [main]
+    paths: ["diagrams/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: assemble site
+        run: |
+          mkdir -p _site/assets _site/skill-map _site/onboarding _site/impeccable _site/writing-standard
+          cp diagrams/index.html _site/index.html
+          cp diagrams/assets/*.png _site/assets/
+          cp diagrams/visual/skill-map.html _site/skill-map/index.html
+          cp diagrams/onboarding/index.html _site/onboarding/index.html
+          cp diagrams/impeccable/index.html _site/impeccable/index.html
+          cp diagrams/writing-standard/reference.html _site/writing-standard/index.html
+          touch _site/.nojekyll
+          find _site -type f | sort
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -83,6 +83,9 @@ The drill-down map takes its own file: shared nodes and edges, plus views that e
   "title": "super-board skill map",
   "root": "overview",                      // optional; default = the view with no parent
   "sourcesBase": "_skills/vendor/super-board/",   // optional prefix for node `source` paths (from the repo root)
+  // publishing the page away from the checkout (GitHub Pages)? `render --map map.json --source-base
+  // https://github.com/OWNER/REPO/blob/main/ [--source-root <pack dir>]` links each source under the
+  // source root to that URL (`:12-20` → `#L12-L20`); sources outside it show as text, no link
   "authors": { "mattpocock": { "name": "Matt Pocock", "url": "https://github.com/mattpocock" } },  // avatars are fetched once and inlined by render
   "nodes": [
     { "id": "super-board", "label": "/super-board",

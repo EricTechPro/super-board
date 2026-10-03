@@ -7,10 +7,11 @@
                                          # edited file is under skills/; always exit 0
 
 Reads each skill's `name` and `description` frontmatter, groups skills by
-skills/families.json (primary / secondary, one brief each, under 15 words; an
+skills/families.json (you_type / board_runs, one brief each, under 15 words; an
 empty brief falls back to the description's first sentence), and
 replaces everything between <!-- skills:start --> and <!-- skills:end -->. Also
-updates the skill counts in the pitch line and the skills badge.
+updates every "N skills (N you type, N the board runs)" count, "**N skills**",
+the "— N skills" in each family title, and the skills badge.
 
 Exit codes: 0 ok / rewritten, 1 stale (--check), 2 bad input (a skill missing
 from families.json or vice versa, a brief of 15+ words, missing markers).
@@ -80,7 +81,8 @@ def render() -> tuple[str, dict[str, int]]:
     parts: list[str] = []
     for fam_key, fam in families.items():
         counts[fam_key] = len(fam["skills"])
-        parts += [f"**{fam['title']}**", "", "| Skill | What it does |", "|---|---|"]
+        title = re.sub(r"— \d+ ", f"— {len(fam['skills'])} ", fam["title"])
+        parts += [f"**{title}**", "", "| Skill | What it does |", "|---|---|"]
         for skill, brief in fam["skills"].items():
             fm = frontmatter(on_disk[skill])
             name = fm.get("name") or skill
@@ -106,8 +108,9 @@ def sync(text: str) -> str:
     _, tail = rest.split(END, 1)
     text = f"{head}{START}\n{table}{END}{tail}"
     text = re.sub(r"\*\*\d+ skills\*\*", f"**{total} skills**", text)
-    text = re.sub(r"\d+ primary, \d+ secondary",
-                  f"{counts.get('primary', 0)} primary, {counts.get('secondary', 0)} secondary", text)
+    typed, lanes = counts.get("you_type", 0), counts.get("board_runs", 0)
+    text = re.sub(r"\d+ skills \(\d+ you type, \d+ the board runs\)",
+                  f"{total} skills ({typed} you type, {lanes} the board runs)", text)
     text = re.sub(r"badge/skills-\d+-", f"badge/skills-{total}-", text)
     return text
 

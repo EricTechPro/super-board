@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>super-board</title>
+<meta name="description" content="Add tasks, walk away, get merged PRs with proof. An autonomous GitHub Project board for Claude Code.">
+<meta property="og:title" content="super-board">
+<meta property="og:description" content="Add tasks, walk away, get merged PRs with proof.">
+<meta property="og:image" content="https://erictechpro.github.io/super-board/assets/skill-map.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='4' y='4' width='88' height='88' rx='20' fill='%230d1117'/%3E%3Crect x='17' y='20' width='14' height='10' rx='2.5' fill='%23d97757'/%3E%3Crect x='41' y='20' width='14' height='10' rx='2.5' fill='%2358a6ff'/%3E%3Crect x='65' y='20' width='14' height='10' rx='2.5' fill='%233fb950'/%3E%3Crect x='65' y='33' width='14' height='10' rx='2.5' fill='%233fb950'/%3E%3C/svg%3E">
+<style>
+/* GitHub Primer tokens, light and dark */
+:root{
+  --bg:#ffffff; --soft:#f6f8fa; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0;
+  --accent:#0969da; --pri:#1f883d; --pri-fg:#ffffff;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans)}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font:13px var(--mono)}
+.sec{padding:64px 32px;border-top:1px solid var(--border);scroll-margin-top:56px}
+.in{max-width:1080px;margin:0 auto;min-width:0}
+.in>*{min-width:0}
+h1.big{font:700 52px/1.08 var(--sans);letter-spacing:-.02em;margin:0 0 14px}
+h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
+.lead{color:var(--muted);margin:0 0 24px;font-size:16px}
+.small{color:var(--muted);font-size:13px;margin:12px 0 0}
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border-radius:6px;border:1px solid var(--border);background:var(--soft);color:var(--fg)!important;font:600 14px/1.2 var(--sans);text-decoration:none!important;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:var(--pri-fg)!important}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn svg{fill:currentColor}
+.ctas{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.cmd{display:flex;align-items:center;gap:10px;background:var(--soft);border:1px solid var(--border);border-radius:6px;padding:6px 6px 6px 14px;max-width:660px;text-align:left}
+.cmd code{flex:1;min-width:0;overflow-x:auto;white-space:nowrap;padding:4px 0;scrollbar-width:none}
+.cmd code::before{content:"$ ";color:var(--muted)}
+.code{position:relative;background:var(--soft);border:1px solid var(--border);border-radius:6px;padding:12px 48px 12px 14px;margin:0 0 12px}
+.code code{display:block;white-space:pre;overflow-x:auto;line-height:1.7}
+.code .cpy{position:absolute;top:8px;right:8px}
+.cpy{flex:none;width:32px;height:32px;display:grid;place-items:center;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:0}
+.cpy:hover{color:var(--fg)}
+.cpy svg{fill:currentColor}.cpy.ok{color:var(--pri)}
+.logo{display:inline-flex;align-items:center;gap:8px;font-weight:700;font-size:17px;color:var(--fg)!important;text-decoration:none!important}
+.logo svg{width:24px;height:24px;display:block}
+.vpill{font:600 11px var(--mono);border:1px solid var(--border);border-radius:999px;padding:1px 7px;color:var(--muted)}
+
+/* top bar */
+.nav{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--border)}
+.nav .row{max-width:1144px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:12px 32px}
+.nav .lk{display:flex;gap:20px;margin-left:auto;align-items:center;font-size:14px}
+.nav .lk a{color:var(--fg)}
+.nav .lk img{height:20px;display:block}
+.nav .lk .btn{padding:5px 12px;font-size:13px}
+.burger{display:none;margin-left:auto;background:none;border:1px solid var(--border);border-radius:6px;color:var(--fg);padding:4px 10px;font-size:16px;cursor:pointer}
+.tbtn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);width:30px;height:30px;display:grid;place-items:center;cursor:pointer;padding:0}
+.tbtn:hover{color:var(--fg)}
+.tbtn svg{fill:currentColor}
+
+/* hero */
+.hero{text-align:center;padding-top:80px;padding-bottom:80px;border-top:0}
+.hero .mark{width:72px;height:72px;display:block;margin:0 auto 18px}
+.hero .cmd{margin:24px auto 0}
+.hero .ctas{justify-content:center}
+.pitch{font:600 22px/1.35 var(--sans);margin:0 0 8px}
+.sub{color:var(--muted);margin:0;font-size:16px}
+
+/* map */
+.mapbox{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--soft)}
+.mapbox iframe{display:block;width:100%;height:620px;border:0;background:#fff}
+
+/* how: one card, still */
+.board{display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));gap:8px;overflow-x:auto;padding-bottom:4px}
+.bcol{background:var(--soft);border:1px solid var(--border);border-radius:8px;padding:8px;min-height:200px}
+.bcol>b{font-size:12.5px;display:block}
+.bcol>.who{display:block;font:11px var(--mono);color:var(--accent);margin-bottom:8px}
+.card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;margin-bottom:6px;position:relative}
+.card.dim{color:var(--muted)}
+.card.ghost{border-style:dashed;opacity:.7}
+.card.live{border:2px solid var(--pri)}
+.card .sn{position:absolute;top:-8px;right:-6px;background:var(--pri);color:var(--pri-fg);border-radius:999px;font-size:10px;font-weight:700;padding:0 6px}
+.card .ev{display:block;font:11px var(--mono);color:var(--pri);margin-top:3px}
+.steps{display:flex;flex-wrap:wrap;gap:8px 20px;margin:16px 0 0;padding:0;list-style:none;color:var(--muted);font-size:14px}
+.steps b{color:var(--fg)}
+
+/* pages */
+.pgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.pcard{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;color:var(--fg)!important;text-decoration:none!important}
+.pcard:hover{border-color:var(--accent)}
+.pcard img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top left;border-bottom:1px solid var(--border);background:var(--soft)}
+.pcard .b{padding:12px 14px;display:flex;flex-direction:column;flex:1}
+.pcard h3{margin:0 0 4px;font:600 16px var(--sans)}
+.pcard p{margin:0 0 8px;color:var(--muted);font-size:13.5px;flex:1}
+.pcard .go{color:var(--accent);font-size:13.5px;font-weight:600}
+
+/* skills */
+.grp{display:flex;align-items:baseline;gap:10px;margin:0 0 10px}
+.grp h3{margin:0;font:600 16px var(--sans)}
+.grp span{color:var(--muted);font-size:13.5px}
+.sgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:28px}
+.sgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.scard{border:1px solid var(--border);border-radius:6px;padding:16px;background:var(--bg);display:flex;flex-direction:column;gap:8px;color:var(--fg)!important;text-decoration:none!important}
+.scard:hover{border-color:var(--accent)}
+.scard .nm{font:700 15px var(--mono)}
+.scard p{margin:0;color:var(--muted);font-size:14px;flex:1}
+.scard code{background:var(--soft);border:1px solid var(--border);border-radius:4px;padding:3px 7px;font-size:12px;align-self:flex-start}
+.scard .col{font:12px var(--mono);color:var(--accent)}
+.uses{margin:0;color:var(--muted);font-size:14px}
+
+/* install */
+.tabbed .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:16px;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);padding:8px 12px;font:600 14px var(--sans);cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:#fd8c73}
+.note{border-left:3px solid var(--accent);padding:6px 12px;color:var(--muted);font-size:14px;margin:4px 0 0}
+.then{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:18px;font-size:14px;color:var(--muted)}
+.then b{color:var(--fg)}
+
+/* footer */
+.foot{padding:26px 32px;border-top:1px solid var(--border);color:var(--muted);font-size:13.5px}
+.foot .row{max-width:1080px;margin:0 auto;display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.foot .sp{flex:1}
+.foot a{color:var(--muted)}
+.foot a:hover{color:var(--accent)}
+
+@media (max-width:900px){
+  .pgrid,.sgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sgrid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .sec{padding:40px 16px}
+  .nav .row{padding:10px 16px;flex-wrap:wrap}
+  .burger{display:block}
+  .nav .lk{display:none;width:100%;flex-direction:column;align-items:flex-start;gap:12px;padding:8px 0 4px}
+  .nav.open .lk{display:flex}
+  h1.big{font-size:36px}
+  .pitch{font-size:18px}
+  .hero{padding-top:48px;padding-bottom:48px}
+  .pgrid,.sgrid,.sgrid.three{grid-template-columns:minmax(0,1fr)}
+  .mapbox iframe{height:460px}
+  .ctas .btn{flex:1 1 auto;justify-content:center}
+  .foot{padding:22px 16px}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav" aria-label="Main">
+  <div class="row">
+    <a class="logo" href="#top" aria-label="super-board home"><svg viewBox="0 0 96 96" aria-hidden="true"><rect x="4" y="4" width="88" height="88" rx="20" fill="#0d1117" stroke="#3d444d" stroke-width="2"/><rect x="14" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="38" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="62" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="17" y="20" width="14" height="10" rx="2.5" fill="#d97757"/><rect x="17" y="33" width="14" height="10" rx="2.5" fill="#d97757" fill-opacity=".55"/><rect x="41" y="20" width="14" height="10" rx="2.5" fill="#58a6ff"/><rect x="65" y="20" width="14" height="10" rx="2.5" fill="#3fb950"/><rect x="65" y="33" width="14" height="10" rx="2.5" fill="#3fb950"/><rect x="65" y="46" width="14" height="10" rx="2.5" fill="#3fb950"/></svg>super-board</a>
+    <a class="vpill" href="https://github.com/EricTechPro/super-board/releases/tag/v3.0.2">v3.0.2</a>
+    <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false" aria-controls="links">☰</button>
+    <div class="lk" id="links">
+      <a href="#how">How it works</a>
+      <a href="#map">Skill map</a>
+      <a href="#pages">Pages</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/EricTechPro/super-board/stargazers" aria-label="GitHub stars"><img alt="GitHub stars" src="https://img.shields.io/github/stars/EricTechPro/super-board?style=social"></a>
+      <a class="btn" href="https://github.com/EricTechPro/super-board"><i class="gh"></i> GitHub</a>
+      <button class="tbtn" id="tt" type="button" aria-label="Toggle light or dark theme" title="Theme"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM8 13V3a5 5 0 0 1 0 10Z"/></svg></button>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+<section class="sec hero"><div class="in">
+  <svg class="mark" viewBox="0 0 96 96" role="img" aria-label="super-board kanban logo"><rect x="4" y="4" width="88" height="88" rx="20" fill="#0d1117" stroke="#3d444d" stroke-width="2"/><rect x="14" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="38" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="62" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="17" y="20" width="14" height="10" rx="2.5" fill="#d97757"/><rect x="17" y="33" width="14" height="10" rx="2.5" fill="#d97757" fill-opacity=".55"/><rect x="17" y="46" width="14" height="10" rx="2.5" fill="#d97757" fill-opacity=".3"/><rect x="41" y="20" width="14" height="10" rx="2.5" fill="#58a6ff"/><rect x="41" y="33" width="14" height="10" rx="2.5" fill="#58a6ff" fill-opacity=".55"/><rect x="65" y="20" width="14" height="10" rx="2.5" fill="#3fb950"/><rect x="65" y="33" width="14" height="10" rx="2.5" fill="#3fb950"/><rect x="65" y="46" width="14" height="10" rx="2.5" fill="#3fb950"/><path d="M66 70.5 l4 4 l8 -9" fill="none" stroke="#3fb950" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <h1 class="big">super-board</h1>
+  <p class="pitch">Add tasks, walk away, get merged PRs with proof.</p>
+  <p class="sub">An autonomous GitHub Project board for Claude Code. 7 skills (4 you type, 3 the board runs) · 8 commands · 6 guard hooks.</p>
+  <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash</code></div>
+  <div class="ctas" style="justify-content:center">
+    <a class="btn pri" href="#map">See the skill map</a>
+    <a class="btn" href="https://github.com/EricTechPro/super-board"><i class="gh"></i> GitHub</a>
+    <a class="btn" href="https://youtu.be/nX_bGyIOFM4">▶ Watch the demo</a>
+  </div>
+</div></section>
+
+<section class="sec" id="map"><div class="in">
+  <h2>The skill map</h2>
+  <p class="lead">Every skill, lane and guard, and how they connect. Click a node to drill in.</p>
+  <div class="mapbox"><iframe src="skill-map/" title="super-board skill map" loading="lazy"></iframe></div>
+  <p class="small"><a href="skill-map/">Open full screen ↗</a></p>
+</div></section>
+
+<section class="sec" id="how"><div class="in">
+  <h2>Watch one card</h2>
+  <p class="lead">#812 goes from Ready to merged on its own. The board is the only state: stop any time, and <code>run</code> picks up from each card's column.</p>
+  <div class="board" role="img" aria-label="Card #812 moves from Ready through Building, QA and Review to Done">
+    <div class="bcol"><b>Backlog</b><span class="who">you · collect</span><div class="card dim">Dark mode toggle</div><div class="card dim">CSV export</div></div>
+    <div class="bcol"><b>Ready</b><span class="who">you</span><div class="card ghost">#812 Receipt size error<span class="sn">1</span></div><div class="card dim">Retry failed sync</div></div>
+    <div class="bcol"><b>Building</b><span class="who">super-build</span><div class="card ghost">#812 draft PR<span class="sn">2</span></div></div>
+    <div class="bcol"><b>QA</b><span class="who">super-qa</span><div class="card ghost">#812 48/48 tests<span class="sn">3</span></div></div>
+    <div class="bcol"><b>Review</b><span class="who">super-review</span><div class="card ghost">#812 review passed<span class="sn">4</span></div></div>
+    <div class="bcol"><b>Blocked</b><span class="who">you 🙋</span></div>
+    <div class="bcol"><b>Done</b><span class="who">merged</span><div class="card live">#812 Receipt size error<span class="ev">✓ PR merged · 3 screenshots</span></div><div class="card dim">Fix login redirect</div></div>
+  </div>
+  <ol class="steps">
+    <li><b>1</b> You drag it to Ready</li>
+    <li><b>2</b> Build: own worktree, tests, draft PR</li>
+    <li><b>3</b> QA: tests and screenshots against the acceptance criteria</li>
+    <li><b>4</b> Review, then the merge gate merges when green</li>
+  </ol>
+</div></section>
+
+<section class="sec" id="pages"><div class="in">
+  <h2>Explore</h2>
+  <p class="lead">Interactive pages that show how super-board works.</p>
+  <div class="pgrid">
+    <a class="pcard" href="skill-map/"><img src="assets/skill-map.png" alt="" loading="lazy"><div class="b"><h3>Skill map</h3><p>Every skill, lane and hook. Click to drill in.</p><span class="go">Open →</span></div></a>
+    <a class="pcard" href="onboarding/"><img src="assets/onboarding.png" alt="" loading="lazy"><div class="b"><h3>Setup simulator</h3><p>The install line and the 8 <code>onboard</code> steps, as your terminal shows them.</p><span class="go">Open →</span></div></a>
+    <a class="pcard" href="impeccable/"><img src="assets/impeccable.png" alt="" loading="lazy"><div class="b"><h3>Impeccable map</h3><p>27 design commands behind /ui-refine-loop.</p><span class="go">Open →</span></div></a>
+    <a class="pcard" href="writing-standard/"><img src="assets/writing-standard.png" alt="" loading="lazy"><div class="b"><h3>Writing standard</h3><p>How commits, tickets, PRs and comments are written.</p><span class="go">Open →</span></div></a>
+  </div>
+</div></section>
+
+<section class="sec" id="skills"><div class="in">
+  <h2>7 skills</h2>
+  <p class="lead">4 you type in Claude Code. 3 the board runs for each card.</p>
+  <div class="grp"><h3>You type</h3><span>4 skills</span></div>
+  <div class="sgrid">
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/super-board/README.md"><span class="nm">/super-board</span><p>Runs the board: Build → QA → Review, merges when green.</p><code>/super-board run my-app</code></a>
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/super-collect/README.md"><span class="nm">/super-collect</span><p>Finds problems in Sentry, PostHog, issues and PRs. Files verified cards.</p><code>/super-collect sentry</code></a>
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/ui-refine-loop/README.md"><span class="nm">/ui-refine-loop</span><p>Critique → refine rounds on one page or component.</p><code>/ui-refine-loop /settings</code></a>
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/visual/README.md"><span class="nm">/visual</span><p>One HTML page: branch recap, plan, or codebase map.</p><code>/visual recap</code></a>
+  </div>
+  <div class="grp"><h3>The board runs</h3><span>3 lanes</span></div>
+  <div class="sgrid three">
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/super-build/README.md"><span class="col">Building</span><span class="nm">super-build</span><p>Own worktree, smallest safe change, tests, draft PR.</p></a>
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/super-qa/README.md"><span class="col">QA</span><span class="nm">super-qa</span><p>Evidence, test-gap check, screenshots, or bounce back to Build.</p></a>
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/super-review/README.md"><span class="col">Review</span><span class="nm">super-review</span><p>Its own review, remembers prior findings, then the merge gate.</p></a>
+  </div>
+  <p class="uses">Uses: <a href="https://github.com/mattpocock/skills">Matt Pocock skills</a>, ponytail, impeccable, humanizer.</p>
+</div></section>
+
+<section class="sec" id="install"><div class="in tabbed">
+  <h2>Install</h2>
+  <p class="lead">In your project folder.</p>
+  <div class="tabs" role="tablist" aria-label="Install method">
+    <button type="button" role="tab" id="tab-t" aria-controls="tp-t" aria-selected="true">Terminal</button>
+    <button type="button" role="tab" id="tab-p" aria-controls="tp-p" aria-selected="false">Claude Code plugin</button>
+    <button type="button" role="tab" id="tab-c" aria-controls="tp-c" aria-selected="false">From a checkout</button>
+  </div>
+  <div class="tp" role="tabpanel" id="tp-t" aria-labelledby="tab-t"><div class="code"><code>curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash</code></div><p class="small" style="margin:0">Needs Claude Code, <code>gh</code>, <code>jq</code>, bash 3.2+ and Python 3. The installer checks.</p></div>
+  <div class="tp" role="tabpanel" id="tp-p" aria-labelledby="tab-p" hidden><div class="code"><code>/plugin marketplace add EricTechPro/super-board
+/plugin install super-board@super-board</code></div><p class="note">The plugin ships the skills only. Run <code>/super-board:super-board onboard</code>; its 🔍 Checks step adds the guard hooks, scripts and workflows.</p></div>
+  <div class="tp" role="tabpanel" id="tp-c" aria-labelledby="tab-c" hidden><div class="code"><code>git clone https://github.com/EricTechPro/super-board.git
+./super-board/install.sh [--no-hooks] [--protect-main] /path/to/your-project</code></div></div>
+  <div class="then"><span><b>Then</b> open Claude Code and run <code>/super-board onboard</code></span><span>8 steps · Enter takes the recommended answer · <a href="onboarding/">see it first</a></span></div>
+</div></section>
+</main>
+
+<footer class="foot"><div class="row">
+  <span>MIT © Eric Tech</span><span class="sp"></span>
+  <a href="https://github.com/EricTechPro/super-board">GitHub</a>
+  <a href="https://youtu.be/nX_bGyIOFM4">YouTube</a>
+  <a href="https://github.com/EricTechPro/super-board/blob/main/RELEASE-NOTES.md">Release notes</a>
+</div></footer>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  try{var th=localStorage.getItem('sb-theme'); if(th) root.setAttribute('data-theme',th);}catch(e){}
+  document.getElementById('tt').onclick=function(){
+    var cur=root.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    var n=cur==='dark'?'light':'dark'; root.setAttribute('data-theme',n);
+    try{localStorage.setItem('sb-theme',n);}catch(e){}
+  };
+  var GH='<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>';
+  var COPY='<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/><path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/></svg>';
+  var CHECK='<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"/></svg>';
+  [].forEach.call(document.querySelectorAll('i.gh'),function(el){el.outerHTML=GH;});
+  [].forEach.call(document.querySelectorAll('.cmd,.code'),function(el){
+    el.insertAdjacentHTML('beforeend','<button class="cpy" type="button" title="Copy" aria-label="Copy command">'+COPY+'</button>');
+  });
+  function copyText(tx,ok){
+    function fb(){var a=document.createElement('textarea');a.value=tx;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok();}catch(e){}document.body.removeChild(a);}
+    try{navigator.clipboard.writeText(tx).then(ok,fb);}catch(e){fb();}
+  }
+  document.addEventListener('click',function(e){
+    var c=e.target.closest('.cpy');
+    if(c){var code=c.parentNode.querySelector('code');
+      copyText(code.textContent,function(){c.innerHTML=CHECK;c.classList.add('ok');setTimeout(function(){c.innerHTML=COPY;c.classList.remove('ok');},1500);});return;}
+    var t=e.target.closest('[role="tab"]');
+    if(t){var box=t.closest('.tabbed');
+      [].forEach.call(box.querySelectorAll('[role="tab"]'),function(b){b.setAttribute('aria-selected',b===t?'true':'false');});
+      [].forEach.call(box.querySelectorAll('[role="tabpanel"]'),function(p){p.hidden=p.id!==t.getAttribute('aria-controls');});return;}
+    var nav=document.getElementById('nav');
+    if(e.target.closest('#burger')){var o=nav.classList.toggle('open');document.getElementById('burger').setAttribute('aria-expanded',o?'true':'false');return;}
+    if(e.target.closest('#links a')){nav.classList.remove('open');document.getElementById('burger').setAttribute('aria-expanded','false');}
+  });
+})();
+</script>
+</body>
+</html>

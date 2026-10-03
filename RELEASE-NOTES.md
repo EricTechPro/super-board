@@ -1,5 +1,29 @@
 # Release notes
 
+## v3.0.2 — 2026-10-02
+
+A rewritten README, a GitHub Pages site at https://erictechpro.github.io/super-board/, and map
+Source links that work away from a checkout.
+
+- 📝 **README rewrite.** Kanban logo and pitch "Add tasks, walk away, get merged PRs with proof.",
+  true counts (7 skills: 4 you type, 3 the board runs · 8 commands · 6 guard hooks), the skill map
+  as the hero image, a link to the live site, install by one-liner or plugin, a three-step quick
+  start and a commands cheat sheet. The old Setup notes moved to `docs/super-board/README.md`.
+- 🌐 **GitHub Pages site.** `.github/workflows/pages.yml` publishes only the public pages: a
+  landing page (`/`) with the live skill map, a one-card board walkthrough, the 7 skills and the
+  install tabs; `/skill-map/`; `/onboarding/`, a step-by-step setup simulator for the 3.0.2
+  install and 8-step onboard; `/impeccable/`; and `/writing-standard/`, a read-only reference
+  built from the chosen formats. Pick-a-design pages stay out of the site.
+- ♻️ **Skill groups.** `skills/families.json` now groups skills as "You type" (super-board,
+  super-collect, ui-refine-loop, visual) and "The board runs" (super-build, super-qa,
+  super-review). `super-board-readme-sync.py` keeps every "N skills (N you type, N the board
+  runs)" count and the family titles in step.
+- ✨ **`/visual render --source-base URL [--source-root DIR]`.** Node sources under the source root
+  become links to the hosted file (`:12-20` → `#L12-L20`); others show as text. The skill-map
+  pages are re-rendered against `https://github.com/EricTechPro/super-board/blob/main/`.
+- 🧪 `test-readme-sync.sh` no longer needs a skills badge, and checks both counts and the family
+  titles after a sync.
+
 ## v3.0.1 — 2026-10-02
 
 Fixes the red Linux CI on v3.0.0 and stops diagram pages from publishing local machine paths.

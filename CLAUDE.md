@@ -1,8 +1,8 @@
 # super-board — agent-facing notes
 
-This repo ships seven skills under `skills/`: the orchestrator `super-board`, the lane workers
-`super-build`, `super-qa`, `super-review`, plus `super-collect` (primary), and `visual`,
-`ui-refine-loop` (secondary). Architecture findings come from `/super-collect architecture`.
+This repo ships seven skills under `skills/`: four you type (`super-board`, `super-collect`,
+`ui-refine-loop`, `visual`) and three the board runs (the lane workers `super-build`, `super-qa`,
+`super-review`). Architecture findings come from `/super-collect architecture`.
 Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill. README skill tables are generated
 by `scripts/super-board-readme-sync.py` from SKILL.md frontmatter and `skills/families.json`.
 
