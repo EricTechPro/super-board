@@ -2,21 +2,44 @@
 
 ## v2.6.0 — 2026-10-02
 
-Cleanup release: one renamed skill, one skill turned into a hook, three new guards, two new evals,
-and a sweep of stale docs.
+Cleanup release: one renamed skill, one skill turned into a hook, super-collect rebuilt, arch-loop
+removed, three new guards, two new evals and a sweep of stale docs.
 
 ### Skills
 
-**ui-refine-loop, renamed from super-refine.** Same skill, now a standalone public helper
-(secondary) under `/ui-refine-loop`: `skills/ui-refine-loop/`, `workflows/ui-refine-loop.js`,
-`tests/test-ui-refine-loop-{setup,workflow}.sh`. The QA lane's qa-hook (run.md Tester step 5b)
-calls it by the new name; the config's `refine` block is unchanged.
+**ui-refine-loop, renamed from super-refine and rebuilt on Impeccable.** A standalone helper
+(secondary) under `/ui-refine-loop`; the board no longer runs it (run.md Tester step 5b, the QA
+lane prompt hook and `references/qa-hook.md` are gone; `refine.qa_hook_rounds` is ignored). It
+reads the target's code, grills at most 10 questions in waves into a per-project taste file
+(`docs/design/taste.md`, from a neutral default), then runs bounded rounds: an isolated design
+reviewer and detector, a checker that ranks typed problems, and a fixer that routes each type to
+an Impeccable command (polish last). Shots cover light and dark at 1440 and 390, with section
+crops and before | after sheets. The score is design /20 + audit /20, not Nielsen. Default 5
+rounds, stopping after two checks with no P0/P1. A finish reviewer grades each fix, and it ends in
+a draft PR with a Before | After table (raw GitHub URLs). Impeccable v4.0.x (`node
+scripts/detect.mjs`) and v4.4+ (`scripts/impeccable`) are both detected, parent dirs included; a
+missing install now warns loudly instead of silently falling back to the rubric.
 
 **cleanup-wt is a hook now, not a skill.** The script moved to `hooks/cleanup-wt.py` and ships
 with the guard hooks. The merge gate still runs it with `--post-merge` after every merge, and the
 `SessionStart` `--auto` sweep is now part of the default `hooks/settings-snippet.json` (it was an
 opt-in block). It leaves the skill tables and is listed under Guards. An old install's
 `.claude/skills/cleanup-wt/` can be deleted by hand.
+
+**super-collect, rebuilt as source plug-ins.** One job: find problems and file them into the
+project's Backlog. Sources `sentry` (REST), `posthog` (HogQL; exceptions, failure events, rage and
+dead clicks, web vitals, surveys, tracking gaps), `github` (unboarded issues, adopted), `prs`
+(recurring problems across merged PRs' comments, reviews and super-review reports, one GraphQL
+search) and `architecture`; run one (`/super-collect sentry`) or all. `--since` picks the window
+(default 14 days). Each candidate goes to one fresh verifier (real, still happening, already
+fixed, duplicate); unclear ones file as `needs-triage`. The `intake`/`lookback` modes, feedback
+folders and run-file lookback are gone; the config's `collect` block is replaced (sources,
+sentry/posthog IDs and thresholds; secrets stay in `.env`), and onboard gains step 11b to set it
+up and test each connection read-only. Tests: `tests/test-collect-fetchers.sh` (new, stubbed
+HTTP), `tests/test-collect-file.sh` 30 → 47 cases.
+
+**arch-loop folded into /super-collect architecture.** The skill is removed; architecture findings
+are now read-only refactor tickets in Backlog instead of an implement loop.
 
 ### Guards
 

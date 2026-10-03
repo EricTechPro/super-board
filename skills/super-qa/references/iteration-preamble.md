@@ -527,7 +527,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    - If "no UX issues" → log one line in `iteration-N.md` Section 6:
      `<slug>: UX clean`. Continue.
    - For each finding → file a GH issue via `super-qa-file-bug.sh` with
-     kind `ux`, category `visual`, priority per the agent's call, and suggested owner `ui-refine-loop`. Body includes
+     kind `ux`, category `visual`, priority per the agent's call, and suggested owner `ui-refine-loop` (a UI ticket — a human can run `/ui-refine-loop`; the board never triggers it). Body includes
      the finding's location + why + suggested fix. The cell still counts
      as `[x]` (functional green); UX bugs are a separate stream from
      functional bugs.
@@ -595,7 +595,7 @@ detection (do NOT batch at end of iter):
    - **Actual behavior:** what happened instead.
    - **Evidence:** screenshot path/link, console log summary, page error summary, network JSON/HAR path, and spec path. If an artifact is not captured, write `not captured` and why.
    - **First-suspect file:** `client/path/file.tsx:42` if identifiable.
-   - **Suggested fix path:** `super-build` for implementation, `ui-refine-loop` for design polish, `super-qa` for harness/test-only fixes, or `super-review` for release-readiness judgment.
+   - **Suggested fix path:** `super-build` for implementation, a UI ticket for design polish (a human can run `/ui-refine-loop`), `super-qa` for harness/test-only fixes, or `super-review` for release-readiness judgment.
    - **Fingerprint:** a stable dedupe key such as `<slug>|<test-case>|<failure-signature>`.
    - **Acceptance criteria:** user-visible fix + regression coverage + Super QA rerun.
 

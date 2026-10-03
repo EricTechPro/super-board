@@ -15,7 +15,7 @@ Use this skill for:
 
 - PR or branch review before merge.
 - Code, architecture, security, data-model, or migration judgment.
-- Release-readiness checks after Super Build, Super QA, or ui-refine-loop.
+- Release-readiness checks after Super Build, Super QA, or a human's `/ui-refine-loop` pass.
 - The Review lane of a `super-board run`.
 - A final pass that needs risks, blockers, and human gates summarized.
 
@@ -23,7 +23,7 @@ Do **not** use this as the primary implementation workflow. Route fixes to:
 
 - **Super Build** for feature/task implementation from GitHub Project `Ready` issues.
 - **Super QA** for functional bugs, broken behavior, failing Playwright paths, or missing QA coverage.
-- **ui-refine-loop** (`/ui-refine-loop`) for visual fidelity, layout, screenshots, wireframes, or design-system drift.
+- Visual fidelity, layout, screenshots, wireframes, or design-system drift: file a UI ticket; a human can run `/ui-refine-loop`. The board never triggers it.
 
 ## Inputs
 
@@ -105,7 +105,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
 4. **Route fixes**
    - If a blocker is an implementation task, hand it to **Super Build**.
    - If a blocker is a functional regression, hand it to **Super QA**.
-   - If a blocker is visual/design fidelity, hand it to **ui-refine-loop**.
+   - If a blocker is visual/design fidelity, file a UI ticket; a human can run `/ui-refine-loop` (the board never triggers it).
    - If it is a deepening opportunity, file it with `scripts/super-review-file-refactor.sh` and carry on to the merge decision. Do not open a PR thread for it; do not bounce the card.
      **Write real acceptance criteria in the `--body-file`.** A card that carries an
      `## Acceptance criteria` section is filed straight into `Ready` and the next wave builds it;
@@ -142,7 +142,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
 - R2 not fixed — <file:line> → route to <workflow>
 
 ### Blockers
-- [ ] R3 <Gap | Bug | Verification miss | Scope drift> <file:line> — <finding> → route to <Super Build | Super QA | ui-refine-loop | human>
+- [ ] R3 <Gap | Bug | Verification miss | Scope drift> <file:line> — <finding> → route to <Super Build | Super QA | UI ticket (human runs /ui-refine-loop) | human>
 
 ### Should fix
 - [ ] R4 <class> <file:line> — <finding> → route to <workflow>
@@ -182,7 +182,7 @@ For short summaries (wave reports), keep it phone-friendly:
 In a `super-board run` the loop runs through the board:
 
 1. Super Review inspects branch/PR and writes findings.
-2. Each actionable finding becomes a prefixed PR thread (`[builder]`, `[QA]`) and the card bounces to the owning lane — Super Build or Super QA; visual polish goes to ui-refine-loop.
+2. Each actionable finding becomes a prefixed PR thread (`[builder]`, `[QA]`) and the card bounces to the owning lane — Super Build or Super QA; for visual polish, file a UI ticket; a human can run `/ui-refine-loop`.
 3. The owning lane fixes and verifies its scope.
 4. Super Review runs again against the updated branch, with its last report as `prior_report` — round 1 checks those findings before any fresh pass.
 5. Stop only when no blocking review findings remain, or unresolved items are explicitly human-gated. A clean review merges through `scripts/super-board-merge-gate.sh`, pinned to the head SHA it reviewed.

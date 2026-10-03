@@ -2,7 +2,7 @@
 # super-collect-file.sh — file one collected item onto the super-board project,
 # into the holding column only. Dry-run unless --yes.
 #
-# This is a router, not a third filer. Bugs, features and lookback fixes go
+# This is a router, not a third filer. Bugs, features and recurring-problem fixes go
 # through super-qa-file-bug.sh; refactors through super-review-file-refactor.sh.
 # What it adds on top of them:
 #   1. a repo-wide fingerprint dedupe (theirs only see their own source label),
@@ -11,11 +11,17 @@
 #      put a card in Ready. No holding column → refuse (exit 65).
 #   3. `--adopt N` for a user-filed issue that is not on the board yet: place the
 #      existing issue instead of filing a copy of it.
+#   4. one fingerprint shape per source, so the same problem keys the same way on
+#      every run: sentry `err|sentry|<issue-id>`, posthog `posthog|<signal>|<key>`
+#      (tracking gaps: `gap|<workflow>`),
+#      github `github|<issue#>`, prs `prs|<boundary>|<cause>`,
+#      architecture `arch|<module>|<problem>`.
 #
 # Usage:
 #   super-collect-file.sh --config <cfg.json> --type bug|feature|refactor|fix \
-#     --source intake|lookback --title "<one line>" --body-file <md> \
-#     --fingerprint "<stable key>" [--priority high|medium|low] [--area <a>] [--yes]
+#     --source sentry|posthog|github|prs|architecture --title "<one line>" --body-file <md> \
+#     --fingerprint "<stable key>" [--priority high|medium|low] [--area <a>] \
+#     [--label <l>]... [--yes]          # e.g. --label needs-triage --label ux
 #   super-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--yes]
 #
 # Stdout: dry-run → one `would-file|duplicate|recurrence|would-adopt` plan line;
@@ -25,7 +31,7 @@
 set -uo pipefail
 
 CONFIG=""; TYPE=""; SOURCE=""; TITLE=""; BODY_FILE=""; FP=""
-PRIORITY="medium"; AREA=""; ADOPT=""; YES=0
+PRIORITY="medium"; AREA=""; ADOPT=""; YES=0; EXTRA_LABELS=()
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -38,6 +44,7 @@ while [ $# -gt 0 ]; do
     --priority)    PRIORITY="$2"; shift 2 ;;
     --area)        AREA="$2"; shift 2 ;;
     --adopt)       ADOPT="$2"; shift 2 ;;
+    --label)       EXTRA_LABELS+=("$2"); shift 2 ;;
     --yes)         YES=1; shift ;;
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
@@ -50,10 +57,16 @@ case "$TYPE" in bug|feature|refactor|fix) ;; *) die "--type must be bug|feature|
 case "$PRIORITY" in high|medium|low) ;; *) die "--priority must be high|medium|low (got: $PRIORITY)" 64 ;; esac
 
 if [ -z "$ADOPT" ]; then
-  case "$SOURCE" in intake|lookback) ;; *) die "--source must be intake|lookback (got: ${SOURCE:-<unset>})" 64 ;; esac
+  case "$SOURCE" in
+    sentry) FP_PREFIX="err|sentry|" ;; posthog) FP_PREFIX="posthog|" ;; github) FP_PREFIX="github|" ;;
+    prs) FP_PREFIX="prs|" ;; architecture) FP_PREFIX="arch|" ;;
+    *) die "--source must be sentry|posthog|github|prs|architecture (got: ${SOURCE:-<unset>})" 64 ;;
+  esac
   [ -n "$TITLE" ] || die "--title is required" 64
   [ -n "$FP" ]    || die "--fingerprint is required (dedupe key)" 64
   case "$FP" in *'"'*|*'\\'*) die "--fingerprint may not contain quotes or backslashes" 64 ;; esac
+  case "$SOURCE|$FP" in "posthog|gap|"?*) FP_PREFIX="gap|" ;; esac
+  case "$FP" in "$FP_PREFIX"?*) ;; *) die "--fingerprint for source ${SOURCE} must start with '${FP_PREFIX}' (got: $FP)" 64 ;; esac
   [ -n "$BODY_FILE" ] && [ -r "$BODY_FILE" ] || die "--body-file missing or unreadable: ${BODY_FILE:-<unset>}" 66
 else
   case "$ADOPT" in *[!0-9]*|"") die "--adopt takes an issue number (got: $ADOPT)" 64 ;; esac
@@ -69,7 +82,7 @@ REPO_FLAG=()
 [ -z "$REMOTE" ] || REPO_FLAG=(-R "$(echo "$REMOTE" | sed -E 's#(git@github\.com:|https://github\.com/)##; s#\.git$##')")
 
 # --- body sections ----------------------------------------------------------
-# super-qa-file-bug.sh enforces its own seven for bugs. Features and lookback
+# super-qa-file-bug.sh enforces its own seven for bugs. Features and recurring-problem
 # fixes are not repro-shaped, so they get their own minimum here and the QA
 # filer's repro check is bypassed for them.
 need_sections() {
@@ -116,7 +129,7 @@ tag() { # $1 = issue number, rest = labels; best-effort
 if [ -n "$ADOPT" ]; then
   if [ "$YES" -ne 1 ]; then echo "would-adopt|#${ADOPT}|${TYPE}|${HOLD}"; exit 0; fi
   URL=$(gh issue view "$ADOPT" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --json url --jq .url 2>/dev/null) || die "cannot read issue #${ADOPT}" 70
-  tag "$ADOPT" "$TYPE" "source:collect"
+  tag "$ADOPT" "$TYPE" "source:collect" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"}
   place "$URL" || { echo "warn: #${ADOPT} not placed in '${HOLD}'" >&2; echo "$ADOPT"; exit 71; }
   echo "$ADOPT"; exit 0
 fi
@@ -181,6 +194,6 @@ esac
 cat "$ERR" >&2; rm -f "$ERR"
 N=$(echo "$OUT" | tail -1)
 case "$N" in ''|*[!0-9]*) die "filer failed (exit ${RC})" "$([ "$RC" -ne 0 ] && echo "$RC" || echo 70)" ;; esac
-tag "$N" "source:collect" "collect:${SOURCE}"
+tag "$N" "source:collect" "collect:${SOURCE}" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"}
 echo "$N"
 exit "$RC"

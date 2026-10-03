@@ -40,13 +40,8 @@ const base = { configPath: 'c.json', variant: 'full' }
   ;/never blocks merge alone/.test(rp) || fail('review prompt must say Over-engineering never blocks alone')
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('ponytail-review') && fail(`${l} must not get the review pass`))
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('super-review:report') && fail(`${l} must not get review memory`))
-  // 1b — the QA lane carries the ui-refine-loop qa-hook condition; build and review do not.
-  const qp = a.prompts['qa:#7']
-  ;/ui-refine-loop in qa-hook mode/.test(qp) || fail('qa prompt must run ui-refine-loop in qa-hook mode')
-  ;/ui \/ design \/ frontend/.test(qp) || fail('qa prompt must name the UI labels')
-  ;/visual AC/.test(qp) || fail('qa prompt must name visual ACs')
-  ;/tests passed/.test(qp) || fail('qa prompt must gate the hook on passing tests')
-  ;['build:#7', 'review:#7'].forEach((l) => a.prompts[l].includes('qa-hook') && fail(`${l} must not get the qa-hook`))
+  // 1b — ui-refine-loop is standalone: no lane prompt mentions it.
+  ;['build:#7', 'qa:#7', 'review:#7'].forEach((l) => /ui-refine-loop|qa-hook/.test(a.prompts[l]) && fail(`${l} must not trigger ui-refine-loop`))
 
   // 2 — a re-review bounce surfaces round-1 counts in the wave summary.
   const b = await run({ ...base, cards: [{ number: 9, status: 'Review', title: 't' }] },

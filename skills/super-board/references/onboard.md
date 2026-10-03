@@ -145,6 +145,32 @@ Progress: 🛠 onboard (you are here)  →  🧹 lint  →  🤖 run
     ├─ Write .claude/super-board/configs/<slug>.json (committed)
     └─ Write .claude/super-board/active ← <slug> (gitignored)
 
+11b. COLLECT SOURCES (any flow with a local repo; per project — this config only)
+    Sets up the `collect` block that `/super-collect` reads (config-schema.json → collect).
+    ├─ Detect, silently:
+    │    • Sentry:  `@sentry/*` / `sentry-sdk` / `sentry_sdk` in manifests, `Sentry.init(`,
+    │               `.sentryclirc`, `sentry.*.config.*`; org/project from those files or DSN
+    │    • PostHog: `posthog-js` / `posthog-node` / `posthog` in manifests, `posthog.init(`,
+    │               NEXT_PUBLIC_POSTHOG_* / POSTHOG_HOST / POSTHOG_PROJECT_ID in env files
+    │    • Secrets: which of SENTRY_AUTH_TOKEN, POSTHOG_PERSONAL_API_KEY exist in the nearest
+    │               `.env` — check NAMES only (`grep -c '^NAME='`), never read or print values
+    ├─ Ask once: "Enable which collect sources? [sentry] [posthog] github prs architecture"
+    │    (detected ones pre-ticked; github, prs, architecture need nothing extra)
+    ├─ Ask only what detection missed: Sentry org/project/region host, PostHog host/project_id.
+    │    Missing secret → tell the user the exact .env line to add (name only) and the scopes:
+    │    Sentry `event:read project:read`; PostHog personal key `query:read error_tracking:read`.
+    ├─ PostHog failure events: grep the app's capture() calls for names like *_failed,
+    │    *_error, status 'failed'; propose them as `collect.posthog.failure_events`, user confirms.
+    ├─ Write `collect` into the config: sources, window_days 14, sentry{…}, posthog{…}.
+    └─ Test each enabled connection, read-only:
+         python3 .claude/skills/super-collect/scripts/collect_sentry.py --config <cfg> ping
+         python3 .claude/skills/super-collect/scripts/collect_posthog.py --config <cfg> ping
+         gh api graphql -f query='{viewer{login}}'          (github, prs)
+       Print ✅/❌ per source. For PostHog also print `silent` — signals with no data in 14 days
+       and the one-line fix (e.g. "Rage clicks need autocapture: posthog.init(…, { autocapture:
+       true })") as a suggestion only. Never edit the app. A failed test does not halt onboard:
+       leave that source out of `collect.sources` and say how to re-test.
+
 12. INSTALL / VERIFY WORKFLOW RUNTIME
     (Skip only when the config sets worker_backend: "claude-p".)
     The default backend launches the Workflow tool with scriptPath
@@ -196,6 +222,7 @@ Every onboard step that touches GitHub or the filesystem has a defined recovery 
 | 7. PROJECT.md autogen | Sub-agent timeout / empty draft | `📝 Couldn't auto-draft PROJECT.md. Skip for now, or write one paragraph and I'll seed from that.` |
 | 8. base branch | gh API rate limit on protection-rule lookup | Soft-fail production detection, warn the user, fall back to asking. Do not halt. |
 | 11. write config | File system not writable | Halt with the exact path: `🛑 Can't write to .claude/super-board/configs/<slug>.json — check permissions.` |
+| 11b. collect sources | A `ping` returns `unavailable` (bad token, wrong org/project_id, wrong region host) | `❌ posthog: PostHog HTTP 401. Check POSTHOG_PERSONAL_API_KEY in .env (scopes query:read, error_tracking:read), then re-test: \`python3 .claude/skills/super-collect/scripts/collect_posthog.py ping\`.` Source left out of `collect.sources`; onboard continues. |
 | 12. workflow runtime | `super-board-wave.js` missing and no copy found to self-heal from | `🛑 Missing .claude/workflows/super-board-wave.js — the dynamic workflow itself. Config is saved. Run \`./install.sh <this-dir>\` from your super-board checkout, then re-run super-board onboard.` |
 | 12. workflow runtime | `node --check` fails on the installed script | `🛑 .claude/workflows/super-board-wave.js is corrupt or truncated. Re-copy it from your super-board checkout (\`./install.sh <this-dir>\`) — don't hand-edit it.` |
 

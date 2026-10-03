@@ -1,39 +1,40 @@
 # /super-collect
 
-Turns errors, user reports and past-run failures into deduped Backlog cards on your super-board.
+Finds problems in one project and files them as deduped Backlog cards on its super-board. The
+board fixes them.
 
 ## What It Does
 
-- **Intake** reads app errors (Sentry or whatever error tool is wired), open GitHub issues that are
-  not on the board, and feedback. It groups them by symptom, dedupes against existing cards, and
-  files typed cards (bug, feature, refactor) with evidence. Existing issues are adopted onto the
-  board, not copied.
-- **Lookback** reads past wave reports and Reviewer reports, finds cards that keep bouncing,
-  findings that come back after a claimed fix, and repeated halts, and files one fix ticket per
-  root cause with acceptance criteria.
-- Filing goes through `super-qa-file-bug.sh` and `super-review-file-refactor.sh`, always into the
+- Reads pluggable sources: **sentry** (unresolved errors), **posthog** (exceptions, failure
+  events, rage and dead clicks, slow pages, survey themes, tracking gaps), **github** (open issues
+  not on the board, adopted rather than copied), **prs** (recurring problems across merged PRs and
+  their human, bot and super-review comments) and **architecture** (read-only refactor finder).
+- Checks every candidate with one fresh verifier: is it real, still happening, already fixed, or a
+  duplicate. Unclear ones are filed with `needs-triage`, never silently dropped.
+- Files through `super-qa-file-bug.sh` and `super-review-file-refactor.sh`, always into the
   holding column. Nothing reaches `Ready` until `super-board lint` says so.
 
-## When To Use It
-
-- Before a `super-board run`, when the Backlog is thin and the error tool is not.
-- After a few runs, when the same cards keep coming back.
-
-## Modes
+## Usage
 
 | Command | Does |
 |---|---|
-| `/super-collect` | intake, then lookback |
-| `/super-collect intake` | errors, unboarded issues, feedback |
-| `/super-collect lookback` | past runs and Reviewer reports |
-| `... --yes` | file without the confirm step |
+| `/super-collect` | every source enabled in the config |
+| `/super-collect sentry` | one source (or several) |
+| `--since 30d` / `--since 2026-09-01` | window, default 14 days |
+| `--yes` | file without the confirm step |
 
 Dry-run is the default: you see what would be filed, then confirm.
 
+## Setup
+
+`/super-board onboard` sets up the `collect` block per project: it detects Sentry and PostHog,
+asks which sources to enable, writes IDs and hosts to the config, and tests each connection
+read-only. Secrets stay in `.env`: `SENTRY_AUTH_TOKEN` (scopes `event:read project:read`),
+`POSTHOG_PERSONAL_API_KEY` (`query:read`, `error_tracking:read`).
+
 ## Install
 
-Ships in the super-board pack under `skills/super-collect/`. Copy it to `.claude/skills/super-collect/`
-alongside the other super-board skills; it calls the pack's filers from `.claude/bin/` (or
-`$SUPER_BOARD_BIN`). Needs a super-board config (`/super-board onboard`), `gh`, and `jq`.
+Ships in the super-board pack under `skills/super-collect/`; `install.sh` copies it to
+`.claude/skills/super-collect/`. Needs a super-board config, `gh`, `jq` and Python 3 (stdlib only).
 
-Test: `bash tests/test-collect-file.sh`
+Tests: `bash tests/test-collect-file.sh` · `bash tests/test-collect-fetchers.sh`

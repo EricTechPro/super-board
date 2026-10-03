@@ -173,7 +173,7 @@ Examples:
 - Priority: `priority:high`, `priority:medium`, or `priority:low`.
 - Area: `area:<product-area>` when known (`area:settings`, `area:imports`, `area:admin-shell`, etc.).
 - QA category when relevant: `qa:functional`, `qa:visual`, `qa:network`, `qa:console`, `qa:i18n`, `qa:a11y`, `qa:data`, `qa:testability`.
-- Suggested skill owner when helpful: `skill:super-build`, `skill:super-qa`, `skill:ui-refine-loop`, or `skill:super-review`.
+- Suggested skill owner when helpful: `skill:super-build`, `skill:super-qa`, `skill:ui-refine-loop`, or `skill:super-review`. `skill:ui-refine-loop` marks a UI ticket for a human to run `/ui-refine-loop` on; the board never triggers it.
 
 The script adds the issue to the resolved `Super Ultimate QA` project and moves it into the `Bug` column (override with `SUPER_QA_TARGET_OPTION_NAME`) so a human (or `/super-build` with `BUILD_LOOP_SOURCE_COLUMN=Bug`) can pick it up immediately. The repo's standalone feature project is not touched by this flow.
 
@@ -213,7 +213,7 @@ Every auto-filed finding must give a future headless Claude/Super Build session 
 - Spec: `<e2e/paths/...spec.ts>`
 
 ## Suggested fix path
-- Suggested owner: `super-build` | `ui-refine-loop` | `super-qa` | `super-review`
+- Suggested owner: `super-build` | `super-qa` | `super-review` | `ui-refine-loop` (UI ticket — a human can run `/ui-refine-loop`; the board never triggers it)
 - Suggested skills: `mattpocock-skills:diagnosing-bugs`, `mattpocock-skills:tdd`, `verification-before-completion`
 - Notes for implementer: <first suspected file/function, if known>
 
@@ -526,10 +526,6 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
   `core/fixtures-hooks.md` (custom fixtures for auth, pre-test seeding, teardown),
   `core/test-data.md` (test data factories), and `core/page-object-model.md` (POM for
   reusable interactions). Keep specs reusable as the suite grows.
-- `ui-refine-loop` (in this pack), in `qa-hook` mode — only on a UI card (label `ui`,
-  `design` or `frontend`, or a visual AC) after its AC tests pass. It polishes the
-  changed surface in a few rounds and never blocks the card. See
-  `skills/ui-refine-loop/references/qa-hook.md` and run.md → Tester step 5b.
 
 ## Coexistence with `/super-build`
 

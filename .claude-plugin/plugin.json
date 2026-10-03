@@ -1,7 +1,7 @@
 {
   "name": "super-board",
   "version": "2.6.0",
-  "description": "Autonomous GitHub Project board runner. Primary skills: super-board, super-build, super-qa, super-review, super-collect. Secondary skills: visual, ui-refine-loop, arch-loop. Workflows: super-board-wave, ui-refine-loop. This manifest exists so `claude plugin eval` can load the pack; install.sh remains the real install path (it also installs the hooks/ guards).",
+  "description": "Autonomous GitHub Project board runner. Primary skills: super-board, super-build, super-qa, super-review, super-collect. Secondary skills: visual, ui-refine-loop. Workflows: super-board-wave, ui-refine-loop. This manifest exists so `claude plugin eval` can load the pack; install.sh remains the real install path (it also installs the hooks/ guards).",
   "author": { "name": "Eric Tech" },
   "license": "MIT",
   "keywords": ["github-projects", "kanban", "autonomous", "workflows", "qa", "code-review"],

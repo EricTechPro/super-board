@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Tests skills/super-collect/scripts/super-collect-file.sh. Deterministic, no
 # network: `gh` is a stub on PATH, and the real super-qa / super-review filers
-# run underneath it. Covers dry-run default, repo-wide dedupe, recurrence,
-# holding-column resolution (never Ready), routing, and --adopt.
+# run underneath it. Covers dry-run default, per-source fingerprint shapes,
+# repo-wide dedupe, recurrence, holding-column resolution (never Ready), routing,
+# extra labels (needs-triage), and --adopt.
 #
 #   bash tests/test-collect-file.sh
 
@@ -88,14 +89,23 @@ export PATH="$WORK:$PATH" GH_LOG="$WORK/gh.log" BODY_LOG="$WORK/body.filed"
 export SUPER_BOARD_BIN="$REPO_ROOT/scripts"
 
 run() { : > "$GH_LOG"; : > "$BODY_LOG"; "$SCRIPT" --config "$WORK/config.json" "$@" 2>"$WORK/err"; }
-BUG=(--type bug --source intake --title "Checkout 500 on empty cart" --body-file "$WORK/bug.md" --fingerprint "err|sentry|4411")
-FIX=(--type fix --source lookback --title "Merge gate bounces on lockfile drift" --body-file "$WORK/fix.md" --fingerprint "lookback|lockfile-drift")
+BUG=(--type bug --source sentry --title "Checkout 500 on empty cart" --body-file "$WORK/bug.md" --fingerprint "err|sentry|4411")
+FIX=(--type fix --source prs --title "Merge gate bounces on lockfile drift" --body-file "$WORK/fix.md" --fingerprint "prs|merge-gate|lockfile-drift")
 
 echo "── arg validation"
-is "type is an enum"        64 "$(run --type chore --source intake --title T --body-file "$WORK/bug.md" --fingerprint f >/dev/null; echo $?)"
+is "type is an enum"        64 "$(run --type chore --source sentry --title T --body-file "$WORK/bug.md" --fingerprint f >/dev/null; echo $?)"
 is "source is an enum"      64 "$(run --type bug --source vibes --title T --body-file "$WORK/bug.md" --fingerprint f >/dev/null; echo $?)"
-is "fingerprint required"   64 "$(run --type bug --source intake --title T --body-file "$WORK/bug.md" >/dev/null; echo $?)"
-is "fix needs Root cause"   66 "$(run --type fix --source lookback --title T --body-file "$WORK/bug.md" --fingerprint f >/dev/null; echo $?)"
+is "old intake source gone" 64 "$(run --type bug --source intake --title T --body-file "$WORK/bug.md" --fingerprint "err|sentry|1" >/dev/null; echo $?)"
+is "fp must match source"   64 "$(run --type bug --source posthog --title T --body-file "$WORK/bug.md" --fingerprint "err|sentry|1" >/dev/null; echo $?)"
+is "gap only for posthog"  64 "$(run --type feature --source sentry --title T --body-file "$WORK/fix.md" --fingerprint "gap|checkout" >/dev/null; echo $?)"
+is "fp prefix needs a key"  64 "$(run --type bug --source sentry --title T --body-file "$WORK/bug.md" --fingerprint "err|sentry|" >/dev/null; echo $?)"
+for pair in "sentry err|sentry|9" "posthog posthog|exception|abc123" "posthog gap|checkout" "github github|55" "prs prs|merge-gate|drift" "architecture arch|order-intake|shallow"; do
+  src=${pair%% *}; fp=${pair#* }
+  OUT=$(run --type bug --source "$src" --title T --body-file "$WORK/bug.md" --fingerprint "$fp")
+  has "fingerprint shape accepted for $src" "$OUT" "would-file|bug|T|Backlog"
+done
+is "fingerprint required"   64 "$(run --type bug --source sentry --title T --body-file "$WORK/bug.md" >/dev/null; echo $?)"
+is "fix needs Root cause"   66 "$(run --type fix --source prs --title T --body-file "$WORK/bug.md" --fingerprint "prs|x|y" >/dev/null; echo $?)"
 
 echo "── dry-run is the default"
 OUT=$(run "${BUG[@]}")
@@ -114,7 +124,7 @@ OUT=$(HITS='[{"number":301,"state":"OPEN","body":"err|sentry|4411"}]' run "${BUG
 is  "--yes on duplicate returns existing" "301" "$OUT"
 has "comments instead of filing" "$(cat "$GH_LOG")" "issue comment 301"
 lacks "no duplicate card" "$(cat "$GH_LOG")" "issue create"
-OUT=$(HITS='[{"number":88,"state":"CLOSED","body":"lookback|lockfile-drift"}]' run "${FIX[@]}")
+OUT=$(HITS='[{"number":88,"state":"CLOSED","body":"prs|merge-gate|lockfile-drift"}]' run "${FIX[@]}")
 has "closed-only hit is a recurrence" "$OUT" "recurrence|#88"
 
 echo "── filing a bug through super-qa-file-bug.sh"
@@ -126,18 +136,29 @@ lacks "never Ready"           "$(cat "$GH_LOG")" "opt_Ready"
 has "stamps the fingerprint"  "$(cat "$BODY_LOG")" "super-collect-fingerprint: err|sentry|4411"
 has "labels source:collect"   "$(cat "$GH_LOG")" "source:collect"
 
-echo "── filing a lookback fix (weak-body bypass, own section check)"
-OUT=$(HITS='[{"number":88,"state":"CLOSED","body":"lookback|lockfile-drift"}]' run "${FIX[@]}" --yes)
+echo "── filing a prs fix (weak-body bypass, own section check)"
+OUT=$(HITS='[{"number":88,"state":"CLOSED","body":"prs|merge-gate|lockfile-drift"}]' run "${FIX[@]}" --yes)
 is  "returns the new issue" "412" "$OUT"
 has "files as tech-debt"      "$(cat "$GH_LOG")" "tech-debt"
 has "names the recurrence"    "$(cat "$BODY_LOG")" "#88"
 lacks "never Ready"           "$(cat "$GH_LOG")" "opt_Ready"
 
 echo "── refactor with criteria still lands in Backlog (filer would pick Ready)"
-OUT=$(run --type refactor --source lookback --title "Split OrderIntake" --body-file "$WORK/fix.md" --fingerprint "lookback|order-intake" --yes)
+OUT=$(run --type refactor --source architecture --title "Split OrderIntake" --body-file "$WORK/fix.md" --fingerprint "arch|order-intake|shallow" --yes)
 has "routes via the review filer" "$(cat "$GH_LOG")" "source:review"
 has "lands in Backlog"            "$(cat "$GH_LOG")" "opt_Backlog"
 lacks "never Ready"               "$(cat "$GH_LOG")" "opt_Ready"
+
+has "labels collect:architecture" "$(cat "$GH_LOG")" "collect:architecture"
+
+echo "── posthog bug with extra labels (needs-triage, ux)"
+OUT=$(run --type bug --source posthog --title "Dead clicks on /checkout" --body-file "$WORK/bug.md" --fingerprint "posthog|dead_click|1a2b3c" --label needs-triage --label ux --yes)
+is  "returns the new issue"   "412" "$OUT"
+has "stamps posthog fingerprint" "$(cat "$BODY_LOG")" "super-collect-fingerprint: posthog|dead_click|1a2b3c"
+has "labels needs-triage"     "$(cat "$GH_LOG")" "--add-label needs-triage"
+has "labels ux"               "$(cat "$GH_LOG")" "--add-label ux"
+has "labels collect:posthog"  "$(cat "$GH_LOG")" "collect:posthog"
+lacks "never Ready"           "$(cat "$GH_LOG")" "opt_Ready"
 
 echo "── adopt a user-filed issue"
 is  "adopt dry-run" "would-adopt|#55|feature|Backlog" "$(run --adopt 55 --type feature)"

@@ -29,10 +29,10 @@ done
 TARGET="${TARGET:-$PWD}"
 
 # Primary: the board and its lanes. Secondary: standalone helpers the lanes
-# can call (visual, ui-refine-loop, arch-loop). Worktree cleanup (cleanup-wt) is a
+# can call (visual, ui-refine-loop). Worktree cleanup (cleanup-wt) is a
 # hook, not a skill: it ships with the guard hooks below.
 PRIMARY_SKILLS="super-board super-build super-qa super-review super-collect"
-SECONDARY_SKILLS="visual ui-refine-loop arch-loop"
+SECONDARY_SKILLS="visual ui-refine-loop"
 
 if [ ! -d "$TARGET" ]; then
   echo "target directory not found: $TARGET" >&2

@@ -1,35 +1,35 @@
 export const meta = {
   name: 'ui-refine-loop',
-  description: 'Critique → refine loop on one UI target: a fresh critic and a fresh refiner each round, a two-line ledger between them',
-  whenToUse: 'Launched by the ui-refine-loop skill (manual or qa-hook mode) after it has built the worktree, started the dev server and taken BEFORE shots. Not for direct ad-hoc use.',
+  description: 'Check → fix loop on one UI target: each round a fresh design reviewer and a fresh detector (isolated, as Impeccable requires), a fresh checker that ranks typed problems, and a fresh fixer that chains the matching Impeccable commands; a fresh finish reviewer grades every fix at the end',
+  whenToUse: 'Launched by the standalone /ui-refine-loop skill after it has read the target code, run the grill, built the worktree, started the dev server and taken round-0 shots. Not for direct ad-hoc use.',
   phases: [
-    { title: 'Critique', detail: 'fresh critic: Impeccable critique/detect/audit (or the built-in rubric), ranked P0–P3, DONE/CONTINUE' },
-    { title: 'Refine', detail: 'fresh refiner: fixes the findings, keeps checks green or reverts, one commit, AFTER shots' },
+    { title: 'Check', detail: 'design reviewer ‖ detector (isolated), then a checker: ranked, typed P0–P3 problems, visual score /40, before vs now' },
+    { title: 'Fix', detail: 'fresh fixer: routes each problem type to an Impeccable command, chains them (polish last), keeps checks green or reverts, one commit, AFTER shots' },
+    { title: 'Finish', detail: 'fresh finish reviewer: grades every claimed fix fixed / partial / not-fixed against round-0 vs final shots' },
   ],
 }
 
 // args = {
-//   mode: 'manual' | 'qa-hook',                // qa-hook: runs on the issue branch inside the QA lane
 //   slug: 'dashboard-reports',
 //   target: '/dashboard/reports',              // what the user named
-//   scope: ['app/dashboard/reports/', 'components/reports/'],  // repo-relative paths the refiner may edit
-//   prompt: 'what is wrong / what we want',     // the user's words verbatim, or the issue's UI ACs in qa-hook mode
-//   rounds: 10,                                 // qa-hook default 3
-//   worktree: '/abs/…/refine-<slug>',           // qa-hook: the QA lane's worktree
+//   scope: ['app/dashboard/reports/', 'components/reports/'],  // repo-relative paths the fixer may edit
+//   prompt: 'the user\'s words verbatim',
+//   rounds: 5,                                  // fix rounds; a closing check follows the last
+//   worktree: '/abs/…/refine-<slug>',
 //   runDir: '/abs/…/refine-<slug>.run',
 //   skillDir: '/abs/…/skills/ui-refine-loop',
-//   critic: 'impeccable' | 'rubric',            // rubric = built-in fallback when Impeccable is not installed
-//   impeccable: '/abs/…/impeccable/scripts/impeccable',   // required when critic = impeccable
-//   tasteFile: '/abs/…/taste.md',               // project taste file, or the skill's references/taste.md
+//   critic: 'impeccable' | 'rubric',            // rubric = loud fallback when Impeccable is missing
+//   impeccable: { layout, skillDir, reference, detect, context, version },  // refine-setup.sh detect → .impeccable
+//   tasteFile: '/abs/…/docs/design/taste.md',   // the grill's output; default the skill's neutral references/taste.md
 //   checks: ['npm run typecheck', 'npm run lint'],        // must stay green; resolved by refine-setup.sh
-//   shootCmd: 'node /abs/…/shoot.mjs --base http://localhost:PORT --route /x --out /abs/run/shots --states main,empty',
+//   shootCmd: 'node /abs/…/shoot.mjs --base http://localhost:PORT --route /x --out /abs/run/shots --states main',
 //   baseUrl: 'http://localhost:PORT',
 //   route: '/dashboard/reports',
-//   context: 'one-paragraph design context',    // optional
-//   beforeShots: ['/abs/…/round-0-main-desktop.png', …],
+//   context: 'one-paragraph design context',    // optional: code-area notes + Impeccable context
+//   beforeShots: ['/abs/…/round-0-main-desktop-light.png', …],  // full shots and crops
 //   extraShots: ['/abs/…/user-1.png'],          // optional
-//   priorLedger: ['R1 …'],                      // optional, when resuming
-//   issue: 42,                                  // qa-hook only
+//   priorLedger: ['C1 …'],                      // optional, when resuming
+//   warnings: ['Impeccable NOT FOUND …'],       // optional, from detect; echoed into the result
 // }
 // The harness can deliver `args` as a JSON-encoded string — normalize first.
 const input = (() => {
@@ -39,172 +39,304 @@ const input = (() => {
 for (const k of ['slug', 'target', 'scope', 'prompt', 'worktree', 'runDir', 'skillDir', 'checks', 'shootCmd', 'baseUrl', 'route', 'beforeShots']) {
   if (!input || input[k] == null) throw new Error(`ui-refine-loop needs args.${k} — see the header comment`)
 }
-const MODE = input.mode ?? 'manual'
-if (!['manual', 'qa-hook'].includes(MODE)) throw new Error(`ui-refine-loop: unknown mode "${MODE}" — use manual | qa-hook`)
-const CRITIC_KIND = input.critic ?? (input.impeccable ? 'impeccable' : 'rubric')
-if (CRITIC_KIND === 'impeccable' && !input.impeccable) throw new Error('ui-refine-loop: critic "impeccable" needs args.impeccable')
-const ROUNDS = input.rounds ?? (MODE === 'qa-hook' ? 3 : 10)
+// Standalone only: the board never runs this. An old `mode` arg other than manual is refused.
+if (input.mode != null && input.mode !== 'manual') throw new Error(`ui-refine-loop: mode "${input.mode}" is gone — the loop is standalone (/ui-refine-loop) only`)
+const IMP = input.impeccable && typeof input.impeccable === 'object' ? input.impeccable : null
+const METHOD = input.critic ?? (IMP ? 'impeccable' : 'rubric')
+if (METHOD === 'impeccable' && !(IMP && IMP.detect && IMP.skillDir)) {
+  throw new Error('ui-refine-loop: critic "impeccable" needs args.impeccable = { skillDir, detect, … } from refine-setup.sh detect')
+}
+const ROUNDS = input.rounds ?? 5
 const TASTE = input.tasteFile ?? `${input.skillDir}/references/taste.md`
+const REF = `${input.skillDir}/references`
+const DEGRADED = METHOD === 'rubric' ? 'Impeccable not installed: scored with the built-in rubric, not Impeccable' : null
 
-const FINDING = {
+// Problem type → the Impeccable command that fixes it. The fixer makes the
+// final call; this is the default route (references/routing.md).
+const ROUTES = {
+  cluttered: 'distill',
+  bland: 'bolder',
+  'too-loud': 'quieter',
+  'dull-color': 'colorize',
+  'spacing-hierarchy': 'layout',
+  typography: 'typeset',
+  responsive: 'adapt',
+  performance: 'optimize',
+  'first-run-empty': 'onboard',
+  'confusing-copy': 'clarify',
+  'edge-cases': 'harden',
+  accessibility: 'harden',
+  'needs-motion': 'animate',
+  personality: 'delight',
+  drift: 'extract',
+  polish: 'polish',
+}
+const TYPES = Object.keys(ROUTES)
+const SEV = ['P0', 'P1', 'P2', 'P3']
+// Distinct routes in severity order, polish always last.
+const chainFor = (problems) => {
+  const seen = []
+  for (const p of [...problems].sort((a, b) => SEV.indexOf(a.severity) - SEV.indexOf(b.severity))) {
+    const c = ROUTES[p.type] ?? 'polish'
+    if (c !== 'polish' && !seen.includes(c)) seen.push(c)
+  }
+  return [...seen, 'polish']
+}
+
+const PROBLEM = {
   type: 'object',
   properties: {
     id: { type: 'string', description: 'stable key <area>-<problem>, reused across rounds for the same issue' },
-    severity: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3'] },
+    severity: { type: 'string', enum: SEV },
+    type: { type: 'string', enum: TYPES },
     title: { type: 'string' },
     location: { type: 'string', description: 'file:line (repo-relative)' },
-    evidence: { type: 'string', description: 'screenshot path + what is visible, or detector rule' },
-    fix: { type: 'string' },
-    verb: { type: 'string', description: 'polish, distill, layout, typeset, clarify, adapt, harden, onboard, quieter, optimize (colorize, bolder, animate, delight only when the prompt asks for more)' },
+    evidence: { type: 'string', description: 'screenshot path + what is visible (theme, viewport, section), or the detector rule' },
+    fix: { type: 'string', description: 'what done looks like, inside the existing visual world' },
   },
-  required: ['id', 'severity', 'title', 'location', 'evidence', 'fix', 'verb'],
+  required: ['id', 'severity', 'type', 'title', 'location', 'evidence', 'fix'],
 }
+const DIMS = (names) => ({ type: 'object', properties: Object.fromEntries(names.map((n) => [n, { type: 'number' }])), required: names })
 
-const CRITIC = {
+const DESIGN = {
   type: 'object',
   properties: {
-    verdict: { type: 'string', enum: ['DONE', 'CONTINUE'] },
-    heuristicsTotal: { type: 'number' },
-    heuristicsMax: { type: 'number', description: '40, or less when heuristics were n/a' },
-    auditTotal: { type: 'number', description: 'audit score out of 20; omit when this round skips the audit' },
-    detectorCount: { type: 'number' },
-    findings: { type: 'array', items: FINDING, description: 'ranked, P0 first; at most 8' },
+    dims: DIMS(['specificity', 'hierarchy', 'typography', 'color', 'composition']),
+    designTotal: { type: 'number', description: 'sum of dims, out of 20' },
+    problems: { type: 'array', items: PROBLEM },
+    strengths: { type: 'array', items: { type: 'string' } },
+    openQuestions: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['dims', 'designTotal', 'problems'],
+}
+const DETECT = {
+  type: 'object',
+  properties: {
+    dims: DIMS(['accessibility', 'performance', 'responsive', 'theming', 'integrity']),
+    auditTotal: { type: 'number', description: 'sum of dims, out of 20' },
+    detectorCount: { type: 'number', description: 'verified detector hits (false positives dropped)' },
+    detectorRan: { type: 'boolean' },
+    problems: { type: 'array', items: PROBLEM },
+  },
+  required: ['dims', 'auditTotal', 'detectorCount', 'detectorRan', 'problems'],
+}
+const CHECK = {
+  type: 'object',
+  properties: {
+    problems: { type: 'array', items: PROBLEM, description: 'merged and ranked, P0 first; at most 8' },
+    vsBefore: { type: 'string', enum: ['baseline', 'better', 'same', 'worse'], description: 'baseline on the first check' },
+    vsBeforeNote: { type: 'string', description: 'one line: what changed against round-0, by section' },
     summary: { type: 'string', description: 'two sentences: overall state and the single biggest remaining problem' },
     openQuestions: { type: 'array', items: { type: 'string' } },
   },
-  required: ['verdict', 'heuristicsTotal', 'heuristicsMax', 'detectorCount', 'findings', 'summary'],
+  required: ['problems', 'vsBefore', 'summary'],
 }
-
-const REFINER = {
+const FIX = {
   type: 'object',
   properties: {
     status: { type: 'string', enum: ['committed', 'reverted', 'nothing-to-do'] },
     commit: { type: 'string', description: 'short sha, or empty' },
-    verbs: { type: 'array', items: { type: 'string' } },
-    fixed: { type: 'array', items: { type: 'string' }, description: 'finding ids fixed' },
+    commands: { type: 'array', items: { type: 'string' }, description: 'Impeccable commands run, in order (polish last)' },
+    fixed: { type: 'array', items: { type: 'string' }, description: 'problem ids fixed' },
     skipped: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, reason: { type: 'string' } }, required: ['id', 'reason'] } },
     outOfScope: { type: 'array', items: { type: 'object', properties: { file: { type: 'string' }, why: { type: 'string' } }, required: ['file', 'why'] } },
     checks: { type: 'string', description: 'check command results, one line' },
-    afterShots: { type: 'array', items: { type: 'string' } },
+    afterShots: { type: 'array', items: { type: 'string' }, description: 'every path the screenshot command printed' },
     openQuestions: { type: 'array', items: { type: 'string' } },
   },
-  required: ['status', 'commit', 'verbs', 'fixed', 'skipped', 'outOfScope', 'checks', 'afterShots'],
+  required: ['status', 'commit', 'commands', 'fixed', 'skipped', 'outOfScope', 'checks', 'afterShots'],
+}
+const FINISH = {
+  type: 'object',
+  properties: {
+    grades: {
+      type: 'array',
+      items: { type: 'object', properties: { id: { type: 'string' }, grade: { type: 'string', enum: ['fixed', 'partial', 'not-fixed'] }, evidence: { type: 'string' } }, required: ['id', 'grade', 'evidence'] },
+    },
+    regressions: { type: 'array', items: { type: 'string' }, description: 'at most 3, introduced by the fixes' },
+    disposition: { type: 'string', description: 'one line: ready for review, or what stays open' },
+  },
+  required: ['grades', 'regressions', 'disposition'],
 }
 
-const criticTools = CRITIC_KIND === 'impeccable'
-  ? `Critic method: impeccable. Launcher: ${input.impeccable} (playbooks in its skill folder's reference/).`
-  : `Critic method: rubric. Impeccable is not installed — score with ${input.skillDir}/references/rubric.md instead; there is no detector, so detectorCount is the rubric's mechanical-check hits.`
+const method = METHOD === 'impeccable'
+  ? `Method: impeccable v${IMP.version ?? '?'} (${IMP.layout} layout). Skill folder: ${IMP.skillDir}. Playbooks: ${IMP.reference ?? IMP.skillDir + '/reference'}/. Detector: \`${IMP.detect} <paths>\`.`
+  : `Method: rubric. ${DEGRADED}. Use ${REF}/rubric.md in place of Impeccable's playbooks and detector.`
 
 const common = () => [
   `Target: ${input.target} (route ${input.route} at ${input.baseUrl}).`,
   `Scope (repo-relative): ${input.scope.join(', ')}.`,
-  MODE === 'qa-hook'
-    ? `Worktree: ${input.worktree} — the QA lane's checkout of issue #${input.issue ?? '?'}'s branch. Edit only there; never push, never switch branches.`
-    : `Worktree: ${input.worktree} — run every command there and edit files only under that path. The main checkout is another session's; never touch it.`,
+  `Worktree: ${input.worktree} — run every command there and edit files only under that path. The main checkout is another session's; never touch it.`,
   `Run dir (shots, auth, logs): ${input.runDir}.`,
-  criticTools,
-  `Taste file (read first; cite its ids): ${TASTE}.`,
-  `Checks that must stay green: ${input.checks.length ? input.checks.join(' && ') : '(none detected — say so in checks)'}.`,
-  `Screenshot command (append --label <label>): ${input.shootCmd}`,
-  `Design context: ${input.context ?? 'no PRODUCT.md / DESIGN.md; the incumbent implementation is the design authority; refinement preserves it.'}`,
+  method,
+  `Taste and direction file (read first; cite its ids): ${TASTE}.`,
+  `Design context: ${input.context ?? 'no PRODUCT.md / DESIGN.md; the incumbent implementation is the design authority.'}`,
   `The brief, verbatim: """${input.prompt}"""`,
 ].join('\n')
 
-const ledgerText = (ledger) => (ledger.length ? ledger.join('\n') : '(first round — no ledger yet)')
+const isSheet = (f) => /(^|\/)cmp-[^/]*\.png$/.test(f)
+const isCrop = (f) => /-s\d+\.png$/.test(f)
+const shotBlock = (current, n) => {
+  const before = input.beforeShots
+  const lines = [
+    `Round-0 (before) shots: ${before.filter((f) => !isCrop(f)).join(', ')}`,
+    `Round-0 section crops: ${before.filter(isCrop).join(', ') || '(none)'}`,
+  ]
+  if (current !== before) {
+    lines.push(
+      `Current shots (light and dark, desktop 1440 and mobile 390): ${current.filter((f) => !isSheet(f) && !isCrop(f)).join(', ')}`,
+      `Current section crops: ${current.filter(isCrop).join(', ') || '(none)'}`,
+      `Before | after sheets (read these first): ${current.filter(isSheet).join(', ') || '(none — compare the pairs above)'}`,
+    )
+  } else {
+    lines.push(`Check ${n} is on the untouched surface: current = round-0.`)
+  }
+  if (input.extraShots?.length) lines.push(`The user's screenshots: ${input.extraShots.join(', ')}`)
+  return lines.join('\n')
+}
+const ledgerText = (ledger) => (ledger.length ? ledger.join('\n') : '(first check — no ledger yet)')
+const counts = (ps) => SEV.map((s) => `${s}×${ps.filter((p) => p.severity === s).length}`).join(' ')
 
 const ledger = [...(input.priorLedger ?? [])]
 const rounds = []
-let shots = [...input.beforeShots, ...(input.extraShots ?? [])]
-let doneStreak = 0
-let best = -1
-let sinceBest = 0
-let refineFails = 0
-let stopReason = `ran all ${ROUNDS} rounds`
-let lastAudit = null
-let prevCleanDone = false
+const claims = [] // problems a fixer said it fixed, for the finish review
 const openQuestions = []
+let shots = input.beforeShots
+let finalLabel = 'round-0'
+let cleanStreak = 0
+let fixFails = 0
+let stopReason = `ran all ${ROUNDS} rounds`
 
-for (let n = 1; n <= ROUNDS; n++) {
-  phase('Critique')
-  // The audit is the expensive half: round 1, every 3rd round, the last round,
-  // and any round that may end the loop (the one after a clean DONE).
-  const runAudit = n === 1 || n % 3 === 0 || n === ROUNDS || prevCleanDone
-  const critic = await agent(
+// Check n runs on the state left by fix n-1; check ROUNDS+1 is the closing
+// check that scores the final state. Fix rounds never exceed ROUNDS.
+for (let n = 1; n <= ROUNDS + 1; n++) {
+  phase('Check')
+  const shotsNow = shotBlock(shots, n)
+  // Assessment A and B in isolated contexts, in parallel: neither sees the other.
+  const [design, detect] = await Promise.all([
+    agent(
+      [`You are the check-${n} design reviewer. Read ${REF}/checker-brief.md, section "Design reviewer", and follow it exactly.`, common(), shotsNow, `Extra states only (a dialog open, a tab switched): \`${input.shootCmd} --label review-r${n} --sections none\``].join('\n\n'),
+      { phase: 'Check', label: `design r${n}`, schema: DESIGN },
+    ),
+    agent(
+      [`You are the check-${n} detector. Read ${REF}/checker-brief.md, section "Detector", and follow it exactly.`, common()].join('\n\n'),
+      { phase: 'Check', label: `detector r${n}`, schema: DETECT },
+    ),
+  ])
+  if (!design) { stopReason = `design reviewer r${n} died`; break }
+  if (!detect) { stopReason = `detector r${n} died`; break }
+
+  const checker = await agent(
     [
-      `You are the round-${n} critic of a refine loop. Read ${input.skillDir}/references/critic-brief.md and follow it exactly.`,
+      `You are the check-${n} checker. Read ${REF}/checker-brief.md, section "Checker", and follow it exactly.`,
       common(),
-      runAudit
-        ? 'Audit: RUN it this round (all five dimensions) and return auditTotal.'
-        : `Audit: SKIP it this round — critique and detect only, omit auditTotal. Last audit: ${lastAudit ?? 'none'}/20.`,
-      `Latest screenshots (Read each one): ${shots.join(', ')}`,
-      `Ledger of earlier rounds:\n${ledgerText(ledger)}`,
+      shotsNow,
+      `Design review (assessment A):\n${JSON.stringify(design, null, 2)}`,
+      `Detector and audit (assessment B):\n${JSON.stringify(detect, null, 2)}`,
+      `Ledger of earlier checks:\n${ledgerText(ledger)}`,
     ].join('\n\n'),
-    { phase: 'Critique', label: `critic r${n}`, schema: CRITIC },
+    { phase: 'Check', label: `check r${n}`, schema: CHECK },
   )
-  if (!critic) { stopReason = `critic r${n} died`; break }
-  openQuestions.push(...(critic.openQuestions ?? []))
+  if (!checker) { stopReason = `checker r${n} died`; break }
+  openQuestions.push(...(design.openQuestions ?? []), ...(checker.openQuestions ?? []))
 
-  if (critic.auditTotal != null) lastAudit = critic.auditTotal
-  const audit = critic.auditTotal != null ? `audit ${critic.auditTotal}/20` : `audit ${lastAudit ?? '–'}/20 (carried)`
-  const score = Math.round((critic.heuristicsTotal / (critic.heuristicsMax || 40)) * 400) / 10
-  const blocking = critic.findings.filter((f) => f.severity === 'P0' || f.severity === 'P1')
-  const counts = ['P0', 'P1', 'P2', 'P3'].map((s) => `${s}×${critic.findings.filter((f) => f.severity === s).length}`).join(' ')
-  const round = { n, score, audit: critic.auditTotal ?? null, auditRun: runAudit, verdict: critic.verdict, counts, findings: critic.findings, summary: critic.summary }
+  const problems = checker.problems.slice(0, 8)
+  const visual = Math.round((design.designTotal + detect.auditTotal) * 10) / 10
+  const blocking = problems.filter((p) => p.severity === 'P0' || p.severity === 'P1')
+  const vsBefore = n === 1 ? 'baseline' : checker.vsBefore
+  const round = { n, visual, design: design.designTotal, audit: detect.auditTotal, detectorCount: detect.detectorCount, detectorRan: detect.detectorRan, vsBefore, vsBeforeNote: checker.vsBeforeNote ?? '', counts: counts(problems), problems, summary: checker.summary }
   rounds.push(round)
+  const head = `C${n} · visual ${visual}/40 (design ${design.designTotal}/20 · audit ${detect.auditTotal}/20 · detector ${detect.detectorCount}) · ${vsBefore}`
 
-  if (score > best) { best = score; sinceBest = 0 } else { sinceBest++ }
-  const cleanDone = critic.verdict === 'DONE' && blocking.length === 0
-  doneStreak = cleanDone ? doneStreak + 1 : 0
-  prevCleanDone = cleanDone
-
-  if (doneStreak >= 2) {
-    ledger.push(`R${n} · ${score}/40 · ${audit} · DONE (2nd in a row) · remaining ${counts}`)
-    stopReason = 'two consecutive clean DONE verdicts'
+  cleanStreak = blocking.length === 0 ? cleanStreak + 1 : 0
+  if (cleanStreak >= 2) {
+    ledger.push(`${head} · clean (2nd in a row) · ${round.counts}`)
+    stopReason = 'two consecutive checks found no P0/P1'
     break
   }
-  if (sinceBest >= 3) {
-    ledger.push(`R${n} · ${score}/40 · ${audit} · ${critic.verdict} · remaining ${counts}`)
-    stopReason = `score plateaued at ${best}/40 for 3 rounds`
+  if (n === ROUNDS + 1) {
+    ledger.push(`${head} · closing check · ${round.counts}`)
     break
   }
-  if (cleanDone) {
-    ledger.push(`R${n} · ${score}/40 · ${audit} · DONE · no refine; next critic confirms · remaining ${counts}`)
+  if (problems.length === 0) {
+    ledger.push(`${head} · clean, nothing to fix; next check confirms`)
     continue
   }
 
-  phase('Refine')
-  const commitMsg = MODE === 'qa-hook'
-    ? `refine(#${input.issue ?? input.slug}) round ${n}: <what changed>`
-    : `refine(${input.slug}) round ${n}: <what changed>`
-  const refiner = await agent(
+  phase('Fix')
+  const plan = chainFor(problems)
+  const routed = problems.map((p) => ({ ...p, route: ROUTES[p.type] ?? 'polish' }))
+  const commitMsg = `refine(${input.slug}) round ${n}: <what changed>`
+  const fixer = await agent(
     [
-      `You are the round-${n} refiner of a refine loop. Read ${input.skillDir}/references/refiner-brief.md and follow it exactly.`,
+      `You are the round-${n} fixer. Read ${REF}/fixer-brief.md and ${REF}/routing.md, and follow them exactly.`,
       common(),
-      `Commit message: "${commitMsg}". Screenshot label: round-${n}.`,
-      `Findings from this round's critic (fix P0 → P1 → P2; P3 only if trivial and in the same files):\n${JSON.stringify(critic.findings, null, 2)}`,
+      `Checks that must stay green: ${input.checks.length ? input.checks.join(' && ') : '(none detected — say so in checks)'}.`,
+      `Commit message: "${commitMsg}".`,
+      `AFTER shots: \`${input.shootCmd} --label round-${n} --compare round-0\` — return every path it prints.`,
+      `Suggested chain (routing.md defaults; you choose the final chain, polish always last): ${plan.join(' → ')}`,
+      `Problems from check ${n}, ranked, each with its default route (fix P0 → P1 → P2; P3 only in files you already touch):\n${JSON.stringify(routed, null, 2)}`,
     ].join('\n\n'),
-    { phase: 'Refine', label: `refiner r${n}`, schema: REFINER },
+    { phase: 'Fix', label: `fixer r${n}`, schema: FIX },
   )
-  if (!refiner) { stopReason = `refiner r${n} died`; break }
-  openQuestions.push(...(refiner.openQuestions ?? []))
-  round.refine = refiner
+  if (!fixer) { stopReason = `fixer r${n} died`; break }
+  openQuestions.push(...(fixer.openQuestions ?? []))
+  round.fix = fixer
 
-  const oos = refiner.outOfScope.length ? ` · out-of-scope: ${refiner.outOfScope.map((o) => `${o.file} (${o.why})`).join('; ')}` : ''
+  const oos = fixer.outOfScope.length ? ` · out-of-scope: ${fixer.outOfScope.map((o) => `${o.file} (${o.why})`).join('; ')}` : ''
   ledger.push(
-    `R${n} · ${score}/40 · ${audit} · ${refiner.status} ${refiner.commit || ''} [${refiner.verbs.join(', ')}]` +
-      `\n  fixed: ${refiner.fixed.join(', ') || '—'} · skipped: ${refiner.skipped.map((s) => s.id).join(', ') || '—'}${oos}` +
-      `\n  remaining after: ${critic.findings.filter((f) => !refiner.fixed.includes(f.id)).map((f) => `${f.severity} ${f.id}`).join(', ') || 'none'}`,
+    `${head} · ${round.counts} · ${fixer.status} ${fixer.commit || ''} [${fixer.commands.join(' → ')}]` +
+      `\n  fixed: ${fixer.fixed.join(', ') || '—'} · skipped: ${fixer.skipped.map((s) => s.id).join(', ') || '—'}${oos}`,
   )
   log(ledger[ledger.length - 1].split('\n')[0])
 
-  if (refiner.status === 'reverted') {
-    refineFails++
-    if (refineFails >= 2) { stopReason = 'two refiner rounds in a row went red and were reverted'; break }
-  } else {
-    refineFails = 0
+  if (fixer.status === 'reverted') {
+    fixFails++
+    if (fixFails >= 2) { stopReason = 'two fix rounds in a row went red and were reverted'; break }
+    continue
   }
-  if (refiner.afterShots.length) shots = refiner.afterShots
+  fixFails = 0
+  if (fixer.status === 'committed') {
+    for (const id of fixer.fixed) {
+      const p = problems.find((x) => x.id === id)
+      if (p) { const i = claims.findIndex((c) => c.id === id); if (i >= 0) claims.splice(i, 1); claims.push({ ...p, round: n }) }
+    }
+    if (fixer.afterShots.length) { shots = fixer.afterShots; finalLabel = `round-${n}` }
+  }
 }
 
-const scoreLine = rounds.map((r) => `R${r.n} ${r.score}`).join(' → ')
-return { mode: MODE, stopReason, best, scoreLine, ledger, rounds, finalShots: shots, openQuestions }
+// Finish review: a fresh context grades every claimed fix against the pixels.
+let finish = null
+if (claims.length && finalLabel !== 'round-0') {
+  phase('Finish')
+  finish = await agent(
+    [
+      `You are the finish reviewer. Read ${REF}/finish-reviewer-brief.md and follow it exactly.`,
+      common(),
+      shotBlock(shots, 'final'),
+      `Claimed fixes to grade (one grade each):\n${JSON.stringify(claims, null, 2)}`,
+    ].join('\n\n'),
+    { phase: 'Finish', label: 'finish', schema: FINISH },
+  )
+}
+
+const first = rounds[0]
+const last = rounds[rounds.length - 1]
+const scoreLine = rounds.map((r) => `C${r.n} ${r.visual}/40${r.n > 1 ? ` (${r.vsBefore})` : ''}`).join(' → ')
+return {
+  method: METHOD,
+  degraded: DEGRADED,
+  warnings: input.warnings ?? [],
+  stopReason,
+  scoreLine,
+  before: first ? first.visual : null,
+  after: last ? last.visual : null,
+  ledger,
+  rounds,
+  finalLabel,
+  finalShots: shots,
+  grades: finish ? finish.grades : [],
+  regressions: finish ? finish.regressions : [],
+  disposition: finish ? finish.disposition : claims.length ? 'finish reviewer died — fixes ungraded' : 'no fixes landed',
+  openQuestions,
+}

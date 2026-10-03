@@ -1,6 +1,6 @@
 # ui-refine-loop config: the `refine` block
 
-These keys are optional and live in the active super-board config (`.claude/super-board/configs/<slug>.json`). `scripts/refine-setup.sh detect` resolves each one in this order: the config key, then auto-detection, then the default. Run `detect` and read its output before setup. Whatever it prints is what the loop will use.
+These keys are optional and live in the active super-board config (`.claude/super-board/configs/<slug>.json`). `scripts/refine-setup.sh detect` resolves each one in this order: the config key, then auto-detection, then the default. Run `detect` and read its output before setup. Whatever it prints is what the loop will use. Anything in its `warnings` array (also printed to stderr in a banner) goes to the user before the loop starts and into the PR body.
 
 ```jsonc
 "refine": {
@@ -13,7 +13,7 @@ These keys are optional and live in the active super-board config (`.claude/supe
   // Polled until it answers 2xx, 3xx, 401 or 403. Default "/".
   "ready_path": "/",
 
-  // Commands the refiner must keep green; a red round is reverted.
+  // Commands the fixer must keep green; a red round is reverted.
   // Auto: package.json typecheck / lint / test scripts (test runs with CI=1),
   // else the config's top-level `verify_commands`.
   "check_commands": ["npm run typecheck", "npm run lint"],
@@ -36,15 +36,21 @@ These keys are optional and live in the active super-board config (`.claude/supe
     { "name": "empty", "env": { "USER_PREFIX": "E2E_EMPTY" } }
   ],
 
-  // Path to a project taste file. Default: the skill's references/taste.md.
+  // The project's taste and direction file, written by the grill (references/grill.md).
+  // Default docs/design/taste.md. Missing → the grill starts from the skill's neutral
+  // references/taste.md. One per project; each target gets a block under Direction.
   "taste_file": "docs/design/taste.md",
 
-  // Impeccable launcher. Auto: .claude/ or .agents/ skills, project then ~.
-  // Not found → the built-in rubric (references/rubric.md).
-  "impeccable": ".agents/skills/impeccable/scripts/impeccable",
+  // Impeccable install: its skill folder, its scripts/impeccable launcher, or any file
+  // in its scripts/. Both layouts work: v4.4+ (scripts/impeccable <verb>) and v4.0.x
+  // (node scripts/detect.mjs, node scripts/context.mjs).
+  // Auto: .claude/skills/impeccable and .agents/skills/impeccable in this directory
+  // and every parent, then under ~. Not found → a loud warning and the built-in
+  // rubric (references/rubric.md); a refine.impeccable that points at nothing warns too.
+  "impeccable": ".agents/skills/impeccable",
 
-  "rounds": 10,          // manual mode default
-  "qa_hook_rounds": 3    // qa-hook mode default
+  "rounds": 5            // fix rounds; a closing check follows the last
+  // qa_hook_rounds is ignored if present: the board no longer runs this loop.
 }
 ```
 

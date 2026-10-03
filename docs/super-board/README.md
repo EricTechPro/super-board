@@ -22,10 +22,10 @@ column each card is in.
 
 ```mermaid
 flowchart LR
-  collect["/super-collect<br/>errors · issues · lookback"] --> backlog["Backlog"]
+  collect["/super-collect<br/>sentry · posthog · issues · PRs · architecture"] --> backlog["Backlog"]
   backlog -->|"/super-board lint, then you"| ready["Ready"]
   ready --> build["Building<br/>super-build: worktree + draft PR"]
-  build --> qa["QA<br/>super-qa: tests, evidence,<br/>ui-refine-loop on UI cards"]
+  build --> qa["QA<br/>super-qa: tests, evidence"]
   qa --> review["Review<br/>super-review: own hypotheses,<br/>prior findings"]
   review --> gate{"merge gate<br/>base + verify_commands"}
   gate -->|green, head unchanged| done["Done (squash-merged)"]
@@ -48,9 +48,9 @@ merge with a hand-off; `variant: "qa-only"` skips Building.
 | `/super-build` | `Ready` → `QA`. Worktree, smallest safe change, draft PR. |
 | `/super-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
 | `/super-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
-| `/super-collect` | Filling `Backlog` from errors, unboarded issues, feedback and repeat failures across past runs. |
-| `/ui-refine-loop` | Polishing one page or component; the Tester also calls it on UI cards (qa-hook). |
-| `/visual`, `/arch-loop` | Secondary helpers: a visual recap or plan, an architecture loop. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |
+| `/super-collect` | Filling `Backlog` from Sentry, PostHog, unboarded issues, recurring PR problems and architecture findings, each checked by one verifier first. |
+| `/ui-refine-loop` | Polishing one page or component, standalone: Impeccable check → fix rounds ending in a draft PR. The board never runs it. |
+| `/visual` | Secondary helper: a visual recap or plan. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |
 
 ## Backends
 
@@ -96,7 +96,7 @@ user a question: the run is unattended, and a skill that waits is a skill that h
 | Lane | Loads |
 |---|---|
 | **super-build** | Routed by the ticket's type label: `bug` → `diagnosing-bugs`+`tdd`, `feature` → `implement`+`tdd`+`codebase-design`, `refactor`/`tech-debt` → `codebase-design`+`tdd`, `docs` → skip `tdd`. Always `ponytail:ponytail` first (inline ladder if absent), `verification-before-completion`, and `code-review` on its own diff. Official docs first for third-party APIs, upgrades, auth/billing. Mechanics (`vitest` / `playwright-best-practices` / `testing-strategy`) by the localisation ladder, never by label. |
-| **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · the same testing skills · `ui-refine-loop` (qa-hook, UI cards whose tests passed) |
+| **super-qa** | `ask-matt` · `tdd` · `diagnosing-bugs` · the same testing skills |
 | **super-review** | `code-review` (Standards + Spec, merge-base as fixed point) · `codebase-design` · `ponytail:ponytail-review` |
 
 Assignment happens when the ticket is written, not at runtime: super-build routes on the issue's

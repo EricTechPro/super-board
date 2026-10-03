@@ -19,6 +19,8 @@
 #     [--area <area>] [--route <route>] [--spec <path>] [--iter <n>] \
 #     [--fingerprint "<slug>|<tc>|<signature>"] \
 #     [--suggested-skill super-build|super-qa|ui-refine-loop|super-review]
+#       (ui-refine-loop only labels a UI ticket; a human can run /ui-refine-loop —
+#        the board never triggers it)
 #
 # Project resolution (per super-qa/SKILL.md → "Project resolution"):
 #   owner  $SUPER_QA_PROJECT_OWNER, else the current repo's owner
@@ -70,7 +72,7 @@ if [ -n "$CATEGORY" ]; then
 fi
 if [ -n "$SUGGESTED_SKILL" ]; then
   case "$SUGGESTED_SKILL" in super-build|super-qa|ui-refine-loop|super-review) ;;
-    *) die "--suggested-skill must be super-build|super-qa|ui-refine-loop|super-review (got: $SUGGESTED_SKILL)" 64 ;; esac
+    *) die "--suggested-skill must be super-build|super-qa|ui-refine-loop|super-review (got: $SUGGESTED_SKILL; ui-refine-loop = UI ticket, a human can run /ui-refine-loop)" 64 ;; esac
 fi
 
 BODY_RAW=$(cat "$BODY_FILE")

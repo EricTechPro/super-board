@@ -1,87 +1,98 @@
 ---
 name: ui-refine-loop
-description: Unattended critique → refine loop on one page or component. Each round a fresh critic (Impeccable critique/detect/audit, or a built-in rubric) scores it DONE/CONTINUE with P0–P3 findings, then a fresh refiner fixes them, keeps checks green or reverts, and commits, all in its own worktree with before/after screenshots at desktop 1440 and mobile 390. Two entry points — manual `/ui-refine-loop <route|component>` and a qa-hook the super-board QA lane calls on UI cards. Use when the user says "ui-refine-loop", "/ui-refine-loop", "refine loop", "iterate on this page", "critique and refine N times", or "keep polishing".
+description: Unattended Impeccable check → fix loop on one page or component. It reads the target's code, grills Eric (at most 10 questions, "you pick" welcome) into a per-project taste and direction file, then runs bounded rounds. Each round a fresh checker runs Impeccable critique and audit (design review and detector in separate sub-agents) and ranks typed problems, and a fresh fixer chains the matching Impeccable commands (polish last), keeps checks green or reverts, and commits. Shots cover before vs now, light and dark, 1440 and 390, plus section crops. A fresh finish reviewer grades every fix, and the loop ends in a draft PR with a Before | After table. Standalone only: started by `/ui-refine-loop <route|component>`, never by the super-board lanes. Use when the user says "ui-refine-loop", "/ui-refine-loop", "refine loop", "iterate on this page", "polish this page with impeccable", or "keep polishing".
 argument-hint: "<route | component path | description> [\"<what's wrong / what we want>\"] [--rounds N] [screenshot paths…]"
 ---
 
-# ui-refine-loop: critique → refine, on a loop
+# ui-refine-loop: Impeccable check → fix, bounded
 
-`impeccable critique` scores a surface once and stops, and a refine pass fixes it once and stops. This skill runs the two as a loop. Each round a **fresh critic** judges the latest screenshots, a **fresh refiner** fixes what it found and commits, and a two-line ledger is the only thing carried between rounds. Fresh contexts matter: a critic that watched the last three edits grades the intent, not the pixels.
-
-Adapted from BookKeepingApp refine-loop.
+Impeccable's `critique` and `audit` find problems once, and each fix command (`distill`, `layout`, `polish`, and the rest) fixes one kind once. This skill chains them into a short unattended loop. Each round, **fresh checkers** find and rank the problems, then a **fresh fixer** picks the right Impeccable commands and lands one green commit. A short ledger is the only thing carried between rounds, because a checker that watched the last edits grades the intent, not the pixels.
 
 ```
-/ui-refine-loop /dashboard/reports "the summary strip feels cramped" --rounds 6
-/ui-refine-loop src/components/ReceiptViewer.tsx "mobile layout breaks under 400px"
+/ui-refine-loop /dashboard/reports "the summary strip feels cramped"
+/ui-refine-loop src/components/ReceiptViewer.tsx "mobile layout breaks under 400px" --rounds 3
 /ui-refine-loop "the billing page plan cards" "too loud, make it calmer" ~/Desktop/billing.png
 ```
 
-Rounds default to **10** in manual mode and **3** in qa-hook mode. In the paths below, `<main>` is this checkout, `<wt>` is the refine worktree, `<run>` is its run dir, and `<skill>` is this skill's folder.
+Rounds default to **5**. Impeccable advises bounded passes; asking for more than 8 gets a one-line warning about cost and diminishing returns. In the paths below, `<main>` is this checkout, `<wt>` is the refine worktree, `<run>` is its run dir, and `<skill>` is this skill's folder.
 
-## Modes
+It is **standalone**: only a person starts it, with `/ui-refine-loop <where>`. The super-board lanes never run it. It works on its own `refine/<slug>` branch from `HEAD` and ends with finish grades and a **draft PR** for human review. It never merges.
 
-| Mode | Started by | Worktree | Ends with |
-|---|---|---|---|
-| `manual` | the user: `/ui-refine-loop …` | new `refine/<slug>` branch from `HEAD` | score line, optional before/after page, squash-merge only on the user's yes |
-| `qa-hook` | the super-board Tester lane, on a UI card whose tests passed | the QA lane's issue-branch checkout | commits on the issue branch; the Tester reports and pushes. See [`references/qa-hook.md`](references/qa-hook.md) |
+## 1. Read the target's code first
 
-The rest of this file covers manual mode. qa-hook uses the same setup script, screenshot script and workflow.
-
-## 0. Resolve the target (ask once)
-
-Turn the argument into a **route** to screenshot and the **scope** paths the refiner may edit:
+The prompt names where: a route, a component path or a description. Turn it into a **route** to screenshot and the **scope** paths the fixer may edit:
 
 - **Route**: the page file that serves it (`app/**/page.*`, `pages/**`, `src/routes/**`, or whatever the framework uses), plus the component folders it imports.
 - **Component path**: that file's folder. The route is a page that renders it (grep for its import), or its Storybook story.
 - **Description**: search for it. Any screenshots the user pasted show which surface they mean.
 
-If there are two plausible readings, or the route matches none of the user's words, ask **one** question listing the candidates, then go. Use the same single question when target files are dirty in `<main>`: the worktree branches from `HEAD`, so uncommitted edits won't be in it. Ask whether to proceed without them or wait. No brief given → the brief is "make it better", and [`references/taste.md`](references/taste.md) picks the direction.
+Then **read that code area** before asking anything: the page, the components it renders, the shared UI it uses, the tokens and theme (including how dark mode works), and `PRODUCT.md` / `DESIGN.md` if they exist. Write a one-paragraph **context** for the sub-agents: what the surface does, its components, its tokens, its dark-mode mechanism. Use a sub-agent for this if it spans many files.
 
-## 1. Setup (once)
+If two readings of the target are plausible, or target files are dirty in `<main>` (the worktree branches from `HEAD`, so uncommitted edits won't be in it), make that the grill's first question.
 
-1. **Settings.** `bash <skill>/scripts/refine-setup.sh detect`. This resolves the dev command, checks, env files, auth script, data states, taste file and critic (`impeccable` or `rubric`) from the super-board config's `refine` block, then from `package.json`, then from defaults. The keys and the auth contract are in [`references/config.md`](references/config.md). If `devCommand` is null, ask the user for the command once (and suggest saving it as `refine.dev_command`).
-2. **Context.** With Impeccable, run `<impeccable> context --target <page or component file>` and condense its directives into one paragraph for the sub-agents. With the rubric, write that paragraph from `PRODUCT.md`/`DESIGN.md` if they exist. Otherwise use "the incumbent implementation is the design authority; refinement preserves it".
+## 2. Grill (at most 10 questions)
+
+Follow [`references/grill.md`](references/grill.md), which uses the `grilling` skill's pattern: numbered questions with your recommended answer under each, asked in waves. Wave 1 is 3 questions; later waves come only if needed, and the total is 10 at most. "You pick" accepts your recommendation. Don't ask what the code or an existing taste file already answers. Keep the answers for step 3.4.
+
+## 3. Setup (once)
+
+1. **Settings.** Run `bash <skill>/scripts/refine-setup.sh detect`. It resolves the dev command, checks, env files, auth script, data states, taste file and Impeccable install from the super-board config's `refine` block, then `package.json`, then defaults ([`references/config.md`](references/config.md)). If `devCommand` is null, ask once (and suggest saving it as `refine.dev_command`).
+2. **Impeccable detection.** Detect's `impeccable` field is `{layout, skillDir, version, detect, context}` or null. It handles both installs: v4.4+ ships a launcher (`scripts/impeccable detect --json`, `scripts/impeccable context`), and v4.0.x ships Node scripts (`node scripts/detect.mjs --json`, `node scripts/context.mjs`). It searches `.claude/skills/impeccable` and `.agents/skills/impeccable` in this directory and every parent, then `~`. **If `warnings` is non-empty, show them to the user now, verbatim.** With no Impeccable, the loop runs on [`references/rubric.md`](references/rubric.md), the result carries `degraded`, and the PR says so. It is never silent.
 3. **Worktree, deps, server.** `slug` is the route or file in kebab-case.
    ```bash
    bash <skill>/scripts/refine-setup.sh up --slug <slug>
    ```
-   This creates `<wt>` = `.claude/worktrees/refine-<slug>` on branch `refine/<slug>`, with `<run>` = `<wt>.run` beside it, so shots, auth state and logs never reach a commit. It records the base sha. It gives the worktree a node_modules: an **APFS clone** (`cp -c -R`, a real directory at near-zero disk cost, because a symlink breaks Turbopack), else a reflink copy, else a frozen-lockfile install. A lockfile that differs from `HEAD` always installs fresh. It copies the env files, starts the dev server on a **free port** (never the one another session holds), and waits for `ready_path`. It prints `{worktree, runDir, baseUrl, …}`. Exit 69 means the server never came up: read `<run>/dev.log`, fix it once, or tell the user.
-   **Storybook instead** when the app cannot run but the target has a story: set `refine.dev_command` to the storybook script with `--port $PORT --ci --no-open`. The route becomes `/iframe.html?id=<story-id>&viewMode=story`.
-4. **BEFORE shots, for every data state.** The states come from `refine.states` (default: `main` only). Never invent a dense dataset. If none exists, say the dense state was not shot.
+   This creates `<wt>` = `.claude/worktrees/refine-<slug>` on branch `refine/<slug>`, with `<run>` = `<wt>.run` beside it, so shots, auth state and logs never reach a commit. It records the base sha and base branch. It gives the worktree a node_modules: an APFS clone, else a reflink copy, else a frozen-lockfile install. It copies the env files, starts the dev server on a free port, and waits for `ready_path`. Exit 69 means the server never came up: read `<run>/dev.log`, fix it once, or tell the user. If the app can't run but the target has a story, set `refine.dev_command` to Storybook with `--port $PORT --ci --no-open`; the route becomes `/iframe.html?id=<story-id>&viewMode=story`.
+4. **Taste and direction file.** Write the grill's answers to `<wt>/<tasteFile>` as [`references/grill.md`](references/grill.md) § Output describes (from the neutral [`references/taste.md`](references/taste.md) if the project has none), and commit it: `refine(<slug>): taste and direction`.
+5. **Impeccable context.** With Impeccable, run `cd <wt> && <impeccable.context> --target <page or component file>` once and fold its directives into the context paragraph.
+6. **Round-0 shots, for every data state** (from `refine.states`, default `main`; never invent a dense dataset):
    ```bash
    cd <wt> && node <skill>/scripts/shoot.mjs --base <baseUrl> --route <route> --out <run>/shots --label round-0 \
      --states '<states JSON from detect>' [--auth <authScript>] [--env <first env file>]
    ```
-   [`scripts/shoot.mjs`](scripts/shoot.mjs) captures desktop 1440 and mobile 390 in light theme, grown to the inner scroll height, as `<label>-<state>-<viewport>.png`. With an auth script it signs in once per state and caches the session. Without one it never signs in. Playwright must resolve from `<wt>`. If it doesn't, `npx playwright install chromium` there. Read every image before you start. A sign-in page or an error overlay here means setup is not done.
+   [`scripts/shoot.mjs`](scripts/shoot.mjs) writes `<label>-<state>-<desktop|mobile>-<light|dark>.png` at 1440 and 390, grown to the inner scroll height, plus light-theme **section crops** (`…-s<i>.png`, from `[data-refine-section]` or `main`'s sections). With `--compare round-0`, later rounds also get **before | after sheets** (`cmp-…png`). Read every image. A sign-in page or an error overlay means setup isn't done. Playwright must resolve from `<wt>`; if it doesn't, run `npx playwright install chromium` there.
 
-## 2. The loop: a saved Workflow
+## 4. The loop: a saved Workflow
 
-Call the **Workflow** tool with `scriptPath: .claude/workflows/ui-refine-loop.js` and the `args` its header documents. Those are: mode, slug, target, scope, the brief verbatim, rounds, the absolute worktree/run/skill paths, critic + impeccable launcher, taste file, checks, `shootCmd` (the step 4 command without `--label`), baseUrl, route, the context paragraph, BEFORE shots, and the user's screenshots. Invoking this skill is the user's opt-in to that workflow.
+Call the **Workflow** tool with `scriptPath: .claude/workflows/ui-refine-loop.js` and the `args` its header documents: slug, target, scope, the brief verbatim, rounds, the absolute worktree/run/skill paths, `critic` and `impeccable` (detect's object, as-is), `tasteFile` (`<wt>/<tasteFile>`), checks, `shootCmd` (the step 3.6 command without `--label`), baseUrl, route, the context paragraph, the round-0 shots (every path printed), the user's screenshots, and detect's `warnings`. Invoking this skill is the user's opt-in to that workflow.
 
-Rounds run one after another. The critic follows [`references/critic-brief.md`](references/critic-brief.md). It runs critique and detect every round, and the audit only on round 1, every third round, and the rounds that may end the loop. It returns DONE or CONTINUE with ranked P0–P3 findings. On CONTINUE, the refiner follows [`references/refiner-brief.md`](references/refiner-brief.md): it keeps the checks green or reverts, commits once, and takes AFTER shots. The script then appends a [ledger](references/ledger.md) entry.
+Each round:
+
+1. **Check.** Two isolated sub-agents run in parallel: the **design reviewer** (Impeccable critique's Assessment A, scoring visual quality /20 across specificity, hierarchy, typography, color and composition) and the **detector** (Impeccable's detector plus the audit, /20). Neither sees the other. A fresh **checker** merges them into at most 8 **ranked, typed** problems and judges before vs now from the sheets. See [`references/checker-brief.md`](references/checker-brief.md).
+2. **Fix.** A fresh **fixer** reads Impeccable's command table, the playbook for each command it runs, and craft-floor. It routes each problem by type ([`references/routing.md`](references/routing.md): cluttered → `distill`, bland → `bolder`, too loud → `quieter`, dull color → `colorize`, spacing/hierarchy → `layout`, type → `typeset`, mobile → `adapt`, slow → `optimize`, empty/first-run → `onboard`, confusing copy → `clarify`, edge cases and a11y → `harden`, motion → `animate`, personality → `delight`, drift or 3+ copies → `extract`), chains them, and always runs **`polish` last**. It keeps the checks green or reverts, makes one commit, and takes AFTER shots with `--compare round-0`. See [`references/fixer-brief.md`](references/fixer-brief.md).
+
+The workflow appends a [ledger](references/ledger.md) line per check. The **score** is visual quality /40 (design /20 + audit /20) plus before/after (`better`/`same`/`worse`); Nielsen heuristics are not used. After the last fix round, a closing check scores the final state.
 
 **Stop rules**, whichever comes first:
 
-- N rounds have run.
-- Two clean DONE verdicts in a row (DONE with no P0 or P1).
-- The best score has not improved for three rounds.
-- Two refiner rounds in a row were reverted.
+- N fix rounds have run (default 5), followed by the closing check.
+- Two consecutive checks found no P0 or P1.
+- Two fix rounds in a row were reverted.
 - A sub-agent died.
 
-**Workflow tool not exposed?** Run the same loop by hand with the Agent tool. Use one `general-purpose` agent per critic and one per refiner. Give each the brief pointer and the inputs the script's prompts carry, never the previous agents' transcripts. You keep the ledger and apply the same stop rules.
+**Finish review.** A fresh **finish reviewer** grades every claimed fix `fixed`, `partial` or `not-fixed` against round-0 vs final shots, and names up to three regressions ([`references/finish-reviewer-brief.md`](references/finish-reviewer-brief.md)).
 
-**Budget.** Each round runs two sub-agents, one at a time, so a 3-agent / one-browser load limit holds. A round costs about 300–450k tokens and 10–20 minutes (critic 120–200k, plus about 60k on an audit round; refiner 150–250k). Ten rounds come to roughly 3.5–4.5M tokens. Say so when the user asks for more than 10.
+**Workflow tool not exposed?** Run the same loop by hand with the Agent tool: one fresh `general-purpose` agent per role (design reviewer and detector in parallel, then checker, then fixer, then finish reviewer). Give each its brief and the inputs the script's prompts carry, never another agent's transcript. You keep the ledger and apply the same stop rules.
 
-## 3. Finish
+**Budget.** A round is four sub-agents, with at most two at once (design reviewer and detector; only the reviewer may open a browser). Expect about 350–500k tokens and 15–25 minutes per round, so the default 5 rounds come to roughly 2–2.5M.
 
-1. Write the returned ledger to `<run>/ledger.md`.
-2. Report: the stop reason, the `scoreLine` (`R1 23 → R2 27.5 → …`, with audit scores alongside), what each commit landed (`git -C <wt> log --oneline $(cat <run>/base)..`), the agents' open questions, and any finding id still in "remaining" after three rounds. Show the `round-0-*` shots next to the final round's shots.
-3. Offer a private before → after page with the shot pairs and the score line. Build it only if the user says yes.
-4. `bash <skill>/scripts/refine-setup.sh down --run <run>`. Then ask whether to merge. On yes: in `<main>`, run `git merge --squash refine/<slug>` and commit in the repo's style (usually `style:` or `fix:`), with a body listing what each round landed. The `refine(<slug>) round N` messages stay on the throwaway branch. If `<main>` has uncommitted changes in the same files, stop and say so. After the merge, `git worktree remove <wt>`, `git branch -D refine/<slug>`, and delete `<run>`. On no, leave the branch and worktree and tell the user where they are.
+## 5. Finish: draft PR
+
+1. Write the returned ledger to `<run>/ledger.md`, then `bash <skill>/scripts/refine-setup.sh down --run <run>`.
+2. **Shots onto the branch.** Run
+   ```bash
+   bash <skill>/scripts/pr-shots.sh --worktree <wt> --run <run> --slug <slug> --final <finalLabel>
+   ```
+   It copies round-0 and the final round's `main` shots (1440 and 390, light and dark) to `<wt>/docs/ui-refine/<slug>/`, commits them, and prints a **Before | After** markdown table whose images are `https://github.com/<owner>/<repo>/raw/<sha>/…` links. Never upload shots to a public image host.
+3. **Push the refine branch only:** `git -C <wt> push -u origin refine/<slug>`. Never push to the base branch.
+4. **PR body**, in this order: the target and the brief (one line each); the `degraded` banner and any `warnings`; the Before | After table; the score line (`C1 22/40 → C2 27/40 (better) → …`, with before → after); the finish grades as a table (`id · severity · grade · evidence`) plus regressions and the disposition; the commits (`git -C <wt> log --oneline $(cat <run>/base)..`); open questions and any problem id still open after three checks; and a note that the shots live in `docs/ui-refine/<slug>/` (drop that commit before merging if unwanted; the links are pinned to a sha and keep working).
+5. **Humanize the prose.** Run the PR title and body through the `humanizer` skill. Without it: short sentences, plain words, no hype, no em-dash chains, no "this PR aims to", and say what changed and why.
+6. Open it as a draft against `$(cat <run>/base-branch)`: `gh pr create --draft --base <base-branch> --head refine/<slug> --title "…" --body-file <run>/pr.md`. Report the PR URL, the stop reason, the score line and the grade counts. Leave the worktree in place for follow-ups and tell the user where it is.
 
 ## Guardrails
 
-- **Never push.** Never merge without the user's yes. Never touch `<main>`'s working tree during the loop.
-- The refiner edits outside the scope paths only with a stated reason. It changes a shared component only behind a new prop that defaults to today's behaviour.
-- A refiner round that cannot get every check command green is reverted, never committed red.
+- **Never merge. Never push to the base branch.** The only push is `refine/<slug>`, for the draft PR. Never touch `<main>`'s working tree during the loop.
+- The fixer edits outside scope only with a stated reason, and changes a shared component only behind a new prop that defaults to today's behaviour.
+- A fix round that can't get every check command green is reverted, never committed red.
 - No auth script means no sign-in. No dense fixture means no dense shots. Never fabricate either.
+- Impeccable missing means a loud warning and the rubric, never a silent fallback.

@@ -6,15 +6,14 @@
       "super-build": "Builder lane: worktree, smallest safe change, tests, draft PR.",
       "super-qa": "Tester lane: evidence, test-gap check, screenshots, or bounce to Build.",
       "super-review": "Reviewer lane: own hypotheses, remembers prior findings, merge gate.",
-      "super-collect": "Turns errors, issues and past-run failures into deduped Backlog cards."
+      "super-collect": "Finds problems (Sentry, PostHog, issues, PRs, architecture) and files verified Backlog cards."
     }
   },
   "secondary": {
     "title": "Secondary — standalone helpers",
     "skills": {
       "visual": "One HTML page: branch recap, plan, or codebase map with diagrams.",
-      "ui-refine-loop": "Critique → refine loop that polishes one page or component.",
-      "arch-loop": "Architecture review loop: find one deepening, implement, verify, repeat."
+      "ui-refine-loop": "Critique → refine loop that polishes one page or component."
     }
   }
 }

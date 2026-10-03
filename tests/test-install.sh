@@ -24,7 +24,7 @@ plant_decoys() { for d in decoy-one decoy-two decoy-three; do mkdir -p "$1/.clau
 decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
 
 SKILLS="super-board super-build super-qa super-review"
-ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual arch-loop"
+ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual"
 
 # 1 — a fresh project: plain directories, nothing to preserve. Every primary and
 #     secondary skill lands, and both workflows.

@@ -151,8 +151,8 @@
   // to disable.
   "block_rate_alert_pct": 30,
 
-  // Optional. ui-refine-loop settings (manual runs and the QA lane's qa-hook,
-  // run.md → Tester step 5b). Every key is optional; refine-setup.sh detect
+  // Optional. Settings for the standalone /ui-refine-loop skill (the board never
+  // runs it). Every key is optional; refine-setup.sh detect
   // resolves config key → auto-detection → default. Full notes and the auth
   // script contract: skills/ui-refine-loop/references/config.md.
   "refine": {
@@ -163,23 +163,64 @@
     "auth_script": "scripts/refine-auth.mjs",
     "states": [{ "name": "main" }],
     "taste_file": "docs/design/taste.md",
-    "impeccable": ".agents/skills/impeccable/scripts/impeccable",
-    // Manual-mode rounds (default 10) and qa-hook rounds (default 3).
-    "rounds": 10,
-    "qa_hook_rounds": 3
+    // Impeccable skill folder, launcher, or scripts/ file; v4.0.x and v4.4+ both work.
+    "impeccable": ".agents/skills/impeccable",
+    // Fix rounds (default 5); a closing check follows the last.
+    "rounds": 5
   },
 
-  // Optional. super-collect bounds. Absent keys use the defaults shown.
+  // Optional. super-collect sources for THIS project (skills/super-collect/SKILL.md).
+  // Written by `super-board onboard` (collect step). IDs and hosts only: secrets
+  // live in .env — SENTRY_AUTH_TOKEN, POSTHOG_PERSONAL_API_KEY — never here.
   "collect": {
-    // Intake window for errors, in days. Default 14.
+    // Sources `/super-collect` runs with no argument. Any of:
+    // "sentry", "posthog", "github", "prs", "architecture".
+    "sources": ["sentry", "posthog", "github", "prs", "architecture"],
+    // Default window in days when no --since is given. Default 14.
     "window_days": 14,
-    // Error source: "auto" (Sentry, else any wired error tool), a tool name
-    // such as "sentry", or false to skip errors. Default "auto".
-    "errors": "auto",
-    // Repo folders read as feedback. Default ["docs/feedback", "feedback"].
-    "feedback_paths": ["docs/feedback", "feedback"],
-    // Lookback reads this many newest run files. Default 10.
-    "lookback_runs": 10
+    "sentry": {
+      "org": "<sentry-org-slug>",
+      "project": "<sentry-project-slug>",
+      // Region host, e.g. https://us.sentry.io or https://de.sentry.io. Default https://sentry.io.
+      "host": "https://sentry.io",
+      // Filter to this environment; "" for all. Default "production".
+      "environment": "production",
+      // Drop issues under these window counts. Defaults 1 / 1.
+      "min_events": 1,
+      "min_users": 1
+    },
+    "posthog": {
+      // App host (us.posthog.com / eu.posthog.com or self-hosted), not the ingest host.
+      "host": "https://us.posthog.com",
+      "project_id": 0,
+      // Distinct people a group needs before it becomes a ticket. Default 5
+      // (signals carry their own default: survey themes need 3).
+      "min_users": 5,
+      // Optional: narrow the built-in signal table (collect_posthog.py SIGNALS):
+      // exception, rageclick, dead_click, web_vitals, survey. Absent = all.
+      "signals": ["exception", "rageclick", "dead_click", "web_vitals", "survey"],
+      // Project-defined app failure events. `fail` is a HogQL condition; omit it
+      // when every occurrence is a failure. Filed at >= min_users people, or when
+      // failing people / all people on that event >= failure_rate.
+      "failure_events": [
+        { "event": "push_completed", "fail": "properties.status = 'failed'" },
+        { "event": "payment_failed" }
+      ],
+      "failure_rate": 0.10,
+      // Optional event property holding the app version / SHA; the verifier
+      // uses it to confirm zero hits on versions after a fix.
+      "version_property": "app_version",
+      // Optional funnel steps for the drop-off REPORT (never tickets).
+      "funnel": ["$pageview", "signup_started", "setup_completed"]
+    },
+    "prs": {
+      // Cap on merged PRs read per run. Default 200.
+      "max_prs": 200
+    },
+    "architecture": {
+      // Cap on refactor findings filed per run. Default 5.
+      "max_findings": 5
+    }
   },
 
   "notifications": {

@@ -1,152 +1,173 @@
 ---
 name: super-collect
-description: Collect work and file it as tickets on the super-board GitHub Project, into Backlog only. Two sources — intake (app errors from Sentry or the project's error tool, user-filed GitHub issues not on the board, feedback) and lookback (repeat problems across past wave reports and Reviewer reports). Dedupes against existing cards, dry-run by default. Use when the user says "super-collect", "/super-collect", "collect tickets", "triage errors onto the board", "what keeps breaking", or "look back over the runs".
+description: Find problems in one project and file them as tickets into its super-board Backlog — the board fixes them. Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings). Each candidate is checked by one fresh verifier before filing. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
 ---
 
-# super-collect — fill the Backlog from real signals
+# super-collect — find problems, file them into Backlog
 
-The one door onto the board for work nobody has filed yet. It sorts, dedupes and files; it never
-builds, and it never moves a card to `Ready` — `super-board lint` decides that.
+One job: find problems and file tickets into the board's **Backlog**. The board fixes them.
+super-collect never builds, never edits app code, and never moves a card to `Ready` —
+`super-board lint` decides that. Per project only: it reads the active project's super-board
+config and files onto that project's board.
 
-Adapted from BuilderIO/skills (MIT) — `factory-collect` and `factory-lookback`.
+## Invocation
 
-## When to use
-
-- Before a `super-board run`, to turn errors and user reports into cards.
-- After a few runs, to find what keeps bouncing and file the fix once.
-- Not for one card you already understand — write it yourself, or use `super-board lint` on it.
-
-## Modes
-
-| Invocation | Sources |
+| Command | Does |
 |---|---|
-| `/super-collect` | intake, then lookback |
-| `/super-collect intake` | errors, unboarded issues, feedback |
-| `/super-collect lookback` | `paths.runs_dir` wave reports + Reviewer reports on PRs |
-| any of the above `--yes` | file without the confirm step |
+| `/super-collect` | every source enabled in `collect.sources` |
+| `/super-collect <source> [<source>…]` | just those: `sentry`, `posthog`, `github`, `prs`, `architecture` |
+| `--since 30d` / `--since 2026-09-01` | window; default `collect.window_days`, else 14 days |
+| `--yes` | file without the confirm step (never skips verify or dedupe) |
 
-Default is **dry-run**: show the plan table, file on confirm. `--yes` skips the confirm, never
-the dedupe.
+Default is **dry-run**: show the plan table, file on confirm.
 
 ## Setup
 
-1. Resolve the active config: `.claude/super-board/active` → `.claude/super-board/configs/<slug>.json`
-   (shape: `../super-board/references/config-schema.json`). Read `project.{owner,number,title}`,
-   `repo.remote`, `paths.runs_dir` (default `docs/super-board/runs`). No config → stop and point
-   at `/super-board onboard`. An optional `collect` block overrides the defaults below:
-   `window_days` (14), `errors` (`"auto"`, a tool name, or `false` to skip), `feedback_paths`
-   (`docs/feedback`, `feedback`), `lookback_runs` (10).
-2. Source `.claude/bin/super-board-gh-guard.sh` and `sb_gh_guard_check 200` before each burst.
-3. Snapshot the board once: `gh project item-list <number> --owner <owner> --format json --limit 500`.
-   That list is the dedupe set for the semantic pass and the "not on the board" set for intake.
+1. Resolve the config: `.claude/super-board/active` → `.claude/super-board/configs/<slug>.json`
+   (shape: `../super-board/references/config-schema.json`). No config, or no `collect` block for a
+   requested source → stop and point at `/super-board onboard` (its collect step sets sources up).
+2. Secrets come only from `.env` (nearest walking up): `SENTRY_AUTH_TOKEN`,
+   `POSTHOG_PERSONAL_API_KEY`. Never print, echo or paste them.
+3. Source `.claude/bin/super-board-gh-guard.sh`; `sb_gh_guard_check 200` before each gh burst.
+4. Snapshot the board once: `gh project item-list <number> --owner <owner> --format json --limit 500`.
+   It is the dedupe set for verification and the "not on the board" set for `github`.
 
-## Intake — real-world signals
+Scripts live in `.claude/skills/super-collect/scripts/` (`S=` below). Every fetcher takes
+`--since` and prints JSON; a fetcher that cannot reach its source prints
+`{"status":"unavailable","error":…}` and exits 2. Record each source as `read (n)`, `empty`,
+`unavailable` or `truncated` — never report an unreachable source as empty.
 
-Auto-detect each source; record it as `read (n)`, `empty`, `unavailable` or `truncated`. Never
-report a missing connector as empty.
+## Sources
 
-| Source | Detected by | Read |
+| Source | Fetch | Candidate → ticket |
 |---|---|---|
-| Errors | `SENTRY_AUTH_TOKEN` + org/project in env or root `.env`, `.sentryclirc`, or a connected Sentry MCP; otherwise any error-tool MCP/CLI the project has wired (Bugsnag, Rollbar, …) | unresolved issues, last 14 days, every page; keep id, count, users, first/last seen, release, link |
-| Issues | always | `gh issue list --state open --json number,title,body,labels,url --limit 300`, minus issue numbers already on the board, minus `source:qa`/`source:review`/`source:collect` |
-| Feedback | `docs/feedback/` or `feedback/` in the repo, or a connected support/feedback MCP | items since the last collect run |
+| `sentry` | `python3 $S/collect_sentry.py list --since <w>` — Sentry REST, Bearer token (scopes `event:read project:read`): org issues list, then `event <id>` / `tags <id>` for evidence | one unresolved issue → `bug`, fp `err|sentry|<id>` |
+| `posthog` | `python3 $S/collect_posthog.py list --since <w>` — HogQL `POST {host}/api/projects/{id}/query/` | one signal group → see table below |
+| `github` | `gh issue list --state open --json number,title,body,labels,url --limit 300`, minus issues on the board and `source:*` labels | real work → **adopt** (`--adopt <n>`), never copied |
+| `prs` | `python3 $S/collect_prs.py list --since <w>` — one GraphQL search `is:pr is:merged merged:>=DATE`, paginated, with comments, reviews and review threads (human and bot), super-review reports flagged (`<!-- super-review:report -->`) | one recurring root cause → `fix` / `refactor` / `feature`, fp `prs|<boundary>|<cause>` |
+| `architecture` | read-only finder sub-agent (below) | one finding → `refactor`, fp `arch|<module>|<problem>` |
 
-Then:
+### posthog signals
 
-1. **Classify** each item: `bug` (verified defect), `feature`, `refactor`, `duplicate`,
-   `needs-info`, or `drop` (noise, out of scope). Group items that share a symptom and a code
-   boundary; one card per group, every source link kept.
-2. **Semantic dedupe** against the board snapshot and open issues: same symptom + same
-   route/module = same card. A match becomes a comment on that card with the new evidence, not a
-   new card.
-3. **Issues get adopted, not copied.** An unboarded issue that is real work is placed with
-   `--adopt <n>`; its author keeps the thread.
-4. **Write the body.** Bugs use super-qa's required template (`../super-qa/SKILL.md` → "Required
-   issue body template": Summary, Repro steps, Expected/Actual behavior, Evidence, Suggested fix
-   path, Acceptance criteria) — the filer rejects bodies missing any of them. Features need
-   Summary, Evidence, Acceptance criteria. Evidence is links and counts, never secrets or user PII.
-5. **Fingerprint** — stable across runs: `err|<tool>|<tool-issue-id>`, `fb|<source>|<item-id>`,
-   or `intake|<route-or-module>|<symptom-slug>` when nothing has a stable id.
+The signal set is a table in `collect_posthog.py` (`SIGNALS`) plus the config's
+`collect.posthog.failure_events`; narrow it with `collect.posthog.signals`.
 
-`needs-info` items are not filed; list them in the report with the one question that would
-unblock each.
+| Signal | Grouped by | Files when | Ticket |
+|---|---|---|---|
+| `exception` | `$exception` by `issue_id` (follows merges) | ≥ `min_users` (5) people | `bug`, label `error` |
+| failure events | each configured `{event, fail}` (e.g. `push_completed` with `properties.status = 'failed'`) | ≥ 5 people, or failing-people rate ≥ `failure_rate` (10%) | `bug`, label `error` |
+| `rageclick` | `$rageclick` by URL + element | ≥ 5 people | `bug`, label `ux` |
+| `dead_click` | `$dead_click` by URL + element | ≥ 5 people | `bug`, labels `ux`, `needs-triage` (high false-positive rate) |
+| `web_vitals` | p75 per pathname | ≥ 50 samples and p75 LCP > 4 s, INP > 500 ms or CLS > 0.25 | `bug`, label `perf` |
+| `survey` | raw `survey sent` responses (only when surveys exist) | you theme them; one theme from ≥ 3 people | `feature` |
 
-## Lookback — across past runs
+Each candidate carries a `replay` link (latest `$session_id`) — put it in Evidence. Funnel
+drop-off and abandonment spikes are **report only**: `collect_posthog.py funnel --since <w>` →
+`<paths.runs_dir>/collect-funnel-<YYYY-MM-DD>.md`. No tickets from them.
 
-Bounded evidence: the last 10 run files (or `--since <date>`), and Reviewer reports on PRs merged
-or closed in the same window.
+**Tracking gaps** (posthog runs only). `collect_posthog.py events --since <w>` lists every event
+seen plus `silentSignals`. Find the app's key user workflows from its routes and existing
+`capture()` calls; for each, list the success and failure events that are missing and the
+signals that return no data (e.g. autocapture off ⇒ no `$rageclick`). File one `feature` ticket
+per workflow with gaps, label `analytics`, fp `gap|<workflow>` — Summary, Evidence (routes, the
+capture calls found, what is missing), Acceptance criteria (named events with their properties).
+Suggestions stay perf- and privacy-safe: sampling, clicks only, no input or text capture, no PII
+in properties. Never edit app code.
 
-```bash
-# Card outcomes, one row per card per wave: | #N | lanes | finalStatus | column | detail |
-grep -hE '^\| #[0-9]+ ' "$RUNS_DIR"/*.md | awk -F'|' '{print $2}' | sort | uniq -c | sort -rn   # waves per card
-grep -hE '^\| #[0-9]+ ' "$RUNS_DIR"/*.md | awk -F'|' '$4 !~ /done|merged/ {print $2"|"$6}'      # non-landing outcomes
+### prs — what to look for
 
-# Reviewer reports (finding ids R1…), one PR at a time
-gh pr view <PR> --json comments \
-  --jq '[.comments[] | select(.body | contains("<!-- super-review:report -->"))] | .[].body'
-```
+Read the JSON for problems that **recur**, not one-off nits:
 
-Plus the machine lines on issues and PRs: `root-cause-hash:` (lane failures) and `blocked-by:`
-with its reason tag (halts).
+1. The same finding shape (same module, same rule) on two or more PRs — from human reviewers,
+   bots or super-review reports.
+2. A super-review finding marked `fixed` that comes back `not fixed` in a later report.
+3. Unresolved review threads on merged PRs that point at a real defect.
+4. A skill, prompt or workflow whose reports keep missing the same thing → a `feature` to refine it.
 
-Look for, in order of signal:
+Cluster by **root cause at a shared boundary**, not by wording. One ticket per cause with
+Summary, Evidence (every PR, comment link and finding id), Root cause, Acceptance criteria — at
+least one criterion is a regression check that would have caught the recurrence.
 
-1. **Bouncers** — a card in 3+ waves without reaching Done, or two failures sharing a
-   `root-cause-hash`.
-2. **Recurrent findings** — a Reviewer finding marked `fixed` that returns as `not fixed` in a
-   later report, or the same finding shape (same module, same rule) on different PRs.
-3. **Repeated halts** — the same Block reason tag or halt gate (`no_progress_cycles`, block-rate,
-   merge-gate rebase) across runs.
+### architecture — the finder
 
-Cluster by **root cause at a shared boundary**, not by wording. For each cluster, trace one
-representative case to code, check whether a claimed fix landed, and separate the confirmed cause
-from hypotheses. **One fix ticket per root cause** — `--type fix` (a `refactor` when the cause is
-module shape), fingerprint `lookback|<boundary>|<cause-slug>`, body with Summary, Evidence (every
-card, PR, finding id and run file it explains), Root cause, Acceptance criteria. At least one
-criterion must be a regression check that would have caught the recurrence.
+Spawn one fresh, **read-only** sub-agent (it edits nothing and commits nothing). It uses, in order
+of what is installed: mattpocock `improve-codebase-architecture` (skip its HTML report and
+grilling; findings only) or `codebase-design` (module, interface, depth, seam, deletion test),
+plus `ponytail:ponytail-audit` for over-engineering. It reads `CONTEXT.md` and `docs/adr/` and
+does not re-open a recorded decision; recently changed files weigh higher. It returns
+`{module, problem, finding, files, why, severity}`; each finding = one `refactor` ticket with
+Summary, Evidence (files, the shallow interface or duplicated concept), Acceptance criteria
+(observable, plus "existing tests still pass"). Cap at `collect.architecture.max_findings` (5).
 
-A thin history is not evidence of no pattern. Say how many runs and PRs were read.
+## Verify — one fresh verifier per candidate
+
+Before anything is filed, each candidate goes to **one** fresh verifier sub-agent. No for/against
+panel, no debate — one verifier, one verdict. Give it the candidate JSON, the board snapshot path
+and the window; nothing from other candidates. It checks, in order:
+
+1. **Real** — the evidence holds up: open the Sentry event / replay / PR comment / code it cites.
+2. **Still happening** — `collect_sentry.py check <id> --after <window start>` (`seenAfter`), or
+   `collect_posthog.py check <signal> <key> --after <date>` (`stopped`, `issueStatus`).
+3. **Already fixed** — a closed issue or merged PR that matches
+   (`gh pr list --state merged --search "<symptom> in:title,body"`, plus the fingerprint), and
+   then from the fix's merge date or release: Sentry `status: resolved` with `seenAfterRelease:
+   false`; PostHog `stopped: true` (zero hits and ≥ 3 days of traffic since the merge; with
+   `version_property`, no hits on versions after the fix). A refactor already landed counts too.
+4. **Duplicate** — same symptom + same route/module as a card in the snapshot or an open issue.
+
+Verdict schema: `{verdict: file | drop-fixed | drop-stale | drop-noise | duplicate | needs-triage,
+evidence: [links], note}`. `duplicate` names the card; the filer then comments on it. **Unclear is
+not a drop**: `needs-triage` files the card with `--label needs-triage`. Report every drop with its
+evidence.
 
 ## Filing
 
-Every card goes through one script, which routes to the pack's existing filers:
+Every card goes through one script, which routes to the pack's filers:
 
 ```bash
-.claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> \
-  --type bug|feature|refactor|fix --source intake|lookback \
-  --title "<one line>" --body-file <md> --fingerprint "<key>" [--priority p] [--area a] [--yes]
-.claude/skills/super-collect/scripts/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
+$S/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
+  --source sentry|posthog|github|prs|architecture --title "<one line>" --body-file <md> \
+  --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] [--yes]
+$S/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 ```
 
-- `bug`, `feature`, `fix` → `super-qa-file-bug.sh` (`fix` files as `tech-debt`);
-  `refactor` → `super-review-file-refactor.sh`. Both keep their own guards and Blocked-by default.
-- **Dedupe** is exact-fingerprint, repo-wide, any label: an open hit gets a "Seen again" comment and
-  its number back; a closed-only hit is a **recurrence** — filed again with a line naming the
-  closed issue.
-- **Column** is the board's holding column (`Backlog`, else `Todo`/`To do`/`Triage`/`Inbox`),
-  resolved before dispatch and passed explicitly. A board with none is refused (exit 65), because
-  both filers would fall back toward `Ready`.
-- Labels: `source:collect`, `collect:<intake|lookback>`, plus the filer's own.
+- `bug`, `feature`, `fix` → `super-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
+  `super-review-file-refactor.sh`. Bugs use super-qa's body template (Summary, Repro steps,
+  Expected/Actual behavior, Evidence, Suggested fix path, Acceptance criteria); features need
+  Summary, Evidence, Acceptance criteria; fixes add Root cause. Evidence is links and counts —
+  never secrets or user PII.
+- **Fingerprint per source** (the filer rejects a mismatch): sentry `err|sentry|<id>`, posthog
+  `posthog|<signal>|<key>` (fetchers emit it) or `gap|<workflow>`, github `github|<n>`, prs
+  `prs|<boundary>|<cause>`, architecture `arch|<module>|<problem>`.
+- **Dedupe** is exact-fingerprint, repo-wide, any label: an open hit gets a "Seen again" comment; a
+  closed-only hit is a **recurrence**, filed again naming the closed issue.
+- **Column** is the board's holding column (`Backlog`, else `Todo`/`To do`/`Triage`/`Inbox`); none
+  → refused (exit 65).
+- Labels: `source:collect`, `collect:<source>`, every `--label`, plus the filer's own.
 
-Dry-run flow: run each item without `--yes`, collect the plan lines, show one table
-(`would-file` / `duplicate` / `recurrence` / `would-adopt`), wait for confirm, then rerun with
-`--yes`.
+Dry-run: run each verified item without `--yes`, show one table (`would-file` / `duplicate` /
+`recurrence` / `would-adopt`, plus the verifier's drops), wait for confirm, rerun with `--yes`.
 
 ## Report
 
 ```
-## super-collect: <filed n | dry-run n> · <mode>
-Coverage   errors: read 42 | issues: read 7 | feedback: unavailable | runs: 10 files, 23 PRs
-Filed      #412 bug  Checkout 500 on empty cart          (err|sentry|4411)
+## super-collect: <filed n | dry-run n> · since 2026-09-18 (14d)
+Coverage   sentry: read 42 | posthog: read 9 (silent: rageclick) | github: read 7 | prs: 23 PRs, 6 reports | architecture: 4
+Filed      #412 bug       Checkout 500 on empty cart              (err|sentry|4411)
+Filed      #413 bug       Dead clicks on /pricing  [needs-triage]  (posthog|dead_click|1a2b3c4d5e6f)
 Duplicate  #301 ← Sentry 4502 (comment added)
-Recurrence #418 fix  Merge gate rebases on lockfile drift (was #88)
-Needs info Sentry 4490 — which tenant? (not filed)
+Recurrence #418 fix       Merge gate rebases on lockfile drift     (was #88)
+Dropped    Sentry 4490 drop-fixed — resolved in web@1.4.0, not seen since (PR #377)
+Gaps       #420 analytics Receipt upload: no failure event         (gap|receipt-upload)
+Report     docs/super-board/runs/collect-funnel-2026-10-02.md
 Next       /super-board lint  — nothing here is in Ready
 ```
 
 ## Common pitfalls
 
 - Filing one card per error event. Group by symptom and boundary first.
-- Treating a Reviewer's `fixed` as proof. Recurrence is decided by the next report, not the claim.
+- Skipping the verifier because the count looks big. Volume is not proof it is still happening.
+- Dropping an unclear candidate. File it `needs-triage`.
 - Copying a user's issue into a new one. Adopt it.
-- Moving anything to `Ready`, or "helping" by writing code. Collect files; lint and run do the rest.
+- Treating a reviewer's `fixed` as proof. Recurrence is decided by the next report.
+- Editing app code, adding instrumentation, or moving anything to `Ready`. Collect files; lint and run do the rest.

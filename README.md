@@ -1,8 +1,8 @@
 # super-board
 
-Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **8 skills** — 5 primary, 3 secondary — 9 commands, 8 guards.
+Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **7 skills** — 5 primary, 2 secondary — 9 commands, 8 guards.
 
-![Skills](https://img.shields.io/badge/skills-8-000000?style=flat-square)
+![Skills](https://img.shields.io/badge/skills-7-000000?style=flat-square)
 ![Version](https://img.shields.io/badge/version-2.6.0-000000?style=flat-square)
 ![Host](https://img.shields.io/badge/host-Claude%20Code-000000?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-000000?style=flat-square)
@@ -30,7 +30,7 @@ Then, inside Claude Code in your project: `/super-board onboard`, move cards to 
 | [`/super-build`](skills/super-build/README.md) | Builder lane: worktree, smallest safe change, tests, draft PR. |
 | [`/super-qa`](skills/super-qa/README.md) | Tester lane: evidence, test-gap check, screenshots, or bounce to Build. |
 | [`/super-review`](skills/super-review/README.md) | Reviewer lane: own hypotheses, remembers prior findings, merge gate. |
-| [`/super-collect`](skills/super-collect/README.md) | Turns errors, issues and past-run failures into deduped Backlog cards. |
+| [`/super-collect`](skills/super-collect/README.md) | Finds problems (Sentry, PostHog, issues, PRs, architecture) and files verified Backlog cards. |
 
 **Secondary — standalone helpers**
 
@@ -38,7 +38,6 @@ Then, inside Claude Code in your project: `/super-board onboard`, move cards to 
 |---|---|
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
-| [`/arch-loop`](skills/arch-loop/README.md) | Architecture review loop: find one deepening, implement, verify, repeat. |
 <!-- skills:end -->
 
 Each name links to that skill's README. Lane skills run as agents inside the `super-board-wave` workflow.
@@ -52,10 +51,9 @@ Each name links to that skill's README. Lane skills run as agents inside the `su
 | `/super-board status` | Read-only board snapshot, column counts, in-flight work |
 | `/super-board run <slug> [--low\|--high]` | The loop, until the board drains or a halt gate fires; also resumes |
 | `/super-board stop` | Posts "stopped mid-flight" notes, releases claims, stops workers |
-| `/super-collect [intake\|lookback]` | Files errors, unboarded issues and repeat failures into Backlog (dry-run first) |
+| `/super-collect [sentry\|posthog\|github\|prs\|architecture] [--since 30d]` | Finds problems, verifies each, files them into Backlog (dry-run first) |
 | `/ui-refine-loop <route>` | Polishes one page or component in critique → refine rounds |
 | `/visual [recap\|plan\|<path>]` | One HTML page of a branch, a plan, or part of the codebase |
-| `/arch-loop` | Architecture improvements, one verified commit per pass |
 
 ## Guards
 
@@ -93,7 +91,7 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 - Skill structure inspired by [obra/superpowers](https://github.com/obra/superpowers).
 - Lanes run on the [mattpocock/skills](https://github.com/mattpocock/skills) process stack.
 - super-collect and visual adapt [BuilderIO/skills](https://github.com/BuilderIO/skills) (MIT); visual's diagrams follow [tt-a1i/archify](https://github.com/tt-a1i/archify) (MIT).
-- ui-refine-loop, arch-loop, the cleanup-wt hook and guard-worktree-path come from Eric Tech's BookKeepingApp.
+- ui-refine-loop, the cleanup-wt hook and guard-worktree-path come from Eric Tech's BookKeepingApp.
 
 ---
 

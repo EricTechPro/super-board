@@ -4,14 +4,15 @@
 #
 #   refine-setup.sh detect [--config <path>]
 #       Print the resolved settings as JSON: config `refine.*` keys first, then
-#       auto-detection from package.json and lockfiles, then defaults.
+#       auto-detection from package.json and lockfiles, then defaults. Warnings
+#       (Impeccable missing, a bad refine.impeccable) go to stderr in a banner
+#       and into the JSON's `warnings` array; never silent.
 #
-#   refine-setup.sh up --slug <slug> [--config <path>] [--worktree <path>]
-#       Manual mode: new worktree <root>/refine-<slug> on branch refine/<slug>
-#       from HEAD (root = $SUPER_REFINE_WT_ROOT or .claude/worktrees).
-#       --worktree <path>: qa-hook mode — reuse that checkout (the QA lane's) as-is.
-#       Then node_modules, env files, dev server, readiness wait. Prints JSON:
-#       {worktree, runDir, port, baseUrl, pid, base, nodeModules}.
+#   refine-setup.sh up --slug <slug> [--config <path>]
+#       New worktree <root>/refine-<slug> on branch refine/<slug> from HEAD
+#       (root = $SUPER_REFINE_WT_ROOT or .claude/worktrees). Then node_modules, env files, dev server, readiness wait. Prints JSON:
+#       {worktree, runDir, port, baseUrl, pid, base, nodeModules}. The base sha
+#       and the branch it came from land in <runDir>/base and <runDir>/base-branch.
 #
 #   refine-setup.sh down --run <runDir>
 #       Stop the dev server started by `up`.
@@ -23,12 +24,11 @@ die() { echo "refine-setup: $1" >&2; exit "${2:-70}"; }
 command -v node >/dev/null || die "node is required" 70
 
 cmd="${1:-}"; shift || true
-CONFIG="" SLUG="" WT="" RUN=""
+CONFIG="" SLUG="" RUN=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --config) CONFIG="$2"; shift 2 ;;
     --slug) SLUG="$2"; shift 2 ;;
-    --worktree) WT="$2"; shift 2 ;;
     --run) RUN="$2"; shift 2 ;;
     *) die "unknown arg $1" 64 ;;
   esac
@@ -78,12 +78,50 @@ const checks = r.check_commands || (() => {
 const envFiles = r.env_files || ['.env', '.env.local', '.env.development.local'].filter(exists)
 
 const home = process.env.HOME || ''
-const impeccable = r.impeccable || [
-  '.claude/skills/impeccable/scripts/impeccable',
-  '.agents/skills/impeccable/scripts/impeccable',
-  path.join(home, '.claude/skills/impeccable/scripts/impeccable'),
-  path.join(home, '.agents/skills/impeccable/scripts/impeccable'),
-].find(exists) || null
+const warnings = []
+
+// Impeccable ships in two layouts: v4.0.x runs Node scripts
+// (scripts/detect.mjs, scripts/context.mjs); v4.4+ ships a launcher
+// (scripts/impeccable <verb>). Accept a skill dir, the launcher, or any file
+// inside scripts/, and normalise to {layout, skillDir, detect, context}.
+const sh = (p) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`)
+const resolveImpeccable = (p) => {
+  if (!p) return null
+  let dir = path.resolve(p)
+  if (!exists(dir)) return null
+  if (fs.statSync(dir).isFile()) dir = path.dirname(dir)
+  if (path.basename(dir) === 'scripts') dir = path.dirname(dir)
+  const s = (f) => path.join(dir, 'scripts', f)
+  let version = null
+  try { version = (fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8').match(/^version:\s*["']?([^\s"']+)/m) || [])[1] || null } catch {}
+  const base = { skillDir: dir, version, reference: path.join(dir, 'reference') }
+  if (exists(s('impeccable'))) {
+    return { ...base, layout: 'launcher', detect: `${sh(s('impeccable'))} detect --json`, context: `${sh(s('impeccable'))} context` }
+  }
+  if (exists(s('detect.mjs'))) {
+    return { ...base, layout: 'node', detect: `node ${sh(s('detect.mjs'))} --json`, context: exists(s('context.mjs')) ? `node ${sh(s('context.mjs'))}` : null }
+  }
+  return null
+}
+
+// Look in .claude/skills and .agents/skills of this dir and every parent (a
+// project nested inside a bigger repo inherits its skills), then under ~.
+const candidates = []
+for (let d = process.cwd(); ; d = path.dirname(d)) {
+  candidates.push(path.join(d, '.claude/skills/impeccable'), path.join(d, '.agents/skills/impeccable'))
+  if (path.dirname(d) === d) break
+}
+candidates.push(path.join(home, '.claude/skills/impeccable'), path.join(home, '.agents/skills/impeccable'))
+
+let impeccable = null
+if (r.impeccable) {
+  impeccable = resolveImpeccable(r.impeccable)
+  if (!impeccable) warnings.push(`refine.impeccable = ${r.impeccable} is not an Impeccable install (no scripts/impeccable and no scripts/detect.mjs)`)
+}
+if (!impeccable) impeccable = candidates.map(resolveImpeccable).find(Boolean) || null
+if (!impeccable) warnings.push('Impeccable NOT FOUND: the loop will use the built-in rubric (references/rubric.md). Scores are not Impeccable scores. Install the impeccable skill under .claude/skills or .agents/skills, or set refine.impeccable.')
+
+const tastePath = r.taste_file || 'docs/design/taste.md'
 
 console.log(JSON.stringify({
   config: process.env.CONFIG && exists(process.env.CONFIG) ? process.env.CONFIG : null,
@@ -95,12 +133,14 @@ console.log(JSON.stringify({
   envFiles,
   authScript: r.auth_script || null,
   states: r.states || [{ name: 'main' }],
-  rounds: r.rounds || 10,
-  qaHookRounds: r.qa_hook_rounds || 3,
+  rounds: r.rounds || 5,
   critic: impeccable ? 'impeccable' : 'rubric',
-  impeccable: impeccable ? path.resolve(impeccable) : null,
-  tasteFile: r.taste_file ? path.resolve(r.taste_file) : null,
+  impeccable,
+  tasteFile: tastePath,
+  tasteExists: exists(tastePath),
+  warnings,
 }, null, 2))
+for (const w of warnings) console.error(`\n!!! ui-refine-loop WARNING: ${w}\n`)
 JS
 }
 
@@ -144,19 +184,15 @@ case "$cmd" in
     PM=$(field packageManager <<<"$S"); LOCK=$(field lockfile <<<"$S")
     DEV=$(field devCommand <<<"$S"); READY=$(field readyPath <<<"$S")
     [ -n "$DEV" ] || die "no dev command: set refine.dev_command in the super-board config" 70
-    if [ -n "$WT" ]; then
-      [ -d "$WT" ] || die "worktree $WT does not exist" 64
-      WT=$(cd "$WT" && pwd); RUN="${WT%/}.refine.run"
-    else
-      [ -n "$SLUG" ] || die "up needs --slug (or --worktree for qa-hook)" 64
-      ROOT="${SUPER_REFINE_WT_ROOT:-.claude/worktrees}"
-      mkdir -p "$ROOT"
-      WT="$(cd "$ROOT" && pwd)/refine-$SLUG"; RUN="$WT.run"
-      [ -e "$WT" ] && die "$WT already exists — finish or remove the previous run first" 70
-      git worktree add -q -b "refine/$SLUG" "$WT" HEAD >&2
-    fi
+    [ -n "$SLUG" ] || die "up needs --slug" 64
+    ROOT="${SUPER_REFINE_WT_ROOT:-.claude/worktrees}"
+    mkdir -p "$ROOT"
+    WT="$(cd "$ROOT" && pwd)/refine-$SLUG"; RUN="$WT.run"
+    [ -e "$WT" ] && die "$WT already exists — finish or remove the previous run first" 70
+    git worktree add -q -b "refine/$SLUG" "$WT" HEAD >&2
     mkdir -p "$RUN/shots"
     git -C "$WT" rev-parse HEAD > "$RUN/base"
+    git rev-parse --abbrev-ref HEAD > "$RUN/base-branch" 2>/dev/null || true
     NM=$(node_modules "$WT" "$PM" "$LOCK")
     while IFS= read -r f || [ -n "$f" ]; do [ -n "$f" ] && [ -f "$f" ] && [ ! -e "$WT/$f" ] && cp "$f" "$WT/$f" || true; done < <(field envFiles <<<"$S")
     PORT=$(free_port)
