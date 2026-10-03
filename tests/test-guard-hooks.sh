@@ -76,7 +76,8 @@ rm -rf "$REPO"
 
 # ---- guard-protected-push (opt-in) -------------------------------------------
 REPO=$(mktemp -d); REPO=$(cd "$REPO" && pwd -P)
-git -C "$REPO" init -q -b main && git -C "$REPO" commit -q --allow-empty -m init
+git -C "$REPO" init -q -b main
+git -C "$REPO" -c user.name=t -c user.email=t@t commit -q --allow-empty -m init
 mkdir -p "$REPO/.claude/super-board/configs"; echo '{"base_branch":"staging"}' > "$REPO/.claude/super-board/configs/app.json"
 pp() { CLAUDE_PROJECT_DIR="$REPO" expect "$1" guard-protected-push.py "$(bash_cmd "$2" "${4:-$REPO}")" "$3"; }
 pp deny  'git push --force origin main'                 "force push to main"

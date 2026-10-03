@@ -79,3 +79,9 @@ every project it is installed in.
 
 - NEVER rewrite a whole PR body: `scripts/super-board-pr-body.sh` rewrites one block.
 - ALWAYS change a format in `writing-standard.md` first, then the templates and `tests/test_writing_format.py`.
+
+## Release checks
+
+Run `bash tests/run-safety.sh` for the offline suite. A pushed `v*` tag runs the same checks
+on Linux/macOS plus status-reader smoke checks, then publishes only if they pass. Follow
+[RELEASING.md](RELEASING.md); it also lists the settings needed to limit manual bypass.

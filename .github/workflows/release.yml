@@ -1,0 +1,35 @@
+name: release
+
+# Create releases here, not with the GitHub UI or a standalone gh release create.
+# Tag rules/permissions are still required to prevent manual bypass; see RELEASING.md.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/cross-platform.yml
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Publish the tested tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          TESTED_SHA: ${{ github.sha }}
+        run: bash .github/scripts/publish-release.sh "$RELEASE_TAG" "$TESTED_SHA"
