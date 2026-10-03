@@ -18,6 +18,7 @@ __pycache__/
 # super-board runtime state (if anyone runs the loop *inside* this repo)
 .claude/super-board/active
 .claude/super-board/inflight/
+.claude/worktrees/
 .worktrees/
 
 # QA evidence (heavy artifacts; keep summaries)

@@ -45,7 +45,8 @@ Progress: ✅ onboard  →  ✅ lint  →  🤖 run (you are here)
 | `pre-flight.md` all items `[✓]` | Halt: "Pre-flight incomplete — fix these: [list]." |
 | No issues missing ACs in active columns | Halt: "N issues need clarification. Run `super-board lint`." |
 | Clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
-| Stale worktree scan | Auto-clean: for each dir in `.worktrees/`, if its branch no longer exists OR no `loop:in-*` label on its issue, `git worktree remove --force` it. Log each removal in the run manifest. Halt only if a removal fails. |
+| Legacy worktrees | If `.worktrees/issue-*` exists, halt before dispatch. Stop its worker, inspect/preserve edits, then `git worktree move` it to the matching `.claude/worktrees/` path. Never delete it as part of an upgrade. |
+| Stale worktree scan | Scan only `.claude/worktrees/issue-<N>` and `issue-<N>-build/qa/review`. If its named branch is gone, use `git worktree remove` without force. Keep detached, dirty, locked, unregistered, or unrelated folders; log failures for inspection. A missing board label alone is not permission to delete work. |
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `🛡 Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run super-board onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*super-board run'` must return zero. If any super-board worker is already alive from a prior crashed run, halt with: `🛑 ${N} super-board workers already running. Stop them first: pkill -f 'claude -p .*super-board run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
 | GraphQL rate-limit guard | Before each tick, query `gh api rate_limit`. If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
@@ -69,17 +70,17 @@ reads the label of the top Ready card the same way (`card_lane`).
 ```
 Builder:   Ready → Building → QA
            worker   = super-build skill
-           worktree = .worktrees/issue-<N>-build/
+           worktree = .claude/worktrees/issue-<N>-build/
            branch   = issue-<N>-<slug>  (created here, persists across lanes)
 
 Tester:    QA → Review            (a `qa` card: Ready → QA → Review)
            worker   = super-qa skill (issue-scoped mode)
-           worktree = .worktrees/issue-<N>-qa/
+           worktree = .claude/worktrees/issue-<N>-qa/
            branch   = same issue-<N>-<slug>  (a `qa` card: the Tester creates it)
 
 Reviewer:  Review → Done
            worker   = super-review skill
-           worktree = .worktrees/issue-<N>-review/
+           worktree = .claude/worktrees/issue-<N>-review/
            branch   = same issue-<N>-<slug>  (squash-merged on approval)
 ```
 
@@ -270,7 +271,7 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 
 0. Legacy backend only: run the Builder pre-flight above in a sub-agent. Anything but `proceed`
    (or a conflict-note `sequence`) → do what its row says, release the claim, exit.
-1. Create worktree `.worktrees/issue-<N>-build/` off `config.base_branch`.
+1. Create worktree `.claude/worktrees/issue-<N>-build/` off `config.base_branch`.
 2. Create branch `issue-<N>-<slug>` from `config.base_branch` — unless one already exists
    (the card came back from Building after a stopped run): then check it out, keep its
    commits and open PR, and continue from where it stopped.
@@ -301,7 +302,7 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 
 ### Tester (first pass — repo-backed)
 
-1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree `.worktrees/issue-<N>-qa/`.
+1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree `.claude/worktrees/issue-<N>-qa/`.
    A `qa` card has no branch yet: move it Ready → QA, then create the branch from the base.
 2. `target.url` set → health-check it first. Unhealthy → Block.
 3. Read issue + PR + Builder's handoff comment.
@@ -345,7 +346,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
 
 ### Reviewer
 
-1. Worktree `.worktrees/issue-<N>-review/` from current state of `issue-<N>-<slug>`.
+1. Worktree `.claude/worktrees/issue-<N>-review/` from current state of `issue-<N>-<slug>`.
 2. **Gate 1** — scan PR threads. If ANY unresolved:
    - `[builder]` open → comment, move card Review → Ready.
    - `[qa]` open → comment, move card Review → QA.

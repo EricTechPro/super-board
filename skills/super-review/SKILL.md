@@ -287,7 +287,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 
 ### State protocol
 - Read from issue + PR comments + PR review threads.
-- Respect handed-down worktree at `.worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
+- Respect handed-down worktree at `.claude/worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
 
 ### Two card types
 - **Built card (`feature`, `bug`, no label):** review the diff (code + tests).

@@ -94,7 +94,7 @@ RUN_MANIFEST="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
 # log could never show what a worker was doing during a 13-minute silence.
 WORKER_LOG_DIR="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}-workers"
 INFLIGHT_DIR=".claude/super-board/inflight"
-mkdir -p "docs/super-board/runs" "$WORKER_LOG_DIR" .worktrees "$INFLIGHT_DIR"
+mkdir -p "docs/super-board/runs" "$WORKER_LOG_DIR" .claude/worktrees "$INFLIGHT_DIR"
 fi  # end non-lib-only setup
 
 # Defaults so the helpers below are safe to source under `set -u` in lib-only mode.
@@ -451,6 +451,39 @@ reap_finished_locks() {
   done
 }
 
+check_legacy_worktrees() {
+  # Never strand a previous run's edits by silently switching its folder.
+  local wt
+  for wt in .worktrees/issue-*; do
+    [ -e "$wt" ] || continue
+    log "🛑 legacy worktree $wt exists — stop its worker and inspect/preserve its edits"
+    log "    Move it with git worktree move to .claude/worktrees/ before resuming."
+    return 73
+  done
+  return 0
+}
+
+cleanup_stale_worktrees() {
+  # This directory also holds Claude's unrelated worktrees. Only board names
+  # belong to this sweep, and a failed Git removal must never become rm -rf.
+  local wt branch
+  for wt in .claude/worktrees/issue-*; do
+    [ -d "$wt" ] || continue
+    [[ "${wt##*/}" =~ ^issue-[0-9]+(-(build|qa|review))?$ ]] || continue
+    branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+    # Detached work may contain commits with no other ref; it is not proof of staleness.
+    [ -n "$branch" ] || continue
+    if ! git rev-parse --verify "refs/heads/$branch" >/dev/null 2>&1; then
+      if git worktree remove "$wt" 2>/dev/null; then
+        log "stale worktree: $wt (branch '$branch' missing) — removed"
+      else
+        log "⚠ kept worktree $wt — inspect its edits/lock before cleanup"
+      fi
+    fi
+  done
+  return 0
+}
+
 reclaim_stranded_building() {
   # Run start only (no worker of ours is alive yet — the orphan guard proved it).
   # A card in Building with no live in-flight lock and no assignee but ours was
@@ -458,14 +491,19 @@ reclaim_stranded_building() {
   # left alone it sits there forever and the run can never reach "all columns
   # empty". Move it back to Ready and say so; the issue branch is kept, so the
   # next Builder continues on it instead of starting over.
-  local issue item_id branch wt
+  local issue item_id branch wt wt_branch
   while IFS=$'\t' read -r issue item_id; do
     [ -n "$issue" ] || continue
     issue_locked "$issue" && continue
     branch=$(git ls-remote --heads origin "issue-${issue}-*" 2>/dev/null | head -1 | sed 's#.*refs/heads/##')
-    for wt in .worktrees/issue-"${issue}"-build; do
-      [ -d "$wt" ] && { git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"; }
-    done
+    wt=".claude/worktrees/issue-${issue}-build"
+    if [ -d "$wt" ]; then
+      wt_branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+      if [ -z "$wt_branch" ] || ! git worktree remove "$wt" 2>/dev/null; then
+        log "⚠ stranded #${issue}: kept $wt and Building status — inspect its detached commits/edits/lock before resuming"
+        continue
+      fi
+    fi
     if ! set_card_status "$item_id" "Ready"; then
       log "⚠ stranded #${issue} in Building — could not move it to Ready; drag it by hand"
       continue
@@ -528,17 +566,9 @@ if [ "$BASE_BRANCH" = "main" ] && [ "$HUMAN_APPROVES" = "false" ]; then
   fi
 fi
 
-# Stale-worktree scan.
-if [ -d .worktrees ]; then
-  for wt in .worktrees/*/; do
-    [ -d "$wt" ] || continue
-    branch=$(git -C "$wt" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    if [ -z "$branch" ] || ! git rev-parse --verify "$branch" >/dev/null 2>&1; then
-      log "stale worktree: $wt (branch '$branch' missing) — removing"
-      git worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"
-    fi
-  done
-fi
+# Existing legacy work is inspected/moved by a human, never deleted on upgrade.
+check_legacy_worktrees
+cleanup_stale_worktrees
 
 # Reap any leftover stale locks from a previous crashed run.
 reap_finished_locks

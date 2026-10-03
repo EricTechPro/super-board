@@ -42,8 +42,8 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 2. **Post the stop comment** on the issue AND (if it exists) the PR, in the comment format of
    writing-standard.md § 4 — header `[orchestrator] [report] 🛑 stopped · <lane> lane`, then:
    - Did: worker PID and timestamp.
-   - ✅ Done: last commit on the branch (the "resume point" — anything past it was unpushed and is lost).
-   - ❌ Not done: uncommitted edits discarded.
+   - ✅ Done: last commit on the branch (a recovery point; inspect the preserved worktree for later edits).
+   - ❌ Not done: interrupted work may be uncommitted.
    - Next: `super-board run <slug>`.
 3. **Release the assignee mutex** on the issue (`gh issue edit --remove-assignee <bot>`).
 4. **Remove descriptive labels** (`loop:in-build`, `loop:in-qa`, `loop:in-review`) — best-effort.
@@ -58,8 +58,8 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 
 ## What stop does NOT do (deliberate)
 
-- **Does not wait for workers to finish.** `claude -p` workers have no SIGTERM handler that flushes a partial commit. Any uncommitted edits in worker worktrees are discarded. The last pushed commit on the branch is the actual resume point.
-- **Does not touch worktrees** under `.worktrees/`. Leaving them in place lets the next worker check out the same branch faster; the dispatcher's stale-worktree scan cleans up anything truly dead on next start.
+- **Does not wait for workers to finish.** `claude -p` workers have no SIGTERM handler that flushes a partial commit. Worktree files remain, but unsaved in-memory work may be lost. Inspect uncommitted edits before resuming; restart recovery keeps dirty worktrees for inspection.
+- **Does not touch worktrees** under `.claude/worktrees/` or the legacy `.worktrees/` location. A legacy board worktree halts the next run until inspected/moved to the canonical folder; cleanup never force-removes it.
 - **Does not touch branches or PRs.** Both persist. State lives on the GitHub Project board — cards stay in whichever column they were in when stopped.
 - **Does not modify the config.** A stopped run is not a deactivated config; `.claude/super-board/active` is preserved.
 - **Does not bypass the GitHub assignee mutex.** It releases the mutex, then kills. If the GitHub API is unreachable, release is best-effort and the orphan-scan + reap-on-next-start covers the gap.
@@ -73,7 +73,7 @@ There is **no `super-board resume` verb on purpose**. The board is the state:
 - The wrap-up comment on each in-flight issue documents what was in progress.
 - `super-board run <slug>` claims the same cards on its next tick and re-runs the lane from scratch (Builder re-implements, Tester re-runs tests, Reviewer re-reviews — there's no per-lane checkpoint inside a worker).
 
-Resume cost: **one lane cycle per previously-in-flight card** (Builder ~5min, Tester ~10min, Reviewer ~3min on a typical card). Last-pushed commit is the floor; anything past it was unpushed and is lost.
+Resume cost: **one lane cycle per previously-in-flight card** (Builder ~5min, Tester ~10min, Reviewer ~3min on a typical card), after any required recovery. Inspect and preserve local edits first; dirty or legacy worktrees need attention before automatic recovery continues.
 
 ## When to use stop
 

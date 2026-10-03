@@ -22,7 +22,10 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
 1. Config exists and validates against `config-schema.json`.
 2. Production-merge guard: refuse `base_branch: main` + `human_approves_merge:
    false` when deploy markers exist (same rule as super-board-run.sh).
-3. Stale-worktree scan: remove `.worktrees/*` whose branch is gone.
+3. Worktree check: if legacy `.worktrees/issue-*` exists, halt for inspection/move
+   as described in run.md. Scan only board worktrees under `.claude/worktrees/`;
+   when their named branch is gone use `git worktree remove` without force. Preserve
+   detached, dirty, locked, unregistered, and unrelated folders.
 4. `node --check` passes on a wrapped copy of
    `.claude/workflows/super-board-wave.js` (catches a broken script before
    burning tokens):
@@ -93,9 +96,12 @@ Repeat until a done condition or halt gate fires:
    **Stranded Building cards.** A card in Building with no assignee between
    waves has no live worker — a stopped or crashed wave left it mid-build. For
    each: find its branch (`git ls-remote --heads origin 'issue-<N>-*'`) and any
-   leftover `.worktrees/issue-<N>-build/`; remove the worktree (uncommitted work
-   in it is lost either way — say so if `git -C <wt> status --porcelain` was not
-   empty), keep the branch and PR, move the card to `Ready`, and comment:
+   leftover `.claude/worktrees/issue-<N>-build/`. If its HEAD is detached, keep it:
+   its commits may have no other ref. Otherwise remove it with `git worktree remove`
+   without force. On detached HEAD or removal failure (dirty, locked, or unregistered),
+   keep the folder and Building status, report the recovery path, and do not
+   redispatch that card until its work is preserved. Otherwise keep the branch and PR,
+   move the card to `Ready`, and comment:
    `[orchestrator] [report] ↩️ back to Ready · stranded in Building` / `Did: found no live
    worker` / `✅ Done: card moved to Ready · branch <name> kept` / `Next: builder`
    (writing-standard.md § 4). The next Builder continues on the branch.
