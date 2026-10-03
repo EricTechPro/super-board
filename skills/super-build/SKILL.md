@@ -90,7 +90,7 @@ gh issue edit N --add-label loop:in-progress
 
 b. **Announce on the issue** (so a human reading the issue page knows it's being worked):
 ```bash
-gh issue comment N --body "🤖 Dispatched by /super-build — worker spinning up in worktree \`.worktrees/issue-N\` on branch \`loop/issue-N\`. Skills: <skills-line-from-body-or-defaults>."
+gh issue comment N --body "🤖 Dispatched by /super-build — worker spinning up in worktree \`.claude/worktrees/issue-N\` on branch \`loop/issue-N\`. Skills: <skills-line-from-body-or-defaults>."
 ```
 
 c. **Dispatch:**
@@ -100,7 +100,7 @@ bash .claude/skills/super-build/scripts/super-build-dispatch.sh N
 …via Bash with `run_in_background: true`. Capture each shell ID.
 
 The dispatcher (this skill's `scripts/super-build-dispatch.sh`) handles:
-- `git worktree add -b loop/issue-N .worktrees/issue-N <base-branch>`
+- `git worktree add -b loop/issue-N .claude/worktrees/issue-N <base-branch>`
 - `gh issue view N --json title,body,labels` to compose the worker prompt
 - prepend `references/worker-preamble.md` + append working-directory footer
 - `cd` into worktree and exec `claude -p --dangerously-skip-permissions --output-format stream-json --verbose --max-turns 250`
@@ -114,7 +114,7 @@ The dispatcher (this skill's `scripts/super-build-dispatch.sh`) handles:
 Poll BashOutput on each in-flight shell. As each finishes:
 
 **On dispatcher exit 0 (success):**
-- `git -C .worktrees/issue-N push -u origin loop/issue-N`
+- `git -C .claude/worktrees/issue-N push -u origin loop/issue-N`
 - `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/super-board/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution
 - `gh issue edit N --remove-label loop:in-progress`
 - `gh issue comment N --body "[builder] [report] ✅ built · PR <URL>"` (Next line: `qa`)
@@ -124,7 +124,7 @@ Poll BashOutput on each in-flight shell. As each finishes:
 - Recompute ready set; if new issues are now unblocked, dispatch in the next wave (respecting the worker cap)
 
 **On dispatcher exit 5 (intentional WIP-PARTIAL — open a partial PR, do NOT close):**
-- `git -C .worktrees/issue-N push -u origin loop/issue-N`
+- `git -C .claude/worktrees/issue-N push -u origin loop/issue-N`
 - `gh pr create --draft --base <base-branch> --head loop/issue-N --title "🚧 [wip] <scope>: <slice from worker's final message>"` — the status card says `Refs #N`, never `Closes`, so the merge does not close the issue.
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
 - `gh issue comment N --body "[builder] [report] ⚠️ partial · PR <URL>\nDid: <slice>\n❌ Not done: <worker's reason for stopping>\nNext: Eric"` — the issue stays open with `human-gated` until the rest lands.
@@ -133,14 +133,14 @@ Poll BashOutput on each in-flight shell. As each finishes:
 
 **On dispatcher exit 2 or 3 (worker failed or no done-commit):**
 - `gh issue edit N --remove-label loop:in-progress`
-- `gh issue comment N --body "[builder] [report] ❌ failed · exit <X>\nDid: worker ran; worktree \`.worktrees/issue-N\` kept\n❌ Not done: <one line from the log>\nNext: Eric\n\n<details><summary>log tail</summary>\n\n\`\`\`\n$(tail -50 .planning/super-build-logs/issue-N.log)\n\`\`\`\n</details>"`
+- `gh issue comment N --body "[builder] [report] ❌ failed · exit <X>\nDid: worker ran; worktree \`.claude/worktrees/issue-N\` kept\n❌ Not done: <one line from the log>\nNext: Eric\n\n<details><summary>log tail</summary>\n\n\`\`\`\n$(tail -50 .planning/super-build-logs/issue-N.log)\n\`\`\`\n</details>"`
 - Report to the user with `tail -50` of `.planning/super-build-logs/issue-N.log`
 - Do NOT open a PR; leave the worktree intact for human inspection
 - Halt the loop
 
 **On dispatcher exit 4 (HUMAN GATE TRIPPED):**
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
-- `gh issue comment N --body "🔴 HUMAN GATE TRIPPED — needs manual handling. See worktree \`.worktrees/issue-N\`."`
+- `gh issue comment N --body "🔴 HUMAN GATE TRIPPED — needs manual handling. See worktree \`.claude/worktrees/issue-N\`."`
 - Report: `🔴 Issue #N tripped HUMAN GATE — needs manual handling`
 - Halt the loop
 
@@ -185,7 +185,8 @@ The preamble at `references/worker-preamble.md` is the worker contract: decision
 
 If the user invokes `/super-build` after a partial run:
 - Re-read `gh issue list`. Issues already closed are skipped automatically.
-- If `.worktrees/issue-N` exists for an N that's still open: a previous worker was interrupted. Default: notify the user and ask before auto-resuming (a re-dispatch overwrites the previous attempt's branch).
+- If legacy `.worktrees/issue-N` exists, stop and inspect it before dispatch. Preserve edits and use `git worktree move` to the matching `.claude/worktrees/issue-N` path; never delete the old folder to make a fresh dispatch fit.
+- If `.claude/worktrees/issue-N` exists for an N that's still open: a previous worker was interrupted. Default: notify the user and ask before auto-resuming (a re-dispatch overwrites the previous attempt's branch).
 - If the `loop:in-progress` label is set on issue N but no worktree exists: stale lock from a crashed orchestrator. Remove the label and treat as ready.
 
 ## Stop conditions
@@ -214,7 +215,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` set by the runner, or invoc
 
 ### State protocol
 - Read context from: issue body + ALL issue comments + linked PR description + PR comments + PR review threads. NEVER from local state files for inter-lane coordination.
-- Respect the worktree path super-board hands you (typically `.worktrees/issue-<N>-build/`). Don't create your own.
+- Respect the worktree path super-board hands you (typically `.claude/worktrees/issue-<N>-build/`). Don't create your own.
 - Respect the single branch super-board hands you (`issue-<N>-<slug>`). Don't create alternate branches.
 
 ### Lifecycle (Builder, first pass)

@@ -13,7 +13,8 @@
 #
 # What it does NOT do:
 #   - Wait for workers to reach a clean stopping point (claude -p has no SIGTERM
-#     handler that flushes a partial commit). Any uncommitted edits are lost.
+#     handler that flushes a partial commit). Unsaved in-memory work can be lost;
+#     uncommitted files remain in the preserved worktree for inspection.
 #   - Touch worktrees. Leaving them lets the next worker pick up faster.
 #   - Touch branches or PRs. State lives on the GitHub Project board.
 #
@@ -101,8 +102,8 @@ post_stop_comment() {
   body="[orchestrator] [report] 🛑 stopped · ${lane:-unknown} lane
 Did: \`super-board stop\` ended worker PID ${pid:-unknown} at ${TS}
 ✅ Done: resume point is the last pushed commit — ${commit}
-❌ Not done: uncommitted edits in the worker's worktree were discarded
-Next: \`super-board run ${CONFIG_SLUG}\` re-claims the card; the ${lane:-target} lane starts over from that commit"
+❌ Not done: interrupted work may be uncommitted; inspect the preserved worktree
+Next: preserve edits before \`super-board run ${CONFIG_SLUG}\`; dirty or legacy worktrees need inspection"
 
   gh issue comment "$issue" --body "$body" >/dev/null 2>&1 \
     && log "  💬 issue comment posted on #${issue}" \

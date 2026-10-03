@@ -8,7 +8,7 @@
 #          SKILL_DIR   (optional) — defaults to the dir this script lives in's parent
 #          MAX_TURNS   (optional) — default 250
 #   - Side effects:
-#       * git worktree add -b loop/issue-N .worktrees/issue-N BASE_BRANCH
+#       * git worktree add -b loop/issue-N .claude/worktrees/issue-N BASE_BRANCH
 #       * runs `claude -p` inside that worktree with the composed prompt
 #       * captures stdout+stderr to .planning/super-build-logs/issue-N.log
 #   - Exit codes:
@@ -72,7 +72,7 @@ if ! git rev-parse --verify "$BASE_BRANCH" >/dev/null 2>&1; then
   fi
 fi
 
-WORKTREE_DIR=".worktrees/issue-$N"
+WORKTREE_DIR=".claude/worktrees/issue-$N"
 WORKER_BRANCH="loop/issue-$N"
 LOG_DIR="$REPO_DIR/.planning/super-build-logs"
 LOG_FILE="$LOG_DIR/issue-$N.log"
@@ -81,6 +81,11 @@ PROMPT_FILE="$LOG_DIR/issue-$N.prompt.md"
 mkdir -p "$LOG_DIR"
 
 # Refuse to clobber an existing worktree/branch silently
+if [[ -e ".worktrees/issue-$N" ]]; then
+  echo "error: legacy worktree .worktrees/issue-$N exists — inspect it before resuming" >&2
+  echo "       Stop its worker, preserve edits, then git worktree move .worktrees/issue-$N $WORKTREE_DIR" >&2
+  exit 64
+fi
 if [[ -e "$WORKTREE_DIR" ]]; then
   echo "error: worktree path $WORKTREE_DIR already exists — refusing to clobber" >&2
   echo "       (remove with: git worktree remove $WORKTREE_DIR && git branch -D $WORKER_BRANCH)" >&2

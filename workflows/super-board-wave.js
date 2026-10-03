@@ -113,7 +113,7 @@ const REVIEW_MEMORY = [
 const lanePrompt = (lane, card) => [
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
-  `create your own worktree under .worktrees/, work on the issue branch, post the required PR/issue comments,`,
+  `create your own worktree under .claude/worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),

@@ -618,7 +618,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 - Respect handed-down worktree + branch.
 
 ### Card types
-- **Built card (`feature`, `bug`, no label):** worktree at `.worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
+- **Built card (`feature`, `bug`, no label):** worktree at `.claude/worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
 - **`qa` card (skipped Building):** move it Ready → QA yourself, create `issue-<N>-<slug>` from the base branch, test what is already there (run.md → "qa cards").
 - **A live URL with no repo** is not a board card: `/super-qa <url>` runs standalone.
 

@@ -98,7 +98,7 @@ The orchestrator will halt or route according to the Super Build skill, remove/a
 
 ## Working environment
 
-- You are in a git worktree at `.worktrees/issue-<N>` on branch `loop/issue-<N>`.
+- You are in a git worktree at `.claude/worktrees/issue-<N>` on branch `loop/issue-<N>`.
 - The base branch (the orchestrator's currently-checked-out branch — `frontend-rebuild`, `main`, or a release branch) is your starting point. **Do not assume `main`.**
 - Other workers may be running concurrently in sibling worktrees on different branches. Don't read or write outside your own worktree.
 - Logs go to `.planning/super-build-logs/issue-<N>.log` (auto-captured by stdout/stderr redirect).
