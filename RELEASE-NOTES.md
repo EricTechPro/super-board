@@ -1,5 +1,18 @@
 # Release notes
 
+## v3.0.1 — 2026-10-02
+
+Fixes the red Linux CI on v3.0.0 and stops diagram pages from publishing local machine paths.
+
+- 🐛 **CI on Ubuntu.** `tests/test-setup.sh` hid `gh` with `PATH=/usr/bin:/bin`, but GitHub's
+  ubuntu runners ship `gh` in `/usr/bin`. The test now runs the check on a curated PATH (git and
+  the package manager only), so a missing `gh` is reported on every OS.
+- 🐛 **Merge gate on bash 4+.** `super-board-merge-gate.sh` used `${#VERIFY[@]:-0}`, a bad
+  substitution on bash 4+ (Linux), so every merge with a matching head failed. Now `${#VERIFY[@]}`.
+- 🔒 **Repo-relative diagram sources.** `/visual` wrote absolute paths (home folder, worktrees,
+  plugin cache) into map pages. Sources are now repo-relative (`~/…` outside the repo), the page
+  stores the repo root relative to itself, and the skill-map pages are re-rendered.
+
 ## v3.0.0 — 2026-10-02
 
 Onboarding rebuilt as an 8-step wizard, one board shape for every project, and labels that

@@ -3,7 +3,7 @@
 Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **7 skills** — 5 primary, 2 secondary — 9 commands, 8 guards.
 
 ![Skills](https://img.shields.io/badge/skills-7-000000?style=flat-square)
-![Version](https://img.shields.io/badge/version-3.0.0-000000?style=flat-square)
+![Version](https://img.shields.io/badge/version-3.0.1-000000?style=flat-square)
 ![Host](https://img.shields.io/badge/host-Claude%20Code-000000?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-000000?style=flat-square)
 
@@ -19,12 +19,12 @@ curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh
 🧩 super-board installer
 🔍 checking what you need
    ✓ curl · tar · python3 · gh · jq · node
-📦 downloading EricTechPro/super-board@v3.0.0
+📦 downloading EricTechPro/super-board@v3.0.1
 🔧 installing
    ✓ skills, scripts and workflows → .claude/
    🛡️  6 guard hooks → .claude/settings.json (backup kept)
 🧠 helper skills: installed
-🎉 super-board 3.0.0 is installed
+🎉 super-board 3.0.1 is installed
 👉 next: open Claude Code here and run /super-board onboard
 ```
 
