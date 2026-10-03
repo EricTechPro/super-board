@@ -98,14 +98,12 @@ printf '%s\n' "$out" | grep -q '^🧠 helper skills: installed$' || fail "helper
 
 # 9 — Node missing: the checks line marks it ✗ and helper skills wait for 🔍 Checks.
 T="$WORK/t9"; mkdir -p "$T"
-# A curated PATH: Ubuntu also ships node/npx in /usr/bin, so merely dropping
-# Homebrew's path does not model a missing Node installation on Linux.
-NONODE="$WORK/bin-nonode"; mkdir -p "$NONODE"
-for tool in bash basename cat chmod cp curl dirname grep gzip id mkdir mktemp python3 rm sed tar tr; do
-  ln -s "$(command -v "$tool")" "$NONODE/$tool"
+# /usr/bin can contain node on Linux. Keep only the tools this install uses.
+NOBIN="$WORK/bin-nonode"; mkdir -p "$NOBIN"
+for t in bash id curl tar gzip python3 mktemp mkdir rm dirname tr cp chmod grep basename sed gh jq; do
+  ln -s "$(command -v "$t")" "$NOBIN/$t"
 done
-for tool in gh jq; do ln -s "$WORK/bin/$tool" "$NONODE/$tool"; done
-out=$(PATH="$NONODE" bash "$GET" --target "$T" 2>&1) || fail "install without node failed: $out"
+out=$(PATH="$NOBIN" bash "$GET" --target "$T" 2>&1) || fail "install without node failed: $out"
 printf '%s\n' "$out" | grep -q '✗ node' || fail "missing node should be marked ✗: $out"
 printf '%s\n' "$out" | grep -q '^🧠 helper skills: skipped — 🔍 Checks will fix this$' || fail "helper line should defer to Checks: $out"
 

@@ -40,12 +40,8 @@ this code.
 
 Before treating this as an enforced release policy:
 
-- Require the `safety (ubuntu-latest)` and `safety (macos-latest)` checks, plus the six
-  `smoke (<os> / py<version>)` checks, for `main` through a branch ruleset. Require review
-  of changes to the workflows and release scripts. These are the direct **cross-platform**
-  check names on branch/PR runs. The **release** run adds `checks / ` in front of each
-  name because it calls a reusable workflow; those tag-only names are not the branch
-  requirements.
+- Require the checks listed below for `main` through a branch ruleset. Require review
+  of changes to the workflows and release scripts.
 - Add a tag ruleset for `v*`. Require the same checks before tag creation (do not enable
   the creation exemption), and bind their source to GitHub Actions. Confirm that GitHub
   offers this rule for the repository before relying on it. The checks must already be
@@ -64,6 +60,22 @@ management; GitHub does not offer a separate "push code but never create a relea
 collaborator role here. Strict isolation requires withholding broad write credentials
 from routine automation and using a trusted publisher. The repository owner can still
 change rules. Do not describe the settings above as protection against the owner.
+
+Use these exact check names from the direct **cross-platform** branch/PR run:
+
+```text
+safety (ubuntu-latest)
+safety (macos-latest)
+smoke (ubuntu-latest / py3.10)
+smoke (ubuntu-latest / py3.12)
+smoke (macos-latest / py3.10)
+smoke (macos-latest / py3.12)
+smoke (windows-latest / py3.10)
+smoke (windows-latest / py3.12)
+```
+
+The **release** run adds `checks / ` to these names because it calls a reusable workflow.
+Those tag-only names are not the branch requirements.
 
 These settings require a separate repository-owner decision. Until then, this workflow
 blocks its own publication on failed tests, but cannot promise to block manual releases.
