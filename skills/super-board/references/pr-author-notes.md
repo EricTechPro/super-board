@@ -42,7 +42,7 @@ Send `body`, `path` and the full current `commit_id` for every new note.
 
 - File summary: set `subject_type` to `file`; omit line numbers. Do not attach a fake
   line-1 comment to stand in for a whole-file note.
-- Critical inline note: set `subject_type` to `line`, with `line` and `side`. Use `LEFT`
+- Critical inline note: omit `subject_type` and send `line` and `side`. Use `LEFT`
   for a deleted line and `RIGHT` for an added line. Add `start_line` and `start_side`
   only for a range that the current diff supports.
 - Write the JSON payload to a file and pass it to `gh api --input <file>`. Keep prose
