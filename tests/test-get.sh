@@ -98,8 +98,12 @@ printf '%s\n' "$out" | grep -q '^🧠 helper skills: installed$' || fail "helper
 
 # 9 — Node missing: the checks line marks it ✗ and helper skills wait for 🔍 Checks.
 T="$WORK/t9"; mkdir -p "$T"
-out=$(PATH="$WORK/bin-nonode:/usr/bin:/bin" bash -c 'mkdir -p "$0"; for t in gh jq; do ln -sf "'"$WORK"'/bin/$t" "$0/$t"; done; bash "$1" --target "$2"' \
-  "$WORK/bin-nonode" "$GET" "$T" 2>&1) || fail "install without node failed: $out"
+# /usr/bin can contain node on Linux. Keep only the tools this install uses.
+NOBIN="$WORK/bin-nonode"; mkdir -p "$NOBIN"
+for t in bash id curl tar gzip python3 mktemp mkdir rm dirname tr cp chmod grep basename sed gh jq; do
+  ln -s "$(command -v "$t")" "$NOBIN/$t"
+done
+out=$(PATH="$NOBIN" bash "$GET" --target "$T" 2>&1) || fail "install without node failed: $out"
 printf '%s\n' "$out" | grep -q '✗ node' || fail "missing node should be marked ✗: $out"
 printf '%s\n' "$out" | grep -q '^🧠 helper skills: skipped — 🔍 Checks will fix this$' || fail "helper line should defer to Checks: $out"
 

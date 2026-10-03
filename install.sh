@@ -66,6 +66,25 @@ fi
 
 [ -n "$QUIET" ] || echo "🧩 super-board $PACK_VERSION → $TARGET"
 echo "🔧 installing"
+
+# Resolve all skill paths before replacing anything. A destination can contain
+# the pack (or a linked source skill); clearing it would destroy our input.
+# A destination inside its source would instead recursively copy into itself.
+python3 - "$REPO_ROOT" "$TARGET" $PRIMARY_SKILLS $SECONDARY_SKILLS <<'PY'
+from pathlib import Path
+import sys
+
+root = Path(sys.argv[1]).resolve()
+target = Path(sys.argv[2])
+for skill in sys.argv[3:]:
+    src = (root / "skills" / skill).resolve()
+    dest = (target / ".claude" / "skills" / skill).resolve()
+    if src == dest:
+        continue
+    if dest == root or dest in root.parents or dest in src.parents or src in dest.parents:
+        sys.exit(f"    ✗ refusing to install {skill}: source and destination overlap ({dest})")
+PY
+
 mkdir -p "$TARGET/.claude/skills" "$TARGET/.claude/bin"
 
 # A project may keep the real skill directories elsewhere and symlink them into
@@ -104,6 +123,13 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
        continue ;;
   esac
 
+  # A self-vendored project can expose this very source through one or more
+  # links. There is nothing to copy in that case; clearing dest erases src too.
+  if [ "$REPO_ROOT/skills/$skill" -ef "$dest" ]; then
+    echo "   ✓ $skill already uses the source directory"
+    continue
+  fi
+
   # Replace the contents, not the directory itself, so a symlink stays a symlink.
   mkdir -p "$dest"
   rm -rf "${dest:?}/"* 2>/dev/null || true
@@ -111,9 +137,17 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   [ -z "$note" ] || echo "   ✓ $skill$note"
 done
 
+# File destinations can be links into the pack too. -ef follows symlinks and
+# also recognizes hard links, so cp never tries to overwrite its own input.
+copy_file() {
+  if [ ! "$1" -ef "$2" ]; then
+    cp "$1" "$2"
+  fi
+}
+
 for script in super-board-run.sh super-board-gh-guard.sh super-board-status.py super-board-wave-plan.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
-    cp "$REPO_ROOT/scripts/$script" "$TARGET/.claude/bin/"
+    copy_file "$REPO_ROOT/scripts/$script" "$TARGET/.claude/bin/$script"
     chmod +x "$TARGET/.claude/bin/$script"
   fi
 done
@@ -121,7 +155,7 @@ done
 mkdir -p "$TARGET/.claude/workflows"
 for wf in super-board-wave.js ui-refine-loop.js; do
   if [ -f "$REPO_ROOT/workflows/$wf" ]; then
-    cp "$REPO_ROOT/workflows/$wf" "$TARGET/.claude/workflows/"
+    copy_file "$REPO_ROOT/workflows/$wf" "$TARGET/.claude/workflows/$wf"
   fi
 done
 echo "   ✓ skills, scripts and workflows → .claude/"
@@ -148,7 +182,7 @@ if [ "$HOOKS" -eq 1 ]; then
   n=0
   for h in "$REPO_ROOT"/hooks/*.py; do
     [ -f "$h" ] || continue
-    cp "$h" "$TARGET/.claude/hooks/"
+    copy_file "$h" "$TARGET/.claude/hooks/$(basename "$h")"
     chmod +x "$TARGET/.claude/hooks/$(basename "$h")"
     n=$((n + 1))
   done
@@ -160,7 +194,7 @@ elif [ "$PROTECT" -eq 1 ]; then
   # --no-hooks --protect-main: the one guard asked for, nothing else. This is the
   # command onboard names when its protect-main question finds no guard script.
   mkdir -p "$TARGET/.claude/hooks"
-  cp "$REPO_ROOT/hooks/guard-protected-push.py" "$TARGET/.claude/hooks/"
+  copy_file "$REPO_ROOT/hooks/guard-protected-push.py" "$TARGET/.claude/hooks/guard-protected-push.py"
   chmod +x "$TARGET/.claude/hooks/guard-protected-push.py"
   echo "   🛡️  --no-hooks: only the push guard → .claude/settings.json ($(merge_settings "$REPO_ROOT/hooks/settings-protect-main.json"))"
 else

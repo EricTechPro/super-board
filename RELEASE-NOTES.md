@@ -1,5 +1,17 @@
 # Release notes
 
+## v3.0.3 — 2026-10-03
+
+Refreshing a vendored installation now preserves skills and helpers that already point at
+the source pack through symlinks.
+
+- 🐛 **Safe local refresh.** `install.sh` recognizes the same source and destination before
+  clearing skill contents or copying scripts, workflows, and hooks. Existing links stay intact.
+- 🔒 **Overlapping paths refused.** A destination that contains the source pack or overlaps
+  its source skill is rejected before any skill is replaced, preventing deletion or recursive copy.
+- 🧪 **Installer regressions.** Disposable fixtures cover two layers of skill links, linked
+  helper files, repeated refreshes, and both directions of source/destination nesting.
+
 ## v3.0.2 — 2026-10-02
 
 A rewritten README, a GitHub Pages site at https://erictechpro.github.io/super-board/, and map

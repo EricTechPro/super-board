@@ -73,6 +73,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Installation stays offline: disposable targets and a local tarball.
+      # Covers linked source/destination refreshes on both BSD and GNU tools.
+      - name: installer — filesystem regressions
+        run: bash tests/test-install.sh
+      - name: installer — bootstrap regressions
+        run: bash tests/test-get.sh
+
       # Workflow-backend planner: 6 fixture scenarios, no gh calls.
       # Needs bash + jq, both preinstalled on ubuntu/macos runners.
       - name: wave-plan — fixture tests
