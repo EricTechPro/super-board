@@ -23,8 +23,7 @@ record of what they were waiting for was English prose in a comment nobody re-re
 The bot must write a structured comment on **both the issue and the PR** (if a PR exists) explaining *why* it moved the card and *what it couldn't safely decide*. Format:
 
 ```
-🛡 super-board · <lane> · BLOCKED
-─────────────────────────────────────
+[<role>] [blocker] 🛑 blocked · <reason emoji> <one-line reason>
 Card:        #<N> <title>
 PR:          #<P> (if exists)
 Reason tag:  <emoji from table below>
@@ -45,9 +44,12 @@ Move back:   drag this card to Ready after the steps above are done
 blocked-by:  <comma-separated issue numbers, or "-" if nothing on this board clears it>
 ```
 
-One line per field. The reader is a human deciding in ten seconds whether this is theirs:
-lead with the fact, show the evidence, name the owner. No narration of what the bot tried
-in what order.
+One line per field. The header is the comment header of writing-standard.md § 4: `<role>` is
+the lane that writes it (`builder` · `qa` · `reviewer` · `collect` · `orchestrator`). The Block
+template is the one comment allowed past 8 lines — its fields are what the human and the sweep
+need. The reader is a human deciding in ten seconds whether this is theirs: lead with the fact,
+show the evidence, name the owner. No narration of what the bot tried in what order. Run the
+prose through `humanizer` when installed.
 
 ### The `blocked-by:` line is mandatory
 
@@ -68,7 +70,7 @@ The same rule governs the issue body's `## Blocked by` section, which is where t
 a card has no block comment yet. Bullets of the form `- #N — why`, or a single `- None.` — nothing
 else parses.
 
-Skipped comments use the same template with `🤷 super-board · <lane> · SKIPPED` and replace `Why blocked` with `Why parked`, `What blocks` with `Why out-of-scope for this loop`.
+Skipped comments use the same template with the header `[<role>] [report] 🤷 skipped · <reason>` and replace `Why blocked` with `Why parked`, `What blocks` with `Why out-of-scope for this loop`.
 
 ## Reason emoji vocabulary
 
@@ -96,8 +98,7 @@ it yourself, or comment `done` to approve and let the next wave merge it) and ex
 an allowed migrate command that failed, a declared human step), or any lane that hits one.
 
 ```
-🛡 super-board · Review · BLOCKED
-─────────────────────────────────────
+[reviewer] [blocker] 🙋 needs you · <one-line reason>
 Card:        #<N> <title>
 PR:          #<P>
 Reason tag:  🙋 needs you

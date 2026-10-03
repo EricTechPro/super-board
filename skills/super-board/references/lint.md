@@ -79,7 +79,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 14-criterion table
+## Lint criteria — 18-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -99,6 +99,10 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 12 | Sub-agent ambiguity flag | "this could mean ≥2 different things" | Surface both interpretations |
 | 13 | `## Blocked by` missing, empty, or unparseable | No section; or `- None — but #26 must merge first` | Rewrite to `- #N — why` bullets, or a bare `- None.` |
 | 14 | An AC proves behaviour against a fake, and no card owns the real thing | "proven with a fake repository, no database" | Name the ticket that builds it, or offer to file one |
+| 15 | Too big: likely over ~400 changed lines (`merge_policy.auto_max_lines`), or spans many areas | "Add billing page, webhook handler, admin UI and email templates" | Hold with ❓ and split via `/to-tickets` into vertical slices |
+| 16 | Ticket sections missing (writing-standard.md § 3): `## Problem`, `## Context`, `## Fix`, `## Risk` — and `## Evidence` (the folded 12-row table) on a bug | Body has "What to build" and ACs only | Rewrite into the ticket format; draft Problem/Fix from the body, ask for Who and Risk |
+| 17 | Acceptance Criteria not a checklist | ACs as prose or plain `-` bullets | Rewrite as `- [ ] <checkable outcome>`, one per line |
+| 18 | Context steps not lettered under Where, more than one step per line, or chained with arrows | "Where: /x — sign in → open Receipts → drop file" | Rewrite as `- **Where:** …` then `  - a. Sign in` / `  - b. …`, one per line; embed the screenshot (raw URL pinned to a sha), never link it |
 
 ---
 
@@ -134,6 +138,25 @@ When an AC contains *fake*, *stub*, *mock*, `notBuiltYet`, or "no database / no 
 proof method, ask one question: **which card builds the real one?** A number is an answer. "Later"
 is not.
 
+## Criterion 15 — too big (small PRs by design)
+
+Small pull requests are a design goal: each ticket should land as one PR under the merge size cap
+(`merge_policy.auto_max_lines`, default 400 changed lines; lockfiles, generated files, snapshots and
+migration SQL do not count). A PR over the cap is never auto-merged — it parks in Blocked 🙋 as a
+"big PR". Catching it at lint time is cheaper than splitting a finished branch.
+
+Flag a ticket as **too big** when either holds:
+
+- **Likely over the cap** — estimate from the ACs and the files they imply: many new screens or
+  endpoints, a new module plus its UI plus its tests, or "and" chaining unrelated deliverables.
+- **Spans many areas** — touches three or more separate areas (say UI, API, database, background
+  job, email) where each could ship and be checked alone.
+
+What lint does: hold the ticket with ❓ (Blocked, `block-template.md`, reason "too big — split
+first") and offer to split it with `/to-tickets` into vertical slices — each slice thin end to end,
+independently mergeable, under the cap, with its own ACs and a `## Blocked by` line. The original
+ticket closes, or becomes the first slice, once the user approves the split.
+
 ## Phase 4 — skill routing
 
 | Flagged pattern | Skill dispatched |
@@ -144,6 +167,8 @@ is not.
 | Bug ticket, no repro steps | `mattpocock-skills:diagnosing-bugs` |
 | Issue needing fundamental rethink (criteria #10, #11) | `mattpocock-skills:grilling` |
 | Issue with multiple interpretations (criterion #12) | `mattpocock-skills:grilling` |
+| Ticket too big (criterion #15) | `/to-tickets` (split into vertical slices) |
+| Ticket format (criteria #16–18) | Inline rewrite into `ticket-format.md` (sub-agent in lint itself) |
 | Catch-all (none of above) | Inline draft (sub-agent in lint itself) |
 
 One sub-agent per issue. User stays in control of pacing.
@@ -236,7 +261,7 @@ Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
 - [ ] Every issue in active-pipeline columns (Ready, Building if present, QA, Review) either:
-  - has a populated `## Acceptance Criteria` section that passes all 12 criteria, OR
+  - has a populated `## Acceptance Criteria` section that passes all 18 criteria, OR
   - carries a `🤷 Skipped` comment explaining why it was deferred, OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).

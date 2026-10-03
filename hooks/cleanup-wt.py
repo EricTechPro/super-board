@@ -358,7 +358,7 @@ def wip_commit(row, log):
     if not git_out(wt, "status", "--porcelain"):
         return True  # nothing to snapshot; the branch alone keeps the commits reachable
     git(wt, "add", "-A")
-    if git(wt, "commit", "--no-verify", "-m", "wip: cleanup-wt snapshot " + now_iso())[0] != 0:
+    if git(wt, "commit", "--no-verify", "-m", "🚧 [wip] cleanup-wt: snapshot " + now_iso())[0] != 0:
         return False
     log.append({"when": now_iso(), "kind": "wip", "name": row["facts"]["branch"], "sha": git_out(wt, "rev-parse", "HEAD"),
                 "path": wt, "action": "wip-commit", "reason": "dirty state saved before removing the worktree"})

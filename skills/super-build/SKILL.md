@@ -104,7 +104,7 @@ The dispatcher (this skill's `scripts/super-build-dispatch.sh`) handles:
 - `gh issue view N --json title,body,labels` to compose the worker prompt
 - prepend `references/worker-preamble.md` + append working-directory footer
 - `cd` into worktree and exec `claude -p --dangerously-skip-permissions --output-format stream-json --verbose --max-turns 250`
-- verify the worker produced a `chore(loop): close #N` commit on its branch
+- verify the worker produced a `🔧 [chore] loop: close #N` commit on its branch
 - exit 0 (success) / 2 (worker non-zero) / 3 (no done-commit) / 4 (HUMAN GATE TRIPPED)
 
 **Base branch:** the orchestrator's currently-checked-out branch (e.g. `frontend-rebuild`). Pass via `BASE_BRANCH` env var to the dispatcher. Don't assume `main`.
@@ -115,9 +115,9 @@ Poll BashOutput on each in-flight shell. As each finishes:
 
 **On dispatcher exit 0 (success):**
 - `git -C .worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<issue title>" --body "Closes #N …"` (PR description template from `skills/super-board/references/run.md`, including `Docs consulted`)
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/super-board/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution
 - `gh issue edit N --remove-label loop:in-progress`
-- `gh issue comment N --body "🔨 PR opened by /super-build: <PR URL>"`
+- `gh issue comment N --body "[builder] [report] ✅ built · PR <URL>"` (Next line: `qa`)
 - Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
 - Leave the worktree in place — the merge gate (after the merge) or the cleanup-wt SessionStart hook removes it once the work is on the base branch.
 - Report: `✅ Super Build issue #N → PR <URL>, card in QA`
@@ -125,15 +125,15 @@ Poll BashOutput on each in-flight shell. As each finishes:
 
 **On dispatcher exit 5 (intentional WIP-PARTIAL — open a partial PR, do NOT close):**
 - `git -C .worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "partial: <slice from worker's final message> (#N)"` — reference `#N` without a `Closes` keyword so the merge does not close the issue.
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "🚧 [wip] <scope>: <slice from worker's final message>"` — the status card says `Refs #N`, never `Closes`, so the merge does not close the issue.
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
-- `gh issue comment N --body "🟡 Partial slice opened as <PR URL>. Issue stays open with \`human-gated\` until the rest lands. Worker's reason for stopping at a partial:\n\n> $(<final assistant message excerpt>)"`
+- `gh issue comment N --body "[builder] [report] ⚠️ partial · PR <URL>\nDid: <slice>\n❌ Not done: <worker's reason for stopping>\nNext: Eric"` — the issue stays open with `human-gated` until the rest lands.
 - Report: `🟡 Issue #N partial PR opened — issue stays open (human-gated)`
 - **Continue dispatching the next issue in the wave.** A WIP-PARTIAL is NOT a halt. The worker did intentional, scoped work and the orchestrator advances.
 
 **On dispatcher exit 2 or 3 (worker failed or no done-commit):**
 - `gh issue edit N --remove-label loop:in-progress`
-- `gh issue comment N --body "❌ /super-build worker failed (exit code <X>). Last 50 lines of log:\n\n\`\`\`\n$(tail -50 .planning/super-build-logs/issue-N.log)\n\`\`\`\nWorktree at \`.worktrees/issue-N\` left intact for human inspection."`
+- `gh issue comment N --body "[builder] [report] ❌ failed · exit <X>\nDid: worker ran; worktree \`.worktrees/issue-N\` kept\n❌ Not done: <one line from the log>\nNext: Eric\n\n<details><summary>log tail</summary>\n\n\`\`\`\n$(tail -50 .planning/super-build-logs/issue-N.log)\n\`\`\`\n</details>"`
 - Report to the user with `tail -50` of `.planning/super-build-logs/issue-N.log`
 - Do NOT open a PR; leave the worktree intact for human inspection
 - Halt the loop
@@ -222,11 +222,24 @@ Follow spec `.claude/skills/super-board/references/run.md` → Builder (first pa
 1. Worktree off `config.base_branch`.
 2. Branch `issue-<N>-<slug>` from `config.base_branch`.
 3. Docs check (section below) — if the ticket touches a third-party surface, an upgrade, or auth/billing, read the current official docs first.
-4. Implement smallest safe change covering ACs.
+4. Implement smallest safe change covering ACs — under the PR size cap (section below).
 5. Commit + push (always).
-6. Open **draft PR** with the PR description template from `run.md` (including `Docs consulted`).
-7. Post 🔨 PR timeline comment + short issue comment with PR URL.
+6. Open **draft PR** with the PR description template from `run.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution.
+7. Post the `[builder] [report]` PR comment + the short issue comment with the PR URL (writing-standard.md § 4).
 8. Move card Ready/Building → QA.
+
+### Keep each PR small (every ticket)
+Each PR stays under the merge size cap: `merge_policy.auto_max_lines` (default 400 changed lines,
+additions + deletions; lockfiles, generated files, snapshots and migration SQL do not count — see
+`merge_policy.size_exclude`). A PR over the cap is never auto-merged: the merge gate parks it in
+Blocked 🙋 "big PR — please review".
+
+Check `git diff --shortstat origin/<base>...HEAD` (minus excluded files) before each push. If the
+change grows past the cap mid-build, **stop — do not push on**. Commit and push what you have on
+the branch, leave the PR as a draft, and post a PR comment proposing the split: the vertical
+slices (each thin end to end, under the cap, with its own ACs), which slice this PR keeps, and
+`/to-tickets` as the way to file the rest. Then move the card to Blocked with `❓` ("too big —
+split proposed in PR #<P>", `block-template.md`). Never pad past the cap to "finish" the ticket.
 
 ### Lifecycle (Builder, rebuild)
 Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
@@ -237,7 +250,7 @@ Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
    ```
 3. Address any new failure feedback from Tester's latest ❌ comment.
 4. Commit + push to same branch. Verify ALL `[builder]` threads are resolved before exit.
-5. 🔨 PR + issue comments. Move card Ready/Building → QA.
+5. Rewrite your PR body blocks (`super-board-pr-body.sh`), post `[builder] [report]` PR + issue comments. Move card Ready/Building → QA.
 
 ### Docs before outside-tool code (every ticket)
 Before writing code, decide whether the ticket touches any of:
@@ -252,10 +265,10 @@ and read the docs for that major. Repo docs and existing call sites come first f
 repo uses it; vendor docs settle what the tool does. Not Stack Overflow, not old blog posts,
 not memory.
 
-Cite what you read in the PR body under `Docs consulted` (URL + the one fact it settled). Docs
-unreachable → say so in that section and in the 🔨 comment, mark the affected code
-`unverified against current docs`, and keep the change minimal. No outside tool touched →
-`Docs consulted: none needed (no third-party surface)`.
+Cite what you read as `Docs:` bullets at the end of the PR body's Solution block (URL + the one
+fact it settled). Docs unreachable → say so there and in the `[builder] [report]` comment, mark the
+affected code `unverified against current docs`, and keep the change minimal. No outside tool
+touched → `Docs: none needed — no third-party surface`.
 
 ### Failure → handoff comment must include `root-cause-hash:` line
 On any failure-handoff comment, include:

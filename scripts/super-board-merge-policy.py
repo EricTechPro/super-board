@@ -22,7 +22,12 @@ unreadable metadata, so the gate fails safe to "human".
 
 Rules, from references/config-schema.json → merge_policy / migrations:
 - merge_policy.default "human" → everything waits for a human.
-- merge_policy.auto_max_lines > 0 and additions+deletions above it → human.
+- merge_policy.auto_max_lines (default 400; 0 = no cap): changed lines
+  (additions + deletions) above it → human ("big PR — please review"). Files
+  matching merge_policy.size_exclude (default: lockfiles, generated output,
+  snapshots) and migration files (migrations.globs) do not count; migration
+  lines are reported separately. Per-file counts come from `files[].additions/
+  deletions`; without them the PR totals are used.
 - merge_policy.always_human.<category>: any label, path glob or added-line
   keyword match → human. Categories ship as money, auth, schema; setting
   always_human replaces them all (`{}` turns category gating off).
@@ -64,6 +69,18 @@ DEFAULT_MIGRATION_GLOBS = [
 ]
 DEFAULT_ALLOWED_ENVS = ["test", "staging"]
 DONE_LABEL = "needs-you:done"
+DEFAULT_AUTO_MAX_LINES = 400
+DEFAULT_SIZE_EXCLUDE = [
+    # lockfiles
+    "**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml", "**/bun.lockb", "**/bun.lock",
+    "**/npm-shrinkwrap.json", "**/Cargo.lock", "**/poetry.lock", "**/uv.lock", "**/Pipfile.lock",
+    "**/Gemfile.lock", "**/composer.lock", "**/go.sum", "**/Podfile.lock", "**/pubspec.lock",
+    # generated output
+    "**/generated/**", "**/__generated__/**", "**/*.generated.*", "**/*.gen.*",
+    "**/*.min.js", "**/*.min.css", "**/*.map", "**/*.pb.go", "**/*_pb2.py",
+    # snapshots
+    "**/__snapshots__/**", "**/*.snap",
+]
 
 
 def glob_re(pattern: str) -> re.Pattern:
@@ -109,16 +126,36 @@ def main() -> int:
     paths = [f.get("path") or "" for f in meta.get("files") or []]
     added = "\n".join(l[1:] for l in diff.splitlines()
                       if l.startswith("+") and not l.startswith("+++")).lower()
-    size = int(meta.get("additions") or 0) + int(meta.get("deletions") or 0)
     body = meta.get("body") or ""
 
     policy = cfg.get("merge_policy") or {}
     human = []
     if (policy.get("default") or "auto") == "human":
         human.append({"category": "default", "why": "merge_policy.default is \"human\""})
-    cap = int(policy.get("auto_max_lines") or 0)
+    mig = cfg.get("migrations") or {}
+    globs = mig.get("globs") or DEFAULT_MIGRATION_GLOBS
+    mig_files = [p for p in paths if matches(p, globs)]
+
+    cap = policy.get("auto_max_lines")
+    cap = DEFAULT_AUTO_MAX_LINES if cap is None else int(cap)
+    excl = policy.get("size_exclude")
+    excl = DEFAULT_SIZE_EXCLUDE if excl is None else excl
+    files = meta.get("files") or []
+    if files and all("additions" in f for f in files):
+        size = mig_lines = 0
+        for f in files:
+            n = int(f.get("additions") or 0) + int(f.get("deletions") or 0)
+            p = f.get("path") or ""
+            if p in mig_files:
+                mig_lines += n
+            elif not matches(p, excl):
+                size += n
+    else:
+        size, mig_lines = int(meta.get("additions") or 0) + int(meta.get("deletions") or 0), 0
     if cap > 0 and size > cap:
-        human.append({"category": "size", "why": f"{size} changed lines > auto_max_lines {cap}"})
+        extra = f" (+{mig_lines} migration lines counted separately)" if mig_lines else ""
+        human.append({"category": "size",
+                      "why": f"big PR — please review: {size} changed lines > auto_max_lines {cap}{extra}"})
     always = policy["always_human"] if isinstance(policy.get("always_human"), dict) else DEFAULT_ALWAYS_HUMAN
     for cat, rule in always.items():
         rule = rule or {}
@@ -132,9 +169,6 @@ def main() -> int:
         if hit:
             human.append({"category": cat, "why": hit})
 
-    mig = cfg.get("migrations") or {}
-    globs = mig.get("globs") or DEFAULT_MIGRATION_GLOBS
-    mig_files = [p for p in paths if matches(p, globs)]
     run, needs = [], []
     if mig_files:
         allowed = mig.get("allowed_envs")

@@ -137,6 +137,17 @@ RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 grep -q -- "--match-head-commit $SHA" "$GH_LOG" || fail "merge must pass --match-head-commit $SHA, got: $(cat "$GH_LOG")"
 teardown
 
+# 9b — the squash message: --subject and --body-file reach `gh pr merge` (writing standard).
+head_setup
+printf -- '- 413 shows the size message\nCloses #1\n' > "$TMP/msg.md"
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --subject "🐛 [fix] receipts: show a size error" --body-file "$TMP/msg.md" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "a merge with a subject should exit 0, got $RC"
+grep -q -- "--subject 🐛 \[fix\] receipts: show a size error" "$GH_LOG" || fail "merge must pass --subject, got: $(cat "$GH_LOG")"
+grep -q -- "--body-file $TMP/msg.md" "$GH_LOG" || fail "merge must pass --body-file, got: $(cat "$GH_LOG")"
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" --body-file /nope.md >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 66 ] || fail "an unreadable --body-file should exit 66, got $RC"
+teardown
+
 # 10 — a push lands during verification: GitHub refuses the pinned merge and the
 #      head has moved, so this is void evidence (6), not branch protection (3).
 head_setup
@@ -201,6 +212,42 @@ cfgset '.merge_policy = {default: "auto", auto_max_lines: 100}'
 RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
 [ "$RC" -eq 7 ] || fail "400 lines over auto_max_lines 100 should exit 7, got $RC"
 echo "$OUT" | grep -q "human-gate: size" || fail "the size gate must say so, got: $OUT"
+teardown
+
+# 15b — the size cap defaults to 400 changed lines: 401 gates ("big PR"), 400
+#       merges, and auto_max_lines 0 turns the cap off.
+head_setup
+RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 401)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+[ "$RC" -eq 7 ] || fail "401 lines over the default cap 400 should exit 7, got $RC"
+echo "$OUT" | grep -q "human-gate: size — big PR — please review" || fail "the size gate must say big PR, got: $OUT"
+RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "400 lines is at the default cap and should merge, got $RC"
+cfgset '.merge_policy = {auto_max_lines: 0}'
+RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 5000)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "auto_max_lines 0 should turn the size cap off, got $RC"
+teardown
+
+# 15c — lockfiles, snapshots and generated files do not count toward the cap;
+#       migration SQL is left out and reported separately; size_exclude is
+#       configurable ([] counts everything).
+head_setup
+BIG=$(jq -cn '{labels: [], body: "", additions: 2300, deletions: 0, files: [
+  {path: "src/x.ts", additions: 300, deletions: 0},
+  {path: "package-lock.json", additions: 900, deletions: 0},
+  {path: "src/__snapshots__/x.test.ts.snap", additions: 500, deletions: 0},
+  {path: "src/api/__generated__/types.ts", additions: 400, deletions: 0},
+  {path: "db/migrations/001_add.sql", additions: 200, deletions: 0}]}')
+cfgset '.migrations = {allowed_envs: ["test"], target_env: "test", commands: {test: "true"}}'
+RC=0; STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "300 counted lines (rest excluded) should merge, got $RC"
+cfgset '.merge_policy = {auto_max_lines: 250}'
+RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+[ "$RC" -eq 7 ] || fail "300 counted lines over cap 250 should exit 7, got $RC"
+echo "$OUT" | grep -q "300 changed lines > auto_max_lines 250 (+200 migration lines counted separately)" \
+  || fail "size gate should count 300 and report migration lines separately, got: $OUT"
+cfgset '.merge_policy = {size_exclude: []}'
+RC=0; STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 7 ] || fail "size_exclude [] should count the lockfile and exit 7, got $RC"
 teardown
 
 # 16 — a destructive keyword counts in an ADDED line only. Deleting a DROP TABLE
@@ -297,4 +344,4 @@ pol "$(meta "" a/b/migrations/1.sql)"      | jq -e '.migrations | length == 1' >
 pol "$(meta "" migrations/old/1.sql)"      | jq -e '.migrations | length == 0' >/dev/null || fail "* must not cross a /"
 rm -rf "$T25"
 
-echo "PASS: test-merge-gate.sh (26 scenarios)"
+echo "PASS: test-merge-gate.sh (27 scenarios)"

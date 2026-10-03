@@ -8,8 +8,10 @@
 #
 # Copies <run>/shots/round-0-<state>-<viewport>-<theme>.png and the --final
 # label's matching shots to <wt>/docs/ui-refine/<slug>/{before,after}-<viewport>-<theme>.png,
-# commits them as "refine(<slug>): before/after screenshots", and prints the
-# markdown table on stdout. The links resolve once the branch is pushed.
+# commits them as "💄 [ui] <slug>: before/after screenshots", and prints the
+# Before | After table on stdout (writing-standard.md § 2: two columns, one row
+# per viewport and theme, both shas in the header — before = <run>/base, after =
+# the code the final shots show). The links resolve once the branch is pushed.
 # --repo defaults to the origin remote. --no-commit only prints (for tests or
 # a re-run after the commit exists).
 #
@@ -53,17 +55,27 @@ for vp in desktop mobile; do
 done
 [ "$copied" -gt 0 ] || die "no round-0 or $FINAL shots for state $STATE in $RUN/shots" 70
 
+short() { git -C "$WT" rev-parse --short "$1" 2>/dev/null || printf '%s' "$1" | cut -c1-7; }
+BEFORE_SHA="round-0"
+[ -s "$RUN/base" ] && BEFORE_SHA=$(short "$(head -1 "$RUN/base")")
+AFTER_SHA=$(short HEAD)
 if [ "$COMMIT" = 1 ]; then
   git -C "$WT" add -- "$DEST"
-  git -C "$WT" diff --cached --quiet -- "$DEST" || git -C "$WT" commit -q -m "refine($SLUG): before/after screenshots" -- "$DEST"
+  git -C "$WT" diff --cached --quiet -- "$DEST" || git -C "$WT" commit -q \
+    -m "💄 [ui] $SLUG: before/after screenshots" \
+    -m "- round-0 and $FINAL shots, desktop + mobile, light + dark" -- "$DEST"
 fi
 SHA=$(git -C "$WT" rev-parse HEAD)
+# On a --no-commit re-run HEAD is the screenshot commit; the code it shows is its parent.
+if [ "$COMMIT" = 0 ] && git -C "$WT" log -1 --format=%s | grep -q ': before/after screenshots$'; then
+  AFTER_SHA=$(short HEAD~1)
+fi
 
 cell() {
   local f="$DEST/$1"
   if [ -f "$WT/$f" ]; then printf '<img src="https://github.com/%s/raw/%s/%s" width="%s">' "$REPO" "$SHA" "$f" "$2"; else printf 'not shot'; fi
 }
-echo "| | Before (round-0) | After ($FINAL) |"
+echo "| | Before \`$BEFORE_SHA\` | After \`$AFTER_SHA\` ($FINAL) |"
 echo "|---|---|---|"
 for vp in desktop mobile; do
   for theme in light dark; do

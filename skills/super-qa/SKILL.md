@@ -82,8 +82,8 @@ orchestrator pausing on `AskUserQuestion`.
 **Decide-and-proceed, don't ask, on these classes of issue:**
 
 - Harness script bugs (parser errors, broken xargs, missing
-  `chmod +x`, stale lock files). Fix locally, commit with a `fix(super-qa):`
-  prefix, then continue.
+  `chmod +x`, stale lock files). Fix locally, commit as `🐛 [fix] super-qa: <what>`
+  (writing-standard.md § 1), then continue.
 - Missing env auto-loads, leftover MCP zombies, log-dir creation.
 - Lint / formatting nits introduced by the worker that block its own commit.
 - Choosing between equivalent dispatch modes (sequential vs sequential —
@@ -297,11 +297,11 @@ Launch one sub-agent (Agent tool) in the repo root, no worktree, with
 prompt = `references/iteration-preamble.md` + a per-iteration footer (iter
 num, base SHA, mandatory final-commit format) and `SUPER_QA_FORENSICS=1`.
 When it returns, classify the iteration:
-- `0` iter complete — a `super-qa: iter N` commit is on the current branch.
+- `0` iter complete — a `🧪 [test] super-qa: iter N` commit is on the current branch.
 - `2` worker failed — it errored and left no done or WIP marker.
-- `3` no done-commit — it finished but no `super-qa: iter N` commit exists.
+- `3` no done-commit — it finished but no `🧪 [test] super-qa: iter N` commit exists.
 - `4` HUMAN GATE — its output contains `HUMAN GATE TRIPPED:`.
-- `5` WIP-CHECKPOINT — it hit its budget mid-fix and left a `wip:` commit;
+- `5` WIP-CHECKPOINT — it hit its budget mid-fix and left a `🚧 [wip] super-qa:` commit;
   the next iter picks it up.
 
 Report: `🔍 Iter N launched`.
@@ -377,7 +377,7 @@ OR 30 min wall-clock):
 **Phase 3 — Report.** Write `docs/super-qa/iter/iteration-N.md` (bugs
 found, items processed, queue size before/after, coverage snapshot). Run
 `npm run qa:report:render`. Commit:
-`super-qa: iter N (X bugs, Y items, Z PRs opened)`.
+`🧪 [test] super-qa: iter N (X bugs, Y items, Z PRs opened)` (writing-standard.md § 1).
 
 ## The bug-handling rule (non-blocking)
 
@@ -579,7 +579,7 @@ docs/super-qa/report/
 - Default: starts a new batch numbered after the last `iteration-*.md`
   (e.g. if iters 1-5 exist, the next batch starts at 6).
 - `--resume`: only run iters whose number is greater than `max(existing)`.
-- A leftover `wip:` commit on the current branch (from a status-5 iteration)
+- A leftover `🚧 [wip] super-qa:` commit on the current branch (from a status-5 iteration)
   is OK — the next iter's regression phase finds the red spec and finishes
   the fix.
 
@@ -629,8 +629,8 @@ See `.claude/skills/super-board/references/run.md` → Tester (first pass — re
 3b. Run the **Test-gap check** (above) against the Builder's diff; its High gaps join the plan.
 4. Run tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
 5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/super-board/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
-6. **Pass** → 🔍 PR comment with results + evidence path → 🔍 **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
-7. **Fail** → 🔍 PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → 🔍 issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
+6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`super-board-pr-body.sh`) → `[qa] [report] ✅` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
+7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
 ### Pass-handoff PR comment MUST include the test command
 Every Pass-handoff PR comment includes a `Local tests:` line with the EXACT command Reviewer will re-run as the self-verification gate:
@@ -646,21 +646,21 @@ The Tester's issue comment is the user's primary visibility into "is this actual
 **The canonical template lives in `.claude/skills/super-board/references/run.md` → "Screenshot embed format" (right after Tester first pass).** Do not duplicate it here; both lanes (super-board Tester + standalone super-qa) follow that exact format. Summary of rules workers must obey:
 
 - Capture screenshots at the standard viewports for UI ACs: **desktop 1920×1080, tablet 1024×768, mobile 375×667**.
-- Commit the screenshots to the issue branch *before* writing the comment — inline image URLs won't render unless the file is on the branch.
-- Use the `https://github.com/<OWNER>/<REPO>/raw/<BRANCH>/...` URL form so images render even when the branch isn't default. Resolve `<OWNER>/<REPO>` from `git remote get-url origin`.
+- Commit the screenshots to the issue branch and push *before* writing the comment — inline image URLs won't render unless the file is on GitHub.
+- Use the `https://github.com/<OWNER>/<REPO>/raw/<SHA>/...` URL form, `<SHA>` = the commit that added the screenshots, so images keep rendering after the branch is deleted on merge. Resolve `<OWNER>/<REPO>` from `git remote get-url origin`.
 - Embed the same screenshots in BOTH the PR timeline comment AND the issue comment — the issue page is the user's primary view.
-- Include a "Local path" bullet list alongside the inline images so the user can also open them in their IDE.
+- Name the evidence folder once (`runs/issue-<N>-qa-v<V>/`) — no file lists.
 - For non-visual ACs (API tests, migration SQL), skip the screenshot table but keep the evidence-path line. State the omission explicitly so the user knows it was intentional.
 - If screenshot capture fails (no display, headless crash), document the reason and link alternative evidence (log file, HTTP trace) rather than silently dropping the requirement.
 - Failure comments use the same format with broken-state screenshots (e.g., `before-fix-desktop.png`).
 
-### Lifecycle (Tester, rebuild — when Reviewer bounced for [QA] thread fixes)
-1. Read PR review threads; filter `[QA]` prefix.
-2. For each unresolved `[QA]` thread: apply fix to test files → resolve thread via `gh api graphql resolveReviewThread`.
+### Lifecycle (Tester, rebuild — when Reviewer bounced for [qa] thread fixes)
+1. Read PR review threads; filter `[qa]` prefix.
+2. For each unresolved `[qa]` thread: apply fix to test files → resolve thread via `gh api graphql resolveReviewThread`.
 3. Re-run full test suite for the ticket.
 4. Save evidence to `runs/issue-<N>-qa-v<N+1>/`.
-5. Commit + push. Verify ALL `[QA]` threads resolved.
-6. Post 🔍 PR + issue comments. Move QA → Review.
+5. Commit + push. Verify ALL `[qa]` threads resolved.
+6. Update the PR's `ac`, `history`, `status` blocks; post `[qa] [report]` PR + issue comments (writing-standard.md § 4). Move QA → Review.
 
 ### Failure → `root-cause-hash:` line required
 Hash lane = `qa`. Same input definition as super-build.

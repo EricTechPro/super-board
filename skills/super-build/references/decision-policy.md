@@ -171,13 +171,16 @@ that contradict the issue's acceptance criteria are a rung-4 human gate.
 ## Recording the decision
 
 Any fork you resolved at **rung 3** goes in the commit message under a
-`--- decision ---` trailer, so the orchestrator and downstream reviewers can
-audit it. Rungs 1 and 2 need no trailer — the AC or the precedent is the record.
+`--- decision ---` trailer, after the bullets (commit format: writing-standard.md
+§ 1), so the orchestrator and downstream reviewers can audit it. Rungs 1 and 2
+need no trailer — the AC or the precedent is the record.
 
 ```
-fix(orders): use idempotency key from request header (closes #123)
+🐛 [fix] orders: use the idempotency key from the request header
 
-<one-line summary>
+- reuse the client's Idempotency-Key instead of minting one
+- duplicate POST returns the first order (orders.test.ts:41)
+Closes #123
 
 --- decision ---
 question: reuse the request header key, or mint a server-side key per order?

@@ -89,7 +89,7 @@ const LANE = {
 const REVIEW_MEMORY = [
   `Before reviewing, load prior_report: the newest PR comment containing "<!-- super-review:report -->" (run.md → Reviewer step 3b).`,
   `None → first review, behave as usual. Found → round 1 marks each prior finding fixed / not fixed / no longer applies;`,
-  `any not fixed → bounce again listing them. Report the counts as priorFindings.`,
+  `any not fixed → bounce again listing them. Edit that report comment in place (keep R-ids), never post a second one. Report the counts as priorFindings.`,
   // Independent pass (run.md → Reviewer step 3): hypotheses before the builder's account.
   `Read the issue ACs and the diff before the builder's PR summary; form your own hypotheses, then check their claims.`,
   `Class every finding Gap / Bug / Verification miss / Scope drift / Over-engineering, and list what you verified correct.`,
@@ -105,6 +105,7 @@ const lanePrompt = (lane, card) => [
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
+  `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ``,
   `Report your exit via structured output:`,

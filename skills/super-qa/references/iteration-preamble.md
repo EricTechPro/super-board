@@ -10,7 +10,7 @@ Run **one iteration** of the loop:
    classify it, write a spec, run it, mark `[x]` or `[b]`, walk the page,
    push children to the back of the queue.
 3. **Report** — write `docs/super-qa/iter/iteration-N.md`, regenerate
-   `docs/super-qa/report/QA-REPORT.md`, commit `super-qa: iter N (X bugs, Y items, Z PRs opened)`,
+   `docs/super-qa/report/QA-REPORT.md`, commit `🧪 [test] super-qa: iter N (X bugs, Y items, Z PRs opened)`,
    exit cleanly.
 
 ## Your iteration
@@ -208,19 +208,14 @@ assertions ("Per-spec expectations" above) onto the 5 existing specs in
 `e2e/paths/` (login, dashboard, orders, orders-new, order-detail). One
 commit:
 
-  `feat(super-qa): retrofit forensics assertions onto existing specs`
+  `🧪 [test] super-qa: retrofit forensics assertions onto existing specs`
 
 When a `[b]` is filed, the bug body produced for `super-qa-file-bug.sh`
-MUST embed (or reference paths to) these artifacts. Template addition:
-
-  ```
-  ## Forensics
-  - Console errors: `docs/super-qa/report/<slug>/tc-N/<locale>/console.log` (N entries)
-  - Page errors: `docs/super-qa/report/<slug>/tc-N/<locale>/pageerrors.log`
-  - Network HAR: `docs/super-qa/report/<slug>/tc-N/<locale>/network.har`
-  - Failing requests: <list of url+status, max 5>
-  - Sentry events: <event ids, max 5>
-  ```
+MUST carry these artifacts in its folded Evidence table (writing-standard.md § 3):
+console and page errors → `Error + stack` and `Logs` (with the
+`docs/super-qa/report/<slug>/tc-N/<locale>/*.log` paths), the HAR →
+`HAR / API sample` (path + the top failing requests, max 5), Sentry event ids →
+`Sentry`.
 
 ## Your workflow (3 phases)
 
@@ -300,21 +295,23 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 4. **Commit + push + open PR:**
    ```bash
    git add -p   # stage only fix-relevant hunks
-   git commit -m "fix(super-qa): <one-line bug summary> (refs #${ISSUE_N})"
+   git commit -m "🐛 [fix] <area>: <one-line bug summary>" -m "- <what changed>
+   - <spec that proves it>
+   Refs #${ISSUE_N}"
    git push -u origin HEAD
    gh pr create \
-     --title "fix(super-qa): <one-line bug summary>" \
+     --title "🐛 [fix] <area>: <one-line bug summary>" \
      --label super-qa \
      --label "$([[ "$SIGNAL" = "objective" ]] && echo auto-merge-candidate || echo needs-human-review)" \
      --body-file /tmp/super-qa-pr-body-${N}-${slug}.md
    ```
 
-   PR body must include:
-   - Link to the GH issue (`Fixes #${ISSUE_N}`)
-   - The exact failing assertion / signal type
-   - Forensics excerpt (top-5 console errors / pageerrors / failing requests)
-   - Files changed + why (1-2 sentences per file)
-   - Reviewer checklist (auto-rendered by `/review` skill below)
+   PR body = the marker blocks of writing-standard.md § 2
+   (`.claude/bin/super-board-pr-body.sh --skeleton`): status card with
+   `Closes #${ISSUE_N}`, Problem (the failing assertion / signal type, lettered
+   steps, screenshot), Solution (plain bullets), Acceptance criteria with proof
+   lines, Iteration history, Risk (🟢/🟡/🔴 — subjective signals are never 🟢).
+   Forensics excerpts go in the proof lines, not as file lists.
 
 5. **Run reviewer skills against the PR (parallel where possible):**
    ```bash
@@ -341,14 +338,14 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 
 **On the active branch (the loop's working branch), only commit:**
 - The forensics fixture extension (iter 2 onwards, separate commit)
-- The per-iter close-out commit `super-qa: iter N (X bugs, Y items, Z PRs opened)`
+- The per-iter close-out commit `🧪 [test] super-qa: iter N (X bugs, Y items, Z PRs opened)`
 - The per-iter `iteration-N.md` + `QA-REPORT.md` + `queue.md` updates
 - New `e2e/paths/<slug>.spec.ts` files (these ARE the deliverable)
 
 **Never on the active branch:**
 - A change to production code (`client/`, `server/`, `shared/`) — those
   go through PRs.
-- A `wip:` commit for an unresolved fix — close the fix branch and leave
+- A `🚧 [wip] super-qa:` commit for an unresolved fix — close the fix branch and leave
   the GH issue open instead.
 
 ### Phase 2 — Explore (bounded)
@@ -357,7 +354,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
 - Default 5 cells popped per iter.
 - Wall-clock cap 30 min from iter start.
 - When wall-clock hits mid-cell, finish the current cell, write the report,
-  exit. When wall-clock hits mid-fix, commit a `wip:` checkpoint with the
+  exit. When wall-clock hits mid-fix, commit a `🚧 [wip] super-qa:` checkpoint with the
   failing spec still red and exit (the orchestrator records this as status 5).
 
 **Per cell:**
@@ -588,16 +585,27 @@ so the human can triage them all with `gh issue list -l source:qa`.
 detection (do NOT batch at end of iter):
 
 1. **Write the issue body** to a temp file, e.g.
-   `/tmp/super-qa-iter-${N}-bug-${slug}.md`. Body must include enough context for a future headless coding session to fix it without rediscovery:
-   - **Summary:** one sentence: what is wrong and where.
-   - **Repro steps:** exact click-by-click steps, including login state and route.
-   - **Expected behavior:** cite `docs/SPEC.md`, `DESIGN.md`, or product intent when possible.
-   - **Actual behavior:** what happened instead.
-   - **Evidence:** screenshot path/link, console log summary, page error summary, network JSON/HAR path, and spec path. If an artifact is not captured, write `not captured` and why.
-   - **First-suspect file:** `client/path/file.tsx:42` if identifiable.
-   - **Suggested fix path:** `super-build` for implementation, a UI ticket for design polish (a human can run `/ui-refine-loop`), `super-qa` for harness/test-only fixes, or `super-review` for release-readiness judgment.
-   - **Fingerprint:** a stable dedupe key such as `<slug>|<test-case>|<failure-signature>`.
-   - **Acceptance criteria:** user-visible fix + regression coverage + Super QA rerun.
+   `/tmp/super-qa-iter-${N}-bug-${slug}.md`, in the ticket format of
+   `.claude/skills/super-board/references/writing-standard.md` § 3 — enough
+   context for a future headless session to fix it without rediscovery. The
+   filer refuses a body that misses a section:
+   - `## Problem` — 1–3 sentences: what is wrong and where.
+   - `## Context` — `- **Where:** <page>, \`<route>\``, then lettered steps one per
+     line (`  - a. Log in as the QA bot`, including login state), `- **Who:**`, and
+     the screenshot embedded by a raw URL pinned to a commit.
+   - `## Evidence` — the folded 12-row table (Error + stack · Request / trace ID ·
+     Sentry · PostHog replay · Logs · Screenshots · HAR / API sample · Env + release ·
+     First / last seen · Users affected · Steps · Expected / actual). Expected cites
+     `docs/SPEC.md`, `DESIGN.md`, or product intent. A row you could not capture says
+     `n/a — <why>`.
+   - `## Fix` — first-suspect `file:line` and the intended change in 1–3 lines.
+   - `## Acceptance Criteria` — `- [ ]` checklist: user-visible fix + regression
+     coverage + Super QA rerun.
+   - `## Risk` — 🟢/🟡/🔴 + one line.
+   The owner goes in `--suggested-skill` (`super-build` for implementation,
+   `ui-refine-loop` for a UI ticket a human runs, `super-qa` for harness/test-only,
+   `super-review` for release-readiness), the dedupe key in `--fingerprint`
+   (`<slug>|<test-case>|<failure-signature>`).
 
 2. **File the issue + auto-promote to Ready:**
    ```bash
@@ -614,7 +622,7 @@ detection (do NOT batch at end of iter):
      --fingerprint "<slug>|<tc>|<failure-signature>" \
      --suggested-skill super-build)
    ```
-   The issue title will be board-readable, for example `🐛 Bug /imports — CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
+   The issue title will be board-readable, for example `🐛 [bug] imports: CSV upload fails after submit`, and the labels will include `bug`, `source:qa`, `priority:<high|medium|low>`, optional `area:<area>`, optional `qa:<category>`, and optional `skill:<owner>`. The script validates required body sections and dedupes by fingerprint: if the same open `source:qa` issue already exists, it comments with the new evidence and returns the existing issue number instead of creating a duplicate card.
 
    The script prints the new issue number on stdout and drops the issue card
    in the `Bug` column of the resolved **Super Ultimate QA** project (see
@@ -622,7 +630,7 @@ detection (do NOT batch at end of iter):
    everywhere downstream:
    - In `queue.md` line: `[b] /foo → BUG-N.M → #${ISSUE_N} (iter:N)`
    - In `iteration-N.md` Section 3 YAML: `gh_issue: ${ISSUE_N}`
-   - In any fix commit message: `fix(super-qa): ... (closes #${ISSUE_N})`
+   - In any fix commit: `🐛 [fix] <area>: …` with `Closes #${ISSUE_N}` in the body
 
 3. **If the script exits non-zero:**
    - Exit 64/66/70: bad arguments — log a `loop-internal` failure to
@@ -747,7 +755,7 @@ git add e2e/paths/<new-or-modified specs> \
 
 **Final commit (mandatory format — orchestrator parses):**
 ```
-super-qa: iter N (X bugs, Y items, Z PRs opened)
+🧪 [test] super-qa: iter N (X bugs, Y items, Z PRs opened)
 ```
 where:
 - `X` = total bugs found in this iter (regression + explore combined)
@@ -758,16 +766,16 @@ STOP. Do NOT advance to a next iteration.
 ## Failure modes
 
 - **Found zero bugs and explored zero cells (queue empty):** valid outcome.
-  Final commit `super-qa: iter N (0 bugs, 0 items, 0 PRs)`. Exit 0. Orchestrator
+  Final commit `🧪 [test] super-qa: iter N (0 bugs, 0 items, 0 PRs)`. Exit 0. Orchestrator
   will detect the queue is empty and terminate.
 - **Real blocker (env unreachable, BASE_URL 500s, qa-bot can't log in):**
   document the blocker in `iteration-N.md` Section 1, do NOT make a
-  `super-qa:` commit, exit non-zero.
-- **Wall-clock hit mid-fix:** make a `wip: super-qa iter N — <one-liner>`
+  `🧪 [test] super-qa:` commit, exit non-zero.
+- **Wall-clock hit mid-fix:** make a `🚧 [wip] super-qa: iter N — <one-liner>`
   commit with the failing spec still red. Then make the close-out
-  `super-qa: iter N (X bugs, Y items, Z PRs opened)` commit anyway, noting in
+  `🧪 [test] super-qa: iter N (X bugs, Y items, Z PRs opened)` commit anyway, noting in
   `iteration-N.md` Section 1 that one fix is in flight. Exit 0. The
-  orchestrator will see the `wip:` and the close-out and treat it as a
+  orchestrator will see the `🚧 [wip]` and the close-out and treat it as a
   successful iter (not exit 5 — exit 5 is for missing close-out commits
   that the orchestrator infers were time-clipped).
 

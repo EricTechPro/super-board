@@ -53,6 +53,12 @@
   // `main` appears to be production.
   "base_branch": "main",
 
+  // IANA time zone for the times super-board writes (the PR body's Iteration
+  // history, via `super-board-pr-body.sh --time`). GitHub markdown cannot run
+  // JavaScript, so a time is fixed when a lane writes it — in this zone.
+  // Onboard sets it to the machine's zone. Absent → the machine's local zone.
+  "timezone": "America/Toronto",
+
   // Names of the Status options on the project. Aliases tolerated;
   // canonicalized at read time.
   //
@@ -87,9 +93,23 @@
     // "human": every PR waits for a human click (the old human_approves_merge).
     // Onboard recommends "human" when base_branch is production-detected.
     "default": "auto",
-    // > 0: a PR with more changed lines (additions + deletions) waits for a
-    // human. 0 (default) = no size cap.
-    "auto_max_lines": 0,
+    // Small PRs by design. A PR with more changed lines (additions +
+    // deletions) than this waits for a human: Blocked 🙋 "big PR — please
+    // review". Default 400; 0 = no size cap. Files matching size_exclude and
+    // migration files (migrations.globs) do not count; migration lines are
+    // reported separately. Builders keep PRs under this cap and lint flags
+    // tickets likely to exceed it (references/lint.md → "Too big").
+    "auto_max_lines": 400,
+    // Globs left out of the size count. Setting this replaces the defaults
+    // below; [] counts every file.
+    "size_exclude": [
+      "**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml", "**/bun.lockb", "**/bun.lock",
+      "**/npm-shrinkwrap.json", "**/Cargo.lock", "**/poetry.lock", "**/uv.lock", "**/Pipfile.lock",
+      "**/Gemfile.lock", "**/composer.lock", "**/go.sum", "**/Podfile.lock", "**/pubspec.lock",
+      "**/generated/**", "**/__generated__/**", "**/*.generated.*", "**/*.gen.*",
+      "**/*.min.js", "**/*.min.css", "**/*.map", "**/*.pb.go", "**/*_pb2.py",
+      "**/__snapshots__/**", "**/*.snap"
+    ],
     // ALWAYS human, whatever `default` says. A PR matching ANY label, path glob
     // or keyword (case-insensitive, searched in the diff's ADDED lines only) of
     // a category exits the gate 7: no merge, card → Blocked 🙋 (the human merges
@@ -103,8 +123,10 @@
       "auth":   { "labels": ["auth", "security"],
                   "paths": ["**/auth/**", "**/authz/**", "**/permissions/**"],
                   "keywords": ["jwt.sign", "bcrypt", "password_hash", "service_role"] },
-      // Destructive schema changes. Additive migrations are not "schema": they
-      // go through `migrations` below, which keeps live databases human-only.
+      // Destructive schema changes ONLY (DROP / TRUNCATE / RENAME, or the
+      // `schema` label) need a human. Additive migrations (new table, new
+      // column, new index) are not "schema": they follow the `migrations` DB-env
+      // rule below. A live database is always human, whatever the change.
       "schema": { "labels": ["schema", "destructive"],
                   "paths": [],
                   "keywords": ["drop table", "drop column", "truncate table", "rename column", "drop schema"] }

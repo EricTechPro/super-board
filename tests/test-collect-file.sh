@@ -27,31 +27,53 @@ cat > "$WORK/config.json" <<'JSON'
 JSON
 
 cat > "$WORK/bug.md" <<'MD'
-## Summary
-Checkout 500s on empty cart.
-## Repro steps
-1. Open /checkout with an empty cart.
-## Expected behavior
-Empty-cart message.
-## Actual behavior
-HTTP 500.
+## Problem
+Checkout 500s on an empty cart.
+## Context
+- **Where:** Checkout, `/checkout`
+  - a. Empty the cart
+  - b. Open `/checkout`
+- **Who:** any shopper
 ## Evidence
-Sentry issue 4411, 37 events in 14d.
-## Suggested fix path
+<details><summary>12 rows · Sentry 4411 · 37 events</summary>
+
+| Row | Value |
+|---|---|
+| Error + stack | `TypeError` · `checkout.ts:12` |
+| Request / trace ID | `req_9` |
+| Sentry | 4411 |
+| PostHog replay | n/a — no replay linked |
+| Logs | `500 cart=empty` |
+| Screenshots | n/a — server error, no UI state |
+| HAR / API sample | `GET /checkout → 500` |
+| Env + release | prod · `abc1234` |
+| First / last seen | Sep 1 · Sep 14 |
+| Users affected | 37 events in 14 days |
+| Steps | 1. empty cart 2. open checkout |
+| Expected / actual | empty-cart message / HTTP 500 |
+
+</details>
+## Fix
 Guard the empty cart in CheckoutService.
-## Acceptance criteria
+## Acceptance Criteria
 - [ ] Empty cart renders the message, no 500.
+## Risk
+🟢 **Low** · one guard clause.
 MD
 
 cat > "$WORK/fix.md" <<'MD'
-## Summary
+## Problem
 Merge gate keeps bouncing cards on stale lockfiles.
+## Context
+- **Where:** merge gate, `verify_commands`
 ## Evidence
 Runs 2026-09-01, 09-08, 09-15: #12, #19, #27 bounced on lockfile drift.
-## Root cause
-verify_commands run without npm ci.
-## Acceptance criteria
+## Fix
+verify_commands run without npm ci; install before typecheck.
+## Acceptance Criteria
 - [ ] verify_commands install before typecheck.
+## Risk
+🟡 **Medium** · every card's verify step changes.
 MD
 
 # gh stub. Env switches:
@@ -105,7 +127,10 @@ for pair in "sentry err|sentry|9" "posthog posthog|exception|abc123" "posthog ga
   has "fingerprint shape accepted for $src" "$OUT" "would-file|bug|T|Backlog"
 done
 is "fingerprint required"   64 "$(run --type bug --source sentry --title T --body-file "$WORK/bug.md" >/dev/null; echo $?)"
-is "fix needs Root cause"   66 "$(run --type fix --source prs --title T --body-file "$WORK/bug.md" --fingerprint "prs|x|y" >/dev/null; echo $?)"
+sed '/## Evidence/,/## Fix/d' "$WORK/fix.md" > "$WORK/fix-no-evidence.md"
+is "fix needs Evidence"     66 "$(run --type fix --source prs --title T --body-file "$WORK/fix-no-evidence.md" --fingerprint "prs|x|y" >/dev/null; echo $?)"
+sed 's/^- \[ \] /- /' "$WORK/fix.md" > "$WORK/fix-no-checklist.md"
+is "fix needs an AC checklist" 66 "$(run --type fix --source prs --title T --body-file "$WORK/fix-no-checklist.md" --fingerprint "prs|x|y" >/dev/null; echo $?)"
 
 echo "── dry-run is the default"
 OUT=$(run "${BUG[@]}")

@@ -73,13 +73,15 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
       `mattpocock-skills:code-review` against your own diff with the merge-base as the fixed
       point (`git merge-base HEAD origin/<base>`) — it never prompts when the fixed point is
       supplied. Fix its Standards findings; a Spec finding you cannot close in scope is a HUMAN GATE.
-   b. Make a final commit using the correct format for what you delivered:
-      - **Full delivery** → `chore(loop): close #<N> — <one-line summary>` ONLY if EVERY acceptance-criterion checkbox in the issue body is satisfied by code, schema, migration, UI, i18n, and tests committed in this branch. The `close #N` syntax auto-links; the orchestrator opens a PR with `Closes #<N>`, and the issue closes when the Reviewer merges it through the merge gate. Your final assistant message should be a short summary; no special prefix needed.
-      - **Intentional partial** → `wip(loop): #<N> partial — <slice-summary>` if you deliberately landed a subset (foundation/scaffolding, single layer of the feature) AND the partial is type-checked, linted, and tested in isolation AND merging it to the base branch is safe (no broken imports, no half-wired routes). Then:
+   b. Make a final commit using the correct format for what you delivered. Every commit you make
+      follows writing-standard.md § 1 (`<emoji> [<type>] <scope>: <subject>` + 1–4 short bullets); the
+      final one uses these exact subjects, which the dispatcher greps:
+      - **Full delivery** → `🔧 [chore] loop: close #<N> — <one-line summary>` ONLY if EVERY acceptance-criterion checkbox in the issue body is satisfied by code, schema, migration, UI, i18n, and tests committed in this branch. The `close #N` syntax auto-links; the orchestrator opens a PR with `Closes #<N>`, and the issue closes when the Reviewer merges it through the merge gate. Your final assistant message should be a short summary; no special prefix needed.
+      - **Intentional partial** → `🚧 [wip] loop: #<N> partial — <slice-summary>` if you deliberately landed a subset (foundation/scaffolding, single layer of the feature) AND the partial is type-checked, linted, and tested in isolation AND merging it to the base branch is safe (no broken imports, no half-wired routes). Then:
         1. Make your final assistant message **start with the literal first line `WIP-PARTIAL: <one-line reason for stopping>`** — this is the dispatcher's contract for "open a partial PR, leave issue open." Without this prefix the orchestrator will treat your branch as a failed run and discard it.
         2. Exit non-zero (the harness will exit on `end_turn` of the final message; that is sufficient).
-      - **Spec is not implementation.** If `docs/specs/<…>-design.md` already exists on the base branch, that's the design. The issue's acceptance criteria are about the IMPLEMENTATION the spec describes (schema + routes + service + UI + i18n + migration + tests). Only `chore(loop): close` if those AC checkboxes are filled by THIS branch's diff. A spec amendment alone is NOT a `chore(loop): close` — at most it is a `wip(loop):` (and usually it's no commit at all).
-      - **Anti-loophole.** If your branch's diff against the base is < 50 lines of non-spec code, OR contains zero new files under `server/`, `client/`, `shared/db/`, or `shared/zod/`, do NOT emit `chore(loop): close` regardless of how the issue body reads. Either commit `wip(loop):` with `WIP-PARTIAL:` prefix as above, or do not commit at all and surface the situation in the final assistant message.
+      - **Spec is not implementation.** If `docs/specs/<…>-design.md` already exists on the base branch, that's the design. The issue's acceptance criteria are about the IMPLEMENTATION the spec describes (schema + routes + service + UI + i18n + migration + tests). Only `🔧 [chore] loop: close` if those AC checkboxes are filled by THIS branch's diff. A spec amendment alone is NOT a `🔧 [chore] loop: close` — at most it is a `🚧 [wip] loop:` (and usually it's no commit at all).
+      - **Anti-loophole.** If your branch's diff against the base is < 50 lines of non-spec code, OR contains zero new files under `server/`, `client/`, `shared/db/`, or `shared/zod/`, do NOT emit `🔧 [chore] loop: close` regardless of how the issue body reads. Either commit `🚧 [wip] loop:` with `WIP-PARTIAL:` prefix as above, or do not commit at all and surface the situation in the final assistant message.
       - **Do not edit the issue body.** Acceptance-criterion checkboxes are the orchestrator's source of truth; rewriting them to "look done" is gaming the contract.
    c. Stop. Do **NOT** run `gh issue close`, do **NOT** remove the `loop:in-progress` label, do **NOT** comment on the issue — the orchestrator handles all of that after merging your branch.
    d. Do **NOT** advance to another issue. The orchestrator handles dispatch.
@@ -88,8 +90,8 @@ You are running UNATTENDED inside **Super Build**, dispatched to work on a singl
 
 If you cannot satisfy any gate (test fails, lint won't pass, typecheck error you can't resolve, missing dependency you can't install, scope decision genuinely requires the user):
 
-- **STOP.** Do not commit a `chore(loop): close #N` marker.
-- Make a partial-progress commit if work is salvageable: `wip(loop): #<N> partial — <reason for stop>`.
+- **STOP.** Do not commit a `🔧 [chore] loop: close #N` marker.
+- Make a partial-progress commit if work is salvageable: `🚧 [wip] loop: #<N> partial — <reason for stop>`.
 - Exit non-zero.
 
 The orchestrator will halt or route according to the Super Build skill, remove/adjust the `loop:in-progress` label, post a failure comment with the log tail on the issue, and notify the user. Your worktree stays intact for human inspection when needed.

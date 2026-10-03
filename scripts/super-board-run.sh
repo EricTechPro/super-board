@@ -454,10 +454,11 @@ reclaim_stranded_building() {
       continue
     fi
     [ -n "$BOT_LOGIN" ] && gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
-    gh issue comment "$issue" --body "↩️ super-board · back to Ready
-Found in Building with no live worker — the last run stopped mid-build.
-Branch: ${branch:-none found (next Builder starts fresh)}${branch:+ (kept; next Builder continues on it)}
-Next: Builder, next tick." >/dev/null 2>&1 || true
+    # Comment format: writing-standard.md § 4.
+    gh issue comment "$issue" --body "[orchestrator] [report] ↩️ back to Ready · stranded in Building
+Did: found no live worker; the last run stopped mid-build
+✅ Done: card moved to Ready · branch ${branch:-none found}${branch:+ kept}
+Next: builder (next tick${branch:+, continues on the branch})" >/dev/null 2>&1 || true
     log "↩ stranded #${issue}: Building → Ready (branch ${branch:-none})"
   done <<EOF
 $(echo "$PROJECT_ITEMS_JSON" | jq -r --arg bot "$BOT_LOGIN" '

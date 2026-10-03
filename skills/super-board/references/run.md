@@ -115,50 +115,91 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 
 ## PR description template
 
-Builder writes this when opening the PR. Each lane updates the relevant section on exit.
+Format: `writing-standard.md` § 2. Title = the commit subject format
+(`✨ [feat] chat: stream replies`). The body is marker blocks; each lane rewrites only its own
+with `.claude/bin/super-board-pr-body.sh --pr <P> --block <name> --expect-head <sha>
+(--body-file | --append-file) <md>`. The script refuses (exit 6) when the PR head moved since you
+read it — re-read, then redo the edit. Builder opens the PR with every block filled
+(`super-board-pr-body.sh --skeleton` prints the empty markers).
+
+| Block | Builder | Tester | Reviewer |
+|---|---|---|---|
+| `status` (alert card) | writes | rewrites on exit | rewrites on exit |
+| `problem` (lettered steps under Where, screenshot embedded) | writes from the ticket's Context | — | — |
+| `solution` (plain bullets, `Docs:` bullets last) | writes, updates on rebuild | — | — |
+| `ac` (checklist + one proof line each) | writes all unchecked | ticks with proof, or leaves unchecked with the reason | unticks one it disproved |
+| `history` (Lane · Done · Time · Details) | appends a row | appends a row | appends a row |
+| `visual` (Before \| After, UI only) | — | writes | — |
+| `risk` (🟢/🟡/🔴 + one line) | writes | — | adjusts |
+| `redcheck` (only when merged with a failing check) | — | — | writes |
 
 ```markdown
-**Status:** <one line, rewritten by each lane on exit> · head `<sha>` · next: <lane | human | none>
+<!-- sb:status -->
+> [!NOTE]
+> ⏳ In QA · round 1 · ✅ 0/2 AC · Closes #<N> · head `<sha>`
+<!-- /sb:status -->
 
-## Issue
-Resolves #<N> — <title>
+<!-- sb:problem -->
+## Problem
+- **Where:** <page>, `<route>`
+  - a. <step>
+  - b. <step>
+- **Who:** <who sees it>
+- **What happened:** <one line>
 
-## Acceptance Criteria
-- [ ] AC1: <text>
-- [ ] AC2: <text>
-- ...
+![<page> · desktop](https://github.com/<OWNER>/<REPO>/raw/<sha>/<path>.png)
+<!-- /sb:problem -->
 
-## Docs consulted
-- <url> — <the one fact it settled>   (or: none needed — no third-party surface)
+<!-- sb:solution -->
+## Solution
+- <one change per bullet>
+- Docs: <url> — <the one fact it settled>   (or: Docs: none needed — no third-party surface)
+<!-- /sb:solution -->
 
+<!-- sb:ac -->
+## Acceptance criteria
+- [ ] <AC1 text>\
+  ↳ not verified yet: QA has not run
+- [ ] <AC2 text>\
+  ↳ not verified yet: QA has not run
+<!-- /sb:ac -->
+
+<!-- sb:history -->
 ## Iteration history
+| Lane | Done | Time | Details |
+|---|---|---|---|
+| 🔨 builder | ✅ | <super-board-pr-body.sh --time> | draft · `<sha>` |
+<!-- /sb:history -->
 
-| #  | Lane     | Result      | When    | Detail                          |
-|----|----------|-------------|---------|----------------------------------|
-| 1  | Builder  | ✅ done     | <time>  | <commit-sha>                     |
-| 2  | Tester   | ❌/✅ vN    | <time>  | runs/issue-<N>-qa-vN/            |
-| 3  | Reviewer | ✅ merged   | <time>  | squash → <merge-commit>          |
-
-## Evidence folders
-- `docs/super-board/runs/issue-<N>-qa-v1/`
-- ...
-
-## Not verified
-- <what no lane has proven yet, and why>   (each lane edits this; "nothing" when empty)
+<!-- sb:risk -->
+## Risk
+🟢 **Low** · <one line: what could break and what limits it>
+<!-- /sb:risk -->
 ```
 
-Tester ticks AC checkboxes on pass. The status line leads because it is what a human reads
-first; it names the head commit so evidence is never read against a different one.
+History rows by lane: `🔨 builder` · `🔍 qa` (`❌ v1` / `✅ v2`, details = evidence folder) ·
+`🧐 reviewer` (`❌ bounced` / `✅ merged`, details = finding ids or `squash <sha>`). Time comes
+from `super-board-pr-body.sh --time --config <cfg>` (config `timezone`).
+
+Status card lines: `> [!NOTE]` + `🔨 Building` / `⏳ In QA` / `⏳ In review · round N` ·
+`> [!TIP]` + `✅ Merged · <sha>` · `> [!WARNING]` + `🛑 Blocked · <reason>`. Each names the AC
+count and the head commit, so evidence is never read against a different one.
+
+No "Not verified" and no "Next" section: an unchecked AC with its one-line reason says what is
+not proven. Merged with a failing check (the 💳 CI-budget bypass) → the Reviewer writes the
+`redcheck` block first:
+`> [!WARNING]` / `> 🔴 Merged with a failing check: <check> · <why it was safe>`, and names the
+check in `risk` too.
 
 ## PR review-comment threads — prefix + resolution protocol
 
-Reviewer always uses **line-level review comments** (resolvable threads). Every thread MUST be prefixed with `[builder]` or `[QA]` to indicate which lane owns the fix.
+Reviewer always uses **line-level review comments** (resolvable threads). Every thread MUST start with the lane that owns the fix — `[builder]`, `[qa]` or `[reviewer]` — then a label (`[blocker]`, `[issue]`, `[suggestion]`, `[nit]`, `[question]`, `[praise]`; writing-standard.md § 4). Read `[QA]` and `[review]` on older PRs as `[qa]` and `[reviewer]`.
 
 Examples:
 
 ```
-src/api/stream.ts:54   [builder] uses `new Date()` — replace with `clock.now()`.
-e2e/streaming/ttfb.spec.ts:18   [QA] spec asserts status only — add TTFB assertion.
+src/api/stream.ts:54   [builder] [blocker] uses `new Date()` — replace with `clock.now()`.
+e2e/streaming/ttfb.spec.ts:18   [qa] [issue] spec asserts status only — add a TTFB assertion.
 ```
 
 **Resolution rules (each lane only scans the current branch's PR):**
@@ -166,8 +207,8 @@ e2e/streaming/ttfb.spec.ts:18   [QA] spec asserts status only — add TTFB asser
 | Lane exiting | Must resolve | Refusal action |
 |---|---|---|
 | Builder (Building → QA) | All `[builder]` threads on this PR | Stay in Building, fix, then exit |
-| Tester (QA → Review) | All `[QA]` threads on this PR | Stay in QA, fix, then exit |
-| Reviewer (approving merge) | ALL threads on this PR | Bounce: `[builder]` open → Ready; `[QA]` open → QA |
+| Tester (QA → Review) | All `[qa]` threads on this PR | Stay in QA, fix, then exit |
+| Reviewer (approving merge) | ALL threads on this PR | Bounce: `[builder]` open → Ready; `[qa]` open → QA |
 
 Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when the fix is committed.
 
@@ -191,7 +232,7 @@ in a sub-agent, before touching a worktree.
 [ ] act on the outcome below, then return one verdict per card
 ```
 
-The script asks four questions; the agent owns the judgement:
+The script asks four questions and the agent adds a fifth; the agent owns the judgement:
 
 | # | Question | Mechanical signal (script) | Agent adds |
 |---|---|---|---|
@@ -199,6 +240,7 @@ The script asks four questions; the agent owns the judgement:
 | 2 | Already in progress? | open PR on another branch closes `#N` or has the same title; a card in Building/QA/Review (or a lower-numbered Ready peer) with the same title | same feature, different words — not merely the same files |
 | 3 | File overlap? | open PR touches files the card names | expected files from reading the issue (`--files`) |
 | 4 | Unclear? | no `## Acceptance Criteria` bullets | AC that contradicts the current code (cite `file:line`) |
+| 5 | Too big? | — | likely over ~400 changed lines (`merge_policy.auto_max_lines`; lockfiles, generated, snapshots, migration SQL excluded) or spans many areas (UI + API + DB + jobs …) — lint.md criterion 15 |
 
 The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanical `hold` into
 `proceed` only by naming why the match is a different feature. Its own branch's PR
@@ -212,6 +254,7 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | `hold` — done | move card to Blocked | `👯` · names the merged PR / closed issue · Owner: Eric (close as duplicate) · `blocked-by: -` |
 | `hold` — in progress | move card to Blocked | `👯` · names the open PR / card · `blocked-by: <the issue that PR or card closes>` — the sweep returns it when that closes, and pre-flight then finds it done |
 | `hold` — unclear | move card to Blocked | `❓` · the missing AC or the contradiction with `file:line` · `blocked-by: -` |
+| `hold` — too big | move card to Blocked | `❓` · "too big — likely over <cap> changed lines / spans <areas>" · suggests splitting with `/to-tickets` into vertical slices, each under the cap · `blocked-by: -` |
 | `sequence` — `blockedBy` non-empty | move card to Blocked | `⏳` · the overlapping PR and files · `blocked-by: <blockedBy>` — the wave-start sweep frees it |
 | `sequence` — `blockedBy` empty | proceed (card stays Ready), comment `⚠️ expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
 | `skipped` | script exit 69 (pre-flight blind): leave the card in Ready, untouched, retried next wave | — |
@@ -229,10 +272,13 @@ A card the pre-flight agent returns no verdict for is treated as `skipped`, neve
 3. Read issue body + ALL comments + PROJECT.md.
 3b. Touches a third-party API/SDK, an upgrade, or auth/billing? Read the current official docs
     for the installed version first (super-build → "Docs before outside-tool code").
-4. Implement smallest safe change covering ACs.
-5. Commit + push (always).
-6. Open draft PR linked to the issue with the PR description template.
-7. Post a 🔨 PR timeline comment with files/commits/summary.
+4. Implement smallest safe change covering ACs, under the PR size cap
+   (`merge_policy.auto_max_lines`, default 400 changed lines). Growing past it mid-build → stop,
+   push what you have, propose the split (vertical slices via `/to-tickets`) in a PR comment and
+   move the card to Blocked `❓` — never push on past the cap (super-build → "Keep each PR small").
+5. Commit + push (always). Commits follow writing-standard.md § 1 (`✨ [feat] chat: stream replies` + short bullets).
+6. Open draft PR linked to the issue with the PR description template (title in commit-subject format, every block filled).
+7. Post the `[builder] [report]` PR comment (see "Commenting cadence").
 8. Post a short status comment on the issue with the PR URL.
 9. Clean up worktree. Keep branch + PR open.
 10. Move card Building → QA.
@@ -246,7 +292,7 @@ A card the pre-flight agent returns no verdict for is treated as `skipped`, neve
    (A Reviewer bounce reaches you as those same `[builder]` threads, listed in the latest `<!-- super-review:report -->` comment. A finding the Reviewer re-opened as `not fixed` was resolved without a fix last time — fix the code, not just the thread.)
 5. Commit + push to same branch.
 6. Verify ALL `[builder]` threads are resolved. If not, return to step 3.
-7. Post 🔨 PR + issue comments. Move Building → QA. Clean up worktree.
+7. Rewrite `status`, `solution`, `history` blocks; post `[builder] [report]` PR + issue comments. Move Building → QA. Clean up worktree.
 
 ### Tester (first pass — repo-backed)
 
@@ -256,26 +302,24 @@ A card the pre-flight agent returns no verdict for is treated as `skipped`, neve
 4. Build issue-scoped test plan: one observable test per AC.
 4b. **Test-gap check** (super-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
 5. Run the tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
-6. **Pass** → commit test files + screenshots to same branch + push → 🔍 PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → 🔍 issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
-7. **Fail** → 🔍 PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → 🔍 issue comment with the same inline screenshots (showing what's wrong) → increment rebuild counter → move card QA → Ready (label `loop:rebuild-N`). Clean up worktree.
+6. **Pass** → commit test files + screenshots to same branch + push → tick the `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` → `[qa] [report] ✅` PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
+7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → issue comment with the same inline screenshots (showing what's wrong) → increment rebuild counter → move card QA → Ready (label `loop:rebuild-N`). Clean up worktree.
 
 #### Screenshot embed format (mandatory on every QA exit — added 2026-05-22)
 
 Inline screenshots in the GitHub comment using raw-URL markdown so they render directly on the issue/PR page without anyone having to clone the repo:
 
 ```markdown
-### Visual evidence
-
 | Viewport | Screenshot |
 |---|---|
-| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<BRANCH>/docs/super-board/runs/issue-<N>-qa-v<V>/desktop.png) |
-| Tablet 1024×768  | ![tablet](https://github.com/<OWNER>/<REPO>/raw/<BRANCH>/docs/super-board/runs/issue-<N>-qa-v<V>/tablet.png) |
-| Mobile 375×667   | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<BRANCH>/docs/super-board/runs/issue-<N>-qa-v<V>/mobile.png) |
+| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-<N>-qa-v<V>/desktop.png) |
+| Tablet 1024×768  | ![tablet](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-<N>-qa-v<V>/tablet.png) |
+| Mobile 375×667   | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-<N>-qa-v<V>/mobile.png) |
 ```
 
 Substitution rules:
 - `<OWNER>/<REPO>` — read from `git remote get-url origin` (parse owner/name).
-- `<BRANCH>` — the issue branch (`issue-<N>-<slug>`), NOT the merge target. The branch must already contain the screenshots when you post the comment.
+- `<SHA>` — the commit that added the screenshots (`git rev-parse HEAD` right after committing them), never a branch name: the branch is deleted on merge and a branch URL breaks. Push before you post.
 - `<N>` and `<V>` — issue number + QA version (`v1`, `v2`, ...).
 - File names — keep them stable and descriptive (`desktop.png`, `tablet.png`, `mobile.png`, or `before-fix-desktop.png` / `after-fix-desktop.png` for rebuild-pass cases).
 
@@ -283,33 +327,33 @@ For non-visual ACs (API tests, migration SQL, etc.), skip the screenshot block b
 
 If a screenshot file is >5MB, downscale to ≤1920px wide before committing; GitHub's image rendering chokes on huge images.
 
-### Tester (rebuild — when Reviewer bounced for `[QA]` thread fixes)
+### Tester (rebuild — when Reviewer bounced for `[qa]` thread fixes)
 
 1. Worktree as above.
-2. Read PR review threads; filter `[QA]` prefix.
-3. For each unresolved `[QA]` thread: apply fix to test files, resolve thread.
+2. Read PR review threads; filter `[qa]` prefix.
+3. For each unresolved `[qa]` thread: apply fix to test files, resolve thread.
 4. Re-run full test suite for the ticket.
 5. Save evidence to `runs/issue-<N>-qa-v<N+1>/`.
-6. Commit + push. Verify ALL `[QA]` threads are resolved.
-7. Post 🔍 PR + issue comments. Move QA → Review. Clean up worktree.
+6. Commit + push. Verify ALL `[qa]` threads are resolved.
+7. Update `ac`, `history`, `status`; post `[qa] [report]` PR + issue comments. Move QA → Review. Clean up worktree.
 
 ### Reviewer
 
 1. Worktree `.worktrees/issue-<N>-review/` from current state of `issue-<N>-<slug>`.
 2. **Gate 1** — scan PR threads. If ANY unresolved:
    - `[builder]` open → comment, move card Review → Ready.
-   - `[QA]` open → comment, move card Review → QA.
+   - `[qa]` open → comment, move card Review → QA.
    - Both open → bounce to whichever is older; the other gets picked up later.
    - Clean up worktree, exit.
-3. Read the issue ACs and the raw diff (code + test files) FIRST and write 2–4 hypotheses of your own — what must hold, where it would break. Only then read the PR description, the 🔨 comment and Tester's handoff, and check each claim like a hypothesis. Spot-check Tester's evidence (one screenshot at least), read CLAUDE.md / AGENTS.md.
+3. Read the issue ACs and the raw diff (code + test files) FIRST and write 2–4 hypotheses of your own — what must hold, where it would break. Only then read the PR description, the `[builder] [report]` comment and Tester's handoff, and check each claim like a hypothesis. Spot-check Tester's evidence (one screenshot at least), read CLAUDE.md / AGENTS.md.
 3b. **Prior-report check (review remembers — added 2.5.0).** Load the last Reviewer report on this PR as `prior_report`. One call:
    ```
    gh pr view <PR> --json comments \
-     --jq '[.comments[] | select(.body | contains("<!-- super-review:report -->"))] | last | .body // ""'
+     --jq '[.comments[] | select(.body | contains("<!-- super-review:report -->"))] | last | {url, body} // {}'
    ```
    - Empty → first review of this card. Skip to step 4; behave exactly as before.
    - Non-empty → the card was bounced and rebuilt. **Round 1** walks every finding in `prior_report` and marks each one `fixed` / `not fixed` / `no longer applies` (code it pointed at is gone or the AC changed), citing the file:line that proves it. A resolved thread is not proof — check the code.
-   - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[QA]` → QA, both → `[builder]` first), `loop:rebuild-N`, and post the Reviewer report listing them under `Prior findings`. Skip the fresh pass; it would review code that is about to change.
+   - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[qa]` → QA, both → `[builder]` first), `loop:rebuild-N`, and update the Reviewer report: those rows go to `❌ not fixed`. Skip the fresh pass; it would review code that is about to change.
    - An unfixed **Over-engineering** finding alone does not bounce; carry it into the new report's Findings.
    - All `fixed` / `no longer applies` → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 4. Review the code (logic, conventions). Review the tests (right thing tested? testable assertions? meaningful coverage?).
@@ -317,41 +361,39 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - Pull `issue-<N>-<slug>` into the review worktree.
    - Re-run the test command Tester used (recorded in Tester's PR handoff comment as `Local tests:` line).
    - Tests green → continue to step 6.
-   - Tests red → open new `[QA]`-prefixed PR thread quoting the failure output, move card Review → QA with `loop:rebuild-N`, exit. Tester wrote a broken suite; QA owns the fix.
+   - Tests red → open new `[qa]`-prefixed PR thread quoting the failure output, move card Review → QA with `loop:rebuild-N`, exit. Tester wrote a broken suite; QA owns the fix.
 6. **Adversarial mode** (per `truth_gate`): when triggered, spawn 2 sub-agents in parallel:
    - **Code-grounder** — verify cited file:line still exists and matches claims.
    - **Historian** — `git blame` the changed lines, check for ADRs / prior incidents.
    - **Budget cap (added 2026-05-22): each sub-agent ≤50 gh calls.** Prefer local `git blame` / `git log` over `gh api graphql`. If a sub-agent needs >50 calls to reach confidence, it returns `confidence: "insufficient_data"` and the Reviewer flags the card as 🛡 truth-check inconclusive instead of burning the shared quota. See `rate-limit-etiquette.md`.
    - Aggregate into a confidence score (0-100). Compare against `config.truth_threshold` (default 70).
-   - **Below threshold** — Reviewer MUST NOT approve. Open a `[review]`-prefixed PR thread quoting the lowest-confidence sub-agent finding, write the full Block template comment (see §4 Block/Skip), move card Review → Blocked with reason tag 🛡 truth-check failed (confidence X/100). The card stays Blocked until human review; the bot's "Why I cannot decide" line names the specific sub-agent finding it could not confirm.
+   - **Below threshold** — Reviewer MUST NOT approve. Open a `[reviewer]`-prefixed PR thread quoting the lowest-confidence sub-agent finding, write the full Block template comment (see §4 Block/Skip), move card Review → Blocked with reason tag 🛡 truth-check failed (confidence X/100). The card stays Blocked until human review; the bot's "Why I cannot decide" line names the specific sub-agent finding it could not confirm.
    - **Above threshold** — continue to step 7.
    - **No Reproducer needed** — Tester's tests were re-run in step 5.
 7. Decide per finding:
    - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
-   - **Test-side new finding** → open new `[QA]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
-   - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[QA]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Add a `🛡 → ✅ CI-budget bypass` comment to both the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
-   - **Human-gate / Blocker finding (schema, API contract, money, auth, migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
-8. Post the **Reviewer report** PR timeline comment on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and posts none). It is what step 3b reads next time, so the first line is the stable marker and every finding gets an id:
+   - **Test-side new finding** → open new `[qa]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
+   - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[qa]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Write the PR's `redcheck` block (`> [!WARNING]` · `🔴 Merged with a failing check: <check> · CI budget block`) and a `[reviewer] [report] ✅ merged · CI-budget bypass` comment on the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
+   - **Human-gate / Blocker finding (destructive schema, API contract, money, auth, live-DB migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
+8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round: find it by the marker (step 3b's lookup, plus `.url` — the number after `#issuecomment-` is its id) and `gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`; post a new comment only when none exists. It is what step 3b reads next time, so the first line is the stable marker and every finding keeps its id (writing-standard.md § 4):
 
    ```
    <!-- super-review:report -->
-   🧐 Reviewer — <bounced | blocked | human-gated | merged>
-   Round:     <N>   (1 = first review)
-   Prior findings:            # omit on round 1
-     • R1 fixed            src/api/stream.ts:54
-     • R2 not fixed        e2e/streaming/ttfb.spec.ts:18
-   Findings:
-     • R3 [builder] Bug  src/api/stream.ts:61 — <one line>
-     • R4 [QA] Verification miss  e2e/streaming/ttfb.spec.ts:30 — <one line>
-     • R5 [builder] Over-engineering  src/api/retry.ts:1 — <what it builds → smaller thing> (Should fix, not blocking)
-   Verified:
-     • <hypothesis or builder claim> — <file:line or command>
-   Not verified: <what, and why — or "nothing">
-   Next:      <Ready | QA | Blocked | Done> · owner: <Builder | Tester | human>
+   [reviewer] [report] ❌ bounced · round 2
+   Did: checked R1–R2 against the code; fresh pass skipped (R2 open)
+   ✅ Done: R1 fixed `src/api/stream.ts:54`
+   ❌ Not done: R2 not fixed `e2e/streaming/ttfb.spec.ts:18`
+   Next: builder
+
+   | ID | Owner | Class | Where | Finding | Status |
+   |---|---|---|---|---|---|
+   | R1 | builder | Bug | `src/api/stream.ts:54` | <one line> | ✅ fixed |
+   | R2 | qa | Verification miss | `e2e/streaming/ttfb.spec.ts:18` | <one line> | ❌ not fixed |
+   | R3 | builder | Over-engineering | `src/api/retry.ts:1` | <what it builds → smaller thing> (should fix, not blocking) | open |
    ```
-   Carry an unfixed prior finding forward under its old id; number new findings after the highest id used so far. Every finding names its class — Gap / Bug / Verification miss / Scope drift (super-review → "Classify findings"); a checked hypothesis that held is not a finding, it goes under `Verified`.
+   Status words in the header: `merge-ready` · `bounced` · `blocked` · `human-gated` · `merged`. Keep every row across rounds; update its Status (`open` · `✅ fixed` · `❌ not fixed` · `no longer applies`). New findings take the next free id. Every finding names its class — Gap / Bug / Verification miss / Scope drift / Over-engineering (super-review → "Classify findings"); a checked hypothesis that held is not a finding, it goes on the `✅ Done` line.
 9. Clean up worktree.
 
 ### Merge protocol (Reviewer only — added 2026-08-06, issue #9)
@@ -366,7 +408,7 @@ on the base branch**.
 1. Mark ready      gh pr ready <PR>                     # idempotent; no-op if already ready
 2. Branch A — human_approves_merge: true
      → stop here. Card Review → Done is NOT taken; leave the card in Review with a
-       `[review]` comment saying the PR is ready for a human to merge.
+       `[reviewer]` comment saying the PR is ready for a human to merge.
    Branch B — human_approves_merge: false
      → merge through the gate (step 5), pinned to the reviewed head — never a bare
        `gh pr merge`. The gate applies `merge_policy` (who merges) and
@@ -376,12 +418,14 @@ on the base branch**.
      gh pr view <PR> --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "none")'
      Expect: MERGED <sha>.  Then verify the sha is reachable from the base branch:
      git fetch origin <base> && git merge-base --is-ancestor <sha> origin/<base>
-4. Only after step 3 passes: close the issue, move card Review → Done, post the ✅ comment
+4. Only after step 3 passes: close the issue, move card Review → Done, rewrite `status` (`> [!TIP]` ✅ Merged) and append the `history` row, post the `[reviewer] [report] ✅ merged` comment
    citing the merge commit sha.
 5. Merge through the gate, never with a bare `gh pr merge`. Record the head you
    reviewed when review passes, and hand it to the gate:
      HEAD=$(gh pr view <N> --json headRefOid -q .headRefOid)   # at the moment review passes
-     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD"
+     bash .claude/bin/super-board-merge-gate.sh --config <config> --pr <N> --expect-head "$HEAD" \
+       --subject "<PR title>" --body-file <msg.md>
+   <msg.md> = the PR's commit bullets, deduplicated, plus `Closes #<issue>` (writing-standard.md § 1).
    The gate takes the merge mutex, checks the PR head is still $HEAD, merges the CURRENT
    base into a scratch worktree at $HEAD, runs `config.verify_commands`, and only then
    squash-merges with `--match-head-commit $HEAD`. After a merge it runs `cleanup-wt --post-merge`
@@ -393,7 +437,7 @@ on the base branch**.
      4 → another card holds the merge lock → leave the card in Review, next wave retries
      5 → the base does not merge in cleanly → **rebase pass** (see below)
      6 → the PR head is not the commit you reviewed (a push after review, or during
-          verify). Your evidence is void: leave the card in Review with a `[review]`
+          verify). Your evidence is void: leave the card in Review with a `[reviewer]`
           comment naming both shas; the next wave reviews the new head
      7 → merge_policy: a human merges this one. Stdout carries one
           `human-gate: <money|auth|schema|size|default|policy> — <evidence>` line per
@@ -423,79 +467,73 @@ landed-work progress signal — depends on Done meaning the code is on the base 
 
 ## Commenting cadence (issue + PR, every lane)
 
-Every lane writes BOTH on every exit.
-
-**How to write them.** Short and evidence-first:
-- First line is the outcome (`Build done`, `QA fail v2`, `Blocked 🔐`) — never narration.
-- Evidence before prose: the command and its result, the commit sha, the file:line.
-- Say what was **verified** and what was **not** (skipped, unavailable, out of reach). An
-  unchecked thing is never implied to pass.
-- End with `Next:` — the lane or person who owns the card now.
-- No restating the issue, no adjectives, no "I have successfully…". A handoff is ≤ 12 lines.
-
-
-- **Issue comment**: short status, with the PR URL + (if applicable) the evidence folder path. The final ✅ comment also carries the full iteration path (e.g. `Build → QA fail v1 → Build → QA pass v2 → Review ✅`).
-- **PR timeline comment**: structured handoff for the next agent — issue ref, branch, commit, files, summary, evidence path, what-fixed-looks-like (on failure), next lane.
-
-Sample issue comment (Builder exit):
+Every lane writes BOTH on every exit, in the comment format of writing-standard.md § 4:
 
 ```
-🔨 super-board · Build done
-   PR:   #87 @ abc1234
-   Next: QA
+[<role>] [<label>] <status-emoji> <status> · <context>
+Did: <one line>
+✅ Done: <what passed or landed, with sha / file:line / command>
+❌ Not done: <what failed or was skipped, and why>   (omit when nothing)
+Next: <builder | qa | reviewer | Eric | none>
 ```
 
-Sample PR timeline comment (Builder exit):
+- Role = who writes it: `builder` · `qa` · `reviewer` · `collect` · `orchestrator`. Label for a
+  lane exit is `report`; `blocker` for a Block comment.
+- ≤ 8 lines. Evidence before prose. An unchecked thing is never implied to pass.
+- NEVER list changed files — the PR shows them. No restating the issue, no adjectives.
+- Machine lines go last and do not count: `Local tests:` (Tester and Builder, the exact command
+  the Reviewer reruns), `gh-quota-on-exit:`, `blocked-by:`.
+- Run the prose through `humanizer` when installed (else the plain-words rules in
+  writing-standard.md).
+- The **issue comment** is the same header plus the PR link; the PR comment carries the detail.
+
+Builder exit (PR):
 
 ```
-🔨 Builder — complete
-Issue:        #42
-Base branch:  staging
-Branch:       issue-42-add-chat-streaming
-Commit:       abc1234
-Files:
-  • src/api/stream.ts             (new)
-  • src/lib/sse-client.ts         (new)
-  • src/components/Chat.tsx       (edit, 12 lines)
-Summary:      Added /api/stream endpoint + client-side SSE consumer.
-              No schema changes. No new deps.
-Local tests:  npm test --run streaming  PASS (4 tests)
-Verified:     AC1 stream opens (streaming.test.ts:12) · typecheck clean
-Not verified: TTFB under load (no load harness) — Tester to measure
-Next:         Tester (QA)
+[builder] [report] ✅ built · round 1
+Did: added /api/stream and the client SSE consumer; no schema change, no new deps
+✅ Done: AC1 stream opens `streaming.test.ts:12` · typecheck clean · `abc1234`
+❌ Not done: AC2 TTFB under load — no load harness here
+Next: qa
+Local tests: npm test --run streaming
+gh-quota-on-exit: graphql=4120/5000 rest=4870/5000
 ```
 
-Sample issue comment (Tester fail rebuild — with mandatory inline screenshots for any UI-touching AC):
+Builder exit (issue):
 
 ```
-🔍 super-board · QA fail · v1
-   PR:  #87
-   Failed: AC1 (TTFB 1240ms), AC2 (CLS 0.18)
-   Evidence: docs/super-board/runs/issue-42-qa-v1/
-   Next: Rebuild
+[builder] [report] ✅ built · PR #87 @ abc1234
+Next: qa
+```
 
-### Visual evidence (broken state)
+Tester fail (issue and PR — screenshots mandatory for any UI-touching AC):
+
+```
+[qa] [report] ❌ failing · v1
+Did: ran AC1–AC2 on desktop + mobile against `abc1234`
+✅ Done: AC2 CLS 0.04
+❌ Not done: AC1 TTFB 1240 ms (want < 800) — fixed looks like first byte under 800 ms
+Next: builder
+Local tests: npx playwright test e2e/streaming
 
 | Viewport | Screenshot |
 |---|---|
-| Desktop 1920×1080 | ![desktop](https://github.com/EricTechPro/BookKeepingApp/raw/issue-42-feature-slug/docs/super-board/runs/issue-42-qa-v1/desktop.png) |
-| Mobile 375×667    | ![mobile](https://github.com/EricTechPro/BookKeepingApp/raw/issue-42-feature-slug/docs/super-board/runs/issue-42-qa-v1/mobile.png) |
+| Desktop 1920×1080 | ![desktop](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-42-qa-v1/desktop.png) |
+| Mobile 375×667 | ![mobile](https://github.com/<OWNER>/<REPO>/raw/<SHA>/docs/super-board/runs/issue-42-qa-v1/mobile.png) |
 ```
 
-Pass-state comment uses the same `### Visual evidence` block but with screenshots of the **working** UI per AC.
+A pass uses the same table with screenshots of the **working** UI per AC.
 
-Sample issue comment (Reviewer approve + merge):
+Reviewer merge (issue):
 
 ```
-✅ super-board · Review approved · Merged
-   PR:  #87
-   Path: Build → QA fail v1 → Build → QA pass v2 → Review ✅
-   Truth check: 95/100
-   Merge: ef67890 on staging
-   Status: Done
+[reviewer] [report] ✅ merged · `ef67890` on staging
+Did: path Build → QA ❌ v1 → Build → QA ✅ v2 → Review ✅ · truth 95/100
+Next: none
 ```
 
-Block/Skip exit comments use the 🛡 / 🤷 emojis with a 1-line reason and reference the PR.
+Block/Skip exits use the same header (`[<role>] [blocker] 🛑 blocked` / `🤷 skipped`) and the
+fields of `block-template.md`.
 
 ## Per-tick logic (~30s cadence)
 
@@ -536,7 +574,7 @@ Claim uses a **GitHub Issue assignee mutex** — atomic compare-and-set via `gh 
    │           move card to Blocked, continue with next card.
    └─ Present → proceed.
 3. Do the lane's work (build / QA / review).
-4. Comment evidence on issue + PR (structured handoff).
+4. Comment evidence on issue + PR (writing-standard.md § 4) and rewrite your PR body blocks.
 5. Move card to next column (or Blocked/Skipped with the full §4 template).
 6. RELEASE CLAIM (`gh issue edit --remove-assignee super-board-bot[bot]`) and remove descriptive label.
 ```

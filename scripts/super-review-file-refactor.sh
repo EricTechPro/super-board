@@ -53,6 +53,14 @@ case "$STRENGTH" in
   *) echo "--strength must be strong|worth-exploring|speculative (got: $STRENGTH)" >&2; exit 64 ;;
 esac
 
+# Ticket format: writing-standard.md § 3. The Reviewer writes Problem, Context and
+# Fix; Acceptance Criteria, Risk and Blocked by are appended below when absent.
+MISSING=""
+for s in "Problem" "Context" "Fix"; do
+  grep -qiE "^#{1,3}[[:space:]]+${s}[[:space:]]*$" "$BODY_FILE" || MISSING="${MISSING}${MISSING:+, }${s}"
+done
+[ -z "$MISSING" ] || { echo "body is missing required section(s): ${MISSING} (writing-standard.md § 3)" >&2; exit 66; }
+
 CONFIG_JSON=$(cat "$CONFIG")
 OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
 NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
@@ -115,11 +123,17 @@ trap 'rm -f "$BODY_TMP"' EXIT
   # Appended only when absent, so a caller that wrote its own keeps it.
   if ! grep -qiE '^## +Acceptance criteria *$' "$BODY_FILE"; then
     echo
-    echo "## Acceptance criteria"
+    echo "## Acceptance Criteria"
     echo
     echo "- [ ] _Not written by the Reviewer that filed this. Run \`super-board lint\` on this card"
     echo "      before it is built — a card graded against criteria nobody wrote is graded against"
     echo "      nothing._"
+  fi
+  if ! grep -qiE '^## +Risk *$' "$BODY_FILE"; then
+    echo
+    echo "## Risk"
+    echo
+    echo "🟡 **Medium** · not assessed by the Reviewer that filed this; lint sets it."
   fi
   if ! grep -qiE '^## +Blocked by *$' "$BODY_FILE"; then
     echo
@@ -158,8 +172,11 @@ done
 LABEL_ARGS=()
 for l in "${LABELS[@]}"; do LABEL_ARGS+=(--label "$l"); done
 
+# Title: `♻️ [refactor] <scope>: <title>`; scope = --area, else the fingerprint's module.
+SCOPE="${AREA:-${FINGERPRINT%%|*}}"
+SCOPE=$(echo "${SCOPE:-code}" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._/-]+#-#g; s#^-+|-+$##g')
 ISSUE_URL=$(gh issue create "${REPO_FLAG[@]}" \
-  --title "🏗 Refactor — ${TITLE}" \
+  --title "♻️ [refactor] ${SCOPE:-code}: ${TITLE}" \
   --body-file "$BODY_TMP" \
   "${LABEL_ARGS[@]}")
 

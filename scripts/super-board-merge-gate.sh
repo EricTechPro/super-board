@@ -48,7 +48,7 @@
 #
 # Usage:
 #   super-board-merge-gate.sh --config <config.json> --pr <number>
-#                             [--expect-head <sha>]
+#                             [--expect-head <sha>] [--subject <title>] [--body-file <md>]
 #                             [--lock-timeout 1800] [--stale-after 5400] [--dry-run]
 #
 # `--expect-head` is the PR head commit the Reviewer actually reviewed and
@@ -57,6 +57,10 @@
 # push that lands after review — or during verification — cannot ride in on
 # evidence gathered for a different commit. Without the flag the gate pins the
 # head it reads on entry and warns.
+#
+# `--subject` / `--body-file` set the squash commit message (writing-standard.md
+# § 1): subject = the PR title (`🐛 [fix] receipts: …`), body = the commit bullets
+# plus `Closes #N`. Without them GitHub writes its own message.
 #
 # `--lock-timeout` is how long THIS caller waits for its turn. `--stale-after` is
 # how old a lock must be before it is presumed abandoned. They are deliberately
@@ -72,8 +76,9 @@
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
 #   6  the PR head is not the commit that was reviewed — review evidence is void,
 #      the card goes back to Review (not Blocked, not a rebase pass)
-#   7  merge policy says a human merges this one (money / auth / schema, a diff
-#      over auto_max_lines, or merge_policy.default "human"). Stdout lists each
+#   7  merge policy says a human merges this one (money / auth / destructive
+#      schema, a diff over auto_max_lines — default 400, "big PR — please
+#      review" — or merge_policy.default "human"). Stdout lists each
 #      `human-gate: <category> — <evidence>`. Nothing ran, nothing merged; the
 #      card → Blocked with the 🙋 template: the human reviews and merges it, or
 #      comments "done" (label needs-you:done) to approve — the next wave re-runs
@@ -89,7 +94,7 @@
 # MERGE POLICY AND MIGRATIONS (config, all optional — defaults shown in
 # references/config-schema.json)
 #
-#   merge_policy: { default: "auto"|"human", auto_max_lines: 0,
+#   merge_policy: { default: "auto"|"human", auto_max_lines: 400, size_exclude,
 #                   always_human: { <category>: {labels, paths, keywords} } }
 #   migrations:   { globs, allowed_envs, target_env, commands: {<env>: cmd},
 #                   human_steps }
@@ -101,12 +106,14 @@
 # merge. `--dry-run` reports both and runs neither.
 set -euo pipefail
 
-CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""
+CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""; SUBJECT=""; MSG_FILE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --config)        CONFIG="$2"; shift 2 ;;
     --pr)            PR="$2"; shift 2 ;;
     --expect-head)   EXPECT_HEAD="$2"; shift 2 ;;
+    --subject)       SUBJECT="$2"; shift 2 ;;
+    --body-file)     MSG_FILE="$2"; shift 2 ;;
     --lock-timeout)  LOCK_TIMEOUT="$2"; shift 2 ;;
     --stale-after)   STALE_AFTER="$2"; shift 2 ;;
     --dry-run)       DRY=1; shift ;;
@@ -115,6 +122,7 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$CONFIG" ] && [ -e "$CONFIG" ] || { echo "config not found: ${CONFIG:-<unset>}" >&2; exit 66; }
 [ -n "$PR" ] || { echo "--pr <number> is required" >&2; exit 64; }
+[ -z "$MSG_FILE" ] || [ -r "$MSG_FILE" ] || { echo "--body-file not readable: $MSG_FILE" >&2; exit 66; }
 # A lock is presumed abandoned only well past the point a caller stops waiting,
 # so a slow-but-alive merge is never stolen from. The floor matters as much as
 # the multiple: an impatient caller (say --lock-timeout 6 in a test) would
@@ -285,6 +293,7 @@ fi
 # --match-head-commit makes GitHub refuse if anything was pushed after HEAD_SHA,
 # including during the verification run above.
 if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
+     ${SUBJECT:+--subject "$SUBJECT"} ${MSG_FILE:+--body-file "$MSG_FILE"} \
      --match-head-commit "$HEAD_SHA" 2>&1 | tail -3 >&2; then
   say "merged ${HEAD_SHA}"
   # Post-merge tidy-up: drop worktrees and local branches the merge just made

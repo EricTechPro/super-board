@@ -25,7 +25,8 @@ cat > "$WORK/config.json" <<'JSON'
  "variant":"full","repo":{"path":".","remote":"https://github.com/acme/app.git"}}
 JSON
 
-echo "shallow module: interface nearly as complex as implementation" > "$WORK/body.md"
+# The Reviewer's part of the ticket format (writing-standard.md § 3).
+printf '## Problem\nShallow module: interface nearly as complex as implementation.\n\n## Context\n- **Where:** `src/order-intake.ts`\n\n## Fix\nDeepen OrderIntake behind one entry point.\n' > "$WORK/body.md"
 
 # ── gh stub. Behaviour switches on env so each case stays declarative.
 #   DEDUPE_HIT   — issue number the fingerprint search should return ("" = none)
@@ -87,6 +88,9 @@ has "files render as a list"       "$(cat "$GH_LOG")" "issue create"
 has "lands in Backlog, not Ready"  "$(cat "$GH_LOG")" "opt_Backlog"
 has "labels the source"            "$(cat "$GH_LOG")" "source:review"
 has "labels the strength"          "$(cat "$GH_LOG")" "strength:strong"
+has "title in ticket format"       "$(cat "$GH_LOG")" "♻️ [refactor] orderintake: OrderIntake is shallow"
+printf 'just a note\n' > "$WORK/nosections.md"
+is "refuses a body without Problem/Context/Fix" 66 "$( DEDUPE_HIT="" "$SCRIPT" --config "$WORK/config.json" --title T --fingerprint f --body-file "$WORK/nosections.md" >/dev/null 2>&1; echo $? )"
 
 echo "── dedupe"
 OUT=$(DEDUPE_HIT="301" run --config "$WORK/config.json" --title "Seen before" \
@@ -107,17 +111,18 @@ echo "── the two machine-read sections, and where the card lands"
 # 1 — a bare note gains BOTH sections, and lands in the holding column. `Ready`
 #     feeds the Builder lane, and a card nobody wrote criteria for is not
 #     buildable no matter how good the prose is.
-printf 'The Window rule is written twice.\n' > "$WORK/bare.md"
+printf '## Problem\nThe Window rule is written twice.\n\n## Context\n- **Where:** `src/window.ts`\n\n## Fix\nOne rule.\n' > "$WORK/bare.md"
 OUT=$(DEDUPE_HIT="" STATUS_OPTS="Backlog Ready Done" run --config "$WORK/config.json" \
   --title "Bare note" --body-file "$WORK/bare.md" --fingerprint "bare|note")
 has "appends Blocked by when absent"      "$(cat "$BODY_LOG")" "## Blocked by"
 has "states None explicitly"              "$(cat "$BODY_LOG")" "- None."
-has "appends a criteria placeholder"      "$(cat "$BODY_LOG")" "## Acceptance criteria"
+has "appends a criteria placeholder"      "$(cat "$BODY_LOG")" "## Acceptance Criteria"
+has "appends a Risk line"                 "$(cat "$BODY_LOG")" "## Risk"
 has "sends a bare note to the holding column" "$(cat "$GH_LOG")" "opt_Backlog"
 
 # 2 — a card that already carries criteria is buildable, so it goes straight to
 #     Ready and the next wave takes it.
-printf 'Body.\n\n## Acceptance criteria\n\n- [ ] one real thing\n\n## Blocked by\n\n- None.\n' > "$WORK/full.md"
+printf '## Problem\nBody.\n\n## Context\n- **Where:** `src/x.ts`\n\n## Fix\nOne.\n\n## Acceptance Criteria\n\n- [ ] one real thing\n\n## Risk\n🟢 **Low** · one file.\n\n## Blocked by\n\n- None.\n' > "$WORK/full.md"
 OUT=$(DEDUPE_HIT="" STATUS_OPTS="Backlog Ready Done" run --config "$WORK/config.json" \
   --title "Complete card" --body-file "$WORK/full.md" --fingerprint "full|card")
 has "a card with criteria lands in Ready" "$(cat "$GH_LOG")" "opt_Ready"

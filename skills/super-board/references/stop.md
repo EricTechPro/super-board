@@ -39,10 +39,12 @@ Nothing else. Stop is intentionally tolerant — its job is to bring the system 
 1. **Look up branch + PR**
    - `git branch -a --list "*issue-<N>-*"` → latest commit on the issue branch.
    - `gh pr list --search "head:issue-<N>-*"` → PR number, if any.
-2. **Post `🛑 stopped mid-flight` comment** on the issue AND (if it exists) the PR. The comment includes:
-   - Lane, worker PID, UTC timestamp.
-   - Last commit on the branch (the "resume point" — anything past it was unpushed and is lost).
-   - Plain-English resume hint: `super-board run <slug>`.
+2. **Post the stop comment** on the issue AND (if it exists) the PR, in the comment format of
+   writing-standard.md § 4 — header `[orchestrator] [report] 🛑 stopped · <lane> lane`, then:
+   - Did: worker PID and timestamp.
+   - ✅ Done: last commit on the branch (the "resume point" — anything past it was unpushed and is lost).
+   - ❌ Not done: uncommitted edits discarded.
+   - Next: `super-board run <slug>`.
 3. **Release the assignee mutex** on the issue (`gh issue edit --remove-assignee <bot>`).
 4. **Remove descriptive labels** (`loop:in-build`, `loop:in-qa`, `loop:in-review`) — best-effort.
 5. **SIGTERM the worker PID**, sleep 1s, SIGKILL if still alive.

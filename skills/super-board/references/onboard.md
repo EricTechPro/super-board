@@ -81,6 +81,9 @@ detects something worth keeping. A halt never loses work: re-running onboard res
    ├─ Collect sources (step 14 detection list) + key names:
    │    bash .claude/bin/super-board-env-check.sh SENTRY_AUTH_TOKEN POSTHOG_PERSONAL_API_KEY
    ├─ Guard hooks: .claude/hooks/guard-protected-push.py present? wired in settings.json?
+   ├─ Machine time zone (IANA name) for config `timezone`: $TZ if set, else
+   │    readlink /etc/localtime | sed 's#.*zoneinfo/##' (macOS, most Linux), else
+   │    timedatectl show -p Timezone --value, else "UTC". No question — shown on the review screen.
    └─ settings.json permissions.allow (for the step 13 diff)
 
 1. RE-RUN CHECK (only when a config or answers file exists)
@@ -189,9 +192,11 @@ detects something worth keeping. A halt never loses work: re-running onboard res
    │    question at a time, show the unit→line mapping + diff, approve. Written in step 15.
    ├─ Only section → stage `block --create`; if only CLAUDE.md exists, stage `@AGENTS.md`
    │    prepended to it (nothing else changes).
-   └─ Writing standard (no question): stage docs/agents/issue-tracker.md with a
+   └─ Writing standard (no question, no opt-out — super-board's writing standard is always
+      applied; never ask about writing style): stage docs/agents/issue-tracker.md with a
       `## Ticket format` section from references/ticket-format.md (create the file, or add /
-      replace only that section). The AGENTS.md block links there — one copy, no drift.
+      replace only that section). The AGENTS.md block's "Writing (super-board)" table links
+      there and to .claude/skills/super-board/references/writing-standard.md — one copy, no drift.
 
 10. PROJECT.md (skip for A, or if the user opts out)
     ├─ Sub-agent drafts it from manifests (package.json, pyproject.toml / requirements.txt,
@@ -211,20 +216,24 @@ detects something worth keeping. A halt never loses work: re-running onboard res
     └─ Production base kept → policies step recommends "human" and target_env "live".
 
 12. POLICIES — "What may the robot do?" (any flow with a local repo; ONE screen)
-    First AskUserQuestion: "Accept the recommended policies?" showing the three picks:
+    First AskUserQuestion: "Accept the recommended policies?" showing the three picks
+    (merge line reads "Recommended: auto-merge up to 400 changed lines"):
        [Accept all recommended (Recommended) / Review each]
     Review each → ONE AskUserQuestion call with three questions:
     a. Merge policy (header "Merge")
        Non-production base:
-         • Auto-merge normal changes; money, auth, destructive schema wait for you (Recommended)
+         • Auto-merge up to 400 changed lines; bigger PRs, money, auth and
+           destructive schema (DROP/TRUNCATE/RENAME) wait for you (Recommended)
          • A human merges everything
        Production base kept:
          • A human merges everything (Recommended)
-         • Auto-merge normal changes; money, auth, destructive schema wait for you
-           → sets merge_policy.allow_auto_on_production: true (run.md's guard needs it)
-       → merge_policy.default "auto" | "human"; always_human = schema defaults
+         • Auto-merge up to 400 changed lines; bigger PRs, money, auth and destructive schema
+           wait for you → sets merge_policy.allow_auto_on_production: true (run.md's guard needs it)
+       → merge_policy.default "auto" | "human"; auto_max_lines 400 (lockfiles, generated,
+         snapshots, migration SQL not counted — size_exclude); always_human = schema defaults
          (labels / path globs / added-line keywords — config-schema.json). A matching PR is
-         parked in Blocked with 🙋: you merge it, or comment `done` to approve.
+         parked in Blocked with 🙋: you merge it, or comment `done` to approve. A PR over the cap
+         shows as "big PR — please review".
     b. Protect the base branch (header "Push guard") — asked ONLY here, once
        Skip entirely if settings.json already wires guard-protected-push.py.
          • Block direct and force pushes to main/master/<base> (Recommended for existing apps)
@@ -240,9 +249,9 @@ detects something worth keeping. A halt never loses work: re-running onboard res
          commands from the manifest's migrate scripts (ask only for a missing one, one line
          each; "-" = the deploy pipeline applies it). Secrets stay in env vars — check the
          names with super-board-env-check.sh, never the values.
-    Say in ONE line, always: "The robot runs migrations on the databases you picked to test
-    its work; anything that must touch live, or a destructive schema change, waits for you —
-    🙋 in Blocked with the exact command."
+    Say in ONE line, always: "The robot runs additive migrations on the databases you picked to
+    test its work; a live database, or a destructive schema change (DROP/TRUNCATE/RENAME), always
+    waits for you — 🙋 in Blocked with the exact command."
 
 13. PERMISSIONS (after policies, before any run can stall on a prompt)
     Build the allowlist from the answers and show it as a diff:
@@ -286,8 +295,9 @@ detects something worth keeping. A halt never loses work: re-running onboard res
       [Write everything (Recommended) / Change one thing → back to that step / Cancel].
     Write, in order (each atomic; stop and report on the first failure — answers are kept):
     ├─ .claude/super-board/configs/<slug>.json (committed): description, variant, project,
-    │    target, repo, base_branch, columns, paths, merge_policy, migrations, collect,
-    │    notifications {channel: "session", bot_identity}, worker_backend "workflow"
+    │    target, repo, base_branch, timezone (the machine zone from step 0), columns, paths,
+    │    merge_policy, migrations, collect, notifications {channel: "session", bot_identity},
+    │    worker_backend "workflow"
     ├─ .claude/super-board/active ← <slug>
     ├─ .gitignore += .claude/super-board/active, .claude/super-board/onboard-answers.json,
     │    .claude/super-board/onboard-staged/, .claude/super-board/backup/, .claude/super-board/inflight/
@@ -404,6 +414,7 @@ Every halt says (a) what was tried, (b) what failed, (c) the exact fix, (d) "re-
 - An interrupted run resumes at `last_step` from the answers file.
 - Variant switches (Full ↔ QA-only) warn that column shape changes.
 - A CLAUDE.md that is no longer the `@AGENTS.md` pointer → step 9 is offered again.
+- A config with no `timezone` → check and repair adds the machine zone from step 0 (no question).
 
 ---
 

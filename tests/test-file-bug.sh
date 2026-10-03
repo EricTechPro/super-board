@@ -21,41 +21,60 @@ is()  { [ "$2" = "$3" ] && ok "$1" || bad "$1" "$2" "$3"; }
 has() { case "$2" in *"$3"*) ok "$1" ;; *) bad "$1" "contains: $3" "$2" ;; esac; }
 hasnt() { case "$2" in *"$3"*) bad "$1" "no '$3'" "found it" ;; *) ok "$1" ;; esac; }
 
-# A complete, actionable body — the shape the preamble tells the agent to write.
+# A complete, actionable body — the ticket format in writing-standard.md § 3.
 cat > "$WORK/good.md" <<'BODY'
-## Summary
+## Problem
 CSV upload reports success but no rows land in the imports table.
 
-## Repro steps
-1. Log in as the QA bot, go to /imports
-2. Upload fixtures/ten-rows.csv, click Submit
-3. Banner says "Imported", table stays empty
+## Context
+- **Where:** Imports page, `/imports`
+  - a. Log in as the QA bot
+  - b. Upload `fixtures/ten-rows.csv`
+  - c. Click **Submit**
+- **Who:** any signed-in user
 
-## Expected behavior
-Per SPEC.md the ten rows appear in the imports table.
-
-## Actual behavior
-Table is empty. The job never reaches a terminal state.
+![imports](https://github.com/acme/app/raw/abc1234/docs/super-qa/report/imports/tc-1/en/after-submit.png)
 
 ## Evidence
-- Screenshot: docs/super-qa/report/imports/tc-1/en/after-submit.png
-- Console: 0 errors
-- Network: POST /api/imports returns 202, no follow-up
-- Spec: e2e/paths/imports.spec.ts
+<details><summary>12 rows · no Sentry event · 1 user</summary>
 
-## Suggested fix path
-- Suggested owner: super-build
-- Notes for implementer: server/imports/job-handler.ts
+| Row | Value |
+|---|---|
+| Error + stack | n/a — no client or server error |
+| Request / trace ID | `req_42` |
+| Sentry | n/a — nothing captured |
+| PostHog replay | n/a — replay off on staging |
+| Logs | `job 91 queued, never picked up` |
+| Screenshots | ![after](https://github.com/acme/app/raw/abc1234/after-submit.png) |
+| HAR / API sample | `POST /api/imports → 202` |
+| Env + release | staging · `abc1234` |
+| First / last seen | Oct 1 · Oct 2 |
+| Users affected | 1 (QA bot) |
+| Steps | 1. log in 2. upload 3. submit |
+| Expected / actual | ten rows / empty table |
 
-## Acceptance criteria
+</details>
+
+## Fix
+Make the import job reach a terminal state; see `server/imports/job-handler.ts`.
+
+## Acceptance Criteria
 - [ ] Uploaded rows are visible after submit
 - [ ] Regression coverage added
 - [ ] Super QA rerun passes /imports
+
+## Risk
+🟢 **Low** · one handler, covered by the imports spec.
 BODY
 
-sed '/## Evidence/,/## Suggested fix path/d' "$WORK/good.md" > "$WORK/no-evidence.md"
+sed '/## Evidence/,/## Fix/d' "$WORK/good.md" > "$WORK/no-evidence.md"
 sed 's|CSV upload reports success but no rows land in the imports table.|<one sentence: what is wrong and where>|' "$WORK/good.md" > "$WORK/placeholder.md"
-sed 's|server/imports/job-handler.ts|TBD|' "$WORK/good.md" > "$WORK/tbd.md"
+sed 's|Make the import job reach a terminal state|TBD|' "$WORK/good.md" > "$WORK/tbd.md"
+sed 's|^- \[ \] |- |' "$WORK/good.md" > "$WORK/no-checklist.md"
+sed '/  - [abc]\. /d' "$WORK/good.md" > "$WORK/no-steps.md"
+sed '/| PostHog replay |/d' "$WORK/good.md" > "$WORK/short-evidence.md"
+sed 's|<details><summary>12 rows · no Sentry event · 1 user</summary>||; s|</details>||' "$WORK/good.md" > "$WORK/open-evidence.md"
+sed 's|  - b. Upload `fixtures/ten-rows.csv`|  - b. Upload → Submit|' "$WORK/good.md" > "$WORK/arrows.md"
 
 # ── gh stub.
 #   DEDUPE_HIT    — issue number the fingerprint search returns ("" = none)
@@ -120,13 +139,20 @@ has "names the missing section"  "$(cat "$WORK/err")" "Evidence"
 is "rejects <placeholder>"       66 "$(code --title T --body-file "$WORK/placeholder.md")"
 is "rejects TBD"                 66 "$(code --title T --body-file "$WORK/tbd.md")"
 is "escape hatch files it anyway" 0 "$(SUPER_QA_ALLOW_WEAK_BODY=1 code --title T --body-file "$WORK/tbd.md")"
+is "rejects AC without a checklist" 66 "$(code --title T --body-file "$WORK/no-checklist.md")"
+has "says why"                      "$(cat "$WORK/err")" "checklist"
+is "rejects Context without lettered steps" 66 "$(code --title T --body-file "$WORK/no-steps.md")"
+is "rejects arrows in steps"        66 "$(code --title T --body-file "$WORK/arrows.md")"
+is "rejects an Evidence row missing" 66 "$(code --title T --body-file "$WORK/short-evidence.md")"
+has "names the missing row"         "$(cat "$WORK/err")" "posthog replay"
+is "rejects an unfolded Evidence table" 66 "$(code --title T --body-file "$WORK/open-evidence.md")"
 
 echo "── happy path"
 OUT=$(run "${BASE[@]}" --kind bug --priority high --category functional \
   --area imports --route /imports --spec e2e/paths/imports.spec.ts --iter 3 \
   --fingerprint "imports|tc-1|silent-drop" --suggested-skill super-build)
 is  "returns the issue number"   "77" "$OUT"
-has "board-readable title"       "$(cat "$GH_LOG")" "🐛 Bug /imports — CSV upload silently drops rows"
+has "board-readable title"       "$(cat "$GH_LOG")" "🐛 [bug] imports: CSV upload silently drops rows"
 has "labels the source"          "$(cat "$GH_LOG")" "source:qa"
 has "labels the priority"        "$(cat "$GH_LOG")" "priority:high"
 has "labels the qa category"     "$(cat "$GH_LOG")" "qa:functional"

@@ -266,7 +266,8 @@ for (let n = 1; n <= ROUNDS + 1; n++) {
   phase('Fix')
   const plan = chainFor(problems)
   const routed = problems.map((p) => ({ ...p, route: ROUTES[p.type] ?? 'polish' }))
-  const commitMsg = `refine(${input.slug}) round ${n}: <what changed>`
+  // writing-standard.md § 1: `💄 [ui] <scope>: <subject>`; the fixer adds the bullets.
+  const commitMsg = `💄 [ui] ${input.slug}: round ${n} — <what changed>`
   const fixer = await agent(
     [
       `You are the round-${n} fixer. Read ${REF}/fixer-brief.md and ${REF}/routing.md, and follow them exactly.`,

@@ -97,21 +97,12 @@ post_stop_comment() {
   commit=$(last_commit_on_branch "$issue")
   pr=$(pr_for_issue "$issue" || echo "")
 
-  body="🛑 super-board · stopped mid-flight
-
-\`\`\`
-Lane:        ${lane:-unknown}
-Worker PID:  ${pid:-unknown} (terminated by super-board stop at ${TS})
-Last commit: ${commit}
-\`\`\`
-
-The dispatcher was halted by \`super-board stop\`. Any uncommitted edits in the
-worker's worktree were discarded; the last pushed commit above is the resume
-point.
-
-**Resume:** \`super-board run ${CONFIG_SLUG}\` — the board is the state. This
-card will be re-claimed and the ${lane:-target} lane will start over from the
-last pushed commit. AC review / test rerun is idempotent."
+  # Comment format: writing-standard.md § 4.
+  body="[orchestrator] [report] 🛑 stopped · ${lane:-unknown} lane
+Did: \`super-board stop\` ended worker PID ${pid:-unknown} at ${TS}
+✅ Done: resume point is the last pushed commit — ${commit}
+❌ Not done: uncommitted edits in the worker's worktree were discarded
+Next: \`super-board run ${CONFIG_SLUG}\` re-claims the card; the ${lane:-target} lane starts over from that commit"
 
   gh issue comment "$issue" --body "$body" >/dev/null 2>&1 \
     && log "  💬 issue comment posted on #${issue}" \

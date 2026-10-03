@@ -69,8 +69,9 @@ drop-off and abandonment spikes are **report only**: `collect_posthog.py funnel 
 seen plus `silentSignals`. Find the app's key user workflows from its routes and existing
 `capture()` calls; for each, list the success and failure events that are missing and the
 signals that return no data (e.g. autocapture off ⇒ no `$rageclick`). File one `feature` ticket
-per workflow with gaps, label `analytics`, fp `gap|<workflow>` — Summary, Evidence (routes, the
-capture calls found, what is missing), Acceptance criteria (named events with their properties).
+per workflow with gaps, label `analytics`, fp `gap|<workflow>` — Problem, Context (routes, the
+capture calls found, what is missing), Fix, Acceptance Criteria (named events with their
+properties), Risk.
 Suggestions stay perf- and privacy-safe: sampling, clicks only, no input or text capture, no PII
 in properties. Never edit app code.
 
@@ -85,8 +86,9 @@ Read the JSON for problems that **recur**, not one-off nits:
 4. A skill, prompt or workflow whose reports keep missing the same thing → a `feature` to refine it.
 
 Cluster by **root cause at a shared boundary**, not by wording. One ticket per cause with
-Summary, Evidence (every PR, comment link and finding id), Root cause, Acceptance criteria — at
-least one criterion is a regression check that would have caught the recurrence.
+Problem, Context, Evidence (every PR, comment link and finding id), Fix (names the root cause),
+Acceptance Criteria, Risk — at least one criterion is a regression check that would have caught
+the recurrence.
 
 ### architecture — the finder
 
@@ -96,8 +98,8 @@ grilling; findings only) or `codebase-design` (module, interface, depth, seam, d
 plus `ponytail:ponytail-audit` for over-engineering. It reads `CONTEXT.md` and `docs/adr/` and
 does not re-open a recorded decision; recently changed files weigh higher. It returns
 `{module, problem, finding, files, why, severity}`; each finding = one `refactor` ticket with
-Summary, Evidence (files, the shallow interface or duplicated concept), Acceptance criteria
-(observable, plus "existing tests still pass"). Cap at `collect.architecture.max_findings` (5).
+Problem, Context (files, the shallow interface or duplicated concept), Fix, Acceptance Criteria
+(observable, plus "existing tests still pass"), Risk. Cap at `collect.architecture.max_findings` (5).
 
 ## Verify — one fresh verifier per candidate
 
@@ -132,10 +134,11 @@ $S/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 ```
 
 - `bug`, `feature`, `fix` → `super-qa-file-bug.sh` (`fix` files as `tech-debt`); `refactor` →
-  `super-review-file-refactor.sh`. Bugs use super-qa's body template (Summary, Repro steps,
-  Expected/Actual behavior, Evidence, Suggested fix path, Acceptance criteria); features need
-  Summary, Evidence, Acceptance criteria; fixes add Root cause. Evidence is links and counts —
-  never secrets or user PII.
+  `super-review-file-refactor.sh`. Every body uses the ticket format in
+  `.claude/skills/super-board/references/writing-standard.md` § 3: Problem · Context (lettered
+  steps under Where) · Fix · Acceptance Criteria (checklist) · Risk; bugs add the folded 12-row
+  Evidence table (a missing row says `n/a — why`), fixes add an Evidence section. Evidence is
+  links and counts — never secrets or user PII. The filer refuses a body that misses a section.
 - **Fingerprint per source** (the filer rejects a mismatch): sentry `err|sentry|<id>`, posthog
   `posthog|<signal>|<key>` (fetchers emit it) or `gap|<workflow>`, github `github|<n>`, prs
   `prs|<boundary>|<cause>`, architecture `arch|<module>|<problem>`.

@@ -176,12 +176,17 @@ to the base branch is opt-in (`onboard` asks once, or `install.sh --protect-main
   a normal change, verify green                merge (0)   Done
   money / auth / destructive schema (labels,   exit 7      Blocked 🙋 — you merge it, or
     path globs, added-line keywords), or                   comment `done` to approve
-    over auto_max_lines
-  migrations, target env allowed               migrate,    Done
+    over auto_max_lines (default 400 changed
+    lines: "big PR — please review")
+  additive migrations, target env allowed      migrate,    Done
                                                merge (0)
   migrations for live (not allowed), a failed  exit 8      Blocked 🙋 — exact commands;
     migrate command, a `needs-you:` step                   comment `done` → next wave merges
 ```
+
+In plain words: only **destructive** schema changes (DROP / TRUNCATE / RENAME, or a `schema`
+label) need a human. Additive migrations (a new table, column or index) follow the database rule:
+the robot runs them on the databases you allowed. A live database is always yours.
 
 ## Configuration
 
@@ -204,7 +209,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
   variant               full | qa-only
   worker_backend        workflow | claude-p
   human_approves_merge  legacy: true = never auto-merge (prefer merge_policy.default "human")
-  merge_policy          default auto|human · auto_max_lines · always_human {money, auth, schema}
+  merge_policy          default auto|human · auto_max_lines (400) · size_exclude · always_human {money, auth, schema}
   migrations            globs · allowed_envs (test, staging, live) · target_env · commands
   verify_commands       run by the merge gate against the current base before every merge
   rebuild_cap           bounces allowed before a card goes Blocked

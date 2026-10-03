@@ -122,6 +122,16 @@ check, atomic writes).
 (labels, path globs, added-line keywords, all configurable) and diffs over `auto_max_lines` always
 go to a human. The merge gate decides (`scripts/super-board-merge-policy.py`) and exits 7; the card
 goes to Blocked with 🙋, and the human merges it or comments `done` to approve.
+`auto_max_lines` defaults to 400 changed lines (additions + deletions; `0` turns it off); lockfiles,
+generated files and snapshots (`size_exclude`, configurable) and migration SQL (reported
+separately) do not count. Over the cap → 🙋 "big PR — please review". "Schema" means destructive
+only (DROP / TRUNCATE / RENAME, or the `schema` label); additive migrations follow the
+`migrations` database rule, and a live database is always human.
+
+**Small PRs by design.** Lint criterion 15 and the Builder pre-flight flag a ticket likely to exceed
+~400 changed lines or spanning many areas as "too big": held with ❓, split via `/to-tickets` into
+vertical slices. The Builder keeps each PR under the cap; growing past it mid-build, it stops and
+proposes the split in a PR comment instead of pushing on.
 
 **DB migrations at merge.** New `migrations` block: onboard asks which databases the robot may
 migrate (test / staging / live, default test + staging). A PR touching the migration globs gets

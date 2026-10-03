@@ -31,7 +31,7 @@ If a check is red and you can't fix it this round, revert inside the worktree: `
 
 ## 5. Commit
 
-Stage only the files you changed (`git add <paths>`, never `-A`), then commit with the message in your prompt, filling in what changed. A failing pre-commit hook counts as a red check. Never push, never switch branches, never merge.
+Stage only the files you changed (`git add <paths>`, never `-A`), then commit with the subject in your prompt, filling in what changed, plus 1–4 short bullets in the body (writing-standard.md § 1). A failing pre-commit hook counts as a red check. Never push, never switch branches, never merge.
 
 ## 6. AFTER shots
 

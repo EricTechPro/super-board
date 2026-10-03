@@ -9,7 +9,10 @@
 # The division of labour: the agent writes evidence, this script writes
 # machinery. It prepends `## Board summary`, appends the hidden `super-qa-meta`
 # block, derives a fingerprint when none is given, and refuses bodies that would
-# leave a future headless session re-discovering the bug from scratch.
+# leave a future headless session re-discovering the bug from scratch: the body
+# needs Problem · Context (lettered steps under Where) · Evidence (the folded
+# 12-row table) · Fix · Acceptance Criteria (a checklist) · Risk — the ticket
+# format in skills/super-board/references/writing-standard.md § 3.
 #
 # Usage:
 #   super-qa-file-bug.sh --title "<one-line>" --body-file <path.md> \
@@ -80,13 +83,44 @@ BODY_RAW=$(cat "$BODY_FILE")
 # --- body guardrails --------------------------------------------------------
 # A ticket that a future headless session cannot act on is worse than no ticket:
 # it looks like tracked work while carrying none of the context. Reject early.
+# Sections and the Evidence table: writing-standard.md § 3.
+EVIDENCE_ROWS="error + stack|request / trace id|sentry|posthog replay|logs|screenshots|har / api sample|env + release|first / last seen|users affected|steps|expected / actual"
+
+# section <name>: the body of one `## <name>` section, up to the next heading.
+section() {
+  echo "$BODY_RAW" | awk -v want="$1" '
+    BEGIN { want = tolower(want) }
+    /^#+[[:space:]]+/ { h = tolower($0); sub(/^#+[[:space:]]+/, "", h); sub(/[[:space:]]+$/, "", h); on = (h == want); next }
+    on { print }'
+}
+
 if [ "${SUPER_QA_ALLOW_WEAK_BODY:-0}" != "1" ]; then
   MISSING=""
-  for section in "Summary" "Repro steps" "Expected behavior" "Actual behavior" \
-                 "Evidence" "Suggested fix path" "Acceptance criteria"; do
-    echo "$BODY_RAW" | grep -qiE "^#{1,3}[[:space:]]+${section}[[:space:]]*$" || MISSING="${MISSING}${MISSING:+, }${section}"
+  for s in "Problem" "Context" "Evidence" "Fix" "Acceptance Criteria" "Risk"; do
+    echo "$BODY_RAW" | grep -qiE "^#{1,3}[[:space:]]+${s}[[:space:]]*$" || MISSING="${MISSING}${MISSING:+, }${s}"
   done
-  [ -z "$MISSING" ] || die "body is missing required section(s): ${MISSING}" 66
+  [ -z "$MISSING" ] || die "body is missing required section(s): ${MISSING} (writing-standard.md § 3)" 66
+
+  section "Acceptance Criteria" | grep -qE '^[[:space:]]*- \[[ xX]\] ' \
+    || die "Acceptance Criteria needs a checklist: one '- [ ] <checkable outcome>' per line" 66
+  CONTEXT=$(section "Context")
+  echo "$CONTEXT" | grep -qiE 'where:' \
+    || die "Context needs a '- **Where:** <page>, \`<route>\`' line" 66
+  echo "$CONTEXT" | grep -qE '^[[:space:]]+- [a-z]\. ' \
+    || die "Context needs lettered steps under Where, one per line ('  - a. Sign in')" 66
+  echo "$CONTEXT" | grep -qE '→' \
+    && die "Context steps go one per line, never chained with arrows" 66
+
+  # The Evidence table: all 12 rows, an empty one says "n/a — why".
+  EV=$(section "Evidence" | tr '[:upper:]' '[:lower:]' | sed -E 's/[[:space:]]*\|[[:space:]]*/|/g')
+  echo "$EV" | grep -q '<details>' || die "Evidence must be a folded table (<details><summary>…</summary> + table)" 66
+  MISSROWS=""
+  OLDIFS=$IFS; IFS='|'
+  for row in $EVIDENCE_ROWS; do
+    echo "$EV" | grep -qF "|${row}|" || MISSROWS="${MISSROWS}${MISSROWS:+, }${row}"
+  done
+  IFS=$OLDIFS
+  [ -z "$MISSROWS" ] || die "Evidence table is missing row(s): ${MISSROWS} — write 'n/a — <why>' for one you could not capture" 66
 
   # Placeholder sweep, outside fenced code (a HAR snippet legitimately contains
   # angle brackets; an unfilled `<one sentence: what is wrong>` does not).
@@ -138,11 +172,14 @@ ${BODY_RAW}" >/dev/null 2>&1 || echo "warn: could not comment on existing #${EXI
 fi
 
 # --- compose ----------------------------------------------------------------
+# Title: `<emoji> [<kind>] <scope>: <title>` (writing-standard.md § 3).
 case "$KIND" in
-  bug) BADGE="🐛 Bug" ;; ux) BADGE="🎨 UX" ;; feature) BADGE="✨ Feature" ;;
-  tests) BADGE="🧪 Tests" ;; docs) BADGE="📝 Docs" ;; tech-debt) BADGE="🧹 Tech debt" ;;
+  bug) BADGE="🐛 [bug]" ;; ux) BADGE="💄 [ui]" ;; feature) BADGE="✨ [feat]" ;;
+  tests) BADGE="🧪 [test]" ;; docs) BADGE="📝 [docs]" ;; tech-debt) BADGE="♻️ [refactor]" ;;
 esac
-FULL_TITLE="${BADGE}${ROUTE:+ ${ROUTE}} — ${TITLE}"
+SCOPE="${AREA:-$(echo "${ROUTE:-}" | sed -E 's#^/+##; s#/+$##; s#[^A-Za-z0-9._-]+#-#g' | tr '[:upper:]' '[:lower:]')}"
+SCOPE="${SCOPE:-app}"
+FULL_TITLE="${BADGE} ${SCOPE}: ${TITLE}"
 
 BODY_TMP=$(mktemp)
 trap 'rm -f "$BODY_TMP"' EXIT

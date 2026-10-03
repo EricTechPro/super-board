@@ -46,10 +46,26 @@ See `skills/super-board/references/rate-limit-etiquette.md` for the full discipl
 ├── skills/<all seven>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/super-board-wave.js, ui-refine-loop.js
-└── bin/super-board-*.sh, super-board-*.py (status, merge-policy, agents-md, settings), super-qa-file-bug.sh, super-review-file-refactor.sh
+└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings), super-qa-file-bug.sh, super-review-file-refactor.sh
 ```
 
 It also refreshes the managed `<!-- super-board:begin … -->` block in the target's AGENTS.md when
 one exists (nothing outside the markers), and asks nothing: `super-board onboard` asks the questions.
 
 Skills call the dispatcher scripts as `.claude/bin/<script>`.
+
+## Writing
+
+Commits, PR bodies, tickets and comments in this repo follow
+`skills/super-board/references/writing-standard.md`, the same standard super-board writes into
+every project it is installed in.
+
+| Thing | Format |
+|---|---|
+| Commit | `<emoji> [type] scope: subject` + short bullets (✨ feat · 🐛 fix · 🔧 chore · ♻️ refactor · 🧪 test · ⚡ perf · 📝 docs · 👷 ci · 💄 ui · 🔒 security · ⏪ revert · 🚧 wip) |
+| PR body | marker blocks, one owner each: status · problem · solution · ac · history · visual · risk |
+| Ticket | Problem · Context · Fix · Acceptance Criteria · Risk · Blocked by (+ Evidence for bugs) |
+| Comment | `[role] [label] status` · Did · ✅ Done · ❌ Not done · Next · ≤ 8 lines |
+
+- NEVER rewrite a whole PR body: `scripts/super-board-pr-body.sh` rewrites one block.
+- ALWAYS change a format in `writing-standard.md` first, then the templates and `tests/test_writing_format.py`.

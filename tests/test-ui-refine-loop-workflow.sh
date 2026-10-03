@@ -145,10 +145,10 @@ const checkLabels = (r) => r.labels.filter((l) => l.startsWith('check '))
   eq(r.out.grades.map((g) => g.grade), ['partial', 'fixed'], 'grades returned')
   eq(r.out.regressions, ['dark footer'], 'regressions returned')
 
-  // 12 — standalone only: an old qa-hook mode is refused; commits are refine(<slug>).
+  // 12 — standalone only: an old qa-hook mode is refused; commits are 💄 [ui] <slug>.
   try { await run({ ...base, mode: 'qa-hook', issue: 42 }, [], committed()); fail('qa-hook mode must throw') } catch (e) { if (!/standalone/.test(e.message)) throw e }
   r = await run({ ...base, rounds: 1 }, [check([p('P1')]), check([])], committed())
-  has(r.calls.find((c) => c.label === 'fixer r1').prompt, 'refine(reports) round 1', 'commit message names the slug')
+  has(r.calls.find((c) => c.label === 'fixer r1').prompt, '💄 [ui] reports: round 1', 'commit message names the slug')
   if (/issue #|QA lane/.test(r.calls.find((c) => c.label === 'fixer r1').prompt)) fail('no board/QA wording in prompts')
 
   // 13 — no Impeccable → rubric, flagged degraded; neutral taste default; impeccable without detect throws.

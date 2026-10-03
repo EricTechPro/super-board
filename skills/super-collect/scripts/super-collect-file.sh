@@ -82,20 +82,27 @@ REPO_FLAG=()
 [ -z "$REMOTE" ] || REPO_FLAG=(-R "$(echo "$REMOTE" | sed -E 's#(git@github\.com:|https://github\.com/)##; s#\.git$##')")
 
 # --- body sections ----------------------------------------------------------
-# super-qa-file-bug.sh enforces its own seven for bugs. Features and recurring-problem
-# fixes are not repro-shaped, so they get their own minimum here and the QA
-# filer's repro check is bypassed for them.
+# The ticket format is writing-standard.md § 3. super-qa-file-bug.sh enforces the
+# full bug shape (lettered steps, the 12-row Evidence table). Features and
+# recurring-problem fixes are not repro-shaped, so they get their own minimum here
+# and the QA filer's repro check is bypassed for them. Refactors: the review filer.
 need_sections() {
   local missing="" s
   for s in "$@"; do
     grep -qiE "^#{1,3}[[:space:]]+${s}[[:space:]]*$" "$BODY_FILE" || missing="${missing}${missing:+, }${s}"
   done
-  [ -z "$missing" ] || die "body is missing required section(s): ${missing}" 66
+  [ -z "$missing" ] || die "body is missing required section(s): ${missing} (writing-standard.md § 3)" 66
+}
+need_checklist() {
+  awk '/^#+[[:space:]]+/ { h = tolower($0); on = (h ~ /^#+[[:space:]]+acceptance criteria[[:space:]]*$/); next }
+       on && /^[[:space:]]*- \[[ xX]\] / { found = 1 } END { exit !found }' "$BODY_FILE" \
+    || die "Acceptance Criteria needs a checklist: one '- [ ] <checkable outcome>' per line" 66
 }
 if [ -z "$ADOPT" ]; then
   case "$TYPE" in
-    feature) need_sections "Summary" "Evidence" "Acceptance criteria" ;;
-    fix)     need_sections "Summary" "Evidence" "Root cause" "Acceptance criteria" ;;
+    feature)  need_sections "Problem" "Context" "Fix" "Acceptance Criteria" "Risk"; need_checklist ;;
+    fix)      need_sections "Problem" "Context" "Evidence" "Fix" "Acceptance Criteria" "Risk"; need_checklist ;;
+    refactor) need_sections "Problem" "Context" "Fix" ;;
   esac
 fi
 

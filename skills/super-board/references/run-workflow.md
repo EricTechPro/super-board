@@ -96,8 +96,9 @@ Repeat until a done condition or halt gate fires:
    leftover `.worktrees/issue-<N>-build/`; remove the worktree (uncommitted work
    in it is lost either way — say so if `git -C <wt> status --porcelain` was not
    empty), keep the branch and PR, move the card to `Ready`, and comment:
-   `↩️ back to Ready — found in Building with no live worker. Branch: <name | none>
-   (kept). Next: Builder.` The next Builder continues on the branch.
+   `[orchestrator] [report] ↩️ back to Ready · stranded in Building` / `Did: found no live
+   worker` / `✅ Done: card moved to Ready · branch <name> kept` / `Next: builder`
+   (writing-standard.md § 4). The next Builder continues on the branch.
    **Builder pre-flight.** No card goes Ready → Building unchecked. The wave's first phase
    (`Pre-flight` in `super-board-wave.js`, before `runLane('build')`) runs one cheap sub-agent per
    batch of up to 5 Ready cards: already merged? already in progress (open PR or another card)?
@@ -189,6 +190,7 @@ don't stall on prompts:
     "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
     "Bash(bash .claude/bin/super-board-preflight.sh:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
+    "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
 
 Merging is NOT in the base list. On a board whose `merge_policy.default` is
@@ -201,7 +203,7 @@ up front (onboard → Permissions), so the first overnight run does not stall:
 
 Without them every Reviewer merge pauses for one interactive approval, so the
 backend is **attended-only**. With them, the gate still enforces
-`merge_policy` (money / auth / schema → human, exit 7) and `migrations`
+`merge_policy` (money / auth / destructive schema / over `auto_max_lines` → human, exit 7) and `migrations`
 (live DB → 🙋 needs you, exit 8), so the allowlist removes the prompt, not
 the policy. Pair auto-merge with a non-production `base_branch`.
 

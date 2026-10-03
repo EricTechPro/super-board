@@ -12,12 +12,14 @@
 #       * runs `claude -p` inside that worktree with the composed prompt
 #       * captures stdout+stderr to .planning/super-build-logs/issue-N.log
 #   - Exit codes:
-#       0  success           — worker produced `chore(loop): close #N` commit on loop/issue-N
+#       0  success           — worker produced `🔧 [chore] loop: close #N` commit on loop/issue-N
 #       2  worker non-zero   — `claude -p` exited non-zero AND no recognizable done/WIP marker
-#       3  no done-commit    — `claude -p` exited zero but no `chore(loop): close #N` commit
+#       3  no done-commit    — `claude -p` exited zero but no `🔧 [chore] loop: close #N` commit
 #       4  HUMAN GATE        — log contains `HUMAN GATE TRIPPED:`
 #       5  WIP-PARTIAL       — log final assistant message starts with `WIP-PARTIAL:` AND
-#                              a `wip(loop): #N partial` commit exists on the branch
+#                              a `🚧 [wip] loop: #N partial` commit exists on the branch
+#   Subjects follow writing-standard.md § 1. The old `chore(loop):` / `wip(loop):` shapes
+#   are still accepted so a branch started before the switch is not read as a failure.
 #
 # Notes:
 #   - The dispatcher never merges, never closes the issue, never edits labels — those
@@ -141,9 +143,9 @@ CLOSE_COMMIT=""
 WIP_COMMIT=""
 if [[ "$BASE_SHA" != "$HEAD_SHA" ]]; then
   CLOSE_COMMIT=$(git -C "$WORKTREE_DIR" log --format="%H %s" "$COMMITS_RANGE" 2>/dev/null \
-    | grep -E "^[0-9a-f]+ chore\(loop\): close #$N( |$)" | head -1 || true)
+    | grep -E "^[0-9a-f]+ ([^ ]+ \[chore\] loop|chore\(loop\)): close #$N( |$)" | head -1 || true)
   WIP_COMMIT=$(git -C "$WORKTREE_DIR" log --format="%H %s" "$COMMITS_RANGE" 2>/dev/null \
-    | grep -E "^[0-9a-f]+ wip\(loop\): #$N partial" | head -1 || true)
+    | grep -E "^[0-9a-f]+ ([^ ]+ \[wip\] loop|wip\(loop\)): #$N partial" | head -1 || true)
 fi
 
 # Detect HUMAN GATE in log
@@ -158,7 +160,7 @@ if [[ -n "$WIP_COMMIT" ]] && grep -q "^WIP-PARTIAL:" "$LOG_FILE"; then
   exit 5
 fi
 
-# Detect success: chore(loop): close commit present
+# Detect success: a `[chore] loop: close #N` commit is present
 if [[ -n "$CLOSE_COMMIT" ]]; then
   if [[ "$WORKER_EXIT" -ne 0 ]]; then
     echo "▶︎ worker exited non-zero ($WORKER_EXIT) but produced close-commit; treating as success" | tee -a "$LOG_FILE"
@@ -173,5 +175,5 @@ if [[ "$WORKER_EXIT" -ne 0 ]]; then
   exit 2
 fi
 
-echo "▶︎ worker exited 0 but produced no chore(loop): close #$N commit" | tee -a "$LOG_FILE"
+echo "▶︎ worker exited 0 but produced no [chore] loop: close #$N commit" | tee -a "$LOG_FILE"
 exit 3
