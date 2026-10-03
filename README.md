@@ -154,6 +154,7 @@ MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://githu
 <a href="https://erictechpro.github.io/super-board/onboarding/">Setup simulator</a> ·
 <a href="https://erictechpro.github.io/super-board/impeccable/">Impeccable map</a> ·
 <a href="RELEASE-NOTES.md">Release notes</a> ·
+<a href="RELEASING.md">Release checks</a> ·
 <a href="https://youtu.be/nX_bGyIOFM4">YouTube walkthrough</a>
 </p>
 <p align="center"><sub>Made by Eric Tech</sub></p>

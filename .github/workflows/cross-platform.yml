@@ -1,20 +1,15 @@
 name: cross-platform
 
-# Smoke + syntax check for the pure-Python super-board-status renderer
-# across Ubuntu, macOS, and Windows. No `gh` auth, no GitHub Project —
-# just proves Python can parse + execute the script on each platform and
-# that the "no config" code path exits with the documented code (64)
-# everywhere.
-#
-# Security note: this workflow only interpolates `matrix.*` values (which
-# are defined in this file). It does NOT consume any `github.event.*` input,
-# so workflow-injection patterns from issue/PR titles or commit messages
-# do not apply here.
+# All offline safety suites run on Linux/macOS. Windows checks the status reader.
+# Reused by release.yml so a failed suite prevents the publish job from running.
+permissions:
+  contents: read
 
 on:
   push:
     branches: [main, dev]
   pull_request:
+  workflow_call:
 
 jobs:
   smoke:
@@ -28,6 +23,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -62,9 +60,10 @@ jobs:
       - name: status — parser fixture tests
         run: python tests/test_status_parse.py
 
-  wave-plan:
-    name: wave-plan (${{ matrix.os }})
+  safety:
+    name: safety (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -72,28 +71,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      # Workflow-backend planner: 6 fixture scenarios, no gh calls.
-      # Needs bash + jq, both preinstalled on ubuntu/macos runners.
-      - name: wave-plan — fixture tests
-        run: bash tests/test-wave-plan.sh
-
-      # Dispatcher gates: closed-issue guard (#10), landed-work halt gate (#8),
-      # dispatch ceiling, by-name status-option resolution. `gh` is stubbed on
-      # PATH — no auth, no network, no board.
-      - name: run-gates — fixture tests
-        run: bash tests/test-run-gates.sh
-
-      # Onboard's setup script: must-have fixes, upgrade + config migration, board
-      # ranking and migration against a stateful gh stub. Custom collect sources.
-      - name: setup — onboarding checks and upgrade
-        run: bash tests/test-setup.sh
-      - name: collect — custom sources
-        run: bash tests/test-collect-custom.sh
-
-      # Syntax-check the dynamic workflow script the same way the
-      # orchestrator's precondition 4 does (run-workflow.md).
-      - name: wave workflow — node --check
-        run: |
-          { echo '(async function(){'; sed 's/^export const meta/const meta/' workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module
-          echo "OK: workflows/super-board-wave.js parses"
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run every offline safety suite
+        run: bash tests/run-safety.sh
