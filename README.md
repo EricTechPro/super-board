@@ -3,7 +3,7 @@
 Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **7 skills** — 5 primary, 2 secondary — 9 commands, 8 guards.
 
 ![Skills](https://img.shields.io/badge/skills-7-000000?style=flat-square)
-![Version](https://img.shields.io/badge/version-2.6.0-000000?style=flat-square)
+![Version](https://img.shields.io/badge/version-3.0.0-000000?style=flat-square)
 ![Host](https://img.shields.io/badge/host-Claude%20Code-000000?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-000000?style=flat-square)
 
@@ -12,12 +12,25 @@ Drag a card into `Ready`, walk away, come back to a merged PR with evidence: **7
 ## Install
 
 ```bash
-git clone https://github.com/EricTechPro/super-board /tmp/super-board   # or download a release zip
-/tmp/super-board/install.sh /path/to/your-project                       # --no-hooks skips the guards; --protect-main adds the push guard
-npx skills@latest add mattpocock/skills                                 # required: lanes call these by name
+curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash   # in your project folder
 ```
 
-Then, inside Claude Code in your project: `/super-board onboard`, move cards to `Ready`, `/super-board run <slug>`.
+```
+🧩 super-board installer
+🔍 checking what you need
+   ✓ curl · tar · python3 · gh · jq · node
+📦 downloading EricTechPro/super-board@v3.0.0
+🔧 installing
+   ✓ skills, scripts and workflows → .claude/
+   🛡️  6 guard hooks → .claude/settings.json (backup kept)
+🧠 helper skills: installed
+🎉 super-board 3.0.0 is installed
+👉 next: open Claude Code here and run /super-board onboard
+```
+
+Or from a checkout: `./install.sh [--no-hooks] [--protect-main] /path/to/your-project`. Then, inside
+Claude Code: `/super-board onboard` (8 steps, Enter takes the recommended answer), move cards to
+`Ready`, `/super-board run <slug>`.
 
 ## Skills
 
@@ -46,12 +59,12 @@ Each name links to that skill's README. Lane skills run as agents inside the `su
 
 | | |
 | --- | --- |
-| `/super-board onboard` | One-time setup: checks the board's columns, writes `.claude/super-board/configs/<slug>.json` |
+| `/super-board onboard` | 8-step setup: 🔍 Checks · 🔑 GitHub · 🗂️ Board · 🌿 Branch · 📜 AGENTS.md · 🛡️ Policies · 📥 Bug sources · ✅ Review; re-run resumes or upgrades |
 | `/super-board lint` | Flags vague ACs and unreadable `Blocked by` lines before agents spend tokens |
 | `/super-board status` | Read-only board snapshot, column counts, in-flight work |
 | `/super-board run <slug> [--low\|--high]` | The loop, until the board drains or a halt gate fires; also resumes |
 | `/super-board stop` | Posts "stopped mid-flight" notes, releases claims, stops workers |
-| `/super-collect [sentry\|posthog\|github\|prs\|architecture] [--since 30d]` | Finds problems, verifies each, files them into Backlog (dry-run first) |
+| `/super-collect [sentry\|posthog\|github\|prs\|architecture\|<custom>] [--since 30d]` | Finds problems, verifies each, files them into Backlog (dry-run first) |
 | `/ui-refine-loop <route>` | Polishes one page or component in critique → refine rounds |
 | `/visual [recap\|plan\|<path>]` | One HTML page of a branch, a plan, or part of the codebase |
 
@@ -73,12 +86,16 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 ## Setup notes
 
 - Needs Claude Code, `gh` (authenticated for the board's owner), `jq`, bash 3.2+ and Python 3.
-- The board is a GitHub Project (v2) with a `Status` field: `Ready, Building, QA, Review, Done, Blocked, Skipped` (`qa-only` drops `Building`), plus a holding column such as `Backlog` for filed cards.
+- The board is a GitHub Project (v2) with a `Status` field: `Backlog, Ready, Building, QA, Review, Blocked, Done`. `onboard` reuses your best-matching board (adding what is missing, keeping every card) or creates one.
+- Three labels route cards: `qa` skips Building (test what exists), `bug` and `feature` are built first; no label is built too.
 - Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
+- `onboard` fixes what the board needs without asking (skills, scripts, workflows, guards, settings, old folders, config keys) and asks only to install a system tool or sign in. An older super-board is upgraded in place (see [Upgrading from 2.x](RELEASE-NOTES.md#upgrading-from-2x)).
 - `onboard` asks once what the robot may do: auto-merge normal changes up to 400 changed lines (money, auth, destructive schema like DROP/TRUNCATE/RENAME, and bigger PRs wait for you; additive migrations run only on the databases you allow, never live), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
 - Auto-merge needs the merge-gate and `gh pr merge` lines in your allowlist; `onboard` offers them as a diff.
-- `onboard` can make AGENTS.md the source of truth (CLAUDE.md becomes `@AGENTS.md`) and keeps a managed super-board section in it. Plugin install: the command is `/super-board:super-board onboard`, and it installs the missing scripts, workflows and hooks.
+- `onboard` can make AGENTS.md the source of truth (CLAUDE.md becomes `@AGENTS.md`) and keeps a managed super-board section in it. Plugin install: the command is `/super-board:super-board onboard`, and its 🔍 Checks step installs the missing scripts, workflows and hooks.
+- Bug sources take any extra source in onboard — a link, app name, API URL, MCP server or command — proven readable (read-only) before it is saved; `/super-collect` runs it like the built-ins.
+- Testing a live site with no repo is not a board: `/super-qa <url>` runs on its own.
 - To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record` to your status-line script.
 - Cards need acceptance criteria: QA grades against them, and `lint` tells you which are missing.
 

@@ -1,7 +1,7 @@
 # super-board: how it works
 
-> **What it does not do:** super-board installs skills, scripts, a workflow and guard hooks.
-> It does not create your GitHub Project, grant `gh` access, add CI, or approve merges you
+> **What it does not do:** super-board installs skills, scripts, a workflow and guard hooks,
+> and onboard sets up your GitHub Project. It does not grant `gh` access on its own, add CI, or approve merges you
 > have not allowed. It is not a CI replacement: workers push branches and your CI still runs.
 > It is not a free pass on review: set `human_approves_merge: true` to keep a person on every
 > merge. It is not for cards without acceptance criteria: QA grades against them.
@@ -26,6 +26,7 @@ flowchart LR
   backlog -->|"/super-board lint, then you"| ready["Ready"]
   ready --> build["Building<br/>super-build: worktree + draft PR"]
   build --> qa["QA<br/>super-qa: tests, evidence"]
+  ready -->|"label qa"| qa
   qa --> review["Review<br/>super-review: own hypotheses,<br/>prior findings"]
   review --> gate{"merge gate<br/>base + verify_commands"}
   gate -->|green, head unchanged| done["Done (squash-merged)"]
@@ -38,7 +39,33 @@ flowchart LR
 
 The diagram shows the routes a card can take, not guarantees. A lane that cannot finish writes
 the Block template and parks the card for a person; `human_approves_merge: true` replaces the
-merge with a hand-off; `variant: "qa-only"` skips Building.
+merge with a hand-off; a card labelled `qa` skips Building.
+
+## Onboarding
+
+`/super-board onboard` is an 8-step wizard. Each step opens with a numbered agenda strip and
+`N of 8 · <emoji> <Name> — <why>`, then one question with the recommended answer first.
+
+| # | Step | What happens |
+|---|---|---|
+| 1 | 🔍 Checks | Fixes every must-have with no question — skills, scripts, workflows, guard hooks, settings entries, old folders (super-refine, cleanup-wt, arch-loop), config keys, labels, columns — and lists them under "Fixed for you". Asks only to install a system tool (the exact brew / apt / winget command) or sign in, then re-checks until green. An older super-board is upgraded here ("Upgraded for you"). |
+| 2 | 🔑 GitHub | Signs in and adds board access (`gh auth refresh -s project,read:project,repo`) only when missing; offers to create the repo. |
+| 3 | 🗂️ Board | Ranks your GitHub Projects by matching columns and recommends reusing the best (adds what is missing, keeps cards), or creates one with a name taken from package.json / README. |
+| 4 | 🌿 Branch | Finds branches and the deploy source; no staging → "Create staging from main" (Recommended). |
+| 5 | 📜 AGENTS.md | "Move your N CLAUDE.md rules into AGENTS.md?" — one short question per conflict, nothing lost (coverage-checked). |
+| 6 | 🛡️ Policies | Two questions: safe defaults (merge rule, push guard, migrations), and the permission lines. |
+| 7 | 📥 Bug sources | Sentry, PostHog, GitHub issues, past PRs, architecture, plus "➕ Add another source": a link, app, API URL, MCP server or command, pinged read-only before it is saved. |
+| 8 | ✅ Review | One compact table, then "Write everything?" — files change once, here. |
+
+Stop at any step: the answers are saved, and the next run shows them and continues. Testing a
+live site with no repo is not a board: `/super-qa <url>`. The full screen-by-screen contract is
+`skills/super-board/references/onboard.md`; the deterministic half is
+`scripts/super-board-setup.py`.
+
+**Labels.** Every board has the same seven columns. Three labels route a card: `qa` goes Ready →
+QA → Review → Done (test what exists), `bug` and `feature` go through Building first, and a card
+with no label is built (the classifier adds `feature` or `bug`). There is no Skipped column: a
+card dropped on purpose is closed as not planned and moved to Done with a 🤷 comment.
 
 ## Skills
 
@@ -194,7 +221,6 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 
 ```json
 {
-  "variant": "full",
   "worker_backend": "workflow",
   "project": { "owner": "your-gh-login-or-org", "number": 12 },
   "base_branch": "main",
@@ -206,8 +232,8 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```
 
 ```
-  variant               full | qa-only
   worker_backend        workflow | claude-p
+  columns               Backlog · Ready · Building · QA · Review · Blocked · Done (always all seven)
   human_approves_merge  legacy: true = never auto-merge (prefer merge_policy.default "human")
   merge_policy          default auto|human · auto_max_lines (400) · size_exclude · always_human {money, auth, schema}
   migrations            globs · allowed_envs (test, staging, live) · target_env · commands
@@ -216,15 +242,16 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
   max_workers           optional wave throttle; absent or 0 = unlimited (claude-p defaults to 3)
   tick_seconds          claude-p GraphQL budget floor, default 120
   usage_pause_pct       pause new waves at this % of the Claude usage window, default 95
-  refine, collect       optional blocks for ui-refine-loop and super-collect
+  refine, collect       optional blocks for ui-refine-loop and super-collect (collect.custom = extra sources)
 ```
 
 ```
-  variant       lanes
-  ─────────     ─────────────────────────────────────
-  full          Ready → Building → QA → Review → Done
-  qa-only              Ready → QA → Review → Done
-                       └ hardening code that already exists
+  label           lanes
+  ─────────       ─────────────────────────────────────
+  feature, bug,   Ready → Building → QA → Review → Done
+  none
+  qa                     Ready → QA → Review → Done
+                         └ hardening code that already exists
 ```
 
 Every key, with notes: `skills/super-board/references/config-schema.json`.
@@ -263,14 +290,14 @@ between independently deployed services, which a single-app repo does not have.
 - Start with `human_approves_merge: true` and a few cards; read the PR comments each lane leaves.
 - Set `verify_commands` before you allow auto-merge, and add `Bash(gh pr merge:*)` to the
   allowlist only when you mean it: it removes the last human gate.
-- Try `variant: "qa-only"` on code that already exists before letting Builders loose.
+- Label a few cards `qa` on code that already exists before letting Builders loose.
 - Run `/super-collect` in its default dry-run before `--yes`.
 
 Missing, unreadable or stale evidence is a hold for a person, never a pass.
 
 ## Limits
 
-- The board, columns, `gh` auth and CI come from you. Onboard checks them; it does not create them.
+- `gh` auth and CI come from you. Onboard reuses or creates the board and its columns and labels; it never signs in or installs a system tool without your OK.
 - The workflow backend needs dynamic workflows enabled in Claude Code.
 - The usage guard reads only what an interactive status line recorded; headless runs see no usage.
 - `verify_commands` are only as good as your test suite. Without them the gate says it proved nothing.

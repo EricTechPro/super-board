@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding Screen Picks</title>
+<style>
+:root{
+  --bg:#f6f8fa; --card:#ffffff; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0;
+  --accent:#0969da; --code-bg:#eff1f3; --pre-bg:#f6f8fa; --green:#1a7f37; --red:#d1242f;
+  --amber:#9a6700; --pick:#1f883d; --note-bg:#ddf4ff; --note-bd:#0969da;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117; --card:#151b23; --fg:#e6edf3; --muted:#9198a1; --border:#3d444d;
+    --accent:#4493f8; --code-bg:#262c36; --pre-bg:#0d1117; --green:#3fb950; --red:#f85149;
+    --amber:#d29922; --pick:#3fb950; --note-bg:#0c2d6b; --note-bd:#4493f8;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --card:#151b23; --fg:#e6edf3; --muted:#9198a1; --border:#3d444d;
+  --accent:#4493f8; --code-bg:#262c36; --pre-bg:#0d1117; --green:#3fb950; --red:#f85149;
+  --amber:#d29922; --pick:#3fb950; --note-bg:#0c2d6b; --note-bd:#4493f8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--border)}
+.bar{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.bar h1{font-size:16px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--pick);border-color:var(--pick);color:#fff;font-weight:600}
+.dots{display:flex;gap:6px;justify-content:center;padding:0 16px 10px;flex-wrap:wrap}
+.dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--muted);background:transparent;padding:0;cursor:pointer}
+.dot.done{background:var(--pick);border-color:var(--pick)}
+.dot.cur{outline:2px solid var(--accent);outline-offset:2px}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
+.slide{display:none}
+.slide.on{display:block}
+.slide h2{font-size:22px;margin:0 0 2px}
+.purpose{color:var(--muted);margin:0 0 16px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+.opt{min-width:0;background:var(--card);border:2px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.opt.picked{border-color:var(--pick)}
+.ohead{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--pre-bg)}
+.ohead b{font-size:14px;flex:1}
+.rec{font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;background:var(--note-bg);color:var(--accent)}
+.pickb{font-size:12.5px;padding:4px 10px}
+.opt.picked .pickb{background:var(--pick);border-color:var(--pick);color:#fff}
+.render{padding:12px 16px;font-size:14px;min-width:0;overflow-x:auto}
+.render h3{font-size:15px;margin:10px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--border)}
+.render h3:first-child{margin-top:0}
+.render ul,.render ol{margin:4px 0;padding-left:22px}
+.render li{margin:2px 0}
+.render ol ol{list-style:lower-alpha}
+.render ol.num ol{list-style:decimal}
+code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code-bg);padding:.1em .35em;border-radius:5px}
+pre{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--pre-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}
+th,td{border:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top}
+th{background:var(--pre-bg)}
+.task{list-style:none;margin-left:-20px}
+.task input{margin-right:6px;vertical-align:-1px}
+.why{display:block;color:var(--muted);font-size:12.5px;margin-left:22px}
+.alert{border-left:4px solid var(--note-bd);padding:6px 12px;margin:4px 0}
+.alert .t{color:var(--accent);font-weight:600;font-size:13.5px}
+.alert.warn{border-color:var(--amber)} .alert.warn .t{color:var(--amber)}
+.alert.tip{border-color:var(--green)} .alert.tip .t{color:var(--green)}
+.badge{font-size:15px}
+.muted{color:var(--muted);font-size:12.5px}
+.gitlog .msg{font-weight:600}
+details{border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:6px 0}
+summary{cursor:pointer}
+.cm{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.cm .ch{background:var(--pre-bg);border-bottom:1px solid var(--border);padding:5px 10px;font-size:12.5px;color:var(--muted)}
+.cm .cb{padding:8px 12px}
+.cm .hd{font:13px ui-monospace,Menlo,monospace;font-weight:600;margin:0 0 4px}
+.cm p{margin:3px 0}
+svg.mock{display:block;max-width:100%;height:auto;border:1px solid var(--border);border-radius:6px;margin:6px 0}
+svg.mock.m{max-width:150px}
+.ba td{width:50%}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--border)}
+.nav .in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.nav .count{flex:1;text-align:center;color:var(--muted);font-size:13px}
+.sum{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;max-width:640px}
+.sum li{margin:4px 0}
+.sum .none{color:var(--red)}
+#copied{color:var(--green);font-size:13px;margin-left:8px}
+@media (max-width:640px){.opts{grid-template-columns:minmax(0,1fr)}.bar h1{font-size:14px}.slide h2{font-size:19px}}
+
+.tm{background:#0a0c0f;color:#e3e7ec;border:1px solid #2a313b;border-radius:8px;padding:10px 12px;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow-x:auto}
+.tm .g{color:#5fd38d}.tm .y{color:#f2c66d}.tm .r{color:#ff6b6b}.tm .b{color:#6cb6ff}.tm .d{color:#8b95a0}.tm .f{color:#56606b}.tm .k{font-weight:700}.tm .w{color:#e3e7ec}
+.tm .s{color:#6cb6ff}
+.tm .pk{border:1px solid #4a5563;border-radius:6px;padding:6px 10px;margin:6px 0 2px;white-space:pre}
+.tm .pk.perm{border-color:#8a7440}
+.tm .chip{background:#3a4252;color:#fff;padding:0 6px;border-radius:3px}
+.render{padding:10px}
+.opts{grid-template-columns:repeat(auto-fit,minmax(min(100%,540px),1fr))}
+@media (max-width:640px){.tm{font-size:10.5px;padding:8px}.render{padding:8px}.purpose{font-size:14px}}
+.opt.none textarea{width:100%;min-height:96px;font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;resize:vertical}
+.opt.none .render p{margin:0 0 6px;color:var(--muted);font-size:13px}
+</style>
+
+</head>
+<body>
+<div class="top">
+  <div class="bar"><h1>Super Board onboarding · pick how each screen looks</h1><button class="btn" id="tt" type="button">Theme</button></div>
+  <div class="dots" id="dots"></div>
+</div>
+<main id="main">
+
+<!-- 1 INSTALL -->
+<section class="slide" data-id="install" data-name="Install output">
+<h2>📦 Install output</h2><p class="purpose">What <code>curl -fsSL …/get.sh | bash</code> prints in the terminal. Today it prints every copied file plus two "next" lines.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Minimal ✓ lines</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">eric@mac</span> <span class="b">my-app</span> % curl -fsSL …/get.sh | bash
+super-board 2.6.0 → /Users/eric/code/my-app
+<span class="g">✓</span> 7 skills
+<span class="g">✓</span> 15 scripts
+<span class="g">✓</span> 2 workflows
+<span class="g">✓</span> 6 guard hooks (settings.json backed up)
+<span class="g">✓</span> helper skills
+<span class="g">✓</span> done
+
+next: claude, then /super-board onboard</div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Grouped with emojis</b><span class="rec">closest to today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">eric@mac</span> <span class="b">my-app</span> % curl -fsSL …/get.sh | bash
+🧩 super-board installer
+   target: /Users/eric/code/my-app
+
+🔍 checking what you need
+   <span class="g">✓</span> curl · tar · python3 · gh · jq · node
+📦 downloading EricTechPro/super-board@v2.6.0
+🔧 installing
+   <span class="g">✓</span> skills, scripts and workflows → .claude/
+   🛡️  6 guard hooks → .claude/settings.json <span class="d">(backup kept)</span>
+   <span class="y">!</span> CLAUDE.md holds its own rules — onboard offers a merge
+🧠 helper skills: installed
+
+🎉 super-board 2.6.0 is installed
+👉 next: open Claude Code here and run /super-board onboard</div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Progress bar</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">eric@mac</span> <span class="b">my-app</span> % curl -fsSL …/get.sh | bash
+super-board 2.6.0
+
+[1/4] check     <span class="g">██████████</span> ok
+[2/4] download  <span class="g">██████████</span> 1.9 MB
+[3/4] install   <span class="g">██████████</span> 7 skills · 15 scripts · 6 guards
+[4/4] helpers   <span class="g">██████████</span> 18 skills
+
+<span class="g">✓ installed in 14s</span>
+→ run: claude   then: /super-board onboard
+<span class="d">  full log: .claude/super-board/install.log</span></div></div></div>
+</div></section>
+
+<!-- 2 WELCOME -->
+<section class="slide" data-id="welcome" data-name="Welcome / intro">
+<h2>🚀 Welcome / intro</h2><p class="purpose">What Claude says right after you type <code>/super-board onboard</code>.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Compact</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+
+<span class="w">⏺</span> Setting up super-board for my-app. About 10 questions,
+  recommended answer first — press Enter to accept.
+  Stop any time; re-run resumes where you left off.</div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Banner + "needs your OK" list</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+
+<span class="w">⏺</span> <span class="k">super-board onboard</span>
+  <span class="f">─────────────────────────────────────</span>
+  A GitHub board the robot works through on its own:
+  Ready → Building → QA → Review → Done.
+
+  What will need your OK:
+   • a GitHub browser sign-in (only if needed)
+   • edits to .claude/settings.json — diff first
+   • AGENTS.md / CLAUDE.md, only if you say yes
+   • one review screen before anything is written
+
+  Progress: 🛠 onboard (here) → 🧹 lint → 🤖 run
+  <span class="f">─────────────────────────────────────</span></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Plan checklist</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+
+<span class="w">⏺</span> <span class="k">super-board setup — 12 steps</span>
+  [ ] 🔍 checks        [ ] 🌿 branch
+  [ ] 🎯 goal          [ ] 🛡️ safety rules
+  [ ] 🔑 GitHub        [ ] 🔓 permissions
+  [ ] 🗂️ board         [ ] 📥 bug sources
+  [ ] 📜 AGENTS.md     [ ] ✅ review &amp; save
+  [ ] 📝 description   [ ] 🎉 done
+  <span class="d">Nothing is written until "review &amp; save".</span></div></div></div>
+</div></section>
+
+<!-- 3 CHECKS -->
+<section class="slide" data-id="checks" data-name="Install checks">
+<h2>🔍 Install checks</h2><p class="purpose">The checks that run before any question (pieces present, board engine works, helper skills).</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · One line</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">⏺</span> <span class="k">Bash</span><span class="d">(super-board-preflight.sh --install)</span>
+  ⎿  <span class="g">all pieces present · engine OK · helper skills OK</span></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Wizard step, tool lines</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="k">Step 1 of 12 · 🔍 Install checks</span>
+  <span class="d">Makes sure every piece works before any questions.</span>
+
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(ls .claude/bin .claude/workflows .claude/hooks)</span>
+  ⎿  all pieces present
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(node --check .claude/workflows/super-board-wave.js)</span>
+  ⎿  board engine OK
+<span class="w">⏺</span> <span class="d">Reminder: dynamic workflows must be ON in /config.</span></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Checklist table</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Install checks
+  ┌──────────────────────┬────────┐
+  │ helper scripts       │ <span class="g">✓</span>      │
+  │ board engine         │ <span class="g">✓</span>      │
+  │ guard hooks          │ <span class="g">✓</span> 6    │
+  │ helper skills        │ <span class="y">✗ Node</span> │
+  │ dynamic workflows on │ <span class="y">?</span> check │
+  └──────────────────────┴────────┘
+  <span class="d">✗ helper skills: install Node, then npx skills add …</span></div></div></div>
+</div></section>
+
+<!-- 4 GOAL -->
+<section class="slide" data-id="goal" data-name="Goal question">
+<h2>🎯 Goal question</h2><p class="purpose">"What do you want to run in a loop?" — the first real question.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Plain picker</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><div class="pk"><span class="chip">☐ Goal</span>
+<span class="k">What do you want to run in a loop?</span>
+
+<span class="s">❯ 1. Build features for this repo (Recommended)</span>
+  2. QA this repo (already built)
+  3. Test a live URL
+  4. Type something.
+
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Wizard: step + why + descriptions</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="k">Step 2 of 12 · 🎯 What should it do?</span>
+  <span class="d">Decides your board's columns and what the robot may touch.</span>
+<div class="pk"><span class="chip">☐ Goal</span>
+<span class="k">What should super-board do for this project?</span>
+
+<span class="s">❯ 1. Build new features (Recommended)</span>
+     <span class="d">writes code, tests it, reviews it, merges it</span>
+  2. Test what's already built
+     <span class="d">finds bugs and adds tests</span>
+  3. Test a live website only
+     <span class="d">no access to the code</span>
+  4. Type something.
+
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Table first, then picker</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Three ways to run:
+  │ goal     │ board columns              │ touches code │
+  │ build    │ Ready·Building·QA·Review   │ yes          │
+  │ QA       │ Ready·QA·Review            │ tests only   │
+  │ live URL │ Ready·QA·Review            │ no           │
+<div class="pk"><span class="chip">☐ Goal</span>
+<span class="s">❯ 1. build (Recommended)</span>
+  2. QA
+  3. live URL
+  4. Type something.
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div></div>
+</div></section>
+
+<!-- 5 GITHUB -->
+<section class="slide" data-id="github" data-name="GitHub connect">
+<h2>🔑 GitHub connect</h2><p class="purpose">Sign-in check, missing board access (opens a browser), git + remote.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Tool lines only</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">⏺</span> <span class="k">Bash</span><span class="d">(gh auth status)</span>
+  ⎿  <span class="y">erictech · missing project scopes</span>
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(gh auth refresh -s project,read:project,repo)</span>
+  ⎿  <span class="g">✓ Authentication complete</span>
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(git remote get-url origin)</span>
+  ⎿  github.com/erictech/my-app</div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Say why, then permission prompt</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="k">Step 3 of 12 · 🔑 Connect GitHub</span>
+  This opens a browser to approve board access —
+  needed to move cards and create the board for you.
+<div class="pk perm"><span class="k">Bash command</span>
+
+  gh auth refresh -s project,read:project,repo
+  <span class="d">Add GitHub project scopes (opens a browser)</span>
+
+Do you want to proceed?
+<span class="s">❯ 1. Yes</span>
+  2. Yes, and don't ask again for gh auth refresh commands
+  3. No, and tell Claude what to do differently (esc)</div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Checklist</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> GitHub
+  <span class="g">✓</span> signed in as erictech
+  <span class="y">○</span> board access — approving in your browser…
+  <span class="g">✓</span> git repo, 412 commits
+  <span class="g">✓</span> remote github.com/erictech/my-app
+  <span class="d">bot identity: erictech (no GitHub App)</span></div></div></div>
+</div></section>
+
+<!-- 6 BOARD -->
+<section class="slide" data-id="board" data-name="Board pick">
+<h2>🗂️ Board pick</h2><p class="purpose">Which GitHub project the robot works from, and the columns it gets.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Picker</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">⏺</span> <span class="k">Bash</span><span class="d">(gh project list --owner erictech)</span>
+  ⎿  2 projects
+<div class="pk"><span class="chip">☐ Project</span>
+<span class="k">Which GitHub project should the robot work from?</span>
+
+<span class="s">❯ 1. Create "my-app board" (Recommended)</span>
+  2. my-app Roadmap (#4)
+  3. Personal (#1)
+  4. Type something.
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Picker + column preview</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="k">Step 4 of 12 · 🗂️ Pick your board</span>
+  Your board will look like this:
+  ┌Ready┐┌Building┐┌QA┐┌Review┐┌Done┐  ┌Blocked┐┌Skipped┐
+  <span class="d">A card that needs you waits in Blocked with 🙋.</span>
+<div class="pk"><span class="chip">☐ Board</span>
+<span class="s">❯ 1. Make a new board "my-app board" (Recommended)</span>
+  2. Use "my-app Roadmap" — I add the missing columns
+  3. Type something.
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Table of existing boards</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Your boards:
+  │ # │ board          │ cards │ columns fit? │
+  │ 4 │ my-app Roadmap │ 31    │ <span class="y">3 of 7</span>       │
+  │ 1 │ Personal       │ 12    │ <span class="y">3 of 7</span>       │
+  │ – │ new board      │ 0     │ <span class="g">7 of 7</span>       │
+<div class="pk"><span class="chip">☐ Board</span>
+<span class="s">❯ 1. new board (Recommended)</span>  2. #4  3. #1  4. Type something.</div></div></div></div>
+</div></section>
+
+<!-- 7 AGENTS -->
+<section class="slide" data-id="agents" data-name="AGENTS.md merge">
+<h2>📜 AGENTS.md merge</h2><p class="purpose">Merging CLAUDE.md into AGENTS.md: duplicates, conflicts, approval.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Numbers + one approval</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> 31 rules · 19 duplicates kept once · 8 move over ·
+  2 stay Claude-only · <span class="y">2 conflicts (I kept AGENTS.md's)</span>
+  CLAUDE.md becomes "@AGENTS.md". Backup first.
+<div class="pk"><span class="chip">☐ AGENTS.md</span>
+<span class="s">❯ 1. Approve (Recommended)</span>
+  2. Show the diff
+  3. Skip the merge
+  4. Type something.</div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · One question per conflict, both lines quoted</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">⏺</span> <span class="k">Bash</span><span class="d">(super-board-agents-md.py units --file AGENTS.md --file CLAUDE.md)</span>
+  ⎿  31 units · 19 dup · 8 move · 2 Claude-only · 2 conflicts
+<div class="pk"><span class="chip">☐ Conflict 1/2</span>
+<span class="k">Which test rule wins?</span>
+  AGENTS.md:14  "Run pnpm test before every commit."
+  CLAUDE.md:9   "Run pnpm test:unit only; e2e runs in CI."
+
+<span class="s">❯ 1. CLAUDE.md:9 — pnpm test:unit only (Recommended)</span>
+  2. AGENTS.md:14 — pnpm test before every commit
+  3. Type something.
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Mapping table + diff</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Where each rule goes:
+  │ rule (source)          │ → goes to          │
+  │ pnpm only (A:3, C:5)   │ AGENTS.md:12 (once)│
+  │ no .env reads (C:11)   │ AGENTS.md:31       │
+  │ use /tdd (C:20)        │ CLAUDE.md:3        │
+  │ <span class="y">tests (A:14 vs C:9)</span>    │ <span class="y">you pick</span>           │
+  <span class="g">coverage: 31/31 mapped</span>
+  <span class="r">- When you write tests please try to…</span>
+  <span class="g">+ | Tests | pnpm test:unit only. e2e = CI. |</span></div></div></div>
+</div></section>
+
+<!-- 8 BRANCH -->
+<section class="slide" data-id="branch" data-name="Branch">
+<h2>🌿 Branch</h2><p class="purpose">Where the robot branches from and merges back, with the "main goes live" warning.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Picker with warning option</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">⏺</span> <span class="k">Bash</span><span class="d">(ls vercel.json .github/workflows/deploy.yml)</span>
+  ⎿  <span class="y">production signals: vercel.json, deploy on push to main</span>
+<div class="pk"><span class="chip">☐ Base branch</span>
+<span class="k">Which branch should super-board branch from and merge into?</span>
+<span class="s">❯ 1. Create staging from main (Recommended)</span>
+  2. main — every merge lands in production
+  3. develop
+  4. Type something.</div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Wizard: warning box first</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="k">Step 7 of 12 · 🌿 Where finished work goes</span>
+  <span class="y">⚠ main goes live (Vercel deploys every push).</span>
+  Safer: the robot merges into staging; you move
+  staging → main when you're happy.
+<div class="pk"><span class="chip">☐ Branch</span>
+<span class="s">❯ 1. A new "staging" branch (Recommended)</span>
+  2. Straight to main — robot never merges alone
+  3. Type something.</div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Consequence table</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span>
+  │ branch  │ goes live?  │ robot may merge? │
+  │ staging │ no          │ <span class="g">yes</span>              │
+  │ develop │ no          │ <span class="g">yes</span>              │
+  │ main    │ <span class="y">every merge</span> │ <span class="y">no — you merge</span>   │
+<div class="pk"><span class="chip">☐ Branch</span>
+<span class="s">❯ 1. staging (Recommended)</span>  2. develop  3. main</div></div></div></div>
+</div></section>
+
+<!-- 9 POLICIES -->
+<section class="slide" data-id="policies" data-name="Policies screen">
+<h2>🛡️ Policies screen</h2><p class="purpose">Merge rule · push guard · which databases the robot may migrate.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · One "Accept all recommended"</b><span class="rec">today (first screen)</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Recommended:
+  🔀 Merge — auto for normal changes; money, auth,
+     destructive schema wait for you (🙋)
+  🚫 Push guard — block direct/force pushes to main
+  🗄️ Migrations — test and staging
+<div class="pk"><span class="chip">☐ Policies</span>
+<span class="k">Accept the recommended policies?</span>
+<span class="s">❯ 1. Accept all recommended (Recommended)</span>
+  2. Review each
+  3. Type something.</div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · One question each (tabs)</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><div class="pk"><span class="d">←</span> <span class="chip">☐ Merge</span>  ☐ Push guard  ☐ Migrations  ✔ Submit <span class="d">→</span>
+
+<span class="k">Who merges a PR that passes review?</span>
+<span class="s">❯ 1. Auto-merge normal changes; money, auth,</span>
+<span class="s">     destructive schema wait for you (Recommended)</span>
+  2. A human merges everything
+  3. Type something.
+
+<span class="f">Enter to select · Tab/Arrow keys to navigate · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Table with toggles</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Safety rules — toggle with the number, Enter to save
+  │ # │ rule                              │ now    │
+  │ 1 │ robot merges normal changes       │ <span class="g">[on ]</span>  │
+  │ 2 │ money/auth/schema wait for you    │ <span class="g">[on ]</span>  │
+  │ 3 │ block pushes to main              │ <span class="g">[on ]</span>  │
+  │ 4 │ migrate: test                     │ <span class="g">[on ]</span>  │
+  │ 5 │ migrate: staging                  │ <span class="g">[on ]</span>  │
+  │ 6 │ migrate: live                     │ <span class="d">[off]</span>  │
+  <span class="d">(would need a custom prompt — not the standard picker)</span></div></div></div>
+</div></section>
+
+<!-- 10 PERMISSIONS -->
+<section class="slide" data-id="perms" data-name="Permissions / allowlist">
+<h2>🔓 Permissions / allowlist</h2><p class="purpose">The lines added to .claude/settings.json so the run doesn't stop for pop-ups.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Raw diff + Add/Skip</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="g">⏺</span> <span class="k">Bash</span><span class="d">(super-board-settings.py allow … --dry-run)</span>
+  <span class="g">+ Bash(gh project:*)</span>
+  <span class="g">+ Bash(gh issue:*)</span>
+  <span class="g">+ Bash(gh pr:*)</span>
+  <span class="g">+ Bash(bash .claude/bin/super-board-merge-gate.sh:*)</span>
+  <span class="g">+ Bash(gh pr merge:*)</span>
+  <span class="g">+ Bash(npm run db:migrate)</span>
+  <span class="g">+ Bash(npm test:*)</span>
+<div class="pk"><span class="chip">☐ Permissions</span>
+<span class="s">❯ 1. Add these lines (Recommended)</span>
+  2. Skip — every merge will ask you</div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Plain-words groups</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Let the robot do these without asking:
+  <span class="g">✓</span> move cards and edit issues     <span class="d">gh project, gh issue</span>
+  <span class="g">✓</span> open and merge pull requests   <span class="d">gh pr, merge gate</span>
+  <span class="g">✓</span> migrate test + staging DBs     <span class="d">npm run db:migrate</span>
+  <span class="g">✓</span> run your tests                 <span class="d">npm test</span>
+<div class="pk"><span class="chip">☐ Permissions</span>
+<span class="s">❯ 1. Allow these (Recommended)</span>
+  2. Show the exact lines
+  3. Ask me each time</div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Claude Code's own edit prompt</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><div class="pk perm"><span class="k">Edit file</span>
+.claude/settings.json
+  "allow": [
+<span class="g">+   "Bash(gh project:*)", "Bash(gh issue:*)",</span>
+<span class="g">+   "Bash(gh pr:*)", "Bash(gh pr merge:*)", …</span>
+  ]
+
+Do you want to make this edit to settings.json?
+<span class="s">❯ 1. Yes</span>
+  2. Yes, allow all edits during this session (shift+tab)
+  3. No, and tell Claude what to do differently (esc)</div></div></div></div>
+</div></section>
+
+<!-- 11 SOURCES -->
+<section class="slide" data-id="sources" data-name="Bug sources">
+<h2>📥 Bug sources</h2><p class="purpose">Sentry / PostHog / GitHub / PRs / architecture: detect, pick, test each read-only.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Multi-select picker</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><div class="pk"><span class="chip">☐ Collect</span>
+<span class="k">Enable which collect sources?</span>
+<span class="s">❯ [✔] 1. sentry (Recommended)</span>   <span class="d">detected</span>
+  [✔] 2. posthog (Recommended)  <span class="d">detected</span>
+  [✔] 3. github
+  [✔] 4. prs
+  [✔] 5. architecture
+      Submit
+<span class="f">Space to toggle · Enter to select · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Ping table with fixes</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> Tested each source (read-only):
+  │ source       │ key     │ ping │
+  │ sentry       │ <span class="g">present</span> │ <span class="g">✅</span>   │
+  │ posthog      │ <span class="y">missing</span> │ <span class="r">❌</span>   │
+  │ github, prs  │ —       │ <span class="g">✅</span>   │
+  │ architecture │ —       │ <span class="g">✅</span>   │
+  <span class="y">posthog: add POSTHOG_PERSONAL_API_KEY to .env</span>
+  <span class="d">  scopes query:read error_tracking:read · left out for now</span>
+  <span class="d">  silent: rage clicks, dead clicks → turn on autocapture</span></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Wizard: found → ask</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="k">Step 10 of 12 · 📥 Where bugs come from</span>
+  Found Sentry (errors) and PostHog (user analytics).
+  Sentry key present · PostHog key missing.
+<div class="pk"><span class="chip">☐ Bugs</span>
+<span class="s">❯ 1. Use Sentry + GitHub + PRs + code cleanup (Recommended)</span>
+  2. Add PostHog too (I'll show the .env line)
+  3. Only GitHub
+  4. Type something.</div></div></div></div>
+</div></section>
+
+<!-- 12 REVIEW -->
+<section class="slide" data-id="review" data-name="Review screen">
+<h2>✅ Review screen</h2><p class="purpose">Every answer + every file that will change, then write once.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Table + Write everything</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span>
+  │ goal        │ build features                 │
+  │ project     │ my-app board (#7, new)         │
+  │ AGENTS.md   │ merge, CLAUDE.md = @AGENTS.md  │
+  │ base        │ staging                        │
+  │ merge       │ auto; money/auth/schema wait   │
+  │ push guard  │ on                             │
+  │ migrations  │ test, staging                  │
+  │ permissions │ add allowlist                  │
+  │ collect     │ sentry, github, prs, arch      │
+<div class="pk"><span class="chip">☐ Review</span>
+<span class="s">❯ 1. Write everything (Recommended)</span>
+  2. Change one thing
+  3. Cancel</div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Files checklist</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> I'll write these files:
+  [✔] .claude/super-board/configs/my-app-build.json
+  [✔] .claude/super-board/active + .gitignore
+  [✔] .claude/settings.json  <span class="d">(7 permission lines, push guard)</span>
+  [✔] AGENTS.md  <span class="d">(+24 −12)</span>  · CLAUDE.md → @AGENTS.md
+  [✔] docs/agents/issue-tracker.md  <span class="d">(ticket format)</span>
+  [✔] docs/super-board/PROJECT.md
+  <span class="d">Backups first. Nothing written yet.</span>
+<div class="pk"><span class="chip">☐ Save</span>
+<span class="s">❯ 1. Write all 6 (Recommended)</span>  2. Change one  3. Cancel</div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · One line each</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> build · board #7 · base staging · auto-merge (🙋 money/
+  auth/schema) · push guard on · migrate test+staging ·
+  allowlist on · sources sentry,github,prs,arch ·
+  AGENTS.md merged · 6 files
+<div class="pk"><span class="chip">☐ Save</span>
+<span class="s">❯ 1. Save (Recommended)</span>  2. Change one  3. Cancel</div></div></div></div>
+</div></section>
+
+<!-- 13 DONE -->
+<section class="slide" data-id="done" data-name="Done summary">
+<h2>🎉 Done summary</h2><p class="purpose">The one place that names the next command.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Four lines</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="g">✅ Onboard complete.</span>
+  📋 Board: github.com/users/erictech/projects/7
+  🧹 Next: run /super-board lint — checks every ticket
+     has clear success criteria.
+  🤖 Then: /super-board run.</div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Wizard finish + to-do by hand</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="g">✓ Setup complete</span>
+  set up: config · board #7 · AGENTS.md · 6 guards
+          · permissions · PROJECT.md · ticket format
+
+  <span class="y">still to do by hand:</span>
+    - add POSTHOG_PERSONAL_API_KEY to .env
+    - turn on dynamic workflows in /config
+
+  next: put tickets in Ready → /super-board lint
+        → /super-board run</div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Next-steps table</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="w">⏺</span> <span class="g">✅ Done.</span> Board → github.com/users/erictech/projects/7
+  │ 1 │ add tickets to Ready │ or /to-tickets        │
+  │ 2 │ /super-board lint    │ tightens each ticket  │
+  │ 3 │ /super-board run     │ robot starts working  │
+  │ ! │ PostHog key missing  │ optional, add to .env │</div></div></div>
+</div></section>
+
+<!-- 14 NEEDS YOU -->
+<section class="slide" data-id="needsyou" data-name="Blocked 🙋 comment">
+<h2>🙋 Blocked "needs you" comment</h2><p class="purpose">The GitHub comment when a card waits for a person (merge to approve, or a migration only you may run).</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · Full template</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="cm"><div class="ch">super-board-bot commented · label <code>needs-you</code></div><div class="cb"><pre>🛡 super-board · Review · BLOCKED
+─────────────────────────────────────
+Card:        #812 Add plan column
+PR:          #845
+Reason tag:  🙋 needs you
+Why blocked: PR adds prisma/migrations/0042_add_plan;
+             live is not in allowed_envs
+Checked:     verify green on staging@9c41e07;
+             migrated: test, staging
+To unblock:  [ ] npx prisma migrate deploy  (live)
+             [ ] comment `done` here
+Move back:   automatic — next wave merges
+blocked-by:  -</pre></div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Short</b><button class="btn pickb">Pick</button></div><div class="render"><div class="cm"><div class="ch">super-board-bot commented · label <code>needs-you</code></div><div class="cb">
+<p class="hd">🙋 Needs you — run 1 command, then comment <code>done</code></p>
+<pre>npx prisma migrate deploy   # live database</pre>
+<p class="muted">Why: live isn't in allowed_envs. Test + staging already migrated and green. The next wave merges after your <code>done</code>.</p></div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Checklist first</b><button class="btn pickb">Pick</button></div><div class="render"><div class="cm"><div class="ch">super-board-bot commented · label <code>needs-you</code></div><div class="cb">
+<p class="hd">🙋 Your turn on #812</p>
+<ul class="task"><li><input type="checkbox" disabled>Run <code>npx prisma migrate deploy</code> on live</li><li><input type="checkbox" disabled>Comment <code>done</code></li></ul>
+<details><summary>Why and what I checked</summary><p class="muted">live is not in allowed_envs · verify green on staging@9c41e07 · migrated test, staging</p></details></div></div></div></div>
+</div></section>
+
+<!-- 15 RESUME -->
+<section class="slide" data-id="resume" data-name="Resume prompt">
+<h2>💾 Resume prompt</h2><p class="purpose">Re-running onboard after it stopped halfway.</p>
+<div class="opts">
+<div class="opt" data-opt="A"><div class="ohead"><b>A · One question</b><span class="rec">today</span><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+<div class="pk"><span class="chip">☐ Resume</span>
+<span class="k">Resume at Policies?</span>
+<span class="s">❯ 1. Resume at Policies (Recommended)</span>
+     <span class="d">every earlier answer is kept</span>
+  2. Start over
+     <span class="d">the answers file is renamed .bak</span>
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div></div>
+<div class="opt" data-opt="B"><div class="ohead"><b>B · Saved answers, then question</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+<span class="w">⏺</span> 💾 Found your answers from 2 Oct, 18:40:
+  <span class="g">✓</span> goal: build   <span class="g">✓</span> board #7   <span class="g">✓</span> AGENTS.md merge
+  <span class="g">✓</span> description   <span class="g">✓</span> base: staging
+  → stopped at 🛡️ Policies
+<div class="pk"><span class="chip">☐ Resume</span>
+<span class="s">❯ 1. Continue at Policies (Recommended)</span>
+  2. Edit an earlier answer
+  3. Start over</div></div></div></div>
+<div class="opt" data-opt="C"><div class="ohead"><b>C · Auto-resume</b><button class="btn pickb">Pick</button></div><div class="render"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+<span class="w">⏺</span> Picking up at 🛡️ Policies (5 answers kept).
+  <span class="d">Say "start over" to begin again.</span>
+
+<span class="w">⏺</span> <span class="k">Step 8 of 12 · 🛡️ Safety rules</span> …</div></div></div>
+</div></section>
+
+<!-- SUMMARY -->
+<section class="slide" data-id="summary" data-name="Summary">
+<h2>Your picks</h2><p class="purpose">Copy them and paste them back to Claude. Comments are included. Options marked "today" are what the branch does now.</p>
+<div class="sum"><ol id="sumlist"></ol>
+<button class="btn primary" id="copy" type="button">Copy my picks</button><span id="copied"></span></div>
+</section>
+
+</main>
+<div class="nav"><div class="in">
+  <button class="btn" id="prev" type="button">← Prev</button>
+  <span class="count" id="count"></span>
+  <button class="btn" id="next" type="button">Next →</button>
+</div></div>
+
+<script>
+(function(){
+  var root=document.documentElement;
+  function sget(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+  function sset(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+  var t=sget('sb-ob-theme'); if(t) root.setAttribute('data-theme',t);
+  document.getElementById('tt').onclick=function(){
+    var cur=root.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    var n=cur==='dark'?'light':'dark'; root.setAttribute('data-theme',n); sset('sb-ob-theme',n);
+  };
+  var picks={}; try{picks=JSON.parse(sget('sb-ob-picks')||'{}')||{};}catch(e){picks={};}
+  var comments={}; try{comments=JSON.parse(sget('sb-ob-comments')||'{}')||{};}catch(e){comments={};}
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  slides.forEach(function(s){
+    var opts=s.querySelector('.opts'); if(!opts) return;
+    var c=document.createElement('div'); c.className='opt none'; c.dataset.opt='N';
+    c.innerHTML='<div class="ohead"><b>None of these — leave a comment</b><button class="btn pickb" type="button">Pick</button></div><div class="render"><p>Say what you want instead. Saved as you type; included in "Copy my picks".</p><textarea placeholder="e.g. like B, but without the step numbers"></textarea></div>';
+    var ta=c.querySelector('textarea'); ta.value=comments[s.dataset.id]||'';
+    ta.addEventListener('input',function(){ comments[s.dataset.id]=ta.value; sset('sb-ob-comments',JSON.stringify(comments)); paint(); });
+    ta.addEventListener('keydown',function(e){ e.stopPropagation(); });
+    opts.appendChild(c);
+  });
+  var dots=document.getElementById('dots'), i=0;
+  try{var h=location.hash.slice(1); slides.forEach(function(s,k){if(s.dataset.id===h)i=k;});}catch(e){}
+  slides.forEach(function(s,k){
+    var d=document.createElement('button'); d.className='dot'; d.type='button';
+    d.title=s.dataset.name; d.setAttribute('aria-label',s.dataset.name);
+    d.onclick=function(){go(k);}; dots.appendChild(d);
+    [].forEach.call(s.querySelectorAll('.opt'),function(o){
+      var b=o.querySelector('.pickb');
+      b.onclick=function(){
+        picks[s.dataset.id]=o.dataset.opt+' · '+o.querySelector('.ohead b').textContent.replace(/^[A-Z] · /,'');
+        sset('sb-ob-picks',JSON.stringify(picks)); paint();
+        if(o.dataset.opt==='N'){ o.querySelector('textarea').focus(); } else setTimeout(function(){go(i+1);},250);
+      };
+    });
+  });
+  function paint(){
+    slides.forEach(function(s,k){
+      var id=s.dataset.id, p=picks[id];
+      [].forEach.call(s.querySelectorAll('.opt'),function(o){
+        var on=p&&p.charAt(0)===o.dataset.opt; o.classList.toggle('picked',!!on);
+        o.querySelector('.pickb').textContent=on?'✓ Picked':'Pick';
+      });
+      dots.children[k].classList.toggle('done',!!p);
+      dots.children[k].classList.toggle('cur',k===i);
+      s.classList.toggle('on',k===i);
+    });
+    document.getElementById('count').textContent=(i+1)+' / '+slides.length+' · '+slides[i].dataset.name;
+    document.getElementById('prev').disabled=i===0;
+    document.getElementById('next').disabled=i===slides.length-1;
+    var ul=document.getElementById('sumlist'); ul.innerHTML='';
+    slides.forEach(function(s){ if(s.dataset.id==='summary')return;
+      var li=document.createElement('li'), p=picks[s.dataset.id];
+      var cm=(comments[s.dataset.id]||'').trim();
+      li.innerHTML='<b>'+s.dataset.name+':</b> '+(p?p:'<span class="none">not picked</span>')+(cm?' — <i>'+cm.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</i>':''); ul.appendChild(li);});
+  }
+  function text(){
+    var out=['Onboarding screen picks:'];
+    slides.forEach(function(s,k){ if(s.dataset.id==='summary') return;
+      var cm=(comments[s.dataset.id]||'').trim().replace(/\s*\n\s*/g,' / ');
+      out.push((k+1)+'. '+s.dataset.name+' = '+(picks[s.dataset.id]||'not picked')+(cm?' — comment: '+cm:''));});
+    return out.join('\n');
+  }
+  document.getElementById('copy').onclick=function(){
+    var tx=text(), msg=document.getElementById('copied');
+    function fb(){var a=document.createElement('textarea');a.value=tx;document.body.appendChild(a);a.select();try{document.execCommand('copy');msg.textContent='Copied';}catch(e){msg.textContent='Select and copy manually';}document.body.removeChild(a);}
+    try{navigator.clipboard.writeText(tx).then(function(){msg.textContent='Copied';},fb);}catch(e){fb();}
+  };
+  function go(k){ if(k<0||k>=slides.length)return; i=k; try{history.replaceState(null,'','#'+slides[i].dataset.id);}catch(e){} paint(); window.scrollTo(0,0); }
+  document.getElementById('prev').onclick=function(){go(i-1);};
+  document.getElementById('next').onclick=function(){go(i+1);};
+  document.addEventListener('keydown',function(e){ if(e.key==='ArrowRight')go(i+1); else if(e.key==='ArrowLeft')go(i-1); });
+  paint();
+})();
+</script>
+<script>
+(function(){
+  var E={install:['B',''],welcome:['N',"Short agenda of the wizard steps — what we'll ask — not a to-do checklist."],
+   checks:['N',"Show which step we're on + a checklist diagram. If something is wrong, debug and fix it (install missing pieces, repair config) with my OK, re-check, and only move on when green."],
+   goal:['X',"Remove this question. The board always has all columns; each ticket's type routes it (a QA ticket skips Build)."],
+   github:['B',''],board:['N',"Show the default columns first (Backlog · Ready · Building · QA · Review · Blocked · Done), then ask what to name the board: 3 names suggested from scanning the app + Type a name."],
+   agents:['B',"Plus one line up front: Claude Code reads AGENTS.md when there's no full CLAUDE.md, so rules move to AGENTS.md and CLAUDE.md stays as @AGENTS.md."],
+   branch:['C',"First share what it found — branches, does staging exist, current branch, recent commits, where deploys come from — then recommend the base branch."],
+   policies:['A',''],perms:['A','Can be the same step as policies.'],
+   sources:['A',"Add plain explanations per source, plus ➕ Add another source (link / app name / API URL / MCP server / CLI) that setup tests read-only and says yes/no with why."],
+   review:['A',''],done:['A','Short, with 🎉.'],needsyou:['C',''],resume:['B','']};
+  [].forEach.call(document.querySelectorAll('.slide'),function(sl){
+    var e=E[sl.dataset.id]; if(!e) return;
+    var box=document.createElement('div'); box.className='alert tip'; box.style.margin='0 0 14px';
+    var lab=e[0]==='X'?'❌ removed':e[0]==='N'?'✅ chosen: his own design':'✅ chosen: '+e[0];
+    box.innerHTML='<div class="t">Eric · '+lab+'</div>'+(e[1]?e[1].replace(/</g,'&lt;'):'');
+    sl.querySelector('.purpose').after(box);
+    [].forEach.call(sl.querySelectorAll('.opt'),function(o){ if(o.dataset.opt===e[0]){ var b=document.createElement('span'); b.className='rec'; b.style.background='var(--pick)'; b.style.color='#fff'; b.textContent='✅ chosen'; o.querySelector('.ohead b').after(b); o.style.borderColor='var(--pick)'; } });
+  });
+})();
+</script>
+</body>
+</html>

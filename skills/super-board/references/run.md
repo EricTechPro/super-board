@@ -115,7 +115,7 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 - Builder creates the branch off `config.base_branch`, writes code, commits + pushes, opens a **draft PR**.
 - Tester checks out the same branch in a fresh worktree, adds tests, commits to the same branch, pushes.
 - Reviewer is the **only lane that merges**. On approval: squash-merges PR into `base_branch`, deletes the branch.
-- If `config.human_approves_merge: true`, Reviewer instead marks the PR ready for review and stops; a human clicks merge.
+- If `config.merge_policy` says a human merges (`default: "human"`, or a money / auth / schema / size hit), the merge gate exits 7 and the Reviewer parks the card in Blocked for a human click instead.
 
 ## PR description template
 
@@ -372,11 +372,12 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - **Code-grounder** — verify cited file:line still exists and matches claims.
    - **Historian** — `git blame` the changed lines, check for ADRs / prior incidents.
    - **Budget cap (added 2026-05-22): each sub-agent ≤50 gh calls.** Prefer local `git blame` / `git log` over `gh api graphql`. If a sub-agent needs >50 calls to reach confidence, it returns `confidence: "insufficient_data"` and the Reviewer flags the card as 🛡 truth-check inconclusive instead of burning the shared quota. See `rate-limit-etiquette.md`.
+   - **Brief:** use the fixed sub-agent brief in super-review → "Adversarial mode" verbatim. Never write your own. It states that Over-engineering is Should fix, never Blocker on its own, and never lowers confidence.
    - Aggregate into a confidence score (0-100). Compare against `config.truth_threshold` (default 70).
    - **Below threshold** — Reviewer MUST NOT approve. Open a `[reviewer]`-prefixed PR thread quoting the lowest-confidence sub-agent finding, write the full Block template comment (see §4 Block/Skip), move card Review → Blocked with reason tag 🛡 truth-check failed (confidence X/100). The card stays Blocked until human review; the bot's "Why I cannot decide" line names the specific sub-agent finding it could not confirm.
    - **Above threshold** — continue to step 7.
    - **No Reproducer needed** — Tester's tests were re-run in step 5.
-7. Decide per finding:
+7. Decide per finding. First re-apply the Over-engineering rule to every collected finding, whatever a sub-agent wrote: Should fix, never Blocker, never on its own a bounce or block. Then:
    - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
    - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
@@ -412,14 +413,10 @@ on the base branch**.
 
 ```
 1. Mark ready      gh pr ready <PR>                     # idempotent; no-op if already ready
-2. Branch A — human_approves_merge: true
-     → stop here. Card Review → Done is NOT taken; leave the card in Review with a
-       `[reviewer]` comment saying the PR is ready for a human to merge.
-   Branch B — human_approves_merge: false
-     → merge through the gate (step 5), pinned to the reviewed head — never a bare
-       `gh pr merge`. The gate applies `merge_policy` (who merges) and
-       `migrations` (which databases the robot may migrate) itself; the Reviewer
-       does not second-guess either, it routes the exit code.
+2. Merge through the gate (step 5), pinned to the reviewed head — never a bare
+   `gh pr merge`. The gate applies `merge_policy` (who merges; `default: "human"`
+   keeps a person on every merge) and `migrations` (which databases the robot may
+   migrate) itself; the Reviewer does not second-guess either, it routes the exit code.
 3. Confirm the merge LANDED, do not trust the exit code:
      gh pr view <PR> --json state,mergeCommit -q '.state + " " + (.mergeCommit.oid // "none")'
      Expect: MERGED <sha>.  Then verify the sha is reachable from the base branch:

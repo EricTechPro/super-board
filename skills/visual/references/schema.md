@@ -71,3 +71,45 @@ Layout that reads well:
 - For a **plan**, flag new pieces `planned` and existing ones plain, so the delta is visible.
 - For **explore**, use one overview diagram, plus one per interesting flow.
 - Edges run forward (higher `col`) wherever possible; back-edges route around the side and read worse.
+
+Every document diagram also gets the camera: drag to pan, pinch or Ctrl/⌘ + scroll to zoom, `+ − 0` on the focused canvas, and ⛶ for full screen.
+
+## Map model (`render --map`)
+
+The drill-down map takes its own file: shared nodes and edges, plus views that each show a subset. `visual.py skillmap` writes a skeleton of it.
+
+```jsonc
+{
+  "title": "super-board skill map",
+  "root": "overview",                      // optional; default = the view with no parent
+  "sourcesBase": "_skills/vendor/super-board/",   // optional prefix for node `source` paths (from the repo root)
+  "authors": { "mattpocock": { "name": "Matt Pocock", "url": "https://github.com/mattpocock" } },  // avatars are fetched once and inlined by render
+  "nodes": [
+    { "id": "super-board", "label": "/super-board",
+      "kind": "public",                    // public | lane | external | verb | script | hook | board
+      "verbs": ["onboard", "run", "stop"], // chips on the node and in the panel
+      "what": "One line: what it does.", "when": "What triggers it.", "how": "How it works (markdown).",
+      "source": "skills/super-board/SKILL.md",      // string or array; `:line` suffixes are fine
+      "sublabel": "optional line under the label",
+      "opensView": "super-board",          // optional; otherwise a view with the node's id opens
+      "author": "EricTechPro",             // optional GitHub login; external skills show the author's avatar
+      "origin": "mattpocock-skills",       // optional: where an external skill comes from
+      "credits": ["BuilderIO"] }           // optional: further authors listed in the panel
+  ],
+  "edges": [ { "id": "e1", "from": "super-board", "to": "super-build", "label": "dispatches", "when": "each wave" } ],
+  "views": [
+    { "id": "overview", "parent": null, "title": "super-board", "caption": "optional one line", "nodeIds": ["super-board", "super-build"] },
+    { "id": "super-board", "parent": "overview", "title": "/super-board", "nodeIds": ["super-board", "..."],
+      "edges": ["e1"],                     // optional: edge ids or edge objects; default = every model edge between its nodes
+      "render": "sequence",                // optional: edges are the run order and get step numbers
+      "layout": { "super-board": [0, 0] } }  // optional [col,row] per node; default = layered auto-layout
+  ]
+}
+```
+
+- **Kinds, as the legend says them:** public skill (you run it; bold outline, halo, PUBLIC tab), board lane (the board starts it), external skill (from another pack; dashed outline, EXTERNAL tab, author avatar or initials), impeccable verb (a design command; pill), script (code a skill runs; small and muted), hook / guard (fires on its own), state (board, config, ledgers).
+- **Skills first.** A view shows the skills and verbs a node triggers. Scripts are small detail nodes or stay in `how`.
+- **Routing.** Every edge gets its own port and its own orthogonal route. Routes never share a line and cross only when nothing else fits; `render` searches row orders for a crossing-free layout, bakes it into `layout`, and the check fails on any crossing that remains. ≋ in the control bar (or F) animates the flow direction.
+- **Drill-down.** A node opens a view when `opensView` names one or a view shares its id. Such nodes draw as a stack with a `⤢ n` badge. A view that is about one node (same id) lays out around it: the node first, then what it calls.
+- **Edges.** A→B plus B→A merge into one two-way edge, and parallel edges between one pair merge into one edge whose label ends in `+n`. A label with no clean spot is left off the canvas but stays in the tooltip and the panel.
+- Keep labels to ≤ 28 chars and edge labels to a verb phrase; the panel carries the long text.

@@ -3,7 +3,10 @@
 
     visual.py detect [--base REF]           # JSON: git state, plan candidates, suggested mode
     visual.py facts  [--base REF]           # JSON: recap facts (commits, files +/-, areas)
-    visual.py render DATA.json [--out PATH] [--no-open]
+    visual.py render DATA.json [--out PATH] [--no-open] [--no-check]
+    visual.py render --map MAP.json [--out PATH] [--no-open] [--no-check]
+    visual.py skillmap SKILLS_DIR [--out MAP.json]   # skeleton view model of a skill pack
+    visual.py check PAGE.html [--shots DIR]          # headless Chrome: light+dark shots, label overlaps
 
 Stdlib only. Run from anywhere inside the project being visualised.
 """
@@ -239,7 +242,12 @@ def output_path(root: Path, data: dict) -> Path:
 
 
 def cmd_render(a) -> None:
-    data = json.loads(Path(a.data).read_text(encoding="utf8"))
+    if a.map:
+        data = load_map(Path(a.map))
+    elif a.data:
+        data = json.loads(Path(a.data).read_text(encoding="utf8"))
+    else:
+        sys.exit("render needs DATA.json or --map MAP.json")
     root = repo_root() or Path.cwd()
     kind = data.setdefault("kind", "explore")
     if kind == "recap" and repo_root():
@@ -256,22 +264,466 @@ def cmd_render(a) -> None:
     for f in data.get("files", []):
         if "area" not in f:
             f["area"], f["prefix"] = area_of(f["path"], data.get("areas", {}))
+    if kind == "map":
+        data["avatarsEmbedded"] = embed_avatars(data)
+        problems = validate_map(data)
+        if problems:
+            sys.exit("map model problems:\n  " + "\n  ".join(problems))
     data.setdefault("meta", {})["generated"] = dt.datetime.now().isoformat(timespec="minutes")
     data["meta"].setdefault("project", root.name)
+    data["meta"].setdefault("root", str(data.pop("_root", None) or root))
 
+    out = Path(a.out) if a.out else output_path(root, data)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    write_page(out, data)
+    baked = 0
+    if kind == "map" and not a.no_optimize and find_chrome():
+        # bake: let the page search for crossing-free row orders once, then freeze them as view layouts
+        layouts = page_layouts(out.resolve())
+        for v in data.get("views", []):
+            if not v.get("layout") and v.get("id") in layouts:
+                v["layout"] = layouts[v["id"]]
+                baked += 1
+        if baked:
+            write_page(out, data)
+    missing = [h["file"] for h in data.get("hunks", []) if h.get("missing")]
+    result: dict = {"out": str(out.resolve()), "bytes": out.stat().st_size, "missingHunks": missing}
+    if kind == "map":
+        result["bakedLayouts"] = baked
+    if not a.no_check:
+        result["check"] = run_check(out.resolve(), Path(a.shots) if a.shots else None, kind == "map")
+    print(json.dumps(result, indent=2))
+    if not a.no_open:
+        opener = "open" if sys.platform == "darwin" else "xdg-open"
+        subprocess.run([opener, str(out)], capture_output=True)
+    if result.get("check", {}).get("overlaps"):
+        sys.exit(2)
+
+
+def write_page(out: Path, data: dict) -> None:
     blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     html = TEMPLATE.read_text(encoding="utf8")
     if PLACEHOLDER not in html:
         sys.exit("template placeholder missing")
     html = html.replace(PLACEHOLDER, blob).replace("__VISUAL_TITLE__", escape(data.get("title", "Visual")))
-    out = Path(a.out) if a.out else output_path(root, data)
-    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html, encoding="utf8")
-    missing = [h["file"] for h in data.get("hunks", []) if h.get("missing")]
-    print(json.dumps({"out": str(out.resolve()), "missingHunks": missing}))
-    if not a.no_open:
-        opener = "open" if sys.platform == "darwin" else "xdg-open"
-        subprocess.run([opener, str(out)], capture_output=True)
+
+
+def page_layouts(page: Path) -> dict:
+    binary = find_chrome()
+    dom = chrome(binary, "--virtual-time-budget=6000", "--window-size=1440,900", "--dump-dom",
+                 page.as_uri() + "#check=1&optimize=1", done=lambda t: "</html>" in t, timeout=600)
+    m = re.search(r'<pre id="visual-check"[^>]*>(.*?)</pre>', dom, re.S)
+    if not m:
+        return {}
+    import html as _html
+    return json.loads(_html.unescape(m[1])).get("layouts") or {}
+
+
+# ---------- map: view-based skill / architecture model ----------
+
+MAP_KINDS = {"public", "lane", "external", "verb", "script", "hook", "board"}
+
+
+def load_map(path: Path) -> dict:
+    model = json.loads(path.read_text(encoding="utf8"))
+    data = dict(model)
+    data["kind"] = "map"
+    views = model.get("views") or []
+    root_view = next((v for v in views if not v.get("parent")), views[0] if views else {})
+    data.setdefault("title", model.get("title") or root_view.get("title") or path.stem)
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=path.resolve().parent,
+                         capture_output=True, text=True).stdout.strip()
+    data["_root"] = top or str(path.resolve().parent)
+    data.setdefault("source", str(path))
+    return data
+
+
+def embed_avatars(d: dict) -> int:
+    """Fetch each author's GitHub avatar once (cached) and inline it, so the page works offline."""
+    import base64
+    import urllib.request
+    cache = Path.home() / ".cache" / "visual" / "avatars"
+    cache.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for login, a in (d.get("authors") or {}).items():
+        if not isinstance(a, dict) or str(a.get("avatar", "")).startswith("data:"):
+            continue
+        f = cache / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', login)}.png"
+        if not f.exists() or f.stat().st_size < 100:
+            try:
+                req = urllib.request.Request(f"https://github.com/{login}.png?size=64", headers={"User-Agent": "visual.py"})
+                with urllib.request.urlopen(req, timeout=10) as r:
+                    f.write_bytes(r.read())
+            except Exception:
+                continue  # the page falls back to an initials badge
+        data = f.read_bytes()
+        mime = "image/jpeg" if data[:3] == b"\xff\xd8\xff" else "image/png"
+        a["avatar"] = f"data:{mime};base64," + base64.b64encode(data).decode()
+        n += 1
+    return n
+
+
+def validate_map(d: dict) -> list[str]:
+    """Hard errors only: dangling ids would render as holes."""
+    ids = {n.get("id") for n in d.get("nodes", [])}
+    vids = {v.get("id") for v in d.get("views", [])}
+    out = []
+    if not d.get("views"):
+        out.append("no views")
+    for v in d.get("views", []):
+        if v.get("parent") and v["parent"] not in vids and v["parent"] not in ids:
+            out.append(f"view {v.get('id')!r}: parent {v['parent']!r} is not a view")
+        for i in v.get("nodeIds", []):
+            if i not in ids:
+                out.append(f"view {v.get('id')!r}: unknown node {i!r}")
+        for e in v.get("edges", []) or []:
+            if isinstance(e, dict) and (e.get("from") not in ids or e.get("to") not in ids):
+                out.append(f"view {v.get('id')!r}: edge {e.get('from')}->{e.get('to')} has an unknown end")
+    for e in d.get("edges", []):
+        if e.get("from") not in ids or e.get("to") not in ids:
+            out.append(f"edge {e.get('from')}->{e.get('to')} has an unknown end")
+    return out[:40]
+
+
+FM = re.compile(r"^---\n(.*?)\n---\n", re.S)
+
+
+def frontmatter(text: str) -> dict:
+    """Tiny YAML subset: `key: value`, `key: >-` folded blocks, quoted scalars."""
+    m = FM.match(text)
+    out: dict = {}
+    if not m:
+        return out
+    key = None
+    for line in m[1].splitlines():
+        kv = re.match(r"^([A-Za-z][\w-]*):\s*(.*)$", line)
+        if kv:
+            key, val = kv[1], kv[2].strip()
+            out[key] = "" if val in (">-", ">", "|", "|-") else val.strip("\"'")
+        elif key and line.startswith((" ", "\t")):
+            out[key] = (out[key] + " " + line.strip()).strip()
+    return out
+
+
+def first_sentence(s: str) -> str:
+    s = re.split(r"(?<=[.!?])\s+(?=[A-Z])", s.strip(), maxsplit=1)[0]
+    return s.strip()
+
+
+def cmd_skillmap(a) -> None:
+    sk = Path(a.skills_dir).resolve()
+    top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=sk, capture_output=True,
+                         text=True).stdout.strip()
+    top_p = Path(top) if top else sk.parent
+    pack = sk.parent
+    rel = lambda p: os.path.relpath(p, top_p)
+    fam = {}
+    fpath = sk / "families.json"
+    if fpath.is_file():
+        for group in json.loads(fpath.read_text()).values():
+            for name, blurb in (group.get("skills") or {}).items():
+                fam[name] = blurb
+    skills = {}
+    for md in sorted(sk.glob("*/SKILL.md")):
+        text = md.read_text(encoding="utf8")
+        fm = frontmatter(text)
+        name = fm.get("name") or md.parent.name
+        skills[name] = {"dir": md.parent, "md": md, "text": text, "fm": fm}
+    # skills installed beside the pack's host repo count as known dependencies
+    ext_md: dict[str, Path] = {}  # name -> SKILL.md of skills installed beside the pack
+    for d in (top_p / ".agents" / "skills", top_p / ".claude" / "skills", Path.home() / ".claude" / "skills"):
+        if d.is_dir():
+            for p in sorted(d.glob("*/SKILL.md")):
+                ext_md.setdefault(p.parent.name, p.resolve())
+    plugins = Path.home() / ".claude" / "plugins"
+    if plugins.is_dir():  # plugin skills: <plugins>/**/skills/<name>/SKILL.md
+        for p in sorted(plugins.glob("**/skills/*/SKILL.md")):
+            ext_md.setdefault(p.parent.name, p.resolve())
+    known_ext = set(ext_md)
+
+    def origin(name: str) -> str:
+        p = str(ext_md.get(name, ""))
+        m = re.search(r"/plugins/(?:cache/)?([^/]+)/", p)
+        if m:
+            return m[1] + " plugin"
+        m = re.search(r"/vendor/([^/]+)/", p)
+        return m[1] if m else ("~/.claude/skills" if p.startswith(str(Path.home() / ".claude")) else "repo skills")
+
+    def ext_mentions(text: str, own: str) -> set[str]:
+        found = {d.split(":", 1)[1] for d in re.findall(r"`([a-z][\w-]*:[a-z][\w-]*)`", text)}
+        found |= set(re.findall(r"`/?([a-z][a-z0-9-]+)`", text)) | set(re.findall(r"(?<![\w/])/([a-z][a-z0-9-]+)\b", text))
+        return {w for w in found if w in known_ext and w != own and w not in skills}
+    nodes, edges, views = {}, [], []
+
+    def add_node(n):
+        nodes.setdefault(n["id"], n)
+        return n["id"]
+
+    def edge(f, t, label, when=""):
+        if f != t and not any(e["from"] == f and e["to"] == t for e in edges):
+            edges.append({"from": f, "to": t, "label": label, "when": when})
+
+    def add_ext(n: str) -> str:
+        did = "dep:" + n
+        if did not in nodes:
+            md = ext_md.get(n)
+            fm = frontmatter(md.read_text(encoding="utf8")) if md else {}
+            desc = fm.get("description", "")
+            when = re.search(r"\bUse (?:it )?when (.*)$", desc, re.S)
+            add_node({"id": did, "label": n, "kind": "external", "external": True, "origin": origin(n), "verbs": [],
+                      "what": first_sentence(desc), "when": ("Use when " + when[1].strip()) if when else "",
+                      "how": "", "source": str(md) if md else ""})
+        return did
+
+    script_re = re.compile(r"(?<![\w/.-])((?:scripts|workflows|bin)/[\w.-]+\.(?:sh|py|js|mjs))")
+    for name, s in skills.items():
+        desc = s["fm"].get("description", "")
+        when = re.search(r"\bUse (?:it )?when (.*)$", desc, re.S)
+        blurb = fam.get(name, "")
+        kind = "lane" if re.search(r"\blane\b", blurb, re.I) else "public"
+        verbs = []
+        for m in re.finditer(r"`/?%s ([a-z][a-z-]+)" % re.escape(name), s["text"]):
+            if m[1] not in verbs:
+                verbs.append(m[1])
+        body = FM.sub("", s["text"])
+        para = next((p.strip() for p in re.split(r"\n\s*\n", body)
+                     if p.strip() and not p.lstrip().startswith(("#", "|", "-", "```", ">"))), "")
+        add_node({"id": name, "label": name if kind == "lane" else "/" + name, "kind": kind,
+                  "verbs": verbs, "what": blurb or first_sentence(desc),
+                  "when": ("Use when " + when[1].strip()) if when else "",
+                  "how": re.sub(r"\s+", " ", para)[:400], "source": rel(s["md"])})
+        for v in verbs:
+            vid = f"{name}:{v}"
+            lines = [l for l in s["text"].splitlines() if re.search(r"`/?%s %s\b" % (re.escape(name), v), l)]
+            row = next((l for l in lines if l.lstrip().startswith("|")), lines[0] if lines else "")
+            cells = [c.strip() for c in row.strip().strip("|").split("|")] if row.lstrip().startswith("|") else []
+            what = cells[-1] if cells else ""
+            add_node({"id": vid, "label": f"/{name} {v}", "kind": "public", "verbs": [],
+                      "what": re.sub(r"`", "", what)[:300], "when": f"User runs `/{name} {v}`",
+                      "how": "", "source": rel(s["md"])})
+            edge(name, vid, "verb")
+    # mentions: skills, scripts, external skill deps
+    for name, s in skills.items():
+        text = FM.sub("", s["text"])
+        for other in skills:
+            if other != name and re.search(r"(?:`/?%s`|/%s\b)" % (re.escape(other), re.escape(other)), text):
+                edge(name, other, "invokes")
+        for m in sorted(set(script_re.findall(text))):
+            base = m.split("/", 1)[1]
+            cand = [s["dir"] / m, pack / m, *(pack / "skills").glob(f"*/scripts/{base}")]
+            hit = next((c for c in cand if c.is_file()), None)
+            sid = "script:" + base
+            add_node({"id": sid, "label": base, "kind": "script", "verbs": [],
+                      "what": "", "when": f"Run by {name}", "how": "",
+                      "source": rel(hit) if hit else m})
+            edge(name, sid, "runs")
+        deps = {d for d in re.findall(r"`([a-z][\w-]*:[a-z][\w-]*)`", text)
+                if d.split(":", 1)[1] in known_ext and d.split(":", 1)[1] not in skills}
+        deps |= {w for w in re.findall(r"`/?([a-z][a-z0-9-]+)`", text) if w in known_ext and w not in skills}
+        for d in sorted(deps):
+            did = "dep:" + d.split(":", 1)[-1]
+            add_ext(d.split(":", 1)[-1])
+            edge(name, did, "uses")
+    # board
+    board_users = [n for n, s in skills.items() if re.search(r"GitHub Project", s["text"])]
+    if board_users:
+        add_node({"id": "board", "label": "GitHub Project", "kind": "board", "verbs": [],
+                  "what": "The Project board: cards move Backlog → Ready → Build → QA → Review → Done.",
+                  "when": "Read and written by every lane", "how": "", "source": ""})
+        for n in board_users:
+            edge(n, "board", "moves cards")
+    # verb mentions of lanes → verb view edges
+    for name, s in skills.items():
+        for v in nodes[name]["verbs"]:
+            vid = f"{name}:{v}"
+            chunk = "\n".join(l for l in s["text"].splitlines() if re.search(r"\b%s %s\b" % (re.escape(name), v), l))
+            for ref in sorted(set(re.findall(r"references/[\w.-]+\.md", chunk))):  # follow the verb's routed reference
+                rp = s["dir"] / ref
+                if rp.is_file():
+                    chunk += "\n" + rp.read_text(encoding="utf8")
+            for other in skills:
+                if other != name and re.search(r"\b%s\b" % re.escape(other), chunk):
+                    edge(vid, other, "dispatches")
+            for m in sorted(set(script_re.findall(chunk))):
+                if "script:" + m.split("/", 1)[1] in nodes:
+                    edge(vid, "script:" + m.split("/", 1)[1], "runs")
+    # hooks
+    snip = pack / "hooks" / "settings-snippet.json"
+    hook_ids = []
+    if snip.is_file():
+        cfg = json.loads(snip.read_text()).get("hooks", {})
+        for event, groups in cfg.items():
+            eid = "event:" + event
+            add_node({"id": eid, "label": event, "kind": "hook", "verbs": [],
+                      "what": f"Claude Code {event} event", "when": "Every matching tool call",
+                      "how": "", "source": rel(snip)})
+            hook_ids.append(eid)
+            for g in groups:
+                for h in g.get("hooks", []):
+                    script = re.search(r"([\w.-]+\.py)", h.get("command", ""))
+                    if not script:
+                        continue
+                    hid = "hook:" + script[1]
+                    hp = pack / "hooks" / script[1]
+                    add_node({"id": hid, "label": script[1], "kind": "hook", "verbs": [],
+                              "what": "", "when": "", "how": "", "source": rel(hp) if hp.is_file() else ""})
+                    w = nodes[hid]["when"]
+                    tag = f"{event}: {g.get('matcher', '*')}"
+                    nodes[hid]["when"] = f"{w}; {tag}" if w else tag
+                    if hid not in hook_ids:
+                        hook_ids.append(hid)
+                    edge(eid, hid, g.get("matcher", "*")[:18], tag)
+    # views: overview → per-skill → per-verb; hooks view
+    top_ids = [n for n in skills] + (["board"] if "board" in nodes else [])
+    pack_name = pack.name
+    views.append({"id": "overview", "parent": None, "title": pack_name,
+                  "nodeIds": top_ids + (["hooks"] if hook_ids else [])})
+    if hook_ids:
+        add_node({"id": "hooks", "label": "Guard hooks", "kind": "hook", "verbs": [],
+                  "what": f"{len([h for h in hook_ids if h.startswith('hook:')])} guard scripts wired into settings.json",
+                  "when": "Installed by install.sh unless --no-hooks", "how": "", "source": rel(snip)})
+        views.append({"id": "hooks", "parent": "overview", "title": "Guard hooks", "nodeIds": hook_ids})
+    for name in skills:
+        out_ids = [e["to"] for e in edges if e["from"] == name]
+        if not out_ids:
+            continue
+        views.append({"id": name, "parent": "overview", "title": nodes[name]["label"],
+                      "nodeIds": [name] + out_ids, "star": name})
+        for v in nodes[name]["verbs"]:
+            vid = f"{name}:{v}"
+            kids = [e["to"] for e in edges if e["from"] == vid]
+            if kids:
+                views.append({"id": vid, "parent": name, "title": f"/{name} {v}", "nodeIds": [vid] + kids, "star": vid})
+    vid_set = {v["id"] for v in views}
+    for v in views:  # view edges: every model edge whose ends are both on the view
+        ids = set(v["nodeIds"])
+        v["edges"] = [e for e in edges if e["from"] in ids and e["to"] in ids
+                      and (not v.get("star") or e["from"] == v["star"])]  # a skill's view shows what it triggers
+        v.pop("star", None)
+    if getattr(a, "deep", False):  # external skills open onto the skills they trigger, as deep as the files go
+        queue = [i[4:] for i in nodes if i.startswith("dep:")]
+        seen = set()
+        while queue:
+            n = queue.pop(0)
+            if n in seen or n not in ext_md:
+                continue
+            seen.add(n)
+            kids = sorted(ext_mentions(FM.sub("", ext_md[n].read_text(encoding="utf8")), n))
+            if not kids:
+                continue
+            for k in kids:
+                add_ext(k)
+                edge("dep:" + n, "dep:" + k, "triggers")
+                queue.append(k)
+            parent = next((v["id"] for v in views if "dep:" + n in v["nodeIds"]), "overview")
+            ids = ["dep:" + n] + ["dep:" + k for k in kids]
+            views.append({"id": "dep:" + n, "parent": parent, "title": n, "nodeIds": ids,
+                          "edges": [e for e in edges if e["from"] == "dep:" + n and e["to"] in ids]})
+    model = {"title": f"{pack_name} skill map", "subtitle": "Skeleton generated by visual.py skillmap — enrich what/when/how",
+             "nodes": list(nodes.values()), "edges": edges, "views": views}
+    text = json.dumps(model, indent=2, ensure_ascii=False)
+    if a.out:
+        Path(a.out).parent.mkdir(parents=True, exist_ok=True)
+        Path(a.out).write_text(text + "\n", encoding="utf8")
+        print(json.dumps({"out": str(Path(a.out).resolve()), "nodes": len(nodes), "edges": len(edges),
+                          "views": len(views)}))
+    else:
+        print(text)
+
+
+# ---------- check: headless Chrome screenshots + label overlap ----------
+
+CHROME_CANDIDATES = [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "google-chrome", "chromium", "chromium-browser",
+]
+
+
+def find_chrome() -> str | None:
+    import shutil
+    for c in CHROME_CANDIDATES:
+        if os.path.isfile(c) or shutil.which(c):
+            return c
+    return None
+
+
+def chrome(binary: str, *args: str, done=None, timeout: int = 45) -> str:
+    """Run headless Chrome and return stdout. Headless Chrome on macOS can linger after it has
+    written its output, so poll for `done(stdout_text)` and stop it ourselves."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as prof, tempfile.TemporaryFile("w+") as out:
+        proc = subprocess.Popen([binary, "--headless", "--disable-gpu", "--hide-scrollbars",
+                                 "--no-first-run", "--no-default-browser-check", "--mute-audio",
+                                 f"--user-data-dir={prof}", *args],
+                                stdout=out, stderr=subprocess.DEVNULL, text=True)
+        t0, text = time.time(), ""
+        while time.time() - t0 < timeout:
+            if proc.poll() is not None:
+                break
+            out.seek(0)
+            text = out.read()
+            if done and done(text):
+                time.sleep(0.3)
+                break
+            time.sleep(0.25)
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+        out.seek(0)
+        return out.read()
+
+
+def run_check(page: Path, shots: Path | None, is_map: bool) -> dict:
+    binary = find_chrome()
+    if not binary:
+        return {"skipped": "no Chrome/Chromium found"}
+    url = page.as_uri()
+    dom = chrome(binary, "--virtual-time-budget=6000", "--window-size=1440,900", "--dump-dom",
+                 url + "#check=1&theme=dark", done=lambda t: "</html>" in t)
+    m = re.search(r'<pre id="visual-check"[^>]*>(.*?)</pre>', dom, re.S)
+    report = {}
+    if m:
+        import html as _html
+        report = json.loads(_html.unescape(m[1]))
+    else:
+        report = {"error": "page did not report (JS error or no diagrams?)"}
+    shots = shots or page.parent / f".{page.stem}-check"
+    shots.mkdir(parents=True, exist_ok=True)
+    size = "1440,900" if is_map else "1400,2600"
+    taken = []
+    plan = [("light", "theme=light"), ("dark", "theme=dark")]
+    if is_map and report.get("childView"):
+        plan.append(("drill-dark", f"theme=dark&view={report['childView']}"))
+    for name, frag in plan:
+        png = shots / f"{name}.png"
+        if png.exists():
+            png.unlink()
+        chrome(binary, "--virtual-time-budget=4000", f"--window-size={size}",
+               f"--screenshot={png}", f"{url}#shot=1&{frag}", done=lambda _t, p=png: p.exists() and p.stat().st_size > 0)
+        if png.exists():
+            taken.append(str(png))
+    ov = report.get("overlaps", [])
+    out = {"screenshots": taken, "overlaps": ov,
+           "counts": {"crossings": sum(" cross" in o for o in ov), "sharedLines": sum("share a line" in o for o in ov),
+                      "labelOnLine": sum(" lies on edge " in o for o in ov),
+                      "labelOnNode": sum(("covers node" in o) or ("overlaps node" in o) for o in ov),
+                      "other": sum(not any(k in o for k in (" cross", "share a line", " lies on edge ", "covers node", "overlaps node")) for o in ov)},
+           "routes": report.get("routes"),
+           "checked": report.get("checked"), "errors": report.get("errors", [])}
+    if "error" in report:
+        out["errors"].append(report["error"])
+    return out
+
+
+def cmd_check(a) -> None:
+    page = Path(a.page).resolve()
+    html = page.read_text(encoding="utf8")
+    res = run_check(page, Path(a.shots) if a.shots else None, '"kind": "map"' in html or '"kind":"map"' in html)
+    print(json.dumps(res, indent=2))
+    if res.get("overlaps") or res.get("errors"):
+        sys.exit(2)
 
 
 def escape(s: str) -> str:
@@ -285,11 +737,23 @@ def main() -> None:
         p = sub.add_parser(name)
         p.add_argument("--base")
     r = sub.add_parser("render")
-    r.add_argument("data")
+    r.add_argument("data", nargs="?")
+    r.add_argument("--map", help="view-based map model (nodes/edges/views) to render as a drill-down map")
     r.add_argument("--out")
+    r.add_argument("--shots", help="directory for check screenshots")
     r.add_argument("--no-open", action="store_true")
+    r.add_argument("--no-check", action="store_true", help="skip the headless Chrome check")
+    r.add_argument("--no-optimize", action="store_true", help="map: skip baking crossing-minimised layouts")
+    m = sub.add_parser("skillmap")
+    m.add_argument("skills_dir")
+    m.add_argument("--out")
+    m.add_argument("--deep", action="store_true", help="give external skills inner views of the skills they trigger")
+    c = sub.add_parser("check")
+    c.add_argument("page")
+    c.add_argument("--shots")
     a = ap.parse_args()
-    {"detect": cmd_detect, "facts": cmd_facts, "render": cmd_render}[a.cmd](a)
+    {"detect": cmd_detect, "facts": cmd_facts, "render": cmd_render, "skillmap": cmd_skillmap,
+     "check": cmd_check}[a.cmd](a)
 
 
 if __name__ == "__main__":

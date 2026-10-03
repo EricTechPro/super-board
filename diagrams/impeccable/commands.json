@@ -1,0 +1,646 @@
+{
+ "schema_version": 1,
+ "diagram_type": "architecture",
+ "meta": {
+  "title": "impeccable v4.0.4 \u00b7 slash commands and how they connect",
+  "output": "commands.html",
+  "quality_profile": "showcase",
+  "locale": "en",
+  "legend": {
+   "mode": "all",
+   "entries": {
+    "cloud": {
+     "label": "context / setup"
+    },
+    "messagebus": {
+     "label": "plan / build"
+    },
+    "security": {
+     "label": "diagnose (report only)"
+    },
+    "backend": {
+     "label": "fix / refine"
+    },
+    "frontend": {
+     "label": "style / enhance"
+    },
+    "external": {
+     "label": "finish"
+    },
+    "database": {
+     "label": "system / iterate"
+    }
+   }
+  }
+ },
+ "components": [
+  {
+   "id": "menu",
+   "type": "cloud",
+   "label": "/impeccable",
+   "sublabel": "what next?",
+   "pos": [
+    40,
+    60
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "init",
+   "type": "cloud",
+   "label": "init",
+   "sublabel": "no PRODUCT.md",
+   "pos": [
+    236,
+    60
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "document",
+   "type": "cloud",
+   "label": "document",
+   "sublabel": "no DESIGN.md",
+   "pos": [
+    432,
+    60
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "shape",
+   "type": "messagebus",
+   "label": "shape",
+   "sublabel": "plan first",
+   "pos": [
+    40,
+    200
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "craft",
+   "type": "messagebus",
+   "label": "craft",
+   "sublabel": "build new",
+   "pos": [
+    236,
+    200
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "critique",
+   "type": "security",
+   "label": "critique",
+   "sublabel": "UX review",
+   "pos": [
+    628,
+    200
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "audit",
+   "type": "security",
+   "label": "audit",
+   "sublabel": "tech check",
+   "pos": [
+    824,
+    200
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "harden",
+   "type": "backend",
+   "label": "harden",
+   "sublabel": "edge cases",
+   "pos": [
+    40,
+    340
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "clarify",
+   "type": "backend",
+   "label": "clarify",
+   "sublabel": "confusing copy",
+   "pos": [
+    236,
+    340
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "adapt",
+   "type": "backend",
+   "label": "adapt",
+   "sublabel": "other screens",
+   "pos": [
+    432,
+    340
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "optimize",
+   "type": "backend",
+   "label": "optimize",
+   "sublabel": "feels slow",
+   "pos": [
+    628,
+    340
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "onboard",
+   "type": "backend",
+   "label": "onboard",
+   "sublabel": "first run",
+   "pos": [
+    824,
+    340
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "distill",
+   "type": "backend",
+   "label": "distill",
+   "sublabel": "too cluttered",
+   "pos": [
+    1020,
+    340
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "layout",
+   "type": "frontend",
+   "label": "layout",
+   "sublabel": "spacing off",
+   "pos": [
+    40,
+    480
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "typeset",
+   "type": "frontend",
+   "label": "typeset",
+   "sublabel": "type off",
+   "pos": [
+    236,
+    480
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "colorize",
+   "type": "frontend",
+   "label": "colorize",
+   "sublabel": "too gray",
+   "pos": [
+    432,
+    480
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "bolder",
+   "type": "frontend",
+   "label": "bolder",
+   "sublabel": "too bland",
+   "pos": [
+    824,
+    480
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "quieter",
+   "type": "frontend",
+   "label": "quieter",
+   "sublabel": "too loud",
+   "pos": [
+    628,
+    480
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "animate",
+   "type": "frontend",
+   "label": "animate",
+   "sublabel": "needs motion",
+   "pos": [
+    824,
+    620
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "delight",
+   "type": "frontend",
+   "label": "delight",
+   "sublabel": "needs charm",
+   "pos": [
+    1020,
+    620
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "overdrive",
+   "type": "frontend",
+   "label": "overdrive",
+   "sublabel": "wow factor",
+   "pos": [
+    628,
+    620
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "polish",
+   "type": "external",
+   "label": "polish",
+   "sublabel": "before ship",
+   "pos": [
+    1216,
+    480
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "extract",
+   "type": "database",
+   "label": "extract",
+   "sublabel": "repeated UI",
+   "pos": [
+    1020,
+    200
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "live",
+   "type": "database",
+   "label": "live",
+   "sublabel": "try variants",
+   "pos": [
+    1216,
+    200
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "hooks",
+   "type": "cloud",
+   "label": "hooks",
+   "sublabel": "auto-detect",
+   "pos": [
+    1020,
+    60
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "doctor",
+   "type": "cloud",
+   "label": "doctor",
+   "sublabel": "stale files",
+   "pos": [
+    824,
+    60
+   ],
+   "size": [
+    128,
+    54
+   ]
+  },
+  {
+   "id": "pin",
+   "type": "cloud",
+   "label": "pin / unpin",
+   "sublabel": "shortcut",
+   "pos": [
+    1216,
+    60
+   ],
+   "size": [
+    128,
+    54
+   ]
+  }
+ ],
+ "boundaries": [
+  {
+   "kind": "region",
+   "label": "Context",
+   "wraps": [
+    "menu",
+    "init",
+    "document"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Plan & build",
+   "wraps": [
+    "shape",
+    "craft"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Diagnose",
+   "wraps": [
+    "critique",
+    "audit"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Fix \u00b7 then polish",
+   "wraps": [
+    "harden",
+    "clarify",
+    "adapt",
+    "optimize",
+    "onboard",
+    "distill"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Style \u00b7 then polish",
+   "wraps": [
+    "layout",
+    "typeset",
+    "colorize",
+    "bolder",
+    "quieter"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Motion",
+   "wraps": [
+    "animate",
+    "delight",
+    "overdrive"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Finish",
+   "wraps": [
+    "polish"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "System",
+   "wraps": [
+    "extract",
+    "live"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Maintenance",
+   "wraps": [
+    "hooks",
+    "doctor",
+    "pin"
+   ]
+  }
+ ],
+ "connections": [
+  {
+   "id": "e0",
+   "from": "shape",
+   "to": "init",
+   "label": "requires",
+   "variant": "emphasis"
+  },
+  {
+   "id": "e1",
+   "from": "craft",
+   "to": "init",
+   "label": "requires",
+   "variant": "emphasis"
+  },
+  {
+   "id": "e2",
+   "from": "document",
+   "to": "init",
+   "label": "requires",
+   "variant": "emphasis"
+  },
+  {
+   "id": "e3",
+   "from": "shape",
+   "to": "craft",
+   "label": "feeds"
+  },
+  {
+   "id": "e4",
+   "from": "craft",
+   "to": "document",
+   "label": "calls"
+  },
+  {
+   "id": "e5",
+   "from": "delight",
+   "to": "animate",
+   "label": "calls"
+  },
+  {
+   "id": "e6",
+   "from": "init",
+   "to": "live",
+   "label": "feeds"
+  },
+  {
+   "id": "e7",
+   "from": "critique",
+   "to": "polish",
+   "label": "feeds"
+  },
+  {
+   "id": "e8",
+   "from": "menu",
+   "to": "init",
+   "label": "suggests",
+   "variant": "dashed"
+  },
+  {
+   "id": "e9",
+   "from": "menu",
+   "to": "critique",
+   "label": "suggests",
+   "variant": "dashed"
+  },
+  {
+   "id": "e10",
+   "from": "audit",
+   "to": "harden",
+   "label": "suggests",
+   "variant": "dashed"
+  },
+  {
+   "id": "e11",
+   "from": "audit",
+   "to": "optimize",
+   "label": "suggests",
+   "variant": "dashed"
+  },
+  {
+   "id": "e12",
+   "from": "layout",
+   "to": "craft",
+   "label": "escalates",
+   "variant": "dashed"
+  },
+  {
+   "id": "e13",
+   "from": "polish",
+   "to": "bolder",
+   "label": "suggests",
+   "variant": "dashed"
+  },
+  {
+   "id": "e14",
+   "from": "live",
+   "to": "polish",
+   "label": "calls"
+  },
+  {
+   "id": "e15",
+   "from": "doctor",
+   "to": "document",
+   "label": "feeds",
+   "variant": "dashed"
+  },
+  {
+   "id": "p_distill",
+   "from": "distill",
+   "to": "polish",
+   "label": "then",
+   "variant": "dashed"
+  },
+  {
+   "id": "p_bolder",
+   "from": "bolder",
+   "to": "polish",
+   "label": "then",
+   "variant": "dashed"
+  },
+  {
+   "id": "p_delight",
+   "from": "delight",
+   "to": "polish",
+   "label": "then",
+   "variant": "dashed"
+  }
+ ],
+ "cards": [
+  {
+   "dot": "violet",
+   "title": "Best practice",
+   "items": [
+    "init once \u2192 shape / build \u2192 critique + audit \u2192 fix & style commands \u2192 polish last",
+    "Click any command for what it does and what to pair it with"
+   ]
+  },
+  {
+   "dot": "rose",
+   "title": "Edges",
+   "items": [
+    "read FROM, label, TO \u00b7 bold = requires \u00b7 dashed = suggests / then",
+    "Group label \"then polish\" = every command in it hands off to polish"
+   ]
+  }
+ ]
+}

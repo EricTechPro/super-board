@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super-board Onboarding</title>
+<style>
+:root{
+  --bg:#0b0d10; --panel:#12161c; --panel2:#181d24; --line:#2a313b;
+  --fg:#e3e7ec; --dim:#8b95a0; --faint:#56606b;
+  --green:#5fd38d; --red:#ff6b6b; --yellow:#f2c66d; --blue:#6cb6ff; --violet:#b9a3ff;
+  --claude:#d97757; --new:#ff9f43;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.5}
+code{font-family:var(--mono);font-size:.92em}
+.wrap{max-width:1040px;margin:0 auto;padding:16px}
+h1.title{font-size:20px;margin:0 0 2px}
+.sub{color:var(--dim);font-size:14px;margin-bottom:12px}
+.sub b.t{color:var(--green)} .sub b.c{color:var(--claude)}
+/* stepper */
+.stepper{display:flex;gap:6px;overflow-x:auto;padding:4px 2px 8px;scrollbar-width:thin}
+.pill{flex:none;display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel);color:var(--dim);border-radius:999px;padding:6px 12px;font-size:13.5px;cursor:pointer;white-space:nowrap;font-family:var(--sans)}
+.pill .n{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.pill:hover{border-color:var(--blue)}
+.pill.cur{background:#1b2c42;border-color:#3d6ea0;color:#fff;font-weight:600}
+.pill.cur .n{color:var(--blue)}
+.pill.seen{color:var(--fg)}
+.pill.t{box-shadow:inset 0 -2px 0 #2c5a3e} .pill.c{box-shadow:inset 0 -2px 0 #6b3d2c}
+.pill .nw{font-size:9.5px;color:var(--new);border:1px solid var(--new);border-radius:3px;padding:0 3px;font-family:var(--mono)}
+.stepbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:6px 0 10px}
+.stepbar .count{font-family:var(--mono);font-size:13px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:3px 9px}
+.stepbar .where{font-size:13px;font-weight:600}
+.where.t{color:var(--green)} .where.c{color:var(--claude)}
+.stepbar .why{color:var(--dim);font-size:14px;flex:1 1 300px}
+.nav{display:flex;gap:8px;margin-left:auto}
+button.btn{font-family:var(--sans);font-size:14px;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:7px 14px;cursor:pointer}
+button.btn:hover:not(:disabled){border-color:var(--blue)} button.btn:disabled{opacity:.35;cursor:default}
+button.btn.primary{background:#16314d;border-color:#2d5a86}
+.demo{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-size:13px;color:var(--dim);border:1px dashed #3a4a66;border-radius:10px;padding:8px 12px;margin-bottom:10px;background:#0b1220}
+.demo b{color:var(--blue);font-weight:600;font-size:11px;letter-spacing:.08em}
+.demo select{font-family:var(--sans);font-size:13px;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;max-width:100%}
+.demo label{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+/* terminal */
+.term{background:#0a0c0f;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.bar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--panel2);border-bottom:1px solid var(--line);font-size:12px;color:var(--dim);font-family:var(--mono)}
+.dot{width:11px;height:11px;border-radius:50%;background:#ff5f57}.dot:nth-child(2){background:#febc2e}.dot:nth-child(3){background:#28c840}
+.bar .tt{flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:40px}
+#screen{padding:14px 16px 18px;font-family:var(--mono);font-size:13.5px;line-height:1.55;min-height:62vh;white-space:pre-wrap;word-break:break-word}
+.l{min-height:1.55em}
+.zp{color:var(--green)} .zp .d{color:var(--blue)}
+.ok{color:var(--green)} .bad{color:var(--red)} .warn{color:var(--yellow)} .info{color:var(--blue)} .dim{color:var(--dim)} .faint{color:var(--faint)} .cl{color:var(--claude)} .newl{color:var(--new)} .b{font-weight:700}
+.scrollback{color:var(--faint);font-size:12px;margin-bottom:8px}
+.welcome{border:1px solid var(--claude);border-radius:6px;padding:6px 12px;margin:2px 0 10px;max-width:470px;white-space:pre-wrap}
+.um{color:var(--dim);margin:8px 0}
+.um .p{color:var(--dim)} .um .t{color:var(--fg)}
+.msg{display:flex;gap:8px;margin:8px 0}
+.msg .bu{flex:none;width:12px}
+.msg .bu.w{color:var(--fg)} .msg .bu.g{color:var(--green)} .msg .bu.r{color:var(--red)}
+.tool .nm{font-weight:700} .tool .ar{color:var(--dim)}
+.tres{padding-left:20px;color:var(--dim)}
+.box{border:1px solid #4a5563;border-radius:8px;padding:8px 12px;margin:10px 0}
+.box.perm{border-color:#8a7440}
+.qchip{display:inline-block;background:#3a4252;color:#fff;padding:0 6px;border-radius:3px}
+.tabs{color:var(--dim);margin-bottom:6px}
+.tabs .on{background:#3a4252;color:#fff;padding:0 5px;border-radius:3px}
+.qq{font-weight:700;margin:6px 0}
+.opt{cursor:pointer;border-radius:4px;padding:1px 4px;margin:0 -4px}
+.opt:hover{background:#151d29}
+.opt .ln1{display:flex}
+.opt .cur{width:2ch;flex:none;color:var(--blue)}
+.opt.on .lab{color:var(--blue)}
+.opt .ds{padding-left:5ch;color:var(--dim)}
+.foot{color:var(--faint);margin-top:8px}
+.ans{cursor:pointer;color:var(--dim)} .ans:hover{color:var(--fg)}
+.ans .q{color:var(--dim)} .ans .a{color:var(--fg)}
+.inbox{border:1px solid #3b434e;border-radius:6px;padding:4px 10px;margin-top:14px;color:var(--faint)}
+.hint2{color:var(--faint);font-size:12px;margin-top:2px;padding-left:2px}
+.otherin{font-family:var(--mono);font-size:13px;background:#07090b;color:var(--fg);border:1px solid var(--blue);border-radius:4px;padding:4px 6px;width:100%;margin-top:4px}
+.diff .add{color:var(--green)} .diff .del{color:var(--red)}
+table.rv{border-collapse:collapse;margin:6px 0 6px 20px;font-family:var(--mono);font-size:12.5px;white-space:normal}
+table.rv td{border:1px solid var(--line);padding:3px 8px;vertical-align:top}
+table.rv td:first-child{color:var(--dim)}
+table.rv a{color:var(--blue);cursor:pointer;margin-left:6px;font-size:11.5px}
+.sum{border:1px solid #2c5a3e;border-radius:8px;padding:10px 12px;margin:10px 0;white-space:normal;font-family:var(--sans);font-size:14.5px}
+.sum h4{margin:10px 0 3px;font-size:11.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.sum h4:first-child{margin-top:0}
+.sum ul{margin:0;padding-left:20px}
+.sum .nx{display:inline-block;margin-top:6px;padding:4px 10px;border:1px solid var(--green);border-radius:6px;color:var(--green);font-family:var(--mono)}
+details.cfg summary{cursor:pointer;color:var(--dim);font-size:12.5px;margin-top:8px}
+details.cfg pre{font-size:11.5px;overflow-x:auto;background:#07090b;border:1px solid var(--line);border-radius:6px;padding:8px;font-family:var(--mono)}
+/* gaps */
+details.gaps{margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+details.gaps>summary{cursor:pointer;font-weight:600}
+details.gaps h3{font-size:14px;margin:16px 0 6px}
+details.gaps ol{margin:0;padding-left:20px;font-size:14px} details.gaps ol li{margin:4px 0}
+details.gaps table{width:100%;border-collapse:collapse;font-size:13.5px}
+details.gaps th,details.gaps td{text-align:left;vertical-align:top;border-top:1px solid var(--line);padding:7px 8px}
+details.gaps th{color:var(--dim);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+details.gaps td.area{color:var(--yellow);white-space:nowrap}
+.note{color:var(--dim);font-size:12.5px;margin-top:10px}
+@media (max-width:700px){
+  .wrap{padding:12px}
+  #screen{font-size:12px;padding:10px 10px 14px;min-height:55vh}
+  .opt .ds{padding-left:4ch}
+  .nav{width:100%} .nav .btn{flex:1}
+  details.gaps table,details.gaps tbody,details.gaps tr,details.gaps td{display:block;width:100%}
+  details.gaps thead{display:none}
+  details.gaps tr{border-top:1px solid var(--line);padding:6px 0}
+  details.gaps td{border:0;padding:2px 0}
+}
+.agenda{font-family:var(--mono);font-size:12px;border:1px solid #2a313b;border-radius:6px;padding:5px 8px;margin:0 0 10px;white-space:normal;line-height:1.9;background:#0d1117}
+.agenda .a{display:inline-block;margin-right:4px;color:var(--faint)}
+.agenda .a.dn{color:var(--green)} .agenda .a.on{color:#fff;background:#1b2c42;border-radius:4px;padding:0 5px}
+.agenda .sep{color:#333b45;margin-right:4px}
+.ghc{border:1px solid #3d444d;border-radius:8px;overflow:hidden;font-family:var(--sans);white-space:normal;max-width:640px;margin:8px 0}
+.ghc .h{background:#161b22;padding:6px 12px;font-size:13px;color:var(--dim);border-bottom:1px solid #3d444d}
+.ghc .bd{padding:10px 14px;font-size:14.5px}
+.ghc .bd ul{list-style:none;padding:0;margin:6px 0} .ghc .bd li{margin:3px 0}
+.ghc code{background:#262c36;padding:1px 5px;border-radius:4px}
+.ghc details{margin-top:6px;color:var(--dim)} .ghc summary{cursor:pointer}
+.lbl{display:inline-block;background:#5a3d0b;color:#f2c66d;border-radius:10px;padding:0 8px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title">super-board onboarding</h1>
+  <div class="sub"><b class="t">Install = your terminal</b> (one line, once). &nbsp;<b class="c">Setup = inside Claude Code</b> (<code>/super-board onboard</code>, a few questions). <b>Target design</b> from Eric's picks — the spec the pack will be built to (not built yet). Today's flow: index-v4.html.</div>
+
+  <div class="stepper" id="stepper"></div>
+  <div class="stepbar">
+    <span class="count" id="count">Step 1 of 13</span>
+    <span class="where t" id="where">💻 Your terminal</span>
+    <span class="why" id="why"></span>
+    <span class="nav"><button class="btn" id="back">← Back</button><button class="btn primary" id="next">Next →</button></span>
+  </div>
+
+  <div class="demo">
+    <b>DEMO</b>
+    <label>Example project
+      <select id="scen">
+        <option value="existing">An app you already have</option>
+        <option value="light">A small repo, no extras</option>
+        <option value="scratch">An empty folder</option>
+        <option value="resume">An app where setup stopped halfway</option>
+        <option value="upgrade">An app with an older super-board (BookKeepingApp)</option>
+      </select></label>
+    <label>Install with
+      <select id="route">
+        <option value="curl">One line in the terminal</option>
+        <option value="plugin">Claude Code plugin (or)</option><option value="nonode">One line, but Node.js missing</option>
+      </select></label>
+    <button class="btn" id="reset" style="font-size:12px;padding:4px 10px">↻ Reset answers</button>
+  </div>
+
+  <div class="term">
+    <div class="bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="tt" id="tt">eric — zsh — ~/code/my-app</span></div>
+    <div id="screen"></div>
+  </div>
+  <div class="hint2">In the picker: click an option (or ↑ ↓ + Enter) to choose a branch. Click an answered line to change it. ← → move between steps.</div>
+
+  <details class="gaps">
+    <summary>Spec notes + decisions</summary>
+    <h3>Spec rules (from Eric's picks)</h3>
+    <ol id="notes"></ol>
+    <h3>Decisions (Eric, 2026-10-02)</h3>
+    <table><thead><tr><th>Area</th><th>Question</th><th>Decision</th><th>Status</th></tr></thead><tbody id="gaps"></tbody></table>
+    <div class="note">Built from Eric's picks in choose.html (2026-10-02). Base flow: feat/sb-cleanup @ a7d69681 (onboard.md 0–16). Previous versions: index-v4.html (today's flow), index-v3.html.</div>
+  </details>
+</div>
+
+<script>
+/* ============ spec notes + open questions ============ */
+const NOTES=[
+ "A wizard: every step opens with an agenda strip and \"Step X of 8 · emoji header\" + one line of why, then one AskUserQuestion (recommended option first).",
+ "8 steps: 🔍 Checks · 🔑 GitHub · 🗂️ Board · 🌿 Branch · 📜 AGENTS.md · 🛡️ Policies & permissions · 📥 Bug sources · ✅ Review & save — then 🎉 Done.",
+ "No goal question. The board always has every column; labels qa / bug / feature route a ticket (qa skips Building; no label → Building).",
+ "Older installs: Checks offers a one-question upgrade (backup, migrate, re-check).",
+ "Checks debug and fix: anything red is fixed with your OK (install missing pieces, repair config), re-checked, and the wizard moves on only when all green.",
+ "Before asking, Claude shares what it found (board name from the app, branches and deploys, rule conflicts, bug sources).",
+ "Bug sources take any extra source — link, app name, API URL, MCP server or CLI command — and setup proves it can read it (read-only) before saving.",
+ "Save as you go; a re-run shows the saved answers and offers to continue. Nothing is written before Review & save.",
+ "Install output: grouped with emojis. Needs-you comment: checklist first."
+];
+document.getElementById('notes').innerHTML=NOTES.map(n=>`<li>${n}</li>`).join('');
+const QS=[
+ ["Board columns","Which columns?","Backlog · Ready · Building · QA · Review · Blocked · Done. Skipped dropped."],
+ ["Ticket type","How does a ticket say its type?","Three labels only: qa, bug, feature. qa skips Building; no label → Building."],
+ ["URL-only","Is \"test a live site, no repo\" part of onboarding?","No. One line in the intro: /super-qa <url> tests a live site on its own."],
+ ["Board","Reuse an existing board?","Scan the user's boards, rank by matching columns, offer the best match (add missing columns), plus new names + type a name."],
+ ["Upgrade","Projects with an older super-board?","Checks detects the old version, shows every change, asks once, migrates (skills, removed folders, Skipped → Done, labels, config keys, AGENTS.md offer), re-checks."],
+ ["Tools","May Checks install tools (Node, gh…)?","Yes — show the exact command, run it after OK."],
+ ["Staging","No staging branch?","Recommended option \"Create staging from main\" (Enter)."],
+ ["Custom sources","Where do they live?","In each project's config; /super-collect reads them; the verifier reviews before filing."],
+ ["Policies","One step or two?","One step, two questions."]
+];
+document.getElementById('gaps').innerHTML=QS.map(g=>`<tr><td class="area">${g[0]}</td><td>${g[1]}</td><td>${g[2]}</td><td class="ok">decided</td></tr>`).join('');
+
+/* ============ scenarios ============ */
+const SCEN={
+ existing:{git:true,remote:'github.com/erictech/my-app',commits:412,agents:'both',claudeLines:38,agentsLines:61,pkg:'ledgerly',readme:'Ledgerly — bookkeeping for freelancers',branches:['main','staging','feat/tax-export'],cur:'feat/tax-export',deploy:'Vercel deploys main (vercel.json, deploy.yml)',staging:true,sentry:{found:true,key:true},posthog:{found:true,key:false},mig:'prisma/migrations',migcmd:'npm run db:migrate',scopes:true},
+ upgrade:{git:true,remote:'github.com/erictech/BookKeepingApp',commits:1290,agents:'both',claudeLines:52,agentsLines:20,pkg:'bookkeeping-app',readme:'BookKeepingApp — receipts and ledgers',branches:['main','staging'],cur:'main',deploy:'Vercel deploys main',staging:true,sentry:{found:true,key:true},posthog:{found:true,key:true},mig:'supabase/migrations',migcmd:'npm run db:migrate',scopes:true,old:'1.8.2'},
+ resume:{git:true,remote:'github.com/erictech/my-app',commits:412,agents:'pointer',pkg:'ledgerly',readme:'Ledgerly — bookkeeping for freelancers',branches:['main','staging'],cur:'main',deploy:'Vercel deploys main',staging:true,sentry:{found:true,key:true},posthog:{found:false},mig:'prisma/migrations',migcmd:'npm run db:migrate',scopes:true,draft:true},
+ light:{git:true,remote:'github.com/erictech/my-app',commits:57,agents:'none',pkg:'notes-api',readme:'Notes API',branches:['main'],cur:'main',deploy:'no deploy found',staging:false,sentry:{found:false},posthog:{found:false},mig:'alembic/versions',migcmd:'alembic upgrade head',scopes:true,brokenCfg:true},
+ scratch:{git:false,remote:null,commits:0,agents:'none',pkg:null,readme:null,branches:[],cur:null,deploy:'nothing yet',staging:false,sentry:{found:false},posthog:{found:false},mig:null,scopes:false}
+};
+
+/* ============ state ============ */
+let s={scen:'existing',route:'curl',ans:{},open:{},cur:'install',seen:new Set(['install'])};
+let ui={hi:{},ticks:{},qs:[],focus:null};
+const P=()=>SCEN[s.scen];
+const pv=v=>(v&&v.other)?'__other':v;
+function DEF(id){
+  const p=P();
+  return ({trust:'y',resume:'y',fix:'all',scopes:'y',remote:'create',name:(s.scen==='existing'||s.scen==='resume'||s.scen==='upgrade')?'reuse':'n1',agents:'yes',c1:'c',c2:'a',agentsOk:'approve',
+    base:'rec',pol:'all',merge:'auto',push:p.commits>0?'y':'n',envs:['test','staging'],perms:'add',extra:'mcp',review:'write',
+    src:[...(p.sentry.found?['sentry']:[]),...(p.posthog.found?['posthog']:[]),'github','prs','architecture']})[id];
+}
+const A=id=>s.ans[id]!==undefined?s.ans[id]:DEF(id);
+const has=id=>s.ans[id]!==undefined;
+const plugin=()=>s.route==='plugin';
+const noNode=()=>s.route==='nonode';
+const cmd=()=>plugin()?'/super-board:super-board onboard':'/super-board onboard';
+function names(){ const p=P(); if(s.scen==='scratch') return ['my-app board','Habit tracker board','My first board'];
+  return [`${cap(p.pkg)} board`,`${p.readme.split(' — ')[0]} build board`,'my-app board']; }
+const cap=x=>x.charAt(0).toUpperCase()+x.slice(1);
+function existingBoard(){ if(s.scen==='existing'||s.scen==='resume') return {t:'Ledgerly Roadmap #4',m:6,miss:'QA',cards:31}; if(s.scen==='upgrade') return {t:'BookKeeping board #2',m:7,miss:'',cards:88}; return null; }
+function boardName(){ const v=A('name'); if(v&&v.other) return v.other; if(v==='reuse'&&existingBoard()) return existingBoard().t; return names()[{n1:0,n2:1,n3:2}[v]||0]; }
+function baseRec(){ const p=P(); return p.staging?'staging':(p.deploy.startsWith('Vercel')?'staging (create from main)':'main'); }
+function baseVal(){ const v=A('base'); if(v&&v.other) return v.other; return v==='rec'?baseRec().split(' ')[0]:v; }
+const prodBase=()=>baseVal()==='main'&&P().deploy.startsWith('Vercel');
+
+/* ============ steps ============ */
+const WIZ=['checks','github','board','branch','agents','policies','sources','review'];
+const STEPS=[
+ {id:'install',e:'📦',n:'Install',t:'Install super-board',why:'Paste one line in your terminal.',w:'t'},
+ {id:'intro',e:'🚀',n:'Start',t:'Start the wizard',why:'Open Claude Code and type one command. Claude shows what it will ask.',w:'c'},
+ {id:'checks',e:'🔍',n:'Checks',t:'Checks',why:'install or update what the board needs.',w:'c'},
+ {id:'github',e:'🔑',n:'GitHub',t:'GitHub',why:'sign in so I can manage boards.',w:'c'},
+ {id:'board',e:'🗂️',n:'Board',t:'Board',why:'the robot takes tickets from here.',w:'c'},
+ {id:'branch',e:'🌿',n:'Branch',t:'Branch',why:'where finished work merges.',w:'c'},
+ {id:'agents',e:'📜',n:'AGENTS.md',t:'AGENTS.md',why:'Claude reads AGENTS.md; CLAUDE.md becomes "@AGENTS.md".',w:'c'},
+ {id:'policies',e:'🛡️',n:'Policies',t:'Policies',why:'what the robot may do alone.',w:'c'},
+ {id:'sources',e:'📥',n:'Bug sources',t:'Bug sources',why:'where to find problems to fix.',w:'c'},
+ {id:'review',e:'✅',n:'Review',t:'Review',why:'nothing is written until you say so.',w:'c'},
+ {id:'done',e:'🎉',n:'Done',t:'Done',why:'What\'s next.',w:'c'},
+ {id:'needsyou',e:'🙋',n:'Later: needs you',t:'Later: a card needs you',why:'What you see on GitHub when the robot stops for a step only you may do.',w:'g'}
+];
+const vis=()=>STEPS;
+
+/* ============ screen builder ============ */
+const PENDING=Symbol('p');
+const esc=x=>String(x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+class Scr{
+  constructor(){ this.h=[]; this.qs=[]; this.picker=false; }
+  raw(x){ this.h.push(x); }
+  l(x='',c=''){ this.h.push(`<div class="l ${c}">${x}</div>`); }
+  z(c){ this.l(`<span class="zp">eric@mac <span class="d">my-app</span> %</span> ${esc(c)}`); }
+  um(t){ this.h.push(`<div class="um"><span class="p">&gt; </span><span class="t">${esc(t)}</span></div>`); }
+  say(x){ this.h.push(`<div class="msg"><span class="bu w">⏺</span><span>${x}</span></div>`); }
+  tool(nm,arg,res,bad){ this.h.push(`<div class="msg"><span class="bu ${bad?'r':'g'}">⏺</span><span class="tool"><span class="nm">${esc(nm)}</span><span class="ar">(${esc(arg)})</span></span></div><div class="tres">⎿  ${res}</div>`); }
+  q(o){
+    const id=o.id, kind=o.kind||'ask';
+    let opts=[...o.options];
+    if(kind!=='perm'){ const ri=opts.findIndex(x=>x.rec); if(ri>0){ const [x]=opts.splice(ri,1); opts.unshift(x);} }
+    if(kind==='ask'&&!o.multi&&o.other!==false) opts.push({label:o.otherLabel||'Type something.',value:'__other'});
+    if(o.multi){ if(!ui.ticks[id]) ui.ticks[id]=new Set(A(id)); opts.push({label:'Submit',value:'__go'}); }
+    if(has(id)&&!s.open[id]){
+      const v=A(id);
+      const label=o.multi?(v.length?v.map(x=>(opts.find(y=>y.value===x)||{label:x}).label.split(' — ')[0]).join(', '):'(none)'):v&&v.other?`"${v.other}"`:(opts.find(x=>x.value===v)||{label:v}).label;
+      if(kind==='perm') this.h.push(`<div class="tres ans" data-reopen="${id}">${v==='n'?'<span class="bad">✗ declined</span>':'<span class="ok">✓ approved</span>'} <span class="q">${esc(o.title)}</span></div>`);
+      else this.h.push(`<div class="msg ans" data-reopen="${id}"><span class="bu w">⏺</span><span>User answered Claude's questions:<br>  ⎿  · <span class="q">${esc(o.question.split('\n')[0])}</span> → <span class="a">${esc(label)}</span></span></div>`);
+      if(kind==='perm'&&v==='n'&&o.stop){ this.say(o.stop); throw PENDING; }
+      if(o.stopOn&&o.stopOn[pv(v)]){ this.say(o.stopOn[pv(v)]); throw PENDING; }
+      return v;
+    }
+    this.qs.push({id,kind,opts,multi:!!o.multi});
+    if(ui.hi[id]==null){ let i=0; if(has(id)&&!o.multi){ const j=opts.findIndex(x=>x.value===pv(A(id))); if(j>=0) i=j; } ui.hi[id]=i; }
+    const hi=ui.hi[id];
+    let head='';
+    if(kind==='perm') head=`<div class="b">${esc(o.title)}</div>\n<div style="padding-left:2ch">${o.body}</div>\n<div>Do you want to proceed?</div>`;
+    else { head=o.tabs?`<div class="tabs">← ${o.tabs.map((t,i)=>i===o.tab?`<span class="on">☐ ${esc(t)}</span>`:`☐ ${esc(t)}`).join('  ')}  ✔ Submit →</div>`:`<div><span class="qchip">☐ ${esc(o.header)}</span></div>`; head+=`<div class="qq">${esc(o.question)}</div>`; }
+    const rows=opts.map((x,i)=>{ const on=i===hi, num=x.value==='__go'?'':`${i+1}. `; const tk=o.multi&&x.value!=='__go'?(ui.ticks[id].has(x.value)?'[✔] ':'[ ] '):'';
+      return `<div class="opt ${on?'on':''}" data-q="${id}" data-i="${i}"><div class="ln1"><span class="cur">${on?'❯':''}</span><span class="lab">${tk}${num}${esc(x.label)}${x.rec&&kind!=='perm'?' (Recommended)':''}</span></div>${x.desc?`<div class="ds">${esc(x.desc)}</div>`:''}</div>`; }).join('');
+    const foot=kind==='perm'?'Esc to cancel':o.multi?'Space to toggle · Enter to select · ↑/↓ to navigate · Esc to cancel':'Enter to select · ↑/↓ to navigate · Esc to cancel';
+    this.h.push(`<div class="box ${kind==='perm'?'perm':''}" data-pk="${id}">${head}${rows}<div class="foot">${foot}</div><div class="oslot"></div></div>`);
+    this.picker=true; throw PENDING;
+  }
+}
+function agenda(b,cur){
+  const ci=cur==='done'?WIZ.length:WIZ.indexOf(cur);
+  b.raw(`<div class="agenda">${WIZ.map((id,i)=>{const st=STEPS.find(x=>x.id===id); return `<span class="a ${i<ci?'dn':i===ci?'on':''}">${i<ci?'✓':i+1} ${st.n}</span>`;}).join('<span class="sep">·</span>')}</div>`);
+}
+function head(b,st){ agenda(b,st.id); const i=WIZ.indexOf(st.id)+1; b.say(`<span class="b">${i} of ${WIZ.length} · ${st.e} ${st.t}</span> <span class="dim">— ${st.why}</span>`); }
+const saved=b=>b.l('<span class="faint">  ⎿  saved to .claude/super-board/onboard-answers.json</span>');
+function inbox(b){ if(!b.picker) b.raw(`<div class="inbox">&gt; <span class="faint">Try "how does super-board work?"</span></div><div class="faint" style="font-size:11.5px;padding-left:2px">? for shortcuts</div>`); }
+function welcome(b){ b.raw(`<div class="welcome"><span class="cl">✻</span> Welcome to <span class="b">Claude Code</span>!\n\n  <span class="dim">/help for help, /status for your current setup</span>\n\n  <span class="dim">cwd: ${T}</span></div>`); }
+const T='/Users/eric/code/my-app';
+
+/* ============ step screens ============ */
+const BODY={
+install(b){
+  if(plugin()){
+    b.l('<span class="faint"># the "or" route — inside Claude Code</span>');
+    b.z('cd ~/code/my-app'); b.z('claude'); welcome(b);
+    b.um('/plugin marketplace add EricTechPro/super-board'); b.l('  ⎿  Successfully added marketplace: super-board','dim');
+    b.um('/plugin install super-board@super-board'); b.l('  ⎿  ✓ Installed super-board. Restart Claude Code to load new plugins.','dim');
+    b.l(''); b.l('<span class="dim">A plugin ships only the skills — 🔍 Checks finds and installs the rest.</span>'); return;
+  }
+  if(s.scen==='scratch') b.z('mkdir -p ~/code/my-app && cd ~/code/my-app'); else b.z('cd ~/code/my-app');
+  b.z('curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash');
+  b.l('🧩 super-board installer'); b.l(`   target: ${T}`); b.l('');
+  b.l('🔍 checking what you need');
+  b.l(noNode()?'   <span class="ok">✓</span> curl · tar · python3 · gh · jq   <span class="warn">✗ node</span> <span class="dim">(helper skills need it)</span>':'   <span class="ok">✓</span> curl · tar · python3 · gh · jq · node');
+  b.l('📦 downloading EricTechPro/super-board@v2.6.0');
+  b.l('🔧 installing');
+  b.l('   <span class="ok">✓</span> skills, scripts and workflows → .claude/');
+  b.l(`   🛡️  6 guard hooks → .claude/settings.json <span class="dim">(${s.scen==='existing'||s.scen==='resume'?'backup kept':'new file'})</span>`);
+  if(P().agents==='both') b.l('   <span class="warn">!</span> CLAUDE.md holds its own rules — onboard offers a merge');
+  b.l(noNode()?'🧠 helper skills: <span class="warn">skipped — 🔍 Checks will fix this</span>':'🧠 helper skills: installed');
+  b.l(''); b.l('🎉 super-board 2.6.0 is installed');
+  b.l('👉 next: open Claude Code here and run /super-board onboard');
+  b.raw(`<span class="zp">eric@mac <span class="d">my-app</span> %</span> <span style="background:var(--fg)">&nbsp;</span>`);
+},
+intro(b){
+  if(!plugin()) b.z('claude');
+  if(s.scen==='scratch'||s.scen==='light') b.q({id:'trust',kind:'perm',title:'Do you trust the files in this folder?',body:`${T}\n<span class="dim">Claude Code may read, write, or execute files contained in this directory.</span>`,options:[{label:'Yes, proceed',value:'y'},{label:'No, exit',value:'n'}],stop:'<span class="bad">Claude Code closed.</span> Choose Yes to set up.'});
+  if(!plugin()) welcome(b); else b.raw('<div class="scrollback">╌╌ Claude Code restarted after the plugin install ╌╌</div>');
+  b.um(cmd());
+  b.tool('Skill','super-board','Successfully loaded skill');
+  b.say(`<span class="b">super-board setup — 8 steps.</span> Enter takes the recommended answer.
+  1 🔍 Checks       install or update what the board needs
+  2 🔑 GitHub       sign in so I can manage boards
+  3 🗂️ Board        pick or create your project board
+  4 🌿 Branch       choose where finished work merges
+  5 📜 AGENTS.md    move your rules into one file
+  6 🛡️ Policies     what the robot may do alone
+  7 📥 Bug sources  where to find problems to fix
+  8 ✅ Review       check every answer, then save once
+<span class="dim">Stop any time; re-run continues. Live site only? /super-qa &lt;url&gt;.</span>`);
+  if(P().draft){
+    b.tool('Bash','cat .claude/super-board/onboard-answers.json','saved 2 Oct, 18:40 · stopped at Policies');
+    b.say(`💾 Found your answers from last time:
+  <span class="ok">✓</span> GitHub: erictech     <span class="ok">✓</span> board: Ledgerly Roadmap
+  <span class="ok">✓</span> base: staging        <span class="ok">✓</span> AGENTS.md: already the source of truth
+  → stopped at 🛡️ Policies & permissions`);
+    b.q({id:'resume',header:'Resume',question:'Continue where you left off?',options:[
+      {label:'Continue at Policies & permissions',value:'y',rec:true},{label:'Edit an earlier answer',value:'edit',desc:'pick which on the next screen'},{label:'Start over',value:'n',desc:'saved answers are renamed .bak'}]});
+  }
+  inbox(b);
+},
+checks(b,st){
+  const p=P(); head(b,st);
+  if(p.old){
+    b.tool('Bash','super-board-preflight.sh',`found super-board v${p.old} — upgrading to v2.6.0`);
+    b.say(`<span class="b">Upgraded for you</span> <span class="dim">(backup: .claude/super-board/backup/20261002-1840/)</span>
+  <span class="ok">✓</span> skills updated; added super-collect, visual, ui-refine-loop
+  <span class="ok">✓</span> removed old folders: super-refine, cleanup-wt, arch-loop
+  <span class="ok">✓</span> scripts, board engine and safety guards updated
+  <span class="ok">✓</span> config moved to the new keys (merge rule, migrations, sources)
+  <span class="ok">✓</span> labels mapped: build→feature · bug-fix→bug · qa-only→qa (14)
+  <span class="ok">✓</span> Skipped column: 4 cards moved to Done, column removed
+  <span class="ok">✓</span> re-checked: all green
+<span class="dim">Your CLAUDE.md still has its own rules — step 5 offers to move them.</span>`);
+    inbox(b); return;
+  }
+  const fixed=[];
+  if(plugin()) fixed.push('super-board scripts, board engine and safety guards installed (plugins don\'t include them)');
+  else fixed.push('super-board skills, scripts and board engine present');
+  if(p.brokenCfg) fixed.push('settings.json repaired (trailing comma; backup kept)');
+  fixed.push('settings.json entries added (backup kept)');
+  if(!p.git) fixed.push('git repo created (git init)');
+  if(s.scen==='upgrade'||s.scen==='existing') fixed.push('board labels qa · bug · feature ready');
+  b.say(`<span class="b">Fixed for you:</span>\n${fixed.map(x=>'  <span class="ok">✓</span> '+esc(x)).join('\n')}`);
+  if(noNode()){
+    b.say('<span class="warn">Needs your machine:</span> Node.js isn\'t installed. It\'s needed for Matt Pocock\'s coding skills (tests, code review, debugging) the board uses.');
+    b.q({id:'node',kind:'perm',title:'Bash command',body:'brew install node && npx -y skills@latest add mattpocock/skills\n<span class="dim">Install Node.js, then Matt Pocock\'s coding skills</span>',
+      options:[{label:'Yes',value:'y'},{label:'Yes, and don\'t ask again for brew install commands',value:'a'},{label:'No, and tell Claude what to do differently (esc)',value:'n'}],
+      stop:'Skipped. The board still runs, with simpler built-in checklists instead of those skills. Run the command later and re-run setup.'});
+    b.tool('Bash','brew install node && npx -y skills@latest add mattpocock/skills','<span class="ok">Node 22.9 · 18 coding skills added</span>');
+  } else b.say('  <span class="ok">✓</span> Matt Pocock\'s coding skills (tests, code review, debugging) present');
+  b.tool('Bash','super-board-preflight.sh','<span class="ok">all green</span>');
+  inbox(b);
+},
+github(b,st){
+  const p=P(); head(b,st);
+  b.tool('Bash','gh auth status',p.scopes?'<span class="ok">signed in as erictech · can manage boards</span>':'<span class="warn">signed in as erictech · can\'t manage boards yet</span>');
+  if(!p.scopes){
+    b.say('This opens a browser to approve board access — needed to move cards and create the board for you.');
+    b.q({id:'scopes',kind:'perm',title:'Bash command',body:'gh auth refresh -s project,read:project,repo\n<span class="dim">Add GitHub board access (opens a browser)</span>',
+      options:[{label:'Yes',value:'y'},{label:'Yes, and don\'t ask again for gh auth refresh commands in '+T,value:'a'},{label:'No, and tell Claude what to do differently (esc)',value:'n'}],
+      stop:'Without board access I can\'t make or move cards. Your answers are saved — run it again when ready.'});
+    b.tool('Bash','gh auth refresh -s project,read:project,repo','<span class="ok">✓ Authentication complete</span>');
+  }
+  if(!p.remote){
+    const r=b.q({id:'remote',header:'GitHub repo',question:'This project isn\'t on GitHub yet. Create a repo?',options:[{label:'Create a private repo',value:'create',rec:true},{label:'Use an existing repo',value:'pick'},{label:'Not now (the robot can\'t open pull requests)',value:'local'}]});
+    if(pv(r)==='create') b.tool('Bash','gh repo create erictech/my-app --private --source . --remote origin','<span class="ok">✓ Created erictech/my-app</span>');
+  } else b.tool('Bash','git remote get-url origin',`<span class="ok">${p.remote}</span>`);
+  b.say('<span class="ok">✓ GitHub connected.</span>'); saved(b); inbox(b);
+},
+board(b,st){
+  const p=P(); head(b,st);
+  b.say(`Columns: ${['Backlog','Ready','Building','QA','Review','Blocked','Done'].map(c=>'<span class="ok">✓</span> '+c).join(' ')}
+<span class="dim">Labels: feature · bug · qa (qa skips Building; no label = feature)</span>`);
+  const ex=existingBoard(), n=names();
+  b.q({id:'name',header:'Board',question:'Which board?',otherLabel:'Type a name',options:[
+    ...(ex?[{label:`Use ${ex.t} — ${ex.m} of 7 columns match${ex.miss?', I\'ll add '+ex.miss:''}`,value:'reuse',rec:true,desc:`github.com/users/erictech/projects/${ex.t.split('#')[1]}`}]:[]),
+    {label:`Create a new board named "${n[0]}"`,value:'n1',rec:!ex},{label:`Create a new board named "${n[1]}"`,value:'n2'}]});
+  if(pv(A('name'))==='reuse') b.tool('Bash',`gh api graphql (add ${ex.miss||'labels'} to ${ex.t})`,`<span class="ok">${esc(ex.t)} ready</span>`);
+  else b.tool('Bash',`gh project create --owner erictech --title "${boardName()}"`,'<span class="ok">github.com/users/erictech/projects/7</span>');
+  saved(b); inbox(b);
+},
+branch(b,st){
+  const p=P(); head(b,st);
+  const live=p.deploy.startsWith('Vercel');
+  b.say(`Found: ${p.branches.length?p.branches.filter(x=>!x.startsWith('feat')).join(', '):'main (new)'}${live?' — main deploys to production':''}${p.staging?'':', no staging'}.`);
+  const opts=p.staging?[{label:'staging',value:'rec',rec:true,desc:'already exists'},{label:'main — every merge goes live',value:'main'}]
+    :[{label:'Create staging from main',value:'rec',rec:true,desc:live?'nothing goes live until you move it':'keeps main clean'},{label:live?'main — every merge goes live':'main',value:'main'}];
+  b.q({id:'base',header:'Branch',question:'Where should finished work merge?',options:opts});
+  if(pv(A('base'))==='rec'&&!p.staging) b.tool('Bash','git push origin main:staging','<span class="ok">created staging</span>');
+  saved(b); inbox(b);
+},
+agents(b,st){
+  const p=P(); head(b,st);
+  if(p.agents==='pointer'){ b.say('<span class="ok">✓ Already done</span> — CLAUDE.md is "@AGENTS.md".'); saved(b); inbox(b); return; }
+  if(p.agents==='none'){
+    b.q({id:'agents',header:'AGENTS.md',question:'Create AGENTS.md for your project rules?',options:[{label:'Yes',value:'yes',rec:true,desc:'CLAUDE.md becomes "@AGENTS.md"'},{label:'Skip',value:'skip'}]});
+    saved(b); inbox(b); return;
+  }
+  const a=b.q({id:'agents',header:'AGENTS.md',question:`Move your ${p.claudeLines} CLAUDE.md rules into AGENTS.md?`,options:[{label:'Yes, move them',value:'yes',rec:true,desc:'backup first, diff before saving'},{label:'Only add the super-board section',value:'section'},{label:'Skip',value:'skip'}]});
+  if(pv(a)!=='yes'){ saved(b); inbox(b); return; }
+  b.q({id:'c1',header:'Conflict 1 of 2',question:'Tests: which rule wins?',options:[{label:'"pnpm test:unit only; e2e in CI" — CLAUDE.md:9',value:'c',rec:true},{label:'"pnpm test before every commit" — AGENTS.md:14',value:'a'}]});
+  b.q({id:'c2',header:'Conflict 2 of 2',question:'Pushing: which rule wins?',options:[{label:'"NEVER push to main" — AGENTS.md:22',value:'a',rec:true},{label:'"doc fixes may go to main" — CLAUDE.md:17',value:'c'}]});
+  b.tool('Bash','super-board-agents-md.py coverage && check','<span class="ok">31/31 rules kept · 118 lines</span>');
+  saved(b); inbox(b);
+},
+policies(b,st){
+  const p=P(); head(b,st);
+  b.q({id:'pol',header:'Rules',question:'Use the safe defaults?',options:[{label:'Yes',value:'all',rec:true,desc:prodBase()?'you merge everything (main goes live) · no pushes to main · migrate test + staging':'robot merges normal changes · money/logins/DB wait for you · no pushes to main · migrate test + staging'},{label:'Review each',value:'each'}]});
+  b.raw(`<details class="td"><summary>show details</summary>merge_policy.default ${prodBase()?'human':'auto'} · always_human: money, auth, schema
+push guard: main, master, ${baseVal()} · migrations.allowed_envs: ${p.mig?A('envs').join(', '):'—'}</details>`);
+  if(pv(A('pol'))==='each'){
+    const tabs=['Merge','Push guard',...(p.mig?['Databases']:[])];
+    b.q({id:'merge',tabs,tab:0,question:'Who merges a change that passes review?',options:prodBase()?[{label:'I merge everything',value:'human',rec:true},{label:'Robot merges normal changes',value:'auto'}]:[{label:'Robot merges normal changes',value:'auto',rec:true},{label:'I merge everything',value:'human'}]});
+    b.q({id:'push',tabs,tab:1,question:'Block pushing straight to main?',options:[{label:'Yes',value:'y',rec:p.commits>0},{label:'No',value:'n',rec:p.commits===0}]});
+    if(p.mig) b.q({id:'envs',tabs,tab:2,multi:true,question:'Which databases may the robot migrate?',options:[{label:'test',value:'test',rec:true},{label:'staging',value:'staging',rec:true},{label:'live',value:'live'}]});
+  }
+  const auto=prodBase()?pv(A('merge'))==='auto'&&has('merge'):pv(A('merge'))!=='human';
+  const lines=['Bash(gh project:*)','Bash(gh issue:*)','Bash(gh pr:*)',...(auto?['Bash(bash .claude/bin/super-board-merge-gate.sh:*)','Bash(gh pr merge:*)']:[]),...(p.mig&&A('envs').length?[`Bash(${p.migcmd})`]:[]),s.scen==='light'?'Bash(pytest:*)':'Bash(npm test:*)'];
+  b.q({id:'perms',header:'Permissions',question:'Let it run its commands without asking each time?',options:[{label:`Yes, add ${lines.length} lines to settings.json`,value:'add',rec:true},{label:'No, ask me each time',value:'skip'}]});
+  b.raw(`<details class="td"><summary>show details</summary>${lines.map(x=>'<span class="ok">+ '+esc(x)+'</span>').join('\n')}</details>`);
+  saved(b); inbox(b);
+},
+sources(b,st){
+  const p=P(); head(b,st);
+  const src=b.q({id:'src',header:'Bug sources',multi:true,question:'Where should I look for problems?',options:[
+    ...(p.sentry.found?[{label:'Sentry — app errors',value:'sentry',rec:true}]:[]),
+    ...(p.posthog.found?[{label:'PostHog — rage clicks, errors, slow pages',value:'posthog',rec:true}]:[]),
+    {label:'GitHub issues — bugs filed but not on the board',value:'github'},
+    {label:'Past PRs — review comments that keep repeating',value:'prs'},
+    {label:'Architecture — tangled or duplicated code',value:'architecture'},
+    {label:'➕ Add another source (link, app, API URL, MCP or command)',value:'add'}]});
+  if(src.includes('add')){
+    const v=s.ans.extraText||'';
+    b.raw(`<div class="tres">➕ Another source: <input class="otherin" id="extraIn" style="width:60%;display:inline-block" placeholder="e.g. linear, https://…, vercel logs" value="${esc(v)}"> <span class="faint">Enter to test</span></div>`);
+    if(v){ const r=testSource(v); b.tool(r.tool,r.arg,r.ok?`<span class="ok">✅ ${esc(r.msg)}</span>`:`<span class="bad">❌ ${esc(r.msg)}</span>`,!r.ok); }
+  }
+  const lines=[];
+  src.filter(x=>x!=='add').forEach(x=>{ if(x==='posthog'&&!p.posthog.key) lines.push('<span class="bad">❌</span> posthog — key missing: add POSTHOG_PERSONAL_API_KEY to .env (left out)'); else lines.push('<span class="ok">✅</span> '+x); });
+  b.say(lines.join('\n'));
+  saved(b); inbox(b);
+},
+review(b,st){
+  head(b,st);
+  const r=rows(); const half=Math.ceil(r.length/2);
+  b.say(r.slice(0,half).map((x,i)=>{const y=r[half+i]; return `  ${x[0].padEnd(12)} ${esc(x[1]).slice(0,34).padEnd(36)}${y?y[0].padEnd(12)+' '+esc(y[1]).slice(0,34):''}`;}).join('\n'));
+  b.q({id:'review',header:'Save',question:'Write everything?',options:[{label:'Write everything',value:'write',rec:true},{label:'Change one thing',value:'change'},{label:'Cancel',value:'cancel'}],
+    stopOn:{change:'Click a step above to change it.',cancel:'Cancelled — nothing written. Run it again to come back here.'}});
+  b.tool('Bash','write config · settings.json · AGENTS.md · CLAUDE.md','<span class="ok">done (backups first)</span>');
+  inbox(b);
+},
+done(b){
+  agenda(b,'done');
+  b.tool('Bash','self-check','<span class="ok">all good</span>');
+  b.say(`<span class="ok b">🎉 Onboard complete.</span>
+📋 Board: github.com/users/erictech/projects/7 (${esc(boardName())})
+🧹 Next: <span class="info">/super-board lint</span> — checks every ticket has clear success criteria.
+🤖 Then: <span class="info">/super-board run</span>.`);
+  inbox(b);
+},
+needsyou(b){
+  b.raw(`<div class="ghc"><div class="h"><b>super-board-bot</b> commented on #812 · <span class="lbl">needs-you</span> · moved to <b>Blocked</b></div><div class="bd">
+<b>🙋 Your turn on #812 — Add plan column</b>
+<ul><li>☐ Run <code>npx prisma migrate deploy</code> on the <b>live</b> database</li><li>☐ Comment <code>done</code> here</li></ul>
+<span style="color:var(--dim);font-size:13px">After <code>done</code>, the next wave moves the card to Review and merges it.</span>
+<details><summary>Why, and what I checked</summary>PR #845 adds prisma/migrations/0042_add_plan. Live isn't in the databases the robot may migrate. Tests green on staging@9c41e07; migrated test and staging.</details>
+</div></div>`);
+}
+};
+function rows(){
+  const p=P();
+  return [['GitHub','erictech'+(p.remote?'':' · new private repo'),'github'],['Board',boardName()+' · 7 columns · labels qa/bug/feature','board'],['Base branch',baseVal(),'branch'],
+   ['AGENTS.md',p.agents==='pointer'?'already source of truth':pv(A(p.agents==='none'?'agents':'agentsOk'))==='skip'?'unchanged':'source of truth · CLAUDE.md = @AGENTS.md','agents'],
+   ['Merging',(prodBase()&&!has('merge'))||pv(A('merge'))==='human'?'you merge everything':'robot merges normal changes; money/logins/DB wait 🙋','policies'],
+   ['Push guard',pv(A('push'))==='y'?'on':'off','policies'],['Databases',p.mig?A('envs').join(', '):'none found','policies'],['Permissions',pv(A('perms'))==='add'?'add allowlist':'ask each time','policies'],
+   ['Bug sources',A('src').filter(x=>x!=='add'&&(x!=='posthog'||p.posthog.key)).concat(A('src').includes('add')&&s.ans.extraText&&testSource(s.ans.extraText).ok?[s.ans.extraText]:[]).join(', '),'sources']];
+}
+
+function testSource(v){
+  const t=v.trim(), l=t.toLowerCase();
+  if(/^https?:\/\//.test(l)) return l.includes('github.com')?{tool:'Bash',arg:'curl -sI '+t,ok:true,msg:'yes — readable without a token; saved in this project\'s config'}:{tool:'Bash',arg:'curl -s -o /dev/null -w "%{http_code}" '+t,ok:false,msg:'no — HTTP 401: it needs a token. Add it to .env and test again'};
+  if(/linear|sentry|jira|mcp/.test(l)) return {tool:'linear',arg:'list_issues limit 1 (read-only)',ok:true,msg:'yes — I can read its issues (12 open). Saved in this project\'s config; /super-collect reads it'};
+  if(/\s/.test(t)&&/^(vercel|fly|heroku|kubectl|gcloud|aws|npx|gh)\b/.test(l)) return {tool:'Bash',arg:t+' | head -5',ok:true,msg:'yes — the command prints logs I can read. Saved in this project\'s config'};
+  return {tool:'Bash',arg:'test "'+t+'"',ok:false,msg:'couldn\'t read "'+t+'" — not a link, MCP server or command I can run read-only'};
+}
+/* ============ render ============ */
+const screen=document.getElementById('screen');
+function render(){
+  const v=vis(); const i=v.findIndex(x=>x.id===s.cur), st=v[i];
+  s.seen.add(st.id);
+  const w=st.id==='install'&&plugin()?'c':st.w;
+  document.getElementById('stepper').innerHTML=v.map((x,j)=>`<button class="pill ${x.id===s.cur?'cur':''} ${s.seen.has(x.id)?'seen':''} ${x.w==='g'?'':x.id==='install'&&plugin()?'c':x.w}" data-st="${x.id}"><span class="n">${WIZ.includes(x.id)?WIZ.indexOf(x.id)+1:'·'}</span>${x.e} ${x.n}</button>`).join('');
+  document.querySelector('.pill.cur').scrollIntoView({block:'nearest',inline:'center'});
+  document.getElementById('count').textContent=WIZ.includes(st.id)?`Step ${WIZ.indexOf(st.id)+1} of ${WIZ.length}`:st.id==='install'?'Before the wizard':st.id==='intro'?'Wizard start':st.id==='done'?'Finished':'After setup';
+  const we=document.getElementById('where'); we.className='where '+(w==='g'?'':w); we.textContent=w==='t'?'💻 Your terminal':w==='g'?'🌐 On GitHub':'✻ Inside Claude Code';
+  document.getElementById('why').textContent=`${st.e} ${st.t} — ${st.why}`;
+  document.getElementById('tt').textContent=w==='t'?'eric — zsh — ~/code/my-app':w==='g'?'github.com/erictech/my-app/issues/812':'eric — claude — ~/code/my-app';
+  const b=new Scr();
+  if(w==='c'&&!['intro','install'].includes(st.id)) b.raw(`<div class="scrollback">╌╌ earlier steps scrolled up ╌╌</div>`);
+  try{ BODY[st.id](b,st); }catch(e){ if(e!==PENDING){ console.error(e); b.l('demo error: '+esc(e.message),'bad'); } }
+  screen.innerHTML=b.h.join('');
+  ui.qs=b.qs; ui.focus=b.qs.length?b.qs[b.qs.length-1].id:null;
+  document.getElementById('back').disabled=i===0;
+  document.getElementById('next').disabled=i===v.length-1;
+}
+function choose(id,i){
+  const q=ui.qs.find(x=>x.id===id); if(!q) return; const o=q.opts[i]; ui.hi[id]=i;
+  if(q.multi){ if(o.value==='__go'){ s.ans[id]=[...ui.ticks[id]]; delete s.open[id]; } else { const t=ui.ticks[id]; t.has(o.value)?t.delete(o.value):t.add(o.value); } return render(); }
+  if(o.value==='__other'){
+    const slot=document.querySelector(`[data-pk="${id}"] .oslot`);
+    slot.innerHTML='<input class="otherin" placeholder="Type your answer, then Enter">'; const inp=slot.querySelector('input'); inp.focus();
+    inp.onkeydown=e=>{ e.stopPropagation(); if(e.key==='Enter'&&inp.value.trim()){ s.ans[id]={other:inp.value.trim()}; delete s.open[id]; render(); } if(e.key==='Escape') slot.innerHTML=''; };
+    return;
+  }
+  s.ans[id]=o.value; delete s.open[id]; render();
+}
+screen.addEventListener('keydown',e=>{ if(e.target.id==='extraIn'){ e.stopPropagation(); if(e.key==='Enter'){ s.ans.extraText=e.target.value.trim(); render(); } } });
+screen.addEventListener('click',e=>{
+  const o=e.target.closest('.opt'); if(o){ choose(o.dataset.q,+o.dataset.i); return; }
+  const r=e.target.closest('[data-reopen]'); if(r){ const id=r.dataset.reopen; s.open[id]=true; ui.hi[id]=null; delete ui.ticks[id]; render(); return; }
+  const j=e.target.closest('[data-jump]'); if(j) go(j.dataset.jump);
+});
+document.getElementById('stepper').addEventListener('click',e=>{ const p=e.target.closest('.pill'); if(p) go(p.dataset.st); });
+function go(id){ s.cur=id; render(); }
+function step(d){ const v=vis(); let i=v.findIndex(x=>x.id===s.cur)+d;
+  if(d>0&&s.cur==='intro'&&P().draft&&pv(A('resume'))==='y') i=v.findIndex(x=>x.id==='policies');
+  if(i>=0&&i<v.length){ s.cur=v[i].id; render(); } }
+document.getElementById('back').onclick=()=>step(-1);
+document.getElementById('next').onclick=()=>step(1);
+document.getElementById('scen').onchange=e=>{ s.scen=e.target.value; s.ans={}; s.open={}; ui.hi={}; ui.ticks={}; render(); };
+document.getElementById('route').onchange=e=>{ s.route=e.target.value; render(); };
+document.getElementById('reset').onclick=()=>{ s.ans={}; s.open={}; ui.hi={}; ui.ticks={}; s.seen=new Set(); s.cur='install'; render(); };
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  const q=ui.focus&&ui.qs.find(x=>x.id===ui.focus);
+  if(e.key==='ArrowLeft'){ step(-1); return; }
+  if(e.key==='ArrowRight'){ step(1); return; }
+  if(!q){ if(e.key==='Enter') step(1); return; }
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); ui.hi[q.id]=(ui.hi[q.id]+(e.key==='ArrowDown'?1:-1)+q.opts.length)%q.opts.length; render(); }
+  else if(/^[1-9]$/.test(e.key)&&+e.key<=q.opts.length){ ui.hi[q.id]=+e.key-1; render(); }
+  else if(e.key===' '&&q.multi){ e.preventDefault(); if(q.opts[ui.hi[q.id]].value!=='__go') choose(q.id,ui.hi[q.id]); }
+  else if(e.key==='Enter'){ e.preventDefault(); if(q.multi&&q.opts[ui.hi[q.id]].value!=='__go') choose(q.id,q.opts.length-1); else choose(q.id,ui.hi[q.id]); }
+  else if(e.key==='Escape'&&q.kind==='perm'){ choose(q.id,q.opts.length-1); }
+});
+render();
+</script>
+</body>
+</html>

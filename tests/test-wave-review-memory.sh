@@ -38,6 +38,8 @@ const base = { configPath: 'c.json' }
   ;/Gap \/ Bug \/ Verification miss \/ Scope drift \/ Over-engineering/.test(rp) || fail('review prompt must name the finding classes')
   rp.includes('ponytail:ponytail-review') || fail('review prompt must run ponytail-review')
   ;/never blocks merge alone/.test(rp) || fail('review prompt must say Over-engineering never blocks alone')
+  ;/fixed brief from super-review/.test(rp) || fail('review prompt must use the fixed truth-check brief')
+  ;/reclass any Over-engineering Blocker to Should fix/.test(rp) || fail('review prompt must re-apply the Over-engineering rule after the truth-check')
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('ponytail-review') && fail(`${l} must not get the review pass`))
   ;['build:#7', 'qa:#7'].forEach((l) => a.prompts[l].includes('super-review:report') && fail(`${l} must not get review memory`))
   // 1b — ui-refine-loop is standalone: no lane prompt mentions it.

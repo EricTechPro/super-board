@@ -323,6 +323,37 @@ def test_paginate_items_stops_when_cursor_missing() -> None:
     assert hit_cap is False  # we returned early, not at the cap
 
 
+def test_board_order_matches_github_columns() -> None:
+    """Kanban columns run left to right as on the board, Backlog included."""
+    assert sbs.BOARD_ORDER == (
+        "Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done",
+    )
+
+
+def test_render_kanban_prints_boxes_in_board_order() -> None:
+    by_status = {s: [] for s in sbs.BOARD_ORDER}
+    by_status["Backlog"] = [{"number": 40, "title": "later", "labels": []},
+                            {"number": 39, "title": "later too", "labels": []}]
+    by_status["Blocked"] = [{"number": 25, "title": "gated", "labels": []}]
+    by_status["Done"] = [{"number": 20, "title": "shipped", "labels": []}]
+    out = sbs.render_kanban(by_status, lambda n: "  ", lambda n: "🛡")
+    heads = [l.split("[")[0].strip("┌─ ").strip() for l in out.splitlines() if l.startswith("┌─")]
+    assert heads == list(sbs.BOARD_ORDER), heads
+    assert "#40 #39   (not started, collapsed)" in out, "Backlog collapses to numbers"
+    assert "later" not in out, "Backlog shows no titles"
+    assert "🛡 #25  gated" in out
+    assert "#20   (squash-merged, collapsed)" in out
+    assert all(sbs.visual_width(l) == 80 for l in out.splitlines()), "every box line is 80 cols"
+
+
+def test_render_kanban_backlog_overflow_truncates() -> None:
+    by_status = {s: [] for s in sbs.BOARD_ORDER}
+    by_status["Backlog"] = [{"number": n, "title": "t", "labels": []} for n in range(200, 100, -1)]
+    out = sbs.render_kanban(by_status, lambda n: "  ", lambda n: "")
+    line = out.splitlines()[1]
+    assert "more   (not started, collapsed)" in line and sbs.visual_width(line) == 80
+
+
 def _run() -> int:
     tests = [
         (name, fn) for name, fn in globals().items()

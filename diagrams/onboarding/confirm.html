@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding Design Check</title>
+<style>
+:root{
+  --bg:#f6f8fa; --card:#ffffff; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0;
+  --accent:#0969da; --code-bg:#eff1f3; --pre-bg:#f6f8fa; --green:#1a7f37; --red:#d1242f;
+  --amber:#9a6700; --pick:#1f883d; --note-bg:#ddf4ff; --note-bd:#0969da;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117; --card:#151b23; --fg:#e6edf3; --muted:#9198a1; --border:#3d444d;
+    --accent:#4493f8; --code-bg:#262c36; --pre-bg:#0d1117; --green:#3fb950; --red:#f85149;
+    --amber:#d29922; --pick:#3fb950; --note-bg:#0c2d6b; --note-bd:#4493f8;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --card:#151b23; --fg:#e6edf3; --muted:#9198a1; --border:#3d444d;
+  --accent:#4493f8; --code-bg:#262c36; --pre-bg:#0d1117; --green:#3fb950; --red:#f85149;
+  --amber:#d29922; --pick:#3fb950; --note-bg:#0c2d6b; --note-bd:#4493f8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif}
+.top{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--border)}
+.bar{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.bar h1{font-size:16px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:6px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--pick);border-color:var(--pick);color:#fff;font-weight:600}
+.dots{display:flex;gap:6px;justify-content:center;padding:0 16px 10px;flex-wrap:wrap}
+.dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--muted);background:transparent;padding:0;cursor:pointer}
+.dot.done{background:var(--pick);border-color:var(--pick)}
+.dot.cur{outline:2px solid var(--accent);outline-offset:2px}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
+.slide{display:none}
+.slide.on{display:block}
+.slide h2{font-size:22px;margin:0 0 2px}
+.purpose{color:var(--muted);margin:0 0 16px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+.opt{min-width:0;background:var(--card);border:2px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.opt.picked{border-color:var(--pick)}
+.ohead{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--pre-bg)}
+.ohead b{font-size:14px;flex:1}
+.rec{font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;background:var(--note-bg);color:var(--accent)}
+.pickb{font-size:12.5px;padding:4px 10px}
+.opt.picked .pickb{background:var(--pick);border-color:var(--pick);color:#fff}
+.render{padding:12px 16px;font-size:14px;min-width:0;overflow-x:auto}
+.render h3{font-size:15px;margin:10px 0 6px;padding-bottom:3px;border-bottom:1px solid var(--border)}
+.render h3:first-child{margin-top:0}
+.render ul,.render ol{margin:4px 0;padding-left:22px}
+.render li{margin:2px 0}
+.render ol ol{list-style:lower-alpha}
+.render ol.num ol{list-style:decimal}
+code{font:12.5px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--code-bg);padding:.1em .35em;border-radius:5px}
+pre{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--pre-bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0;white-space:pre}
+table{border-collapse:collapse;width:100%;font-size:13px;margin:6px 0}
+th,td{border:1px solid var(--border);padding:5px 8px;text-align:left;vertical-align:top}
+th{background:var(--pre-bg)}
+.task{list-style:none;margin-left:-20px}
+.task input{margin-right:6px;vertical-align:-1px}
+.why{display:block;color:var(--muted);font-size:12.5px;margin-left:22px}
+.alert{border-left:4px solid var(--note-bd);padding:6px 12px;margin:4px 0}
+.alert .t{color:var(--accent);font-weight:600;font-size:13.5px}
+.alert.warn{border-color:var(--amber)} .alert.warn .t{color:var(--amber)}
+.alert.tip{border-color:var(--green)} .alert.tip .t{color:var(--green)}
+.badge{font-size:15px}
+.muted{color:var(--muted);font-size:12.5px}
+.gitlog .msg{font-weight:600}
+details{border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:6px 0}
+summary{cursor:pointer}
+.cm{border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.cm .ch{background:var(--pre-bg);border-bottom:1px solid var(--border);padding:5px 10px;font-size:12.5px;color:var(--muted)}
+.cm .cb{padding:8px 12px}
+.cm .hd{font:13px ui-monospace,Menlo,monospace;font-weight:600;margin:0 0 4px}
+.cm p{margin:3px 0}
+svg.mock{display:block;max-width:100%;height:auto;border:1px solid var(--border);border-radius:6px;margin:6px 0}
+svg.mock.m{max-width:150px}
+.ba td{width:50%}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:1px solid var(--border)}
+.nav .in{max-width:1180px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.nav .count{flex:1;text-align:center;color:var(--muted);font-size:13px}
+.sum{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 18px;max-width:640px}
+.sum li{margin:4px 0}
+.sum .none{color:var(--red)}
+#copied{color:var(--green);font-size:13px;margin-left:8px}
+@media (max-width:640px){.opts{grid-template-columns:minmax(0,1fr)}.bar h1{font-size:14px}.slide h2{font-size:19px}}
+
+.tm{background:#0a0c0f;color:#e3e7ec;border:1px solid #2a313b;border-radius:8px;padding:10px 12px;font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow-x:auto}
+.tm .g{color:#5fd38d}.tm .y{color:#f2c66d}.tm .r{color:#ff6b6b}.tm .b{color:#6cb6ff}.tm .d{color:#8b95a0}.tm .f{color:#56606b}.tm .k{font-weight:700}.tm .w{color:#e3e7ec}
+.tm .s{color:#6cb6ff}
+.tm .pk{border:1px solid #4a5563;border-radius:6px;padding:6px 10px;margin:6px 0 2px;white-space:pre}
+.tm .pk.perm{border-color:#8a7440}
+.tm .chip{background:#3a4252;color:#fff;padding:0 6px;border-radius:3px}
+.render{padding:10px}
+.opts{grid-template-columns:repeat(auto-fit,minmax(min(100%,540px),1fr))}
+@media (max-width:640px){.tm{font-size:10.5px;padding:8px}.render{padding:8px}.purpose{font-size:14px}}
+.opt.none textarea{width:100%;min-height:96px;font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;resize:vertical}
+.opt.none .render p{margin:0 0 6px;color:var(--muted);font-size:13px}
+
+.screen{max-width:900px}
+.tm .ag{white-space:normal;border:1px solid #2a313b;border-radius:6px;padding:3px 8px;margin:2px 0 8px;line-height:1.9;background:#0d1117;font-size:11.5px}
+.tm .ag .a{color:#56606b;margin-right:3px;white-space:nowrap}
+.tm .ag .a.dn{color:#5fd38d} .tm .ag .a.on{color:#fff;background:#1b2c42;border-radius:4px;padding:0 5px}
+.tm .ag .sep{color:#333b45;margin-right:3px}
+.verdict{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:0 0 14px;max-width:900px}
+.vb{display:flex;flex-wrap:wrap;gap:8px}
+.vb .v{font-size:14px;padding:7px 14px}
+.vb .v.on[data-v=ok]{background:var(--pick);border-color:var(--pick);color:#fff}
+.vb .v.on[data-v=change]{background:var(--amber);border-color:var(--amber);color:#fff}
+.vb .v.on[data-v=remove]{background:var(--red);border-color:var(--red);color:#fff}
+.cl{display:block;margin-top:10px;font-size:13px;color:var(--muted)}
+.cl textarea{display:block;width:100%;min-height:64px;margin-top:4px;font:inherit;font-size:14px;color:var(--fg);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;resize:vertical}
+.cl.open textarea{border-color:var(--accent);min-height:96px}
+.tm details.td{white-space:pre-wrap;border:0;padding:0;margin:0 0 4px 2ch;color:#8b95a0;font-size:11.5px}
+.tm details.td summary{cursor:pointer;color:#6cb6ff}
+.tm input.tin{font:inherit;background:#07090b;color:#e3e7ec;border:1px solid #6cb6ff;border-radius:4px;padding:1px 6px;width:22ch}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="bar"><h1>Super Board onboarding · confirm the new design</h1><button class="btn" id="tt" type="button">Theme</button></div>
+  <div class="dots" id="dots"></div>
+</div>
+<main id="main">
+
+<!-- INSTALL -->
+<section class="slide" data-id="install" data-name="📦 Install">
+<h2>📦 Install</h2><p class="purpose">In your terminal, once. One line downloads the pack, installs it, adds the helper skills, and says what to do next.</p>
+<div class="screen"><div class="tm"><span class="g">eric@mac</span> <span class="b">my-app</span> % curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash
+🧩 super-board installer
+   target: /Users/eric/code/my-app
+
+🔍 checking what you need
+   <span class="g">✓</span> curl · tar · python3 · gh · jq · node
+📦 downloading EricTechPro/super-board@v2.6.0
+🔧 installing
+   <span class="g">✓</span> skills, scripts and workflows → .claude/
+   🛡️  6 guard hooks → .claude/settings.json <span class="d">(backup kept)</span>
+   <span class="y">!</span> CLAUDE.md holds its own rules — onboard offers a merge
+🧠 helper skills: installed
+
+🎉 super-board 2.6.0 is installed
+👉 next: open Claude Code here and run /super-board onboard</div></div>
+</section>
+
+<!-- START -->
+<section class="slide" data-id="start" data-name="🚀 Start / agenda">
+<h2>🚀 Start / agenda</h2><p class="purpose">The 8 steps, in order, each with what it really does.</p>
+<div class="screen"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+
+<span class="w">⏺</span> <span class="k">super-board setup — 8 steps.</span> Enter takes the recommended answer.
+  1 🔍 Checks       install or update what the board needs
+  2 🔑 GitHub       sign in so I can manage boards
+  3 🗂️ Board        pick or create your project board
+  4 🌿 Branch       choose where finished work merges
+  5 📜 AGENTS.md    move your rules into one file
+  6 🛡️ Policies     what the robot may do alone
+  7 📥 Bug sources  where to find problems to fix
+  8 ✅ Review       check every answer, then save once
+  <span class="d">Stop any time; re-run continues. Live site only? /super-qa &lt;url&gt;.</span></div></div>
+</section>
+
+<!-- 1 CHECKS -->
+<section class="slide" data-id="checks" data-name="1 🔍 Checks">
+<h2>1 · 🔍 Checks</h2><p class="purpose">Must-haves are fixed automatically, no question. It asks only for things on your machine (a system tool) or a login.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="1"></div><span class="w">⏺</span> <span class="k">1 of 8 · 🔍 Checks</span> <span class="d">— install or update what the board needs.</span>
+
+<span class="w">⏺</span> <span class="k">Fixed for you:</span>
+  <span class="g">✓</span> super-board skills and scripts installed
+  <span class="g">✓</span> board engine (workflow) installed
+  <span class="g">✓</span> 6 safety guards switched on
+  <span class="g">✓</span> settings.json entries added (backup kept)
+  <span class="g">✓</span> git repo found
+
+  <span class="y">Needs your machine:</span> Node.js isn't installed. It's needed for
+  Matt Pocock's coding skills (tests, code review, debugging) the board uses.
+<div class="pk perm"><span class="k">Bash command</span>
+
+  brew install node && npx -y skills@latest add mattpocock/skills
+  <span class="d">Install Node.js, then Matt Pocock's coding skills</span>
+
+Do you want to proceed?
+<span class="s">❯ 1. Yes</span>
+  2. Yes, and don't ask again for brew install commands
+  3. No, and tell Claude what to do differently (esc)</div>
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(super-board-preflight.sh)</span>  ⎿  <span class="g">all green</span></div></div>
+</section>
+
+<!-- 1b UPGRADE -->
+<section class="slide" data-id="upgrade" data-name="1 🔍 Checks — upgrade">
+<h2>1 · 🔍 Checks — older super-board found</h2><p class="purpose">Same rule: every must-have is applied automatically and listed. No question here — the CLAUDE.md merge is asked in step 5.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="1"></div><span class="w">⏺</span> <span class="k">1 of 8 · 🔍 Checks</span> <span class="d">— found super-board v1.8.2; upgrading to v2.6.0.</span>
+
+<span class="w">⏺</span> <span class="k">Upgraded for you</span> <span class="d">(backup: .claude/super-board/backup/20261002-1840/)</span>
+  <span class="g">✓</span> skills updated; added super-collect, visual, ui-refine-loop
+  <span class="g">✓</span> removed old folders: super-refine, cleanup-wt, arch-loop
+  <span class="g">✓</span> scripts, board engine and safety guards updated
+  <span class="g">✓</span> config moved to the new keys (merge rule, migrations, sources)
+  <span class="g">✓</span> labels mapped: build→feature · bug-fix→bug · qa-only→qa (14)
+  <span class="g">✓</span> Skipped column: 4 cards moved to Done, column removed
+  <span class="g">✓</span> re-checked: all green
+  <span class="d">Your CLAUDE.md still has its own rules — step 5 offers to move them.</span></div></div>
+</section>
+
+<!-- 2 GITHUB -->
+<section class="slide" data-id="github" data-name="2 🔑 GitHub">
+<h2>2 · 🔑 GitHub</h2><p class="purpose">Says why it needs access, then Claude Code's permission prompt (only if board access is missing).</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="2"></div><span class="w">⏺</span> <span class="k">2 of 8 · 🔑 GitHub</span> <span class="d">— sign in so I can manage boards.</span>
+
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(gh auth status)</span>
+  ⎿  <span class="y">signed in as erictech · can't manage boards yet</span>
+
+<span class="w">⏺</span> This opens a browser to approve board access —
+  needed to move cards and create the board for you.
+<div class="pk perm"><span class="k">Bash command</span>
+
+  gh auth refresh -s project,read:project,repo
+  <span class="d">Add GitHub board access (opens a browser)</span>
+
+Do you want to proceed?
+<span class="s">❯ 1. Yes</span>
+  2. Yes, and don't ask again for gh auth refresh commands in /Users/eric/code/my-app
+  3. No, and tell Claude what to do differently (esc)</div>
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(git remote get-url origin)</span>
+  ⎿  <span class="g">github.com/erictech/my-app</span>
+<span class="w">⏺</span> <span class="g">✓ GitHub connected.</span></div></div>
+</section>
+
+<!-- 3 BOARD -->
+<section class="slide" data-id="board" data-name="3 🗂️ Board">
+<h2>3 · 🗂️ Board</h2><p class="purpose">Columns as a short checklist, then one question: which board.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="3"></div><span class="w">⏺</span> <span class="k">3 of 8 · 🗂️ Board</span> <span class="d">— the robot takes tickets from here.</span>
+  Columns: <span class="g">✓</span> Backlog <span class="g">✓</span> Ready <span class="g">✓</span> Building <span class="g">✓</span> QA <span class="g">✓</span> Review <span class="g">✓</span> Blocked <span class="g">✓</span> Done
+  <span class="d">Labels: feature · bug · qa (qa skips Building; no label = feature)</span>
+<div class="pk"><span class="chip">☐ Board</span>
+<span class="k">Which board?</span>
+<span class="s">❯ 1. Use Ledgerly Roadmap (#4) — 6 of 7 columns match, I'll add QA (Recommended)</span>
+     <span class="d">github.com/users/erictech/projects/4</span>
+  2. Create a new board named "Ledgerly board"
+  3. Create a new board named "Ledgerly build board"
+  4. Type a name
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div>
+</section>
+
+<!-- 4 BRANCH -->
+<section class="slide" data-id="branch" data-name="4 🌿 Branch">
+<h2>4 · 🌿 Branch</h2><p class="purpose">What it found in one line, then the question.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="4"></div><span class="w">⏺</span> <span class="k">4 of 8 · 🌿 Branch</span> <span class="d">— where finished work merges.</span>
+  Found: <span class="k">main</span> (deploys to production via Vercel), no staging.
+<div class="pk"><span class="chip">☐ Branch</span>
+<span class="k">Where should finished work merge?</span>
+<span class="s">❯ 1. Create staging from main (Recommended)</span>
+     <span class="d">nothing goes live until you move it to main</span>
+  2. main — every merge goes live
+  3. Type something.
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div>
+</section>
+
+<!-- 5 AGENTS -->
+<section class="slide" data-id="agents" data-name="5 📜 AGENTS.md">
+<h2>5 · 📜 AGENTS.md</h2><p class="purpose">One line, one question; then one short question per conflict.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="5"></div><span class="w">⏺</span> <span class="k">5 of 8 · 📜 AGENTS.md</span> <span class="d">— Claude reads AGENTS.md; CLAUDE.md becomes "@AGENTS.md".</span>
+<div class="pk"><span class="chip">☐ AGENTS.md</span>
+<span class="k">Move your 38 CLAUDE.md rules into AGENTS.md?</span>
+<span class="s">❯ 1. Yes, move them (Recommended)</span>   <span class="d">backup first, diff before saving</span>
+  2. Only add the super-board section
+  3. Skip</div>
+<div class="pk"><span class="chip">☐ Conflict 1 of 2</span>
+<span class="k">Tests: which rule wins?</span>
+<span class="s">❯ 1. "pnpm test:unit only; e2e in CI" — CLAUDE.md:9 (Recommended)</span>
+  2. "pnpm test before every commit" — AGENTS.md:14
+  3. Type something.</div></div></div>
+</section>
+
+<!-- 6 POLICIES -->
+<section class="slide" data-id="policies" data-name="6 🛡️ Policies">
+<h2>6 · 🛡️ Policies &amp; permissions</h2><p class="purpose">Two compact questions; details folded away.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="6"></div><span class="w">⏺</span> <span class="k">6 of 8 · 🛡️ Policies</span> <span class="d">— what the robot may do alone.</span>
+<div class="pk"><span class="chip">☐ Rules</span>
+<span class="k">Use the safe defaults?</span>
+<span class="s">❯ 1. Yes (Recommended)</span>
+     <span class="d">robot merges normal changes · money/logins/DB wait for you</span>
+     <span class="d">no pushes to main · migrate test + staging only</span>
+  2. Review each</div>
+<details class="td"><summary>show details</summary>merge_policy.default auto · always_human: money, auth, schema
+push guard on (main, master, staging) · migrations.allowed_envs: test, staging</details><div class="pk"><span class="chip">☐ Permissions</span>
+<span class="k">Let it run its commands without asking each time?</span>
+<span class="s">❯ 1. Yes, add 7 lines to settings.json (Recommended)</span>
+  2. No, ask me each time</div>
+<details class="td"><summary>show details</summary><span class="g">+ Bash(gh project:*)  + Bash(gh issue:*)  + Bash(gh pr:*)</span>
+<span class="g">+ Bash(bash .claude/bin/super-board-merge-gate.sh:*)  + Bash(gh pr merge:*)</span>
+<span class="g">+ Bash(npm run db:migrate)  + Bash(npm test:*)</span></details></div></div>
+</section>
+
+<!-- 7 SOURCES -->
+<section class="slide" data-id="sources" data-name="7 📥 Bug sources">
+<h2>7 · 📥 Bug sources</h2><p class="purpose">Tick sources; "Add another source" is a real text box; then the read-only test result.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="7"></div><span class="w">⏺</span> <span class="k">7 of 8 · 📥 Bug sources</span> <span class="d">— where to find problems to fix.</span>
+<div class="pk"><span class="chip">☐ Bug sources</span>
+<span class="k">Where should I look for problems?</span>
+<span class="s">❯ [✔] 1. Sentry — app errors (Recommended)</span>
+  [✔] 2. PostHog — rage clicks, errors, slow pages (Recommended)
+  [✔] 3. GitHub issues — bugs filed but not on the board
+  [✔] 4. Past PRs — review comments that keep repeating
+  [✔] 5. Architecture — tangled or duplicated code
+  [✔] 6. ➕ Add another source: <input class="tin" value="linear MCP server" aria-label="Another source"> <span class="d">(link, app, API URL, MCP or command)</span>
+      Submit
+<span class="f">Space to toggle · Enter to select · Esc to cancel</span></div>
+  <span class="g">✅</span> linear — can read issues (12 open bugs); saved in this project's config
+  <span class="g">✅</span> sentry · github · prs · architecture
+  <span class="r">❌</span> posthog — key missing: add POSTHOG_PERSONAL_API_KEY to .env (left out)</div></div>
+</section>
+
+<!-- 8 REVIEW -->
+<section class="slide" data-id="review" data-name="8 ✅ Review">
+<h2>8 · ✅ Review &amp; save</h2><p class="purpose">Compact table, then write once.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="8"></div><span class="w">⏺</span> <span class="k">8 of 8 · ✅ Review</span> <span class="d">— nothing is written until you say so.</span>
+  Board    Ledgerly Roadmap #4 (+QA)    Branch   staging (new)
+  Rules    safe defaults                Perms    7 lines
+  AGENTS   rules moved, CLAUDE.md→@     Sources  sentry, github, prs, arch, linear
+<div class="pk"><span class="chip">☐ Save</span>
+<span class="k">Write everything?</span>
+<span class="s">❯ 1. Write everything (Recommended)</span>
+  2. Change one thing
+  3. Cancel</div></div></div>
+</section>
+
+<!-- DONE -->
+<section class="slide" data-id="done" data-name="🎉 Done">
+<h2>🎉 Done</h2><p class="purpose">Short. The one place that names the next command.</p>
+<div class="screen"><div class="tm"><div class="ag" data-cur="9"></div><span class="g">⏺</span> <span class="k">Bash</span><span class="d">(self-check)</span>  ⎿  <span class="g">all good</span>
+
+<span class="w">⏺</span> <span class="g">🎉 Onboard complete.</span>
+  📋 Board: github.com/users/erictech/projects/4 (Ledgerly Roadmap)
+  🧹 Next: /super-board lint — checks every ticket has clear success criteria.
+  🤖 Then: /super-board run.</div></div>
+</section>
+
+<!-- NEEDS YOU -->
+<section class="slide" data-id="needsyou" data-name="🙋 Needs-you comment">
+<h2>🙋 Needs-you comment</h2><p class="purpose">On GitHub, later — when the robot stops for a step only you may do. The card moves to Blocked with the <code>needs-you</code> label.</p>
+<div class="screen"><div class="cm"><div class="ch">super-board-bot commented on #812 · label <code>needs-you</code> · moved to Blocked</div><div class="cb">
+<p class="hd">🙋 Your turn on #812 — Add plan column</p>
+<ul class="task"><li><input type="checkbox" disabled>Run <code>npx prisma migrate deploy</code> on the <b>live</b> database</li><li><input type="checkbox" disabled>Comment <code>done</code> here</li></ul>
+<p class="muted">After <code>done</code>, the next wave moves the card to Review and merges it.</p>
+<details><summary>Why, and what I checked</summary><p class="muted">PR #845 adds prisma/migrations/0042_add_plan. Live isn't in the databases the robot may migrate. Tests green on staging@9c41e07; migrated test and staging.</p></details></div></div></div>
+</section>
+
+<!-- RESUME -->
+<section class="slide" data-id="resume" data-name="💾 Resume">
+<h2>💾 Resume</h2><p class="purpose">Running onboard again after it stopped halfway: saved answers first, then the question.</p>
+<div class="screen"><div class="tm"><span class="d">&gt;</span> /super-board onboard
+
+<span class="g">⏺</span> <span class="k">Bash</span><span class="d">(cat .claude/super-board/onboard-answers.json)</span>
+  ⎿  saved 2 Oct, 18:40 · stopped at Policies & permissions
+
+<span class="w">⏺</span> 💾 Found your answers from last time:
+  <span class="g">✓</span> GitHub: erictech        <span class="g">✓</span> board: Ledgerly Roadmap
+  <span class="g">✓</span> base: staging           <span class="g">✓</span> AGENTS.md: merged
+  → stopped at 🛡️ Policies & permissions
+<div class="ag" data-cur="6"></div><div class="pk"><span class="chip">☐ Resume</span>
+<span class="k">Continue where you left off?</span>
+<span class="s">❯ 1. Continue at Policies &amp; permissions (Recommended)</span>
+  2. Edit an earlier answer
+     <span class="d">pick which on the next screen</span>
+  3. Start over
+     <span class="d">saved answers are renamed .bak</span>
+  4. Type something.
+<span class="f">Enter to select · ↑/↓ to navigate · Esc to cancel</span></div></div></div>
+</section>
+
+<!-- SUMMARY -->
+<section class="slide" data-id="summary" data-name="Summary">
+<h2>Your answers</h2><p class="purpose">Copy them and paste them back to Claude. Comments are included.</p>
+<div class="sum"><ol id="sumlist"></ol>
+<button class="btn primary" id="copy" type="button">Copy my answers</button><span id="copied"></span></div>
+</section>
+
+</main>
+<div class="nav"><div class="in">
+  <button class="btn" id="prev" type="button">← Prev</button>
+  <span class="count" id="count"></span>
+  <button class="btn" id="next" type="button">Next →</button>
+</div></div>
+
+<script>
+(function(){
+  var KEY='sb-onb-confirm-v3';
+  var root=document.documentElement;
+  function sget(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+  function sset(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+  var t=sget(KEY+'-theme'); if(t) root.setAttribute('data-theme',t);
+  document.getElementById('tt').onclick=function(){
+    var cur=root.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
+    var n=cur==='dark'?'light':'dark'; root.setAttribute('data-theme',n); sset(KEY+'-theme',n);
+  };
+  // agenda strips
+  var AG=[['🔍','Checks'],['🔑','GitHub'],['🗂️','Board'],['🌿','Branch'],['📜','AGENTS.md'],['🛡️','Policies'],['📥','Bug sources'],['✅','Review']];
+  [].forEach.call(document.querySelectorAll('.ag'),function(el){
+    var c=+el.dataset.cur;
+    el.innerHTML=AG.map(function(a,i){var n=i+1;var cls=n<c?'dn':n===c?'on':'';return '<span class="a '+cls+'">'+(n<c?'✓':n)+' '+a[1]+'</span>';}).join('<span class="sep">·</span>');
+  });
+  var st={}; try{st=JSON.parse(sget(KEY)||'{}')||{};}catch(e){st={};}
+  function save(){ sset(KEY,JSON.stringify(st)); }
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var dots=document.getElementById('dots'), i=0;
+  try{var h=location.hash.slice(1); slides.forEach(function(s,k){if(s.dataset.id===h)i=k;});}catch(e){}
+  var LBL={ok:'✅ Looks good',change:'✏️ Change',remove:'❌ Remove step'};
+  slides.forEach(function(s,k){
+    var d=document.createElement('button'); d.className='dot'; d.type='button'; d.title=s.dataset.name; d.setAttribute('aria-label',s.dataset.name);
+    d.onclick=function(){go(k);}; dots.appendChild(d);
+    if(s.dataset.id==='summary') return;
+    var id=s.dataset.id; st[id]=st[id]||{v:'',c:''};
+    var bar=document.createElement('div'); bar.className='verdict';
+    bar.innerHTML='<div class="vb"><button class="btn v" data-v="ok" type="button">✅ Looks good</button><button class="btn v" data-v="change" type="button">✏️ Change</button><button class="btn v" data-v="remove" type="button">❌ Remove step</button></div>'+
+      '<label class="cl">Leave a comment<textarea placeholder="What should change? (optional for ✅)"></textarea></label>';
+    s.querySelector('.purpose').after(bar);
+    var ta=bar.querySelector('textarea'); ta.value=st[id].c||'';
+    ta.addEventListener('input',function(){ st[id].c=ta.value; save(); paint(); });
+    ta.addEventListener('keydown',function(e){ e.stopPropagation(); });
+    [].forEach.call(bar.querySelectorAll('.v'),function(b){ b.onclick=function(){
+      st[id].v=b.dataset.v; save(); paint();
+      if(b.dataset.v==='change'){ ta.focus(); } else setTimeout(function(){go(i+1);},250);
+    };});
+  });
+  function paint(){
+    slides.forEach(function(s,k){
+      var id=s.dataset.id, a=st[id];
+      [].forEach.call(s.querySelectorAll('.v'),function(b){ b.classList.toggle('on',!!a&&a.v===b.dataset.v); });
+      var cl=s.querySelector('.cl'); if(cl) cl.classList.toggle('open',!!a&&(a.v==='change'||a.v==='remove'||(a.c||'').trim()!==''));
+      dots.children[k].classList.toggle('done',!!(a&&a.v));
+      dots.children[k].classList.toggle('cur',k===i);
+      s.classList.toggle('on',k===i);
+    });
+    document.getElementById('count').textContent=(i+1)+' / '+slides.length+' · '+slides[i].dataset.name;
+    document.getElementById('prev').disabled=i===0;
+    document.getElementById('next').disabled=i===slides.length-1;
+    var ul=document.getElementById('sumlist'); ul.innerHTML='';
+    slides.forEach(function(s){ if(s.dataset.id==='summary')return; var a=st[s.dataset.id]||{}, c=(a.c||'').trim();
+      var li=document.createElement('li');
+      li.innerHTML='<b>'+s.dataset.name+':</b> '+(a.v?LBL[a.v]:'<span class="none">no answer</span>')+(c?' — <i>'+c.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</i>':'');
+      ul.appendChild(li); });
+  }
+  function text(){
+    var out=['Onboarding design check:'];
+    slides.forEach(function(s,k){ if(s.dataset.id==='summary')return; var a=st[s.dataset.id]||{}, c=(a.c||'').trim().replace(/\s*\n\s*/g,' / ');
+      out.push((k+1)+'. '+s.dataset.name+' = '+(a.v?LBL[a.v]:'no answer')+(c?' — comment: '+c:'')); });
+    return out.join('\n');
+  }
+  document.getElementById('copy').onclick=function(){
+    var tx=text(), msg=document.getElementById('copied');
+    function fb(){var a=document.createElement('textarea');a.value=tx;document.body.appendChild(a);a.select();try{document.execCommand('copy');msg.textContent='Copied';}catch(e){msg.textContent='Select and copy manually';}document.body.removeChild(a);}
+    try{navigator.clipboard.writeText(tx).then(function(){msg.textContent='Copied';},fb);}catch(e){fb();}
+  };
+  function go(k){ if(k<0||k>=slides.length)return; i=k; try{history.replaceState(null,'','#'+slides[i].dataset.id);}catch(e){} paint(); window.scrollTo(0,0); }
+  document.getElementById('prev').onclick=function(){go(i-1);};
+  document.getElementById('next').onclick=function(){go(i+1);};
+  document.addEventListener('keydown',function(e){ if(e.key==='ArrowRight')go(i+1); else if(e.key==='ArrowLeft')go(i-1); });
+  paint();
+})();
+</script>
+</body>
+</html>

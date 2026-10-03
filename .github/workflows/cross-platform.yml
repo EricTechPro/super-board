@@ -84,6 +84,13 @@ jobs:
       - name: run-gates — fixture tests
         run: bash tests/test-run-gates.sh
 
+      # Onboard's setup script: must-have fixes, upgrade + config migration, board
+      # ranking and migration against a stateful gh stub. Custom collect sources.
+      - name: setup — onboarding checks and upgrade
+        run: bash tests/test-setup.sh
+      - name: collect — custom sources
+        run: bash tests/test-collect-custom.sh
+
       # Syntax-check the dynamic workflow script the same way the
       # orchestrator's precondition 4 does (run-workflow.md).
       - name: wave workflow — node --check

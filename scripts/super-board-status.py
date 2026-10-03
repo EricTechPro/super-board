@@ -64,6 +64,13 @@ LANE_GLYPH = {"build": "🔨", "qa": "🔍", "review": "✏️"}
 LANE_LABEL = {"build": "Building", "qa": "QA", "review": "Review"}
 LANE_ROLE = {"build": "Builder ", "qa": "Tester  ", "review": "Reviewer"}
 
+# Board columns, left to right as they sit on the GitHub project. The kanban
+# prints in exactly this order. Backlog and Done collapse to one line of numbers.
+BOARD_ORDER: tuple[str, ...] = (
+    "Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done",
+)
+COLLAPSED_TAIL = {"Backlog": "(not started, collapsed)", "Done": "(squash-merged, collapsed)"}
+
 
 # ───────────────────────────── manifest grammar ─────────────────────────────
 # The dispatcher's log format lives in `scripts/super-board-run.sh`. These
@@ -430,6 +437,63 @@ def paginate_items(
 # ───────────────────────────── main ─────────────────────────────
 
 
+def render_collapsed(label: str, lane_items: list[dict[str, Any]]) -> str:
+    """One line of issue numbers, newest first, `… +N more` past 76 cols."""
+    out = [box_top(label, len(lane_items))]
+    if not lane_items:
+        out.append(box_line("(empty)"))
+    else:
+        nums = [f"#{x['number']}" for x in lane_items]
+        tail = "   " + COLLAPSED_TAIL[label]
+        accum: list[str] = []
+        for i, x in enumerate(nums):
+            remaining = len(nums) - i - 1
+            candidate = " ".join(accum + [x])
+            proposed = candidate + (f" … +{remaining} more" if remaining > 0 else "") + tail
+            if visual_width(proposed) > 76:
+                break
+            accum.append(x)
+        remaining = len(nums) - len(accum)
+        out.append(box_line(" ".join(accum) + (f" … +{remaining} more" if remaining > 0 else "") + tail))
+    out.append(box_bot())
+    return "\n".join(out)
+
+
+def render_kanban(
+    by_status: dict[str, list[dict[str, Any]]],
+    glyph_for: Callable[[int], str],
+    reason_glyph_for: Callable[[int], str],
+) -> str:
+    """The kanban boxes in BOARD_ORDER. Pure: lookups come in as callables."""
+    boxes: list[str] = []
+    for label in BOARD_ORDER:
+        lane_items = by_status.get(label, [])
+        if label in COLLAPSED_TAIL:
+            boxes.append(render_collapsed(label, lane_items))
+            continue
+        out = [box_top(label, len(lane_items))]
+        if not lane_items:
+            out.append(box_line("(empty)"))
+        for it in lane_items:
+            n = it["number"]
+            if label == "Blocked":
+                out.append(box_line(f"{reason_glyph_for(n)} #{n}  {it['title']}"))
+                continue
+            left = f"{glyph_for(n)} #{n}  {it['title']}"
+            suffix = rebuild_suffix(it)
+            if suffix:
+                budget = 76 - visual_width(suffix) - 1
+                if visual_width(left) > budget:
+                    left = truncate_to(left, budget)
+                pad = max(1, 76 - visual_width(left) - visual_width(suffix))
+                out.append(box_line(left + (" " * pad) + suffix))
+            else:
+                out.append(box_line(left))
+        out.append(box_bot())
+        boxes.append("\n".join(out))
+    return "\n".join(boxes)
+
+
 def main() -> int:
     config_slug = resolve_config_slug(sys.argv)
     if not valid_slug(config_slug):
@@ -497,7 +561,7 @@ def main() -> int:
 
     by_status: dict[str, list[dict[str, Any]]] = {
         s: sorted([i for i in items if i["status"] == s], key=lambda x: -x["number"])
-        for s in ("Ready", "Building", "QA", "Review", "Done", "Blocked")
+        for s in BOARD_ORDER
     }
 
     # ── fetch reason-tag comments for Blocked only ──
@@ -592,71 +656,7 @@ def main() -> int:
     print()
 
     # ── kanban ──
-    def render_lane(label: str, lane_items: list[dict[str, Any]]) -> str:
-        out = [box_top(label, len(lane_items))]
-        if not lane_items:
-            out.append(box_line("(empty)"))
-        else:
-            for it in lane_items:
-                n = it["number"]
-                glyph = glyph_for_issue(n)
-                left = f"{glyph} #{n}  {it['title']}"
-                suffix = rebuild_suffix(it)
-                if suffix:
-                    budget = 76 - visual_width(suffix) - 1
-                    if visual_width(left) > budget:
-                        left = truncate_to(left, budget)
-                    pad = 76 - visual_width(left) - visual_width(suffix)
-                    if pad < 1:
-                        pad = 1
-                    out.append(box_line(left + (" " * pad) + suffix))
-                else:
-                    out.append(box_line(left))
-        out.append(box_bot())
-        return "\n".join(out)
-
-    print(render_lane("Ready",    by_status["Ready"]))
-    print(render_lane("Building", by_status["Building"]))
-    print(render_lane("QA",       by_status["QA"]))
-    print(render_lane("Review",   by_status["Review"]))
-
-    # Done: single collapsed line.
-    done = by_status["Done"]
-    print(box_top("Done", len(done)))
-    if not done:
-        print(box_line("(empty)"))
-    else:
-        nums = [f"#{x['number']}" for x in done]
-        tail = "   (squash-merged, collapsed)"
-        full = " ".join(nums) + tail
-        if visual_width(full) <= 76:
-            print(box_line(full))
-        else:
-            accum: list[str] = []
-            for i, x in enumerate(nums):
-                remaining = len(nums) - i - 1
-                candidate = " ".join(accum + [x])
-                proposed = candidate + (f" … +{remaining} more" if remaining > 0 else "") + tail
-                if visual_width(proposed) > 76:
-                    break
-                accum.append(x)
-            remaining = len(nums) - len(accum)
-            body = " ".join(accum) + (f" … +{remaining} more" if remaining > 0 else "") + tail
-            print(box_line(body))
-    print(box_bot())
-
-    def render_blocklane(label: str, lane_items: list[dict[str, Any]]) -> str:
-        out = [box_top(label, len(lane_items))]
-        if not lane_items:
-            out.append(box_line("(empty)"))
-        else:
-            for it in lane_items:
-                em, _ = reason_for_issue(it["number"])
-                out.append(box_line(f"{em} #{it['number']}  {it['title']}"))
-        out.append(box_bot())
-        return "\n".join(out)
-
-    print(render_blocklane("Blocked", by_status["Blocked"]))
+    print(render_kanban(by_status, glyph_for_issue, lambda n: reason_for_issue(n)[0]))
 
     # ── workers ──
     print()

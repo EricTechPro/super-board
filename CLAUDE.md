@@ -46,11 +46,21 @@ See `skills/super-board/references/rate-limit-etiquette.md` for the full discipl
 ├── skills/<all seven>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/super-board-wave.js, ui-refine-loop.js
-└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings), super-qa-file-bug.sh, super-review-file-refactor.sh
+└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings, setup), super-qa-file-bug.sh, super-review-file-refactor.sh
 ```
 
 It also refreshes the managed `<!-- super-board:begin … -->` block in the target's AGENTS.md when
-one exists (nothing outside the markers), and asks nothing: `super-board onboard` asks the questions.
+one exists (nothing outside the markers), records an older install in
+`.claude/super-board/upgrade.json`, prints grouped emoji output, and asks nothing:
+`super-board onboard` asks the questions. Onboard's 🔍 Checks (`scripts/super-board-setup.py`)
+fixes must-haves and finishes upgrades with no question.
+
+## Board shape (v3.0.0)
+
+Columns are always Backlog · Ready · Building · QA · Review · Blocked · Done — no Skipped, no
+per-board `variant`. Labels `qa` · `bug` · `feature` route cards: `qa` skips Building, everything
+else (and no label) is built. Change routing in `scripts/super-board-wave-plan.sh`,
+`workflows/super-board-wave.js` and `run.md` → "Lanes and label routing" together.
 
 Skills call the dispatcher scripts as `.claude/bin/<script>`.
 

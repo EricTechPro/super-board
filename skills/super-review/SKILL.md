@@ -310,7 +310,9 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the 
    - Re-run the EXACT command from Tester's PR `Local tests:` line.
    - Green → continue. Red → open new `[qa]`-prefixed thread quoting failure, move card Review → QA with `loop:rebuild-N`, exit.
 6. **Adversarial mode** (per `config.truth_gate` — `off` / `non-trivial` / `always`, default `non-trivial`): see section below.
-7. Decide per finding:
+7. Decide per finding. First apply the Over-engineering rule to every finding collected —
+   yours, `ponytail:ponytail-review`'s and the truth-check sub-agents': Over-engineering is
+   Should fix, never Blocker, and never on its own a reason to bounce or block. Then:
    - **Deepening opportunity** → `scripts/super-review-file-refactor.sh`, then keep going. It is not a finding for merge purposes and never bounces a card.
    - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
@@ -327,9 +329,8 @@ Builder opens PRs as **drafts**, and GitHub never auto-merges a draft. Skipping 
 two complete builds. In order, no shortcuts:
 
 1. `gh pr ready <PR>` — idempotent, safe on an already-ready PR.
-2. `human_approves_merge: true` → stop; leave the card in **Review** with a `[reviewer]`
-   comment that the PR is ready for a human. Do not move it to Done.
-   `human_approves_merge: false` → merge through the gate, pinned to the head you reviewed:
+2. Merge through the gate, pinned to the head you reviewed (`merge_policy.default: "human"`
+   keeps a person on every merge — the gate returns exit 7 below):
    record `gh pr view <PR> --json headRefOid` when review passes, then
    `super-board-merge-gate.sh --config <cfg> --pr <PR> --expect-head <sha> --subject "<PR title>"
    --body-file <msg.md>` (it merges with `--match-head-commit`; the message is the PR title plus the
@@ -381,16 +382,39 @@ Activated per `config.truth_gate`:
 - `non-trivial` (default) — diff ≥10 lines OR labels in `{security, migration, payments, auth}` trigger adversarial.
 - `always` — every card.
 
-When activated, spawn 2 sub-agents in parallel. Give each the issue ACs and the diff
-first and have it form its own hypotheses; hand it the builder's summary only after, as
-claims to check — not as the frame:
+When activated, spawn 2 sub-agents in parallel:
 - **Code-grounder.** Verify cited file:line still exists and matches claims.
 - **Historian.** `git blame` the changed lines; check for ADRs / prior incidents.
 
-Each returns its findings with the same classes (Gap / Bug / Verification miss / Scope
-drift / Over-engineering / No issue).
+**Use this brief verbatim.** Fill the `<…>` slots; do not reword, add or drop lines. A
+reviewer that wrote its own brief once told the sub-agents over-engineering was blocking,
+and a correct PR was held for it.
 
-Each sub-agent returns a confidence score `0–100`.
+```
+You are the <Code-grounder | Historian> in an adversarial truth-check of PR #<P>.
+Job: <Code-grounder: verify every file:line the PR cites still exists and does what the PR
+claims. | Historian: git blame the changed lines; look for ADRs, prior incidents, reverted
+attempts.>
+Read the issue ACs and the diff first and form your own hypotheses. Only then read the
+builder's summary below, as claims to check, not as the frame.
+ACs: <paste>
+Diff: <merge-base diff or path to it>
+Builder's summary (claims): <paste>
+Budget: at most 50 gh calls; prefer local git. Over budget: confidence "insufficient_data".
+Class every finding: Gap / Bug / Verification miss / Scope drift / Over-engineering / No issue.
+Severity: Blocker / Should fix / Nit.
+Over-engineering is ALWAYS Should fix and NEVER Blocker on its own. It does not lower your
+confidence score.
+Confidence 0-100 = how sure you are the PR's claims are true and the code does what the ACs
+ask. Design taste and over-building do not count against it.
+Return: findings (class, severity, file:line, one line each) and confidence.
+```
+
+**After collecting, the Reviewer re-applies the rules itself.** Whatever a sub-agent wrote:
+reclass any Over-engineering finding marked Blocker to Should fix, and ignore it when
+deciding merge or bounce (step 7). A sub-agent that lowered its confidence only because of
+over-engineering is re-scored without it. The merge decision is the Reviewer's, not the
+sub-agents'.
 
 **Aggregation rule: take the MINIMUM of the two scores.** Rationale: one strong skeptic should be enough to block.
 

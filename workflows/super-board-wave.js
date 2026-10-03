@@ -16,7 +16,6 @@ export const meta = {
 //   cards: [{ number, status, title, lane, labels }],  // output of super-board-wave-plan.sh
 //     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
 //     and skips the Builder; every other Ready card is built first (v3.0.0).
-//   humanApprovesMerge: boolean (optional, default false),
 //   tier: 'low' | 'medium' | 'high' (optional, default 'medium'),  // run model ladder
 // }
 // The harness can deliver `args` as a JSON-encoded string (the tool param is
@@ -104,6 +103,8 @@ const REVIEW_MEMORY = [
   `Class every finding Gap / Bug / Verification miss / Scope drift / Over-engineering, and list what you verified correct.`,
   // Simplest-solution pass (super-review step 3): Should fix at most, never a bounce on its own.
   `Run ponytail:ponytail-review on the merge-base diff (inline ladder if the plugin is absent); Over-engineering never blocks merge alone.`,
+  // Truth-check brief is fixed (super-review → Adversarial mode); a hand-written one once made over-building blocking.
+  `Truth-check sub-agents get the fixed brief from super-review → "Adversarial mode", verbatim. After collecting, reclass any Over-engineering Blocker to Should fix; it never decides merge or bounce.`,
   // Merge policy + migrations live in the gate (run.md → Merge protocol step 5).
   `Merge only via super-board-merge-gate.sh. Exit 7 = merge_policy says a human merges (money/auth/schema/size): Blocked with the 🙋 template quoting its human-gate lines; To unblock = merge it yourself, or comment done to approve.`,
   `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,

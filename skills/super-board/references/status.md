@@ -93,6 +93,9 @@ strings. Do **not** improvise.
 config: <slug>   labels: qa · bug · feature   base: <base_branch>
 mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|always>
 
+┌─ Backlog  [N] ───────────────────────────────────────────────────────────────┐
+│ <collapsed line — see §D>                                                    │
+└──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Ready    [N] ───────────────────────────────────────────────────────────────┐
 │ <card lines, one per issue — see §C>                                         │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -105,11 +108,11 @@ mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|a
 ┌─ Review   [N] ───────────────────────────────────────────────────────────────┐
 │ <card lines>                                                                 │
 └──────────────────────────────────────────────────────────────────────────────┘
-┌─ Done     [N] ───────────────────────────────────────────────────────────────┐
-│ <collapsed line — see §D>                                                    │
-└──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Blocked  [N] ───────────────────────────────────────────────────────────────┐
 │ <card lines with reason glyph>                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌─ Done     [N] ───────────────────────────────────────────────────────────────┐
+│ <collapsed line — see §D>                                                    │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ▎Workers  (claim: <login> · <active>/<max> active)
@@ -133,6 +136,9 @@ mode:   <auto-merge|human-approves>        truth gate: <off|non-trivial (≥N)|a
 config: nsadashboard-super-board   labels: qa · bug · feature   base: staging
 mode:   auto-merge                 truth gate: non-trivial (≥70)
 
+┌─ Backlog  [3] ───────────────────────────────────────────────────────────────┐
+│ #33 #31 #30   (not started, collapsed)                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Ready    [1] ───────────────────────────────────────────────────────────────┐
 │ 🔨 #26  Strip nav + editor groups from command palette            ↻ 2/3      │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -146,11 +152,11 @@ mode:   auto-merge                 truth gate: non-trivial (≥70)
 ┌─ Review   [0] ───────────────────────────────────────────────────────────────┐
 │ (empty)                                                                      │
 └──────────────────────────────────────────────────────────────────────────────┘
-┌─ Done     [9] ───────────────────────────────────────────────────────────────┐
-│ #20 #18 #7 #6 #5 #4 #3 #2 #1   (squash-merged, collapsed)                    │
-└──────────────────────────────────────────────────────────────────────────────┘
 ┌─ Blocked  [1] ───────────────────────────────────────────────────────────────┐
 │ 🛡 #25  Add Controle page — gated on #24                                     │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌─ Done     [9] ───────────────────────────────────────────────────────────────┐
+│ #20 #18 #7 #6 #5 #4 #3 #2 #1   (squash-merged, collapsed)                    │
 └──────────────────────────────────────────────────────────────────────────────┘
 
 ▎Workers  (claim: LucariusWest · 2/3 active)
@@ -186,7 +192,7 @@ mode:   auto-merge                 truth gate: non-trivial (≥70)
 1. Header line (project + `#number`)
 2. Separator (80 × `─`)
 3. Config strip (2 lines: `config/labels/base`, `mode/truth-gate`)
-4. Kanban — 6 boxes, **fixed order**: Ready → Building → QA → Review → Done → Blocked (Backlog is not shown; there is no Skipped column since v3.0.0)
+4. Kanban — 7 boxes in board order, left to right as on GitHub: Backlog · Ready · Building · QA · Review · Blocked · Done (`BOARD_ORDER` in the script; there is no Skipped column since v3.0.0)
 5. `▎Workers`
 6. `▎Block reasons`
 7. `▎Recent`
@@ -219,8 +225,9 @@ Inside a Kanban box, one line per issue:
   - Blocked: `— <reason glyph> <short reason>` or `— gated on #N`
   - Otherwise: empty
 
-### §D — Done column collapsing
+### §D — Backlog and Done collapsing
 
+Backlog and Done are **always one line** each. Backlog is tagged `(not started, collapsed)`.
 Done is **always one line** of issue numbers, newest first, no titles, tagged
 `(squash-merged, collapsed)`. Never expand Done card-by-card. If Done has more
 than ~12 issues at 80-col width, truncate with `… +N more` at the end.

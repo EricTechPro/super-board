@@ -1,5 +1,104 @@
 # Release notes
 
+## v3.0.0 — 2026-10-02
+
+Onboarding rebuilt as an 8-step wizard, one board shape for every project, and labels that
+route cards. **Breaking:** the Skipped column, the per-board `variant`, the goal question and
+URL-only boards are gone; commits, tickets, PR bodies and comments follow the writing standard.
+
+### Breaking
+
+- **No Skipped column.** Every board is Backlog · Ready · Building · QA · Review · Blocked · Done.
+  A card dropped on purpose is closed as not planned and moved to Done with a `🤷 dropped`
+  comment. The run's done condition, the landed-work signal, status, lint and the block template
+  no longer know Skipped.
+- **Labels route cards, not `variant`.** Three labels: `qa` (Ready → QA → Review → Done, skips
+  Building), `bug` and `feature` (built first). No label is built too, and the haiku classifier
+  adds `feature` or `bug` — never `qa`. `super-board-wave-plan.sh` puts `lane` and `labels` on
+  every card; `super-board-wave.js` and the legacy runner route on them. A config that still says
+  `variant: "qa-only"` is refused (exit 65) until onboard upgrades it.
+- **No goal question, no URL-only board.** Onboard always sets up a repo board. Testing a live
+  site alone is `/super-qa <url>`.
+- **Writing standard.** Commits `<emoji> [type] scope: subject` + short bullets; tickets Problem ·
+  Context · Fix · Acceptance Criteria · Risk · Blocked by; PR bodies in marker blocks; comments
+  `[role] [label] status` (references/writing-standard.md).
+
+### Onboarding
+
+**8 steps, each one question.** 🔍 Checks · 🔑 GitHub · 🗂️ Board · 🌿 Branch · 📜 AGENTS.md ·
+🛡️ Policies · 📥 Bug sources · ✅ Review. Each opens with a numbered agenda strip and
+`N of 8 · <emoji> <Name> — <why>`; the start screen lists the steps; a re-run shows the saved
+answers and continues.
+
+**Checks fixes, it doesn't ask.** `scripts/super-board-setup.py fix` installs or refreshes skills,
+scripts, workflows, guard hooks and their settings entries, removes the super-refine / cleanup-wt
+/ arch-loop folders, migrates config keys, runs `git init` and adds Matt Pocock's skills — backed
+up first, listed under "Fixed for you". Only a system tool install (the exact brew / apt / dnf /
+winget command) or a sign-in is asked, through Claude Code's permission prompt; it re-checks until
+green.
+
+**Board.** `board-rank` lists your GitHub Projects ranked by matching columns and recommends the
+best (≥ 4 of 7); `board-migrate` adds the missing columns and the three labels and keeps every
+card. A new board gets two names from package.json / README / the folder, or one you type.
+
+**Branch.** No staging → "Create staging from main" (Recommended) runs `git push origin main:staging`.
+
+**Policies** is two questions (safe defaults; N permission lines), details folded.
+**Bug sources** adds "➕ Add another source" (below). **Review** is one compact table and
+"Write everything?"; files change once, there. **Done** is three lines and a 🎉.
+
+**🙋 Needs you, checklist first.** The comment opens with "🙋 Your turn on #N — title", the exact
+commands as checkboxes and "Comment done here"; why and evidence fold under "Why, and what I
+checked".
+
+### super-collect custom sources
+
+Onboard's "➕ Add another source" takes a link, app name, API URL, MCP server or CLI command.
+`collect_custom.py classify` decides which, `ping` proves it is readable (read-only; commands that
+change something are refused), `add` saves `{name, kind, target, auth_env?, map?}` to
+`collect.custom[]`. `/super-collect` runs them (`list`; MCP reads go through the agent and
+`normalize`), turns the output into candidates with fingerprint `custom|<name>|<key>`, and sends
+them through the same verifier and filer (`--source custom`).
+
+### Install output
+
+`get.sh` and `install.sh` print grouped lines with emojis (🧩 🔍 📦 🔧 🧠 🎉 👉) instead of one line
+per file; failures still name the file. `install.sh` records an older install in
+`.claude/super-board/upgrade.json` for onboard.
+
+### Upgrading from 2.x
+
+> [!WARNING]
+> `board-migrate` (step 2's board changes) is tested only against a stubbed `gh`, never a live
+> GitHub project. Try it on a throwaway board first: copy your project, run
+> `python3 .claude/bin/super-board-setup.py board-migrate --owner <o> --number <copy> --repo <r> --dry-run`,
+> then without `--dry-run`, and check the columns, labels and card statuses before you run
+> onboard on the real board.
+
+1. Install over the old copy: `curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash`
+   (or `./install.sh <project>`). It records the version you came from.
+2. Run `/super-board onboard`. Step 1 upgrades with no question and lists it under
+   "Upgraded for you" (backup in `.claude/super-board/backup/<ts>/`):
+   - removes `.claude/skills/super-refine`, `cleanup-wt`, `arch-loop`;
+   - config: drops `variant` (a "qa-only" board's cards get the `qa` label), sets the seven
+     `columns`, turns a URL-only `target` into a repo target, replaces the old `collect` keys
+     (`errors`, `feedback_paths`, `lookback_runs`) with `sources`, drops
+     `refine.qa_hook_rounds`, adds `merge_policy` (from `human_approves_merge`), `migrations`,
+     `timezone`, `worker_backend`, and sets `notifications.channel` to `session`;
+   - board: adds missing columns, creates `qa` · `bug` · `feature`, maps old labels
+     (build → feature, bug-fix → bug, qa-only → qa), moves Skipped cards to Done and removes the
+     Skipped option. Card statuses the change clears are put back.
+3. Your CLAUDE.md rules stay where they are; step 5 offers to move them into AGENTS.md.
+4. A run started on an unmigrated `qa-only` config stops with exit 65 and says to run onboard.
+
+### Tests
+
+New `tests/test-setup.sh` (9: must-have fixes, upgrade detection and migration, idempotent config
+migration, tool commands, board names, staging, board ranking and migration with a stateful `gh`
+stub) and `tests/test_collect_custom.py` (17). Label routing in `test-wave-plan.sh`,
+`test-wave-preflight.sh` (10) and `test-run-gates.sh`; grouped output in `test-install.sh` (13)
+and `test-get.sh` (9); the 🙋 checklist in `test_writing_format.py` (14).
+
 ## v2.6.0 — 2026-10-02
 
 Cleanup release: one renamed skill, one skill turned into a hook, super-collect rebuilt, arch-loop
