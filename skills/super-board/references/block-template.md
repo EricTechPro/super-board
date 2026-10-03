@@ -1,13 +1,13 @@
-# Block & Skip exit template
+# Block exit template
 
-`Blocked` and `Skipped` sit AFTER `Done` on the board — they're not workflow steps, they're exit ramps.
+`Blocked` is an exit ramp, not a workflow step. There is no `Skipped` column (removed in v3.0.0).
 
 ## When / who moves cards there
 
-| Column  | When                                       | Who moves cards there                        |
-|---------|--------------------------------------------|----------------------------------------------|
-| Blocked | Card needs human action                    | Any lane, from any workflow column           |
-| Skipped | Card isn't actionable in this loop         | Any lane, from any workflow column           |
+| Where | When | Who |
+|---|---|---|
+| Blocked | Card needs human action, or waits on another card | Any lane, from any workflow column |
+| Done (closed as not planned) | Card dropped on purpose: out of scope, won't do | Any lane; 🤷 comment below |
 
 Once moved, the card waits. **A card blocked only on other cards no longer waits for a human:**
 the wave planner sweeps `Blocked` at the start of every wave, and any card whose `## Blocked by`
@@ -18,7 +18,7 @@ That sweep is why the `blocked-by:` line below is mandatory. Before it existed, 
 terminal: on 2026-08-20 five cards sat there long after their blockers had merged, because the only
 record of what they were waiting for was English prose in a comment nobody re-read.
 
-## Required Block/Skip comment template (mandatory on every transition into Blocked or Skipped)
+## Required Block comment template (mandatory on every transition into Blocked)
 
 The bot must write a structured comment on **both the issue and the PR** (if a PR exists) explaining *why* it moved the card and *what it couldn't safely decide*. Format:
 
@@ -70,7 +70,9 @@ The same rule governs the issue body's `## Blocked by` section, which is where t
 a card has no block comment yet. Bullets of the form `- #N — why`, or a single `- None.` — nothing
 else parses.
 
-Skipped comments use the same template with the header `[<role>] [report] 🤷 skipped · <reason>` and replace `Why blocked` with `Why parked`, `What blocks` with `Why out-of-scope for this loop`.
+A card dropped on purpose uses the same template with the header `[<role>] [report] 🤷 dropped ·
+<reason>`, replaces `Why blocked` with `Why dropped` and `What blocks` with `Why out of scope`, is
+closed as not planned (`gh issue close <N> --reason "not planned"`) and moves to Done.
 
 ## Reason emoji vocabulary
 
@@ -97,28 +99,42 @@ itself — the merge gate's exit 7 (merge_policy routes the merge to a human: re
 it yourself, or comment `done` to approve and let the next wave merge it) and exit 8 (migrations against a database outside `migrations.allowed_envs`,
 an allowed migrate command that failed, a declared human step), or any lane that hits one.
 
+Checklist first: the person sees what to do before why. The why and the evidence fold away.
+Merge gate exit 7 (a human merges) has one item before `done`: `- [ ] Review and merge PR #<P>
+(or comment done to approve it)`.
+
 ```
-[reviewer] [blocker] 🙋 needs you · <one-line reason>
-Card:        #<N> <title>
-PR:          #<P>
-Reason tag:  🙋 needs you
-Why blocked: <one line — e.g. "PR adds supabase/migrations/0042_add_plan.sql; live is not in allowed_envs">
-Evidence:    <the gate's `needs-you:` lines, verbatim>
-Checked:     <verify_commands green against <base>@<sha>; migrated: test, staging>
-What blocks: the command(s) below, run by a person against <env>
-Why I (bot) cannot decide:
-             <"live database; onboarding allowed test and staging only">
-To unblock:  [ ] <exact command 1, copy-paste ready>
-             [ ] <exact command 2>
-             [ ] comment `done` here (or add the `needs-you:done` label)
-Owner:       <Eric | repo admin>
-Move back:   automatic — the next wave sees `done`, moves the card to Review, and the merge gate re-verifies and merges
-blocked-by:  -
+[reviewer] [blocker] 🙋 Your turn on #<N> — <title>
+- [ ] Run `<exact command 1, copy-paste ready>` on the **<env>** database
+- [ ] <exact command 2, if any>
+- [ ] Comment `done` here
+After `done`, the next wave moves the card to Review and merges it.
+
+<details><summary>Why, and what I checked</summary>
+
+PR #<P> <one line — e.g. "adds prisma/migrations/0042_add_plan">. <env> isn't in the databases the robot may migrate.
+Tests green on <base>@<sha>; migrated <test, staging>.
+Evidence: <the gate's `needs-you:` lines, verbatim>
+Reason tag: 🙋 needs you · Owner: <Eric | repo admin>
+blocked-by: -
+</details>
 ```
 
-**The `To unblock` commands are exact.** Copy them from the gate's `needs-you: <command>` lines;
+Example (what the person sees on GitHub):
+
+> **🙋 Your turn on #812 — Add plan column**
+> - [ ] Run `npx prisma migrate deploy` on the **live** database
+> - [ ] Comment `done` here
+>
+> After `done`, the next wave moves the card to Review and merges it.
+> ▸ Why, and what I checked
+
+The `Reason tag:` and `blocked-by: -` lines stay (inside the fold): the planner reads them
+(`super-board-deps.sh` → `needsYou`, `humanGated`). The issue and the PR get the `needs-you` label.
+
+**The checklist commands are exact.** Copy them from the gate's `needs-you: <command>` lines;
 never paraphrase ("run the migration on prod"). A placeholder such as `<your live migrate command>`
-means the config has no command for that env — say so in `Why blocked` and name the config key
+means the config has no command for that env — say so in the fold and name the config key
 (`migrations.commands.live`).
 
 **Resume.** The wave planner's `resume` list carries every 🙋 card whose human said `done` (a
@@ -130,4 +146,4 @@ A command that still fails puts the card straight back here.
 
 ## Hard rule
 
-**The bot is forbidden from moving any card to Blocked/Skipped *without* this full template populated. A 1-line "needs creds" comment is a contract violation and fails Reviewer's thread gate.**
+**The bot is forbidden from moving any card to Blocked, or dropping it to Done, *without* this full template populated. A 1-line "needs creds" comment is a contract violation and fails Reviewer's thread gate.**

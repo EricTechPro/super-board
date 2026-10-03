@@ -289,9 +289,9 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 - Read from issue + PR comments + PR review threads.
 - Respect handed-down worktree at `.worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
 
-### Two variant modes
-- **Full variant:** review the diff (code + tests).
-- **QA-only variant:** review the QA report quality, not the code diff. (No diff exists in QA-only-URL.)
+### Two card types
+- **Built card (`feature`, `bug`, no label):** review the diff (code + tests).
+- **`qa` card:** review the QA report quality and any test diff; there is no product-code diff.
 
 ### Lifecycle (Reviewer)
 See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the sub-steps:

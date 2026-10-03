@@ -45,8 +45,16 @@
 # between leaves the card in Building, and nothing ever picks it up again. The
 # planner runs only between waves, after the crash-recovery sweep has stripped
 # leaked claims, so a Building card with no assignee has no live worker. It is
-# reported in `stranded` (full variant only); the orchestrator checks its branch
-# and worktree and moves it back to Ready, keeping the branch.
+# reported in `stranded`; the orchestrator checks its branch and worktree and
+# moves it back to Ready, keeping the branch.
+#
+# LABEL ROUTING (v3.0.0). One board shape for every project; a card's label picks
+# its lane. Three labels: `qa`, `bug`, `feature`. A Ready card labelled `qa` skips
+# the Builder and goes straight to the Tester (lane "qa"); every other Ready card,
+# labelled or not, is built first (lane "build"). Each picked card carries `lane`
+# and its `labels`. The old per-board `variant` is gone: a config still saying
+# "qa-only" is refused (exit 65) until `super-board onboard` upgrades it, because
+# reading it as "full" would start building on a board meant only for testing.
 #
 # Usage:
 #   super-board-wave-plan.sh --config <config.json> [--items <project-items.json>]
@@ -56,7 +64,7 @@
 # to keep the script offline.
 #
 # Stdout:
-#   { "cards": [ {"number":10,"status":"Review","title":"…"} ],
+#   { "cards": [ {"number":10,"status":"Review","title":"…","lane":"review","labels":[]} ],
 #     "sweep": [ {"number":37,"title":"…","clearedBy":[32]} ],
 #     "resume": [ {"number":51,"title":"…"} ],
 #     "flag":  [ {"number":82,"title":"…","why":"…"} ],
@@ -77,7 +85,7 @@ done
 # Read the config ONCE — $CONFIG may be a process substitution (test mode),
 # which is a FIFO and cannot be read twice.
 CONFIG_JSON=$(cat "$CONFIG")
-VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant')
+VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant // ""')
 # 0 or absent = unlimited. A wave is sized by the dependency graph, not a knob.
 MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
 OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
@@ -89,12 +97,13 @@ else
   ITEMS=$(gh project item-list "$NUMBER" --owner "$OWNER" --format json --limit 500)
 fi
 
-# Validate loudly: a typo (or missing key → literal "null") must not silently
-# drop the QA column from selection and strand cards there.
+# `variant` was removed in v3.0.0 (labels route cards now). Absent or "full" is
+# fine. Anything else — "qa-only", or a typo — is refused loudly rather than
+# guessed: a guess either builds on a test-only board or strands the QA column.
 case "$VARIANT" in
-  full)    COLUMNS='["Review","QA","Ready"]' ;;
-  qa-only) COLUMNS='["Review","Ready"]' ;;
-  *) echo "invalid variant in config: ${VARIANT} (expected full|qa-only)" >&2; exit 65 ;;
+  ""|full) COLUMNS='["Review","QA","Ready"]' ;;
+  qa-only) echo "config still says variant \"qa-only\" — removed in v3.0.0. Run /super-board onboard: it upgrades the config and labels those cards qa." >&2; exit 65 ;;
+  *) echo "invalid variant in config: ${VARIANT} (variant was removed in v3.0.0 — delete the key)" >&2; exit 65 ;;
 esac
 
 # The dependency graph. Only Ready and Blocked cards are gated by it — a card in
@@ -116,16 +125,26 @@ fi
 # auto-merges into one base branch race. That guard now lives where the race
 # actually is — the merge step takes a lock inside the wave workflow and the
 # freshness gate re-verifies under it — so reviews may run in parallel here.
-echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" \
-                 --arg variant "$VARIANT" '
+echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argjson deps "$DEPS" '
   def dep($n): $deps[($n | tostring)];
+  # gh project item-list puts label names on the item (`labels`); some shapes put
+  # them on the content, as strings or {name}. Lower-cased, names only.
+  def labels_of: [ ((.labels // []) + (.content.labels // []))[]
+                   | (if type == "object" then .name else . end) | ascii_downcase ] | unique;
+  def lane_of($status; $labels):
+    if $status == "Review" then "review"
+    elif $status == "QA" then "qa"
+    elif ($labels | index("qa")) then "qa"
+    else "build" end;
   # Unknown to the graph (closed, or beyond the fetch limit) is not "free".
   def free($n): (dep($n) | if . == null then false else .runnable end);
 
   [ .items[]
     | select(.content.type == "Issue")
     | select((.content.assignees // []) | length == 0)
-    | { number: .content.number, status: .status, title: .content.title } ] as $all
+    | labels_of as $l
+    | { number: .content.number, status: .status, title: .content.title,
+        lane: lane_of(.status; $l), labels: $l } ] as $all
 
   # In flight: already past preflight, so the graph does not gate them. Iterated
   # in $cols order (Review, then QA) rather than board order, so a throttled wave
@@ -164,6 +183,4 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
                | { number, title, why: (dep(.number) | .why) } ],
 
       # Building with no claim between waves = no live worker. Back to Ready.
-      stranded: (if $variant == "full"
-                 then [ $all[] | select(.status == "Building") | { number, title } ]
-                 else [] end) }'
+      stranded: [ $all[] | select(.status == "Building") | { number, title } ] }'

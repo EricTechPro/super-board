@@ -146,7 +146,7 @@ Poll BashOutput on each in-flight shell. As each finishes:
 
 ### 5. Final report
 
-When the selected GitHub Project `Ready` queue is empty, or only blocked/skipped cards remain: report a summary listing PRs opened this run (cards in `QA`), issues still skipped (`human-gated` / `loop:halted` / blocked dependencies), and any halts. Suggest: "Run `super-board run` to test, review and merge them."
+When the selected GitHub Project `Ready` queue is empty, or only blocked cards remain: report a summary listing PRs opened this run (cards in `QA`), issues not built (`human-gated` / `loop:halted` / blocked dependencies), and any halts. Suggest: "Run `super-board run` to test, review and merge them."
 
 ## Issue contract
 
@@ -280,5 +280,5 @@ Hash inputs (joined with `|`): lane (`build`) | error class | first 3 unique nor
 ### Never merge
 Builder NEVER squash-merges. Reviewer owns merge.
 
-### Block/Skip exits use the §4 mandatory template
-When moving a card to Blocked or Skipped, populate the full template from `.claude/skills/super-board/references/block-template.md`. A 1-line "needs creds" comment is a contract violation.
+### Block exits use the §4 mandatory template
+When moving a card to Blocked (or dropping it: closed as not planned, Done, 🤷), populate the full template from `.claude/skills/super-board/references/block-template.md`. A 1-line "needs creds" comment is a contract violation.

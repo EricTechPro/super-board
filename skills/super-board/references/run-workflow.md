@@ -127,7 +127,8 @@ Repeat until a done condition or halt gate fires:
    (or /loop re-entries) against the same board without bot_identity.
 4. **Launch** — Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, variant, cards, humanApprovesMerge, tier }`. Runs in the background; the
+   `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` straight from the planner: each
+   carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
    `tier` is the run's model ladder: `'low'` when the user invoked
    `super-board run --low` (haiku/sonnet/opus by card complexity), `'high'`

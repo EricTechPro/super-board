@@ -1,6 +1,6 @@
 ## Super Board
 
-Board pipeline: Ready → Building → QA → Review → Done. Blocked, Skipped = exits.
+Board: Backlog · Ready · Building · QA · Review · Blocked · Done. Labels route: `qa` skips Building · `bug`, `feature`, none → built first.
 
 | When | Use | NEVER |
 |---|---|---|
@@ -9,7 +9,7 @@ Board pipeline: Ready → Building → QA → Review → Done. Blocked, Skipped 
 | Drain the board | `/super-board run` | NEVER build, test or merge from the orchestrator |
 | Board state / halt | `/super-board status` · `/super-board stop` | |
 | Build one ticket | `/super-build` | NEVER build outside the card's worktree |
-| QA a branch or URL | `/super-qa` | NEVER mark QA pass without evidence |
+| QA a branch, or a live URL alone | `/super-qa` · `/super-qa <url>` | NEVER mark QA pass without evidence |
 | Review a PR, merge | `/super-review` | NEVER `gh pr merge` direct — merge gate only |
 | File bugs from Sentry, PostHog, PRs | `/super-collect` | DON'T file without a verifier pass |
 | UI polish | `/ui-refine-loop` (human runs it) | board NEVER runs it |

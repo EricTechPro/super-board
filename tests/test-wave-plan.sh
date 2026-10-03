@@ -83,16 +83,17 @@ OUT10=$("$PLAN" --config <(echo "$NOCAP") --items fixtures/wave-items-review-hea
 echo "$OUT10" | jq -e '[.cards[] | select(.status == "Review")] | length >= 2' >/dev/null \
   || fail "reviews should run in parallel now, got: $OUT10"
 
-# 11 — qa-only has no Builder lane, so the QA column is not an in-flight source.
-OUT11=$("$PLAN" --config <(echo "$NOCAP" | jq '.variant = "qa-only"') --items "$ITEMS" --deps "$DEPS")
-echo "$OUT11" | jq -e '[.cards[].status] | index("QA") == null' >/dev/null \
-  || fail "qa-only must not select from the QA column, got: $OUT11"
-echo "$OUT11" | jq -e '[.cards[].number] | index(12) != null' >/dev/null \
-  || fail "qa-only must still select free Ready cards, got: $OUT11"
+# 11 — variant was removed in v3.0.0. A config still saying "qa-only" is refused
+#      (exit 65) until onboard upgrades it: reading it as a build board would start
+#      building on a board meant only for testing.
+RC=0; "$PLAN" --config <(echo "$NOCAP" | jq '.variant = "qa-only"') --items "$ITEMS" --deps "$DEPS" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 65 ] || fail "a legacy qa-only config should exit 65, got $RC"
 
-# 12 — invalid variant fails loudly (exit 65), never silently qa-only.
+# 12 — an invalid variant fails loudly (exit 65); an absent one is the normal case.
 RC=0; "$PLAN" --config <(jq '.variant = "fulll"' "$CFG") --items "$ITEMS" --deps "$DEPS" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 65 ] || fail "invalid variant should exit 65, got $RC"
+"$PLAN" --config <(echo "$NOCAP" | jq 'del(.variant)') --items "$ITEMS" --deps "$DEPS" >/dev/null \
+  || fail "a config with no variant must plan normally"
 
 # 13 — empty board → empty everything (run-workflow.md's done condition depends
 #      on this shape).
@@ -119,9 +120,25 @@ echo "$OUT" | jq -e '[.stranded[].number] == [18]' >/dev/null \
 echo "$OUT" | jq -e '[.cards[].number] | index(18) == null' >/dev/null \
   || fail "#18 must be moved to Ready first, not dispatched from Building"
 
-# 17 — qa-only boards have no Building lane, so nothing is ever stranded there.
-echo "$OUT11" | jq -e '.stranded == []' >/dev/null \
-  || fail "qa-only must report no stranded cards, got: $(echo "$OUT11" | jq -c .stranded)"
+# 17 — label routing. A Ready card labelled `qa` skips the Builder (lane qa); `bug`,
+#      `feature` and no label are built first (lane build). QA/Review cards keep their
+#      column's lane. Labels come from the item (`labels`) or the content, any case.
+LBL_ITEMS=$(jq -n '{items: [
+  {status:"Ready", labels:["QA"], content:{type:"Issue", number:12, title:"qa card", assignees:[]}},
+  {status:"Ready", labels:["bug"], content:{type:"Issue", number:10, title:"bug card", assignees:[]}},
+  {status:"Ready", content:{type:"Issue", number:13, title:"no label", assignees:[], labels:[{name:"feature"}]}},
+  {status:"Ready", content:{type:"Issue", number:9, title:"bare", assignees:[]}},
+  {status:"QA", labels:["qa"], content:{type:"Issue", number:11, title:"in qa", assignees:[]}}]}')
+LBL_DEPS=$(jq -n '[9,10,12,13] | map({(tostring): {runnable:true, parseable:true, blockers:[]}}) | add')
+OUT17=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$LBL_ITEMS") --deps <(echo "$LBL_DEPS"))
+lane() { echo "$OUT17" | jq -r --argjson n "$1" '.cards[] | select(.number == $n) | .lane'; }
+[ "$(lane 12)" = qa ]    || fail "a qa-labelled Ready card must skip Building (lane qa), got: $OUT17"
+[ "$(lane 10)" = build ] || fail "a bug card is built first, got $(lane 10)"
+[ "$(lane 13)" = build ] || fail "a feature card (label on content) is built first, got $(lane 13)"
+[ "$(lane 9)" = build ]  || fail "no label = Building, got $(lane 9)"
+[ "$(lane 11)" = qa ]    || fail "a QA-column card keeps lane qa, got $(lane 11)"
+echo "$OUT17" | jq -e '.cards[] | select(.number == 12) | .labels == ["qa"]' >/dev/null \
+  || fail "labels must be passed through lower-cased, got: $OUT17"
 
 # 18 — resume: a 🙋 Blocked card whose human step is done (#20) is reported for
 #      the move back to Review; one still waiting (#21) is not. Neither is swept

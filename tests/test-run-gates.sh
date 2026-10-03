@@ -73,11 +73,22 @@ board() {
 
 echo "── done_signature (#8: progress = landed work)"
 PROJECT_ITEMS_JSON=$(board 1:Done 2:Ready 3:Review)
-is "counts only Done/Skipped" "1" "$(done_signature)"
-PROJECT_ITEMS_JSON=$(board 1:Done 2:Skipped 3:Review)
-is "Skipped is terminal too" "1,2" "$(done_signature)"
+is "counts only Done" "1" "$(done_signature)"
+PROJECT_ITEMS_JSON=$(board 1:Done 2:Blocked 3:Review)
+is "Blocked is not landed work" "1" "$(done_signature)"
 PROJECT_ITEMS_JSON=$(board 1:Review 2:QA 3:Ready)
 is "nothing landed → empty signature" "" "$(done_signature)"
+
+echo
+echo "── card_lane (v3.0.0: a qa label skips Building)"
+PROJECT_ITEMS_JSON='{"items":[{"status":"Ready","labels":["QA"],"content":{"type":"Issue","number":5}},
+  {"status":"Ready","labels":["bug"],"content":{"type":"Issue","number":6}},
+  {"status":"Ready","content":{"type":"Issue","number":7,"labels":[{"name":"qa"}]}},
+  {"status":"Ready","content":{"type":"Issue","number":8}}]}'
+is "qa label → Tester" "qa" "$(card_lane 5)"
+is "bug label → Builder" "build" "$(card_lane 6)"
+is "qa label on the content → Tester" "qa" "$(card_lane 7)"
+is "no label → Builder" "build" "$(card_lane 8)"
 
 echo
 echo "── record_cycle_progress (#8: halt is independent of lane occupancy)"

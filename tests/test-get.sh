@@ -84,4 +84,23 @@ if TMPDIR="$WORK/tmp7" SUPER_BOARD_TARBALL="file://$WORK/nope.tgz" bash "$GET" -
 fi
 [ -z "$(ls -A "$WORK/tmp7")" ] || fail "temp folder was left behind after a failed download"
 
-echo "PASS: test-get.sh (7 cases)"
+# 8 — grouped output, in the spec's order: header · checks · download · installing ·
+#     helper skills · 🎉 · 👉. One line per group of files, no per-file list.
+T="$WORK/t8"; mkdir -p "$T"; printf '# Rules\n- pnpm\n' > "$T/CLAUDE.md"; : > "$NPX_LOG"
+out=$(bash "$GET" --target "$T" 2>&1) || fail "grouped-output install failed: $out"
+order=$(printf '%s\n' "$out" | grep -oE '^(🧩|🔍|📦|🔧|🧠|🎉|👉)' | tr -d '\n')
+[ "$order" = "🧩🔍📦🔧🧠🎉👉" ] || fail "groups out of order ($order): $out"
+printf '%s\n' "$out" | grep -q '^   ✓ curl · tar · python3 · gh · jq · node$' || fail "checks line wrong: $out"
+printf '%s\n' "$out" | grep -q '^   🛡️  6 guard hooks → .claude/settings.json (new file)$' || fail "guard line wrong: $out"
+printf '%s\n' "$out" | grep -q '^   ! CLAUDE.md holds its own rules — onboard offers a merge$' || fail "CLAUDE.md hint missing: $out"
+printf '%s\n' "$out" | grep -q '^🧠 helper skills: installed$' || fail "helper line wrong: $out"
+[ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -le 12 ] || fail "output should stay ≤ 12 lines: $out"
+
+# 9 — Node missing: the checks line marks it ✗ and helper skills wait for 🔍 Checks.
+T="$WORK/t9"; mkdir -p "$T"
+out=$(PATH="$WORK/bin-nonode:/usr/bin:/bin" bash -c 'mkdir -p "$0"; for t in gh jq; do ln -sf "'"$WORK"'/bin/$t" "$0/$t"; done; bash "$1" --target "$2"' \
+  "$WORK/bin-nonode" "$GET" "$T" 2>&1) || fail "install without node failed: $out"
+printf '%s\n' "$out" | grep -q '✗ node' || fail "missing node should be marked ✗: $out"
+printf '%s\n' "$out" | grep -q '^🧠 helper skills: skipped — 🔍 Checks will fix this$' || fail "helper line should defer to Checks: $out"
+
+echo "PASS: test-get.sh (9 cases)"

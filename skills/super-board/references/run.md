@@ -44,57 +44,61 @@ Progress: ✅ onboard  →  ✅ lint  →  🤖 run (you are here)
 | `gh auth` valid with required scopes | Halt: "Re-auth: `gh auth refresh -s project,read:project,repo`." |
 | `pre-flight.md` all items `[✓]` | Halt: "Pre-flight incomplete — fix these: [list]." |
 | No issues missing ACs in active columns | Halt: "N issues need clarification. Run `super-board lint`." |
-| Full variant: clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
+| Clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
 | Stale worktree scan | Auto-clean: for each dir in `.worktrees/`, if its branch no longer exists OR no `loop:in-*` label on its issue, `git worktree remove --force` it. Log each removal in the run manifest. Halt only if a removal fails. |
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `🛡 Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run super-board onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*super-board run'` must return zero. If any super-board worker is already alive from a prior crashed run, halt with: `🛑 ${N} super-board workers already running. Stop them first: pkill -f 'claude -p .*super-board run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
 | GraphQL rate-limit guard | Before each tick, query `gh api rate_limit`. If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
 
-## Lane mapping by variant
+## Lanes and label routing
 
-Full variant — 3 lanes:
+One board shape (v3.0.0): Backlog · Ready · Building · QA · Review · Blocked · Done. A card's
+label picks its path — three labels, no per-board variant:
+
+| Label | Path | Why |
+|---|---|---|
+| `feature` | Ready → Building → QA → Review → Done | new behaviour: build, test, review |
+| `bug` | Ready → Building → QA → Review → Done | a fix: same lanes |
+| `qa` | Ready → QA → Review → Done | test what already exists; skips Building |
+| none | as `feature` | the classifier adds `feature` or `bug`; it never adds `qa` |
+
+`super-board-wave-plan.sh` puts `lane` (`build` / `qa` / `review`) and `labels` on every picked
+card; `super-board-wave.js` sends a `qa` card from Ready straight to the Tester. The legacy runner
+reads the label of the top Ready card the same way (`card_lane`).
 
 ```
 Builder:   Ready → Building → QA
-           worker   = claude -p with super-build skill
+           worker   = super-build skill
            worktree = .worktrees/issue-<N>-build/
            branch   = issue-<N>-<slug>  (created here, persists across lanes)
 
-Tester:    QA → Review
-           worker   = claude -p with super-qa skill (issue-scoped mode)
+Tester:    QA → Review            (a `qa` card: Ready → QA → Review)
+           worker   = super-qa skill (issue-scoped mode)
            worktree = .worktrees/issue-<N>-qa/
-           branch   = same issue-<N>-<slug>  (checked out, tests appended)
+           branch   = same issue-<N>-<slug>  (a `qa` card: the Tester creates it)
 
 Reviewer:  Review → Done
-           worker   = claude -p with super-review skill
+           worker   = super-review skill
            worktree = .worktrees/issue-<N>-review/
            branch   = same issue-<N>-<slug>  (squash-merged on approval)
 ```
 
-QA-only variant — 2 lanes:
+**`qa` cards.** The Tester moves the card Ready → QA itself, creates `issue-<N>-<slug>` from the
+base branch, and tests what is already there against the ACs. Tests it writes are committed to
+that branch; a PR opens only when there is something to merge (tests, evidence). A failure it
+cannot fix with tests alone is filed as a `bug` card (`super-qa-file-bug.sh`) and named in the
+handoff — the `qa` card still moves on to Review with the findings. The Reviewer reviews the QA
+report and any test diff.
 
-```
-Tester:    Ready → QA → Review
-           worker   = claude -p with super-qa skill
-                       (URL-target mode if target.type=url)
-           worktree = .worktrees/issue-<N>-qa/  (or none if URL-only)
-           branch   = issue-<N>-<slug>          (or none if URL-only)
-
-Reviewer:  Review → Done
-           worker   = claude -p with super-review skill
-                       (QA-only mode: reviews QA report quality, not code diff)
-           worktree = .worktrees/issue-<N>-review/  (or none if URL-only)
-           branch   = same issue-<N>-<slug>          (or none if URL-only)
-```
+A live site with no repo is not a board. `/super-qa <url>` tests it on its own.
 
 ## Dispatch allocation model — one worker per lane, not per backlog
 
 `super-board run` allocates headless Claude capacity by **lane**, not by how many cards are stacked in one column.
 
-- **Full variant max concurrency:** 3 workers total — at most one Builder, one Tester, and one Reviewer at the same time.
-- **QA-only variant max concurrency:** 2 workers total — at most one Tester and one Reviewer at the same time.
-- **Never dispatch multiple workers from the same column just because that column has a backlog.** If all cards are in `Ready`, Full dispatches exactly one Builder until that Builder exits; QA-only dispatches exactly one Tester until that Tester exits.
-- **Mixed-column example:** if `Ready`, `QA`, and `Review` each contain cards and all lanes are idle, Full dispatches three workers: one Builder from `Ready`, one Tester from `QA`, and one Reviewer from `Review`.
+- **Max concurrency:** 3 workers total — at most one Builder, one Tester, and one Reviewer at the same time.
+- **Never dispatch multiple workers from the same column just because that column has a backlog.** If all cards are in `Ready`, the runner dispatches exactly one worker for the top card — a Builder, or a Tester when the card is labelled `qa` — until it exits.
+- **Mixed-column example:** if `Ready`, `QA`, and `Review` each contain cards and all lanes are idle, the runner dispatches three workers: one Builder from `Ready`, one Tester from `QA`, and one Reviewer from `Review`.
 - **Downstream-first priority:** when multiple lanes are available, dispatch Review before QA before Ready/Build, so finished work gets closed before new build work starts.
 - **Lane idle gate:** a lane is eligible only when its prior worker process has exited. The runner must track lane PIDs or an equivalent lane lease; GitHub issue assignees are per-card mutexes, not lane-capacity controls.
 
@@ -212,7 +216,7 @@ e2e/streaming/ttfb.spec.ts:18   [qa] [issue] spec asserts status only — add a 
 
 Threads are resolved via `gh api graphql` `resolveReviewThread` mutation when the fix is committed.
 
-## Lane lifecycles (Full variant, per card)
+## Lane lifecycles (per card)
 
 ### Builder pre-flight (before ANY card goes Ready → Building)
 
@@ -259,7 +263,8 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | `sequence` — `blockedBy` empty | proceed (card stays Ready), comment `⚠️ expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
 | `skipped` | script exit 69 (pre-flight blind): leave the card in Ready, untouched, retried next wave | — |
 
-A card the pre-flight agent returns no verdict for is treated as `skipped`, never built unchecked.
+A card the pre-flight agent returns no verdict for is treated as `skipped` (a verdict, not a
+column), never built unchecked. `qa` cards are not pre-flighted: nothing is built.
 
 ### Builder (first pass)
 
@@ -297,7 +302,8 @@ A card the pre-flight agent returns no verdict for is treated as `skipped`, neve
 ### Tester (first pass — repo-backed)
 
 1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree `.worktrees/issue-<N>-qa/`.
-2. URL-only variant: skip worktree + pull, run a health-check on `target.url`. If unhealthy → Block.
+   A `qa` card has no branch yet: move it Ready → QA, then create the branch from the base.
+2. `target.url` set → health-check it first. Unhealthy → Block.
 3. Read issue + PR + Builder's handoff comment.
 4. Build issue-scoped test plan: one observable test per AC.
 4b. **Test-gap check** (super-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
@@ -461,8 +467,9 @@ on the base branch**.
      6 needs a fresh review of a commit nobody has reviewed yet.
 ```
 
-**Ordering invariant.** `Done` means "merged". If step 3 cannot be satisfied, the card
-goes to Blocked, never Done. Anything that reads the board — status, halt gate, the
+**Ordering invariant.** `Done` means "merged" — or closed as not planned on purpose, with a 🤷
+comment (there is no Skipped column). If step 3 cannot be satisfied, the card goes to Blocked,
+never Done. Anything that reads the board — status, halt gate, the
 landed-work progress signal — depends on Done meaning the code is on the base branch.
 
 ## Commenting cadence (issue + PR, every lane)
@@ -532,8 +539,10 @@ Did: path Build → QA ❌ v1 → Build → QA ✅ v2 → Review ✅ · truth 95
 Next: none
 ```
 
-Block/Skip exits use the same header (`[<role>] [blocker] 🛑 blocked` / `🤷 skipped`) and the
-fields of `block-template.md`.
+Block exits use the same header (`[<role>] [blocker] 🛑 blocked`) and the fields of
+`block-template.md`. A card dropped on purpose (out of scope, won't do) is closed as not planned
+and moved to Done with a `[<role>] [report] 🤷 dropped · <reason>` comment — there is no Skipped
+column.
 
 ## Per-tick logic (~30s cadence)
 
@@ -543,13 +552,12 @@ fields of `block-template.md`.
 3. Downstream-first dispatch by lane capacity:
    ├─ Review has cards + Reviewer idle → dispatch top of Review
    ├─ QA has cards + Tester idle       → dispatch top of QA
-   └─ (Full only) Ready has cards + Builder idle → dispatch top of Ready
+   └─ Ready has cards → top card labelled `qa` + Tester idle → Tester;
+                         otherwise Builder idle → Builder
 
    Allocation rule: at most ONE worker per lane at a time.
-   Full max concurrency = 3 total workers (Builder + Tester + Reviewer),
-   but never 3 Builders from a Ready backlog. QA-only max concurrency = 2
-   total workers (Tester + Reviewer), but never 2 Testers from a Ready/QA
-   backlog. GitHub issue assignees prevent two workers claiming the same card;
+   Max concurrency = 3 total workers (Builder + Tester + Reviewer),
+   but never 3 Builders from a Ready backlog. GitHub issue assignees prevent two workers claiming the same card;
    the runner still must track lane idleness separately to prevent multiple
    same-lane workers.
 4. Wait for any lane to finish OR 30s timeout
@@ -575,7 +583,7 @@ Claim uses a **GitHub Issue assignee mutex** — atomic compare-and-set via `gh 
    └─ Present → proceed.
 3. Do the lane's work (build / QA / review).
 4. Comment evidence on issue + PR (writing-standard.md § 4) and rewrite your PR body blocks.
-5. Move card to next column (or Blocked/Skipped with the full §4 template).
+5. Move card to next column (or Blocked with the full §4 template; dropped on purpose → closed, Done, 🤷 comment).
 6. RELEASE CLAIM (`gh issue edit --remove-assignee super-board-bot[bot]`) and remove descriptive label.
 ```
 
@@ -647,7 +655,7 @@ Before planning any wave, `super-board-wave-plan.sh` reports four lists the orch
 
 - **`sweep`** — `Blocked` cards whose blockers have all closed. Move each to `Ready` and comment
   naming what cleared it (`clearedBy` carries the numbers). They then join this very wave.
-- **`stranded`** — `Building` cards with no claim (full variant). Nothing selects from Building,
+- **`stranded`** — `Building` cards with no claim. Nothing selects from Building,
   so a wave stopped mid-build leaves them there forever. Remove any leftover build worktree, keep
   the branch, move the card to `Ready`, and comment naming the branch. The legacy dispatcher does
   the same once at start (`reclaim_stranded_building`).
@@ -663,7 +671,7 @@ Before planning any wave, `super-board-wave-plan.sh` reports four lists the orch
 
 **Why the sweep exists.** `Blocked` used to be terminal. A card parked naming the issue it waited
 for, that issue later merged, and nothing ever read the note back — the run's own done-condition
-("only Blocked/Skipped/Done cards remain") meant a closing blocker could not wake anything. Five
+("only Blocked/Done cards remain") meant a closing blocker could not wake anything. Five
 cards sat that way on a real board until a human opened it and noticed.
 
 ### Root-cause hash (used by the rebuild-cap gate)
@@ -688,7 +696,7 @@ Different hash on the same card resets the counter — the bot recognizes that p
 
 The loop exits cleanly when:
 - All active-pipeline columns are empty; OR
-- Only Blocked/Skipped/Done cards remain; OR
+- Only Blocked/Done cards remain (Backlog is not part of a run); OR
 - A halt gate fires.
 
 ## Run manifest
@@ -697,13 +705,13 @@ The loop exits cleanly when:
 docs/super-board/runs/<YYYY-MM-DD>-<slug>.md
 ```
 
-Records: config used, variant, columns, target, per-card history (claim → completion → next column with evidence links), halt gates, final counts, per-lane wall-clock, resume command.
+Records: config used, columns, target, per-card history (claim → completion → next column with evidence links), halt gates, final counts, per-lane wall-clock, resume command.
 
 ## Notification cadence
 
-- **Start** — project, variant, initial column counts, link to live status: `super-board status`.
+- **Start** — project, initial column counts, link to live status: `super-board status`.
 - **Per card completion** — `✅ Tester → #41 passed all checks → Review`.
-- **Per Block/Skip** — short headline + reason tag (`⛔ #19 blocked → 🔐 missing OPENAI_API_KEY`) + link to the full §4 template comment on the issue.
+- **Per Block** — short headline + reason tag (`⛔ #19 blocked → 🔐 missing OPENAI_API_KEY`) + link to the full §4 template comment on the issue.
 - **Every 10 dispatches** — brief column-count snapshot.
 - **Block-rate alert** — when Blocked count exceeds `config.block_rate_alert_pct` of initial Ready: ping with breakdown ("11/30 Ready cards blocked: 🔐×6, 💳×3, ❓×2 — see project board"). One-shot per run (does not re-fire).
 - **Final** — end column counts, total moved to Done, blockers (with reason-tag breakdown), total wall-clock.

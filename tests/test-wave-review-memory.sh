@@ -23,7 +23,7 @@ const run = (args, reply) => {
     .then((out) => ({ out, prompts }))
 }
 const fail = (m) => { console.error('FAIL: ' + m); process.exit(1) }
-const base = { configPath: 'c.json', variant: 'full' }
+const base = { configPath: 'c.json' }
 
 ;(async () => {
   // 1 — the Review lane is told to load prior_report by its marker; other lanes are not.

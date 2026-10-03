@@ -189,6 +189,21 @@ def test_block_template_uses_the_header():
     assert "Reason tag:" in text, "super-board-deps.sh parses 'Reason tag:'"
 
 
+def test_needs_you_comment_is_checklist_first():
+    """The 🙋 comment shows what to do first; why and evidence fold away; the planner's lines stay."""
+    text = (REF / "block-template.md").read_text(encoding="utf-8")
+    block = next(b for b in fenced(text) if "🙋 Your turn on" in b)
+    lines = block.splitlines()
+    assert re.match(r"^\[reviewer\] \[blocker\] 🙋 Your turn on #<N> — ", lines[0]), lines[0]
+    assert lines[1].startswith("- [ ] "), "the first line after the header is a checklist item"
+    assert any(l == "- [ ] Comment `done` here" for l in lines), "the checklist ends with: comment done"
+    fold = block.index("<details><summary>Why, and what I checked</summary>")
+    assert block.index("- [ ] ") < fold, "checklist before the fold"
+    assert re.search(r"Reason tag:[^\n]*🙋", block[fold:]), "deps.sh reads 'Reason tag: 🙋'"
+    assert re.search(r"^blocked-by: -$", block[fold:], flags=re.M), "deps.sh reads 'blocked-by: -'"
+
+
+
 # ── PR body ──────────────────────────────────────────────────────────────────
 
 def test_pr_body_markers():

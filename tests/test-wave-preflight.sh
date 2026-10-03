@@ -14,9 +14,9 @@ const fs = require('fs')
 const src = fs.readFileSync(process.argv[2], 'utf8').replace(/^export const meta/m, 'const meta')
 const AsyncFunction = (async () => {}).constructor
 const run = (args, verdicts) => {
-  const labels = []
+  const labels = [], prompts = {}
   const agent = async (prompt, opts) => {
-    labels.push(opts.label)
+    labels.push(opts.label); prompts[opts.label] = prompt
     if (opts.label.startsWith('preflight')) {
       const nums = opts.label.slice('preflight:'.length).split(',').map((s) => Number(s.slice(1)))
       return { verdicts: nums.filter((n) => verdicts[n]).map((n) => ({ number: n, ...verdicts[n] })) }
@@ -30,14 +30,14 @@ const run = (args, verdicts) => {
     return v
   }))
   return new AsyncFunction('args', 'agent', 'pipeline', 'log', src)(args, agent, pipeline, () => {})
-    .then((out) => ({ out, labels }))
+    .then((out) => ({ out, labels, prompts }))
 }
 const fail = (m) => { console.error('FAIL: ' + m); process.exit(1) }
-const card = (number, status = 'Ready') => ({ number, status, title: `t${number}` })
+const card = (number, status = 'Ready', extra = {}) => ({ number, status, title: `t${number}`, ...extra })
 const by = (out, n) => out.cards.find((c) => c.number === n)
 
 ;(async () => {
-  const { out, labels } = await run({ configPath: 'c.json', variant: 'full',
+  const { out, labels } = await run({ configPath: 'c.json',
     cards: [card(1), card(2), card(3), card(4), card(5), card(6, 'Review')] }, {
       1: { verdict: 'proceed', detail: 'clean' },
       2: { verdict: 'hold', column: 'Blocked', detail: 'duplicate of merged PR #31' },
@@ -65,14 +65,30 @@ const by = (out, n) => out.cards.find((c) => c.number === n)
 
   // 7 — batching: 5 Ready cards fit one pre-flight agent.
   labels.filter((l) => l.startsWith('preflight')).length === 1 || fail('5 Ready cards = 1 pre-flight agent, got ' + labels)
-  const seven = await run({ configPath: 'c.json', variant: 'full', cards: [1, 2, 3, 4, 5, 6, 7].map((n) => card(n)) },
+  const seven = await run({ configPath: 'c.json', cards: [1, 2, 3, 4, 5, 6, 7].map((n) => card(n)) },
     Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((n) => [n, { verdict: 'proceed', detail: 'clean' }])))
   seven.labels.filter((l) => l.startsWith('preflight')).length === 2 || fail('7 Ready cards = 2 pre-flight agents')
 
-  // 8 — qa-only boards have no Builder lane, so no pre-flight runs.
-  const qa = await run({ configPath: 'c.json', variant: 'qa-only', cards: [card(1)] }, {})
-  qa.labels.some((l) => l.startsWith('preflight')) && fail('qa-only must not pre-flight')
-  qa.labels.includes('qa:#1') || fail('qa-only Ready still goes to QA')
+  // 8 — a qa-labelled Ready card skips Building: no pre-flight, no Builder, Tester first,
+  //     told to move the card Ready → QA itself. Lane from the planner or from labels.
+  const qa = await run({ configPath: 'c.json', cards: [card(1, 'Ready', { lane: 'qa', labels: ['qa'] }), card(2, 'Ready', { labels: ['QA'] })] }, {})
+  qa.labels.some((l) => l.startsWith('preflight')) && fail('qa cards must not pre-flight')
+  qa.labels.some((l) => l.startsWith('build')) && fail('qa cards must not build')
+  ;(qa.labels.includes('qa:#1') && qa.labels.includes('qa:#2')) || fail('qa Ready cards go to QA: ' + qa.labels)
+  ;/Ready → QA/.test(qa.prompts['qa:#1']) || fail('the Tester must be told to move a qa card Ready → QA')
+
+  // 9 — bug, feature and no label all build; the classifier keeps a label and labels a bare card.
+  const mix = await run({ configPath: 'c.json', cards: [card(3, 'Ready', { lane: 'build', labels: ['bug'] }), card(4)] },
+    { 3: { verdict: 'proceed', detail: 'ok' }, 4: { verdict: 'proceed', detail: 'ok' } })
+  ;(mix.labels.includes('build:#3') && mix.labels.includes('build:#4')) || fail('bug and unlabelled cards build: ' + mix.labels)
+  ;/label says "bug"/.test(mix.prompts['classify:#3']) || fail('classifier must keep the bug label')
+  ;(/--add-label/.test(mix.prompts['classify:#4']) && /never qa/.test(mix.prompts['classify:#4']))
+    || fail('classifier must label a bare card feature or bug, never qa')
+
+  // 10 — a stale caller passing the removed qa-only variant is refused, not guessed.
+  let threw = false
+  try { await run({ configPath: 'c.json', variant: 'qa-only', cards: [card(1)] }, {}) } catch { threw = true }
+  threw || fail('variant qa-only must be refused')
 })().catch((e) => fail(e.stack))
 JS
-echo "PASS: test-wave-preflight.sh (8 scenarios)"
+echo "PASS: test-wave-preflight.sh (10 scenarios)"

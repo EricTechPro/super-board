@@ -254,7 +254,7 @@ promote() {
   #
   # Without this, a board whose columns do not include `Bug` lost every finding
   # to exit 71. Observed on a real board on 2026-08-20, whose Status options are
-  # Todo/Ready/Building/QA/Review/Done/Blocked/Skipped — no `Bug` among them.
+  # Todo/Ready/Building/QA/Review/Done/Blocked — no `Bug` among them.
   local candidate
   for candidate in "$TARGET_COLUMN" Bug Ready Todo Backlog Triage; do
     option_id=$(echo "$field_json" | jq -r --arg c "$candidate" \

@@ -1,6 +1,6 @@
 ---
 name: super-collect
-description: Find problems in one project and file them as tickets into its super-board Backlog — the board fixes them. Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings). Each candidate is checked by one fresh verifier before filing. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
+description: Find problems in one project and file them as tickets into its super-board Backlog — the board fixes them. Source plug-ins - sentry (app errors), posthog (exceptions, rage/dead clicks, failure events, web vitals, tracking gaps), github (issues not on the board), prs (recurring problems in merged PRs and their review comments), architecture (refactor findings), plus any custom source added in onboard (an MCP server, HTTP API, CLI command or app). Each candidate is checked by one fresh verifier before filing. Dry-run by default. Use when the user says "super-collect", "/super-collect", "/super-collect sentry", "collect tickets", "triage errors onto the board", "what keeps breaking", or "find refactors".
 ---
 
 # super-collect — find problems, file them into Backlog
@@ -15,7 +15,7 @@ config and files onto that project's board.
 | Command | Does |
 |---|---|
 | `/super-collect` | every source enabled in `collect.sources` |
-| `/super-collect <source> [<source>…]` | just those: `sentry`, `posthog`, `github`, `prs`, `architecture` |
+| `/super-collect <source> [<source>…]` | just those: `sentry`, `posthog`, `github`, `prs`, `architecture`, or a custom source's `name` |
 | `--since 30d` / `--since 2026-09-01` | window; default `collect.window_days`, else 14 days |
 | `--yes` | file without the confirm step (never skips verify or dedupe) |
 
@@ -46,6 +46,17 @@ Scripts live in `.claude/skills/super-collect/scripts/` (`S=` below). Every fetc
 | `github` | `gh issue list --state open --json number,title,body,labels,url --limit 300`, minus issues on the board and `source:*` labels | real work → **adopt** (`--adopt <n>`), never copied |
 | `prs` | `python3 $S/collect_prs.py list --since <w>` — one GraphQL search `is:pr is:merged merged:>=DATE`, paginated, with comments, reviews and review threads (human and bot), super-review reports flagged (`<!-- super-review:report -->`) | one recurring root cause → `fix` / `refactor` / `feature`, fp `prs|<boundary>|<cause>` |
 | `architecture` | read-only finder sub-agent (below) | one finding → `refactor`, fp `arch|<module>|<problem>` |
+| custom (`collect.custom[]`) | `python3 $S/collect_custom.py list --since <w>` — http and cli sources run in the script; an `mcp` source comes back `status: agent`: call that server's read/list tool yourself (read-only), then pipe its JSON into `collect_custom.py normalize --name <n>` | one candidate → `bug` (errors, incidents) or `feature` (requests), `--source custom`, fp `custom|<name>|<key>` (the script emits it) |
+
+### custom sources
+
+Added in onboard's "➕ Add another source" (`super-board onboard` → 📥 Bug sources): the user types a
+link, an app name, an API URL, an MCP server or a command; `collect_custom.py classify` decides
+which, `ping` proves it can be read (read-only) and `add` saves `{name, kind, target, auth_env?,
+map?}` to this project's config and its `name` to `collect.sources`. Here they run like any other
+source: every candidate goes to the same verifier and the same filer. A source that cannot be
+reached is `unavailable`, never `empty`. A command that looks like it changes something is refused
+by the script — never work around that.
 
 ### posthog signals
 
@@ -128,7 +139,7 @@ Every card goes through one script, which routes to the pack's filers:
 
 ```bash
 $S/super-collect-file.sh --config <cfg> --type bug|feature|refactor|fix \
-  --source sentry|posthog|github|prs|architecture --title "<one line>" --body-file <md> \
+  --source sentry|posthog|github|prs|architecture|custom --title "<one line>" --body-file <md> \
   --fingerprint "<key>" [--priority p] [--area a] [--label needs-triage] [--label ux] [--yes]
 $S/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
 ```
@@ -141,7 +152,7 @@ $S/super-collect-file.sh --config <cfg> --adopt <n> --type <t> [--yes]
   links and counts — never secrets or user PII. The filer refuses a body that misses a section.
 - **Fingerprint per source** (the filer rejects a mismatch): sentry `err|sentry|<id>`, posthog
   `posthog|<signal>|<key>` (fetchers emit it) or `gap|<workflow>`, github `github|<n>`, prs
-  `prs|<boundary>|<cause>`, architecture `arch|<module>|<problem>`.
+  `prs|<boundary>|<cause>`, architecture `arch|<module>|<problem>`, custom `custom|<name>|<key>`.
 - **Dedupe** is exact-fingerprint, repo-wide, any label: an open hit gets a "Seen again" comment; a
   closed-only hit is a **recurrence**, filed again naming the closed issue.
 - **Column** is the board's holding column (`Backlog`, else `Todo`/`To do`/`Triage`/`Inbox`); none
@@ -155,7 +166,7 @@ Dry-run: run each verified item without `--yes`, show one table (`would-file` / 
 
 ```
 ## super-collect: <filed n | dry-run n> · since 2026-09-18 (14d)
-Coverage   sentry: read 42 | posthog: read 9 (silent: rageclick) | github: read 7 | prs: 23 PRs, 6 reports | architecture: 4
+Coverage   sentry: read 42 | posthog: read 9 (silent: rageclick) | github: read 7 | prs: 23 PRs, 6 reports | architecture: 4 | linear: read 12
 Filed      #412 bug       Checkout 500 on empty cart              (err|sentry|4411)
 Filed      #413 bug       Dead clicks on /pricing  [needs-triage]  (posthog|dead_click|1a2b3c4d5e6f)
 Duplicate  #301 ← Sentry 4502 (comment added)

@@ -1,6 +1,6 @@
 ---
 name: super-board
-description: GitHub-Project-driven autonomous pipeline. Five verbs — onboard, lint, status, run, stop — that take a Project board from empty to drained across Build → QA → Review → Done lanes, with graceful shutdown / resume. Use when the user says "super-board", "/super-board", "drain my GitHub project", "set up the autonomous loop", "kick off the headless build/QA pipeline", or "stop super-board".
+description: GitHub-Project-driven autonomous pipeline. Five verbs — onboard, lint, status, run, stop — that take a Project board from empty to drained across Build → QA → Review → Done lanes (labels qa · bug · feature route each card), with graceful shutdown / resume. Use when the user says "super-board", "/super-board", "drain my GitHub project", "set up the autonomous loop", "kick off the headless build/QA pipeline", or "stop super-board".
 ---
 
 # super-board — autonomous GitHub Project pipeline
@@ -28,7 +28,7 @@ If invoked with no verb, ask which one.
 | `super-board run ...` with config `worker_backend: "claude-p"` (legacy, explicit opt-in) | `references/run.md` |
 | `super-board stop ...` / "stop the run" / "pause the loop" / "kill super-board" | `references/stop.md` |
 | "resume" / "pick up where I left off" / "restart after stop" | `references/stop.md` (resume = run; no separate verb) |
-| Anything about Block/Skip exits | `references/block-template.md` |
+| Anything about Blocked exits, 🙋 needs you, or dropping a card | `references/block-template.md` |
 | Config structure questions | `references/config-schema.json` |
 | Worker gh-call discipline / rate-limit recovery | `references/rate-limit-etiquette.md` (+ `scripts/super-board-gh-guard.sh`) |
 

@@ -19,7 +19,7 @@
 #
 # Usage:
 #   super-collect-file.sh --config <cfg.json> --type bug|feature|refactor|fix \
-#     --source sentry|posthog|github|prs|architecture --title "<one line>" --body-file <md> \
+#     --source sentry|posthog|github|prs|architecture|custom --title "<one line>" --body-file <md> \
 #     --fingerprint "<stable key>" [--priority high|medium|low] [--area <a>] \
 #     [--label <l>]... [--yes]          # e.g. --label needs-triage --label ux
 #   super-collect-file.sh --config <cfg.json> --adopt <issue#> --type bug|feature|refactor [--yes]
@@ -60,7 +60,8 @@ if [ -z "$ADOPT" ]; then
   case "$SOURCE" in
     sentry) FP_PREFIX="err|sentry|" ;; posthog) FP_PREFIX="posthog|" ;; github) FP_PREFIX="github|" ;;
     prs) FP_PREFIX="prs|" ;; architecture) FP_PREFIX="arch|" ;;
-    *) die "--source must be sentry|posthog|github|prs|architecture (got: ${SOURCE:-<unset>})" 64 ;;
+    custom) FP_PREFIX="custom|" ;;   # onboard's "➕ Add another source": custom|<name>|<key>
+    *) die "--source must be sentry|posthog|github|prs|architecture|custom (got: ${SOURCE:-<unset>})" 64 ;;
   esac
   [ -n "$TITLE" ] || die "--title is required" 64
   [ -n "$FP" ]    || die "--fingerprint is required (dedupe key)" 64

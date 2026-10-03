@@ -56,7 +56,14 @@ if [ ! -f "$CONFIG_PATH" ]; then
 fi
 
 # ───────────────────────────── config read ─────────────────────────────
-VARIANT=$(jq -r '.variant' "$CONFIG_PATH")
+# `variant` was removed in v3.0.0: one board shape, labels route cards (a Ready card
+# labelled `qa` goes to the Tester, everything else to the Builder). A config still
+# saying "qa-only" is refused, same as the wave planner.
+VARIANT=$(jq -r '.variant // "full"' "$CONFIG_PATH")
+if [ "$VARIANT" != "full" ]; then
+  echo "config still says variant \"$VARIANT\" — removed in v3.0.0. Run /super-board onboard to upgrade." >&2
+  exit 65
+fi
 PROJECT_OWNER=$(jq -r '.project.owner' "$CONFIG_PATH")
 PROJECT_NUMBER=$(jq -r '.project.number' "$CONFIG_PATH")
 BASE_BRANCH=$(jq -r '.base_branch // "main"' "$CONFIG_PATH")
@@ -172,6 +179,16 @@ issue_is_open() {
 
 TOP_ISSUE=""
 TOP_ITEM_ID=""
+card_lane() {
+  # "qa" when issue $1 carries the `qa` label on the board snapshot, else "build".
+  # Labels sit on the item (`labels`) or its content, as names or {name}.
+  echo "$PROJECT_ITEMS_JSON" | jq -r --argjson n "$1" '
+    [.items[] | select(.content.number == $n)
+     | ((.labels // []) + (.content.labels // []))[]
+     | (if type == "object" then .name else . end) | ascii_downcase]
+    | if index("qa") then "qa" else "build" end' 2>/dev/null || echo build
+}
+
 top_card_in_column() {
   # Sets TOP_ISSUE / TOP_ITEM_ID to the FIRST dispatchable card in column $1:
   # no assignee, no local in-flight lock, and the underlying issue still OPEN.
@@ -367,9 +384,9 @@ sweep_lane_zombies() {
 done_signature() {
   # The set of cards that have LANDED, as a stable string. This — not lane
   # occupancy — is the run's definition of forward progress (issue #8).
-  # Skipped counts as terminal: a card deliberately dropped is a decision, not a stall.
+  # A card deliberately dropped is closed and moved to Done too (v3.0.0: no Skipped column).
   echo "$PROJECT_ITEMS_JSON" | jq -r '
-    [.items[] | select(.status == "Done" or .status == "Skipped") | .content.number // empty]
+    [.items[] | select(.status == "Done") | .content.number // empty]
     | sort | @csv' 2>/dev/null || echo ""
 }
 
@@ -482,7 +499,7 @@ if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
 fi
 
 # ───────────────────────────── preconditions ─────────────────────────────
-log "super-board run started — config=${CONFIG_SLUG} variant=${VARIANT} base=${BASE_BRANCH} tick=${TICK_SECONDS}s max_workers=${MAX_WORKERS} no_progress_cycles=${NO_PROGRESS_CYCLES} max_dispatches=${MAX_DISPATCHES}"
+log "super-board run started — config=${CONFIG_SLUG} base=${BASE_BRANCH} tick=${TICK_SECONDS}s max_workers=${MAX_WORKERS} no_progress_cycles=${NO_PROGRESS_CYCLES} max_dispatches=${MAX_DISPATCHES}"
 
 # Orphan-worker guard. `|| true` defends against pipefail when pgrep finds nothing.
 ORPHANS=$(pgrep -f 'claude -p .*super-board run' 2>/dev/null | grep -v "^$$\$" | wc -l | tr -d ' ' || true)
@@ -529,7 +546,7 @@ reap_finished_locks
 # ───────────────────────────── main loop ─────────────────────────────
 gh_rate_guard
 fetch_project_items
-if [ "$VARIANT" = "full" ]; then reclaim_stranded_building; fetch_project_items; fi
+reclaim_stranded_building; fetch_project_items
 INITIAL_READY=$(column_count "Ready")
 log "initial Ready count: $INITIAL_READY"
 
@@ -595,7 +612,7 @@ while true; do
 
   READY=$(column_count "Ready")
   BUILDING=0
-  [ "$VARIANT" = "full" ] && BUILDING=$(column_count "Building")
+  BUILDING=$(column_count "Building")
   QA=$(column_count "QA")
   REVIEW=$(column_count "Review")
   BLOCKED=$(column_count "Blocked")
@@ -627,22 +644,23 @@ while true; do
       ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
     fi
   fi
+  QA_FREE=$QA_IDLE
   if can_dispatch && [ "$QA" -gt 0 ] && [ "$QA_IDLE" -eq 1 ]; then
     if top_card_in_column "QA"; then
       dispatch_lane qa "$TOP_ISSUE"
-      ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
+      ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1)); QA_FREE=0
     fi
   fi
-  if can_dispatch && [ "$VARIANT" = "full" ] && [ "$READY" -gt 0 ] && [ "$BUILD_IDLE" -eq 1 ]; then
+  # Ready: the top card's label picks the lane — `qa` skips Building (Tester),
+  # anything else is built first. A busy lane waits for the next tick.
+  if can_dispatch && [ "$READY" -gt 0 ] && { [ "$BUILD_IDLE" -eq 1 ] || [ "$QA_FREE" -eq 1 ]; }; then
     if top_card_in_column "Ready"; then
-      dispatch_lane build "$TOP_ISSUE"
-      ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
-    fi
-  fi
-  if can_dispatch && [ "$VARIANT" = "qa-only" ] && [ "$READY" -gt 0 ] && [ "$QA_IDLE" -eq 1 ]; then
-    if top_card_in_column "Ready"; then
-      dispatch_lane qa "$TOP_ISSUE"
-      ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
+      if [ "$(card_lane "$TOP_ISSUE")" = "qa" ]; then
+        [ "$QA_FREE" -eq 1 ] && { dispatch_lane qa "$TOP_ISSUE"; ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1)); }
+      elif [ "$BUILD_IDLE" -eq 1 ]; then
+        dispatch_lane build "$TOP_ISSUE"
+        ACTIVE_WORKERS=$((ACTIVE_WORKERS + 1))
+      fi
     fi
   fi
 

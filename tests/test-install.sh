@@ -171,17 +171,38 @@ grep -q '^- keep me$' "$T/AGENTS.md" && grep -q '^- and me$' "$T/AGENTS.md" || f
 grep -q '^old$' "$T/AGENTS.md" && fail "install should refresh the managed block"
 grep -q "super-board:begin v$(cat ../VERSION)" "$T/AGENTS.md" || fail "block should carry the pack version"
 echo "$OUT" | grep -q "CLAUDE.md holds its own rules" || fail "a non-pointer CLAUDE.md should get the onboard hint"
-[ "$(echo "$OUT" | tail -1)" = "✓ installed. Next: open Claude Code here and run /super-board onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
+[ "$(echo "$OUT" | tail -1)" = "👉 next: open Claude Code here and run /super-board onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
+echo "$OUT" | grep -q "📜 AGENTS.md: super-board block refreshed" || fail "the block refresh should be one grouped line, got: $OUT"
 rm -rf "$T"
-# SUPER_BOARD_QUIET_NEXT=1 (set by get.sh, which prints its own next step) drops the Next line.
+# SUPER_BOARD_QUIET_NEXT=1 (set by get.sh, which prints its own header and next step)
+# prints only the 🔧 installing group: one line per group of files, no per-file list.
 T=$(mktemp -d)
-OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" --no-hooks "$T" 2>&1)
-[ "$(echo "$OUT" | tail -1)" = "✓ installed." ] || fail "SUPER_BOARD_QUIET_NEXT=1 should drop the Next line, got: $(echo "$OUT" | tail -1)"
+OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
+[ "$(echo "$OUT" | head -1)" = "🔧 installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
+echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
+echo "$OUT" | grep -q "✓ skills, scripts and workflows → .claude/" || fail "quiet mode should print the grouped files line"
+echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
+[ "$(echo "$OUT" | wc -l | tr -d ' ')" -le 3 ] || fail "grouped output should be ≤ 3 lines here, got: $OUT"
+rm -rf "$T"
+
+# 12 — upgrade record: an older super-board in the target is written to
+#      .claude/super-board/upgrade.json (from, to, the skills that are new) for onboard.
+T=$(mktemp -d); mkdir -p "$T/.claude/skills/super-board" "$T/.claude/skills/super-build"
+echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"
+OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
+jq -e --arg v "$(cat ../VERSION)" '.from == "1.8.2" and .to == $v and (.added_skills | index("super-collect")) and (.added_skills | index("super-build") | not)' \
+  "$T/.claude/super-board/upgrade.json" >/dev/null || fail "upgrade.json wrong: $(cat "$T/.claude/super-board/upgrade.json" 2>&1)"
+echo "$OUT" | grep -q "⬆️  upgrade from 1.8.2" || fail "the upgrade should be one grouped line, got: $OUT"
+"$INSTALL" --no-hooks "$T" >/dev/null 2>&1
+jq -e '.from == "1.8.2"' "$T/.claude/super-board/upgrade.json" >/dev/null || fail "a second install must keep the original from-version"
+rm -rf "$T"
+T=$(mktemp -d); "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
+[ -e "$T/.claude/super-board/upgrade.json" ] && fail "a fresh install is not an upgrade"
 rm -rf "$T"
 T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
-for s in super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py; do
+for s in super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py super-board-setup.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
 done
 rm -rf "$T"
@@ -193,4 +214,4 @@ doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
 sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
 PY
 
-echo "PASS: test-install.sh (12 scenarios)"
+echo "PASS: test-install.sh (13 scenarios)"

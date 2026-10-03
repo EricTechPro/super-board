@@ -14,7 +14,7 @@ Drives a GitHub Project board on its own: drag a card into `Ready`, and it comes
 ## When To Use It
 
 - You have a GitHub Project of cards with acceptance criteria and want them built, tested and reviewed unattended.
-- You want to harden code that already exists (`variant: "qa-only"`: QA and Review lanes only).
+- You want to harden code that already exists: label those cards `qa` and they skip Building (QA and Review only).
 
 ## Verbs
 

@@ -4,7 +4,7 @@ export const meta = {
   whenToUse: 'Launched by the super-board run-workflow backend with args from super-board-wave-plan.sh. Not for direct ad-hoc use.',
   phases: [
     { title: 'Pre-flight', detail: 'per Ready card: already done? in progress? file overlap? unclear? (run.md → Builder pre-flight)' },
-    { title: 'Classify', detail: 'haiku router: kind + complexity per Ready card' },
+    { title: 'Classify', detail: 'haiku router: kind (feature | bug | qa) + complexity per Ready card' },
     { title: 'Build', detail: 'Builder lifecycle (run.md): worktree, branch, draft PR' },
     { title: 'QA', detail: 'Tester lifecycle (run.md): test plan, evidence, screenshots' },
     { title: 'Review', detail: 'Reviewer lifecycle (run.md): gates, rerun tests, merge' },
@@ -13,8 +13,9 @@ export const meta = {
 
 // args = {
 //   configPath: '.claude/super-board/configs/<slug>.json',
-//   variant: 'full' | 'qa-only',
-//   cards: [{ number, status, title }],     // output of super-board-wave-plan.sh
+//   cards: [{ number, status, title, lane, labels }],  // output of super-board-wave-plan.sh
+//     lane: 'build' | 'qa' | 'review' — a Ready card labelled `qa` has lane 'qa'
+//     and skips the Builder; every other Ready card is built first (v3.0.0).
 //   humanApprovesMerge: boolean (optional, default false),
 //   tier: 'low' | 'medium' | 'high' (optional, default 'medium'),  // run model ladder
 // }
@@ -24,9 +25,17 @@ const input = (() => {
   if (typeof args !== 'string') return args
   try { return JSON.parse(args) } catch { return args }
 })()
-if (!input || !Array.isArray(input.cards) || !input.configPath || !input.variant) {
-  throw new Error('super-board-wave needs args {configPath, variant, cards:[{number,status,title}]}')
+if (!input || !Array.isArray(input.cards) || !input.configPath) {
+  throw new Error('super-board-wave needs args {configPath, cards:[{number,status,title,lane}]}')
 }
+// `variant` was removed in v3.0.0; the planner refuses a "qa-only" config, so a
+// wave launched with one is a stale caller. Refuse rather than guess.
+if (input.variant && input.variant !== 'full') {
+  throw new Error(`super-board-wave: variant "${input.variant}" was removed in v3.0.0 — labels route cards; run /super-board onboard to upgrade`)
+}
+// Lane for a card entering at Ready: the planner's `lane`, else its labels.
+const labelsOf = (card) => (card.labels || []).map((l) => String(l).toLowerCase())
+const readyLane = (card) => card.lane || (labelsOf(card).includes('qa') ? 'qa' : 'build')
 if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
   throw new Error(`super-board-wave: unknown tier "${input.tier}" — use low | medium | high`)
 }
@@ -34,7 +43,7 @@ if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
 const CLASSIFY_SCHEMA = {
   type: 'object',
   properties: {
-    kind: { type: 'string', enum: ['feature', 'bug', 'docs', 'chore'] },
+    kind: { type: 'string', enum: ['feature', 'bug', 'qa'] },
     complexity: { type: 'string', enum: ['low', 'medium', 'high'] },
   },
   required: ['kind', 'complexity'],
@@ -107,6 +116,9 @@ const lanePrompt = (lane, card) => [
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
+  ...(lane === 'qa' && card.status === 'Ready'
+    ? [`This card is labelled qa: it skips Building. Move it Ready → QA yourself, create the issue branch from the base branch, and test what is already there (run.md → "qa cards").`]
+    : []),
   ``,
   `Report your exit via structured output:`,
   `- status=advanced  → card moved forward (Building→QA, QA→Review, Review→Done/merged)`,
@@ -185,7 +197,8 @@ const preflightPrompt = (batch) => [
   `Return one verdict per issue: proceed | hold | sequence | skipped (pre-flight blind). Never drop a card silently.`,
 ].join('\n')
 
-const ready = input.variant === 'full' ? input.cards.filter((c) => c.status === 'Ready') : []
+// Only cards the Builder will take are pre-flighted; `qa` cards skip Building.
+const ready = input.cards.filter((c) => c.status === 'Ready' && readyLane(c) === 'build')
 const verdicts = new Map()
 const batches = []
 for (let i = 0; i < ready.length; i += PREFLIGHT_BATCH) batches.push(ready.slice(i, i + PREFLIGHT_BATCH))
@@ -219,9 +232,15 @@ const results = await pipeline(
   // Stage 1: classify cards entering at Ready (router for model tiering)
   async (card) => {
     if (card.status !== 'Ready') return { card, cls: null }
+    const labels = labelsOf(card)
+    const typed = ['qa', 'bug', 'feature'].find((l) => labels.includes(l))
     const cls = await agent(
       `Read GitHub issue #${card.number} ("${card.title}") — body and all comments — using gh issue view. ` +
-      `Classify it: kind (feature|bug|docs|chore) and complexity (low|medium|high) judged by the scope of code change required.`,
+      `Classify it: kind (feature|bug|qa) and complexity (low|medium|high) judged by the scope of change required. ` +
+      (typed
+        ? `Its label says "${typed}": return kind "${typed}" — the label routes the card, you never override it.`
+        : `It has no type label, so it is built (no label = Building). Return feature or bug — never qa, ` +
+          `which only a person sets — and add that label: gh issue edit ${card.number} --add-label <kind>.`),
       { label: `classify:#${card.number}`, phase: 'Classify', model: classifyModel, schema: CLASSIFY_SCHEMA }
     )
     return { card, cls }
@@ -234,7 +253,7 @@ const results = await pipeline(
     const model = tierFor(prev && prev.cls)
     let at = card.status
 
-    if (at === 'Ready' && input.variant === 'full') {
+    if (at === 'Ready' && readyLane(card) === 'build') {
       if (!preflightGo(card)) {
         history.push(preflightExit(card))
         return { number: card.number, history }
@@ -243,9 +262,9 @@ const results = await pipeline(
       if (b.status !== 'advanced') return { number: card.number, history }
       at = 'QA'
     }
-    // By design: qa-only boards have no Builder lane — Ready cards go
-    // straight to the Tester (run.md "Lane mapping by variant").
-    if (at === 'Ready' && input.variant === 'qa-only') at = 'QA'
+    // A `qa`-labelled card skips Building: Ready → QA, Tester first
+    // (run.md "Lanes and label routing").
+    if (at === 'Ready' && readyLane(card) === 'qa') at = 'QA'
     if (at === 'QA') {
       const q = await runLane('qa', card, model, history)
       if (q.status !== 'advanced') return { number: card.number, history }

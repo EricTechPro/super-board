@@ -617,13 +617,14 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 - Read from issue + PR comments + PR review threads.
 - Respect handed-down worktree + branch.
 
-### Variants
-- **Repo-backed:** worktree at `.worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
-- **URL-target mode (QA-only variant on URL target):** NO worktree, NO branch. Hit `config.target.url` directly with `curl` / Playwright / `browse`.
+### Card types
+- **Built card (`feature`, `bug`, no label):** worktree at `.worktrees/issue-<N>-qa/` checked out at Builder's branch tip.
+- **`qa` card (skipped Building):** move it Ready → QA yourself, create `issue-<N>-<slug>` from the base branch, test what is already there (run.md → "qa cards").
+- **A live URL with no repo** is not a board card: `/super-qa <url>` runs standalone.
 
 ### Lifecycle (Tester, first pass)
 See `.claude/skills/super-board/references/run.md` → Tester (first pass — repo-backed). Summary:
-1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree (skip if URL-only).
+1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree (a `qa` card: create it from the base).
 2. Read issue + PR + Builder's handoff.
 3. Build issue-scoped test plan: ONE observable test per AC.
 3b. Run the **Test-gap check** (above) against the Builder's diff; its High gaps join the plan.

@@ -20,8 +20,9 @@
     "number": 0
   },
 
-  // "full" or "qa-only".
-  "variant": "qa-only",
+  // No `variant` (removed in v3.0.0). Every board has the same columns, and a
+  // card's label picks its lane — see `labels` below. Onboard's upgrade deletes a
+  // leftover `variant`; the wave planner refuses "qa-only" until it is gone.
 
   // Worker dispatch backend. "workflow" (default) drains waves in-session via
   // the super-board-wave dynamic workflow (references/run-workflow.md);
@@ -38,15 +39,15 @@
   "model_tier": "medium",
 
   "target": {
-    // "url" | "repo" | "repo+url". Tells the runner whether to clone, hit a
-    // URL, or both.
-    "type": "url",
-    "url": "<https://your-target-url.example.com>"
+    // "repo" | "repo+url". A board always drives a repo; `url` is the live or
+    // preview site the Tester may also hit. Testing a live site with no repo is
+    // not a board: run `/super-qa <url>` on its own.
+    "type": "repo",
+    "url": null
   },
 
-  // `null` for URL-only; `{path, remote}` otherwise. `remote` can be `null`
-  // for local-only.
-  "repo": null,
+  // `{path, remote}`. `remote` can be `null` for local-only (no pull requests).
+  "repo": { "path": ".", "remote": "https://github.com/<owner>/<repo>" },
 
   // The branch all per-issue branches are cut from and squash-merged back into.
   // Default `"main"`. Onboard warns and suggests `"staging"` or `"develop"` if
@@ -59,15 +60,22 @@
   // Onboard sets it to the machine's zone. Absent → the machine's local zone.
   "timezone": "America/Toronto",
 
-  // Names of the Status options on the project. Aliases tolerated;
-  // canonicalized at read time.
-  //
-  // Full variant (7):    Ready · Building · QA · Review · Done · Blocked · Skipped
-  // QA-only variant (6): Ready ·            QA · Review · Done · Blocked · Skipped
-  "columns": ["Ready", "QA", "Review", "Done", "Blocked", "Skipped"],
+  // Names of the Status options on the project, always all seven (v3.0.0).
+  // Aliases tolerated; canonicalized at read time. There is no Skipped column:
+  // a card dropped on purpose is closed as not planned and moved to Done with a
+  // 🤷 comment. Onboard adds any missing option and keeps every card.
+  "columns": ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"],
+
+  // The three type labels (v3.0.0). Onboard creates them on the repo. Routing:
+  //   qa      → Ready → QA → Review → Done (skips Building: test what exists)
+  //   bug     → Ready → Building → QA → Review → Done
+  //   feature → same as bug
+  //   none    → built, like feature; the classifier adds feature or bug
+  // Fixed, not configurable; listed here so a reader sees the whole contract.
+  "labels": ["qa", "bug", "feature"],
 
   "paths": {
-    // `null` when no PROJECT.md exists (URL-only flows).
+    // `null` when the project has no PROJECT.md.
     "project_md": null,
     "pre_flight_md": "docs/super-board/pre-flight.md",
     "runs_dir": "docs/super-board/runs"
@@ -171,7 +179,7 @@
 
   // ── Runaway controls (v2.0.0).
   // Halt after this many consecutive dispatch cycles in which NO card reached
-  // Done or Skipped. Progress is measured by landed work, never by lane
+  // Done. Progress is measured by landed work, never by lane
   // occupancy: a pipeline that is 100% busy and lands nothing is precisely the
   // runaway this gate exists to catch. Default `6`.
   "no_progress_cycles": 6,
@@ -266,8 +274,9 @@
   // live in .env — SENTRY_AUTH_TOKEN, POSTHOG_PERSONAL_API_KEY — never here.
   "collect": {
     // Sources `/super-collect` runs with no argument. Any of:
-    // "sentry", "posthog", "github", "prs", "architecture".
-    "sources": ["sentry", "posthog", "github", "prs", "architecture"],
+    // "sentry", "posthog", "github", "prs", "architecture", plus the `name` of
+    // any entry in `custom` below.
+    "sources": ["sentry", "posthog", "github", "prs", "architecture", "linear"],
     // Default window in days when no --since is given. Default 14.
     "window_days": 14,
     "sentry": {
@@ -312,7 +321,27 @@
     "architecture": {
       // Cap on refactor findings filed per run. Default 5.
       "max_findings": 5
-    }
+    },
+    // Extra sources added in onboard's "➕ Add another source" (v3.0.0). Each
+    // was pinged read-only before it was saved. `/super-collect` runs them with
+    // skills/super-collect/scripts/collect_custom.py, turns the output into
+    // candidates and sends them through the same verifier as every other source.
+    //   name     — short slug; also what `sources` lists. Fingerprint custom|<name>|<key>.
+    //   kind     — "mcp" (an MCP server Claude Code has; the agent calls its read
+    //              tool), "http" (GET returning JSON), "cli" (a read-only command
+    //              printing JSON or lines), "app" (a known app name resolved to
+    //              one of the three at setup).
+    //   target   — the MCP server name, the URL, or the command.
+    //   auth_env — optional env var holding a token (http: sent as Bearer). The
+    //              name only; the value stays in .env.
+    //   map      — optional dot-paths into each record: items (the list), id,
+    //              title, body, url, count. Absent = best guess per record.
+    "custom": [
+      { "name": "linear", "kind": "mcp", "target": "linear", "map": { "items": "issues" } },
+      { "name": "statuspage", "kind": "http", "target": "https://status.example.com/api/v2/incidents.json",
+        "map": { "items": "incidents", "id": "id", "title": "name", "url": "shortlink" } },
+      { "name": "vercel-logs", "kind": "cli", "target": "vercel logs --output json" }
+    ]
   },
 
   "notifications": {

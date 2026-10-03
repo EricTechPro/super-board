@@ -1,321 +1,335 @@
 # super-board onboard — verb reference
 
-Config schema and field notes: `config-schema.json`.
+Config schema and field notes: `config-schema.json`. Loaded by `SKILL.md` for `super-board onboard`.
 
-This file documents the interactive setup wizard. It is loaded by `SKILL.md`
-when the user invokes `super-board onboard …`.
+**Where it runs:** the current Claude Code session, in the user's folder. Not headless.
+Invoked as `/super-board onboard` (get.sh / install.sh) or `/super-board:super-board onboard`
+(plugin install — skill names carry the plugin prefix).
 
-**Where it runs:** current Claude Code session, in user's CWD. Not headless.
-Invoked as `/super-board onboard` (installed with install.sh / get.sh) or
-`/super-board:super-board onboard` (plugin install — skill names carry the plugin prefix).
-
-**Design rules**
+## Design rules
 
 | Rule | How |
 |---|---|
-| Detect first | ask only what detection cannot answer |
-| Halt early | anything that can stop onboard (runtime, auth) runs before the questions it would waste |
-| Recommended first | every question puts its recommended option FIRST, labelled `(Recommended)`, so Enter picks it; one short line says why |
-| One tool | ask with `AskUserQuestion` (≤ 4 questions per call, `multiSelect` where noted). NEVER free-text a choice that has options |
+| Wizard | 8 numbered steps. Each opens with the agenda strip and `N of 8 · <emoji> <Name> — <one short why>`, then one `AskUserQuestion` |
+| Minimal text | what it found in one line, then the question. Details go in an option's description or one dim line under it — never a paragraph |
+| Recommended first | every question puts its recommended option FIRST, labelled `(Recommended)`, so Enter takes it |
+| One tool | ask with `AskUserQuestion` (≤ 4 questions per call, ≤ 4 options per question; the built-in "Other" box is the free-text option). NEVER free-text a choice that has options |
+| Fix, don't ask | a must-have (skills, scripts, workflows, guard hooks, settings entries, old folders, config keys, labels, columns) is fixed with NO question and listed under "Fixed for you". Only system tools and sign-ins are asked — through Claude Code's own permission prompt on the exact command |
 | Save as you go | every answer is written to `.claude/super-board/onboard-answers.json` the moment it is given |
-| Write once | nothing in the target repo changes until the review screen (step 15) is approved — drafts live in `.claude/super-board/onboard-staged/` |
+| Write once | files in the repo (config, settings.json allow lines, AGENTS.md, CLAUDE.md, docs) change only at step 8, after "Write everything". GitHub-side actions the user just picked (create or extend the board, create `staging`) run in their own step |
 | Secrets | NEVER read, grep, cat or source a dotenv file. Key names only, via `.claude/bin/super-board-env-check.sh` |
+
+**Scripts.** `SB=.claude/bin` after an install. Plugin install before step 1 has run: the plugin's
+own copy, `PACK=$(dirname "$(find ~/.claude/plugins -path '*super-board*' -name install.sh -not -path
+'*/node_modules/*' 2>/dev/null | head -1)")`, `SB=$PACK/scripts`. `$PACK` empty → `🛑 Can't find the
+super-board plugin files. Run the one-line installer (get.sh) or ./install.sh <this-dir> from a
+checkout, then re-run onboard.`
+
+| Script | Used in |
+|---|---|
+| `python3 $SB/super-board-setup.py check / fix --text` | 1 Checks |
+| `python3 $SB/super-board-setup.py board-rank / board-migrate / names` | 1 (upgrade), 3 Board |
+| `python3 $SB/super-board-setup.py branch` | 4 Branch |
+| `python3 $SB/super-board-agents-md.py …` | 5 AGENTS.md |
+| `python3 $SB/super-board-settings.py allow … --dry-run` | 6 Policies |
+| `python3 .claude/skills/super-collect/scripts/collect_custom.py classify / ping / add` | 7 Bug sources |
 
 ---
 
-## Intro shown when onboard starts
+## Screens
+
+**Start** (after the skill loads; nothing asked yet):
 
 ```
-super-board onboard
-─────────────────────────────────────────────────────────
-super-board = a GitHub Project pipeline that runs autonomously.
-              It drains issues from Ready across columns
-              (Building → QA → Review → Done) until the board
-              is empty or only Blocked/Skipped cards remain.
-
-What will need your OK along the way:
-  • a GitHub browser sign-in, only if gh lacks the project scopes
-  • edits to .claude/settings.json (permission lines, optional push guard) — shown as a diff first
-  • AGENTS.md / CLAUDE.md, only if you say yes — shown as a diff first
-  • one review screen before anything is written
-
-Progress: 🛠 onboard (you are here)  →  🧹 lint  →  🤖 run
-─────────────────────────────────────────────────────────
+⏺ super-board setup — 8 steps. Enter takes the recommended answer.
+  1 🔍 Checks       install or update what the board needs
+  2 🔑 GitHub       sign in so I can manage boards
+  3 🗂️ Board        pick or create your project board
+  4 🌿 Branch       choose where finished work merges
+  5 📜 AGENTS.md    move your rules into one file
+  6 🛡️ Policies     what the robot may do alone
+  7 📥 Bug sources  where to find problems to fix
+  8 ✅ Review       check every answer, then save once
+  Stop any time; re-run continues. Live site only? /super-qa <url>.
 ```
+
+**Agenda strip** — first line of every step, done steps ticked, the current one bold:
+
+```
+✓ 1 Checks · ✓ 2 GitHub · 3 Board · 4 Branch · 5 AGENTS.md · 6 Policies · 7 Bug sources · 8 Review
+⏺ 3 of 8 · 🗂️ Board — the robot takes tickets from here.
+```
+
+| # | Header line |
+|---|---|
+| 1 | `1 of 8 · 🔍 Checks — install or update what the board needs.` |
+| 2 | `2 of 8 · 🔑 GitHub — sign in so I can manage boards.` |
+| 3 | `3 of 8 · 🗂️ Board — the robot takes tickets from here.` |
+| 4 | `4 of 8 · 🌿 Branch — where finished work merges.` |
+| 5 | `5 of 8 · 📜 AGENTS.md — Claude reads AGENTS.md; CLAUDE.md becomes "@AGENTS.md".` |
+| 6 | `6 of 8 · 🛡️ Policies — what the robot may do alone.` |
+| 7 | `7 of 8 · 📥 Bug sources — where to find problems to fix.` |
+| 8 | `8 of 8 · ✅ Review — nothing is written until you say so.` |
+
+**Resume** — an answers file with `last_step` and no finished config. Saved answers first, then
+the question:
+
+```
+⏺ Bash(cat .claude/super-board/onboard-answers.json)
+  ⎿  saved 2 Oct, 18:40 · stopped at Policies & permissions
+⏺ 💾 Found your answers from last time:
+  ✓ GitHub: erictech        ✓ board: Ledgerly Roadmap
+  ✓ base: staging           ✓ AGENTS.md: merged
+  → stopped at 🛡️ Policies & permissions
+```
+
+AskUserQuestion "Continue where you left off?" [Continue at <step> (Recommended) / Edit an earlier
+answer — pick which on the next screen / Start over — saved answers are renamed .bak]. Step 1
+Checks always runs again first, silently unless it fixes something.
+
+**Re-run on a finished setup** (config exists, nothing interrupted): show the current values in
+the step-8 table, then "Onboard found an existing setup. What now?" [Keep all — check and repair
+(Recommended) / Edit an earlier answer / Start over]. Keep all = step 1, the board repair of step 3
+(`board-migrate`, no question), the step-7 pings, the self-check. A CLAUDE.md that is no longer the
+`@AGENTS.md` pointer → step 5 is offered even under Keep all.
 
 ---
 
 ## The answers file
 
-`.claude/super-board/onboard-answers.json` (gitignored — step 15 adds it). Shape:
+`.claude/super-board/onboard-answers.json` (gitignored — step 8 adds it):
 
 ```json
-{ "version": 1, "updated": "<iso>", "last_step": "policies",
-  "answers": { "goal": "B", "project": {"owner": "acme", "number": 7},
-               "agents": "refine", "base_branch": "staging",
-               "policies": {"merge_default": "auto", "protect_main": true,
-                            "allowed_envs": ["test", "staging"]},
-               "permissions": "approved", "collect": ["github", "prs"] } }
+{ "version": 2, "updated": "<iso>", "last_step": "policies",
+  "answers": { "github": {"login": "erictech", "remote": "github.com/erictech/my-app"},
+               "board": {"owner": "erictech", "number": 4, "title": "Ledgerly Roadmap", "reused": true},
+               "base_branch": "staging", "agents": "merged",
+               "policies": {"merge_default": "auto", "protect_main": true, "allowed_envs": ["test", "staging"]},
+               "permissions": "add", "collect": ["sentry", "github", "prs", "architecture", "linear"],
+               "custom": [{"name": "linear", "kind": "mcp", "target": "linear"}] } }
 ```
 
-Write it (atomically: temp file + rename) after EVERY answer and after every step that
-detects something worth keeping. A halt never loses work: re-running onboard resumes at
-`last_step` with every earlier answer pre-filled.
+Write it atomically (temp file + rename) after every answer. A halt never loses work.
 
 ---
 
-## Step-by-step logic
+## Step by step
 
 ```
-0. SILENT DETECT (no questions)
-   ├─ CWD: git repo? commits? remote URL? manifests? empty folder?
-   ├─ .claude/super-board/configs/*.json, active pointer, onboard-answers.json
-   ├─ PROJECT.md, docs/agents/issue-tracker.md
-   ├─ Instruction files: python3 .claude/bin/super-board-agents-md.py detect
-   │    (AGENTS.md / CLAUDE.md / CLAUDE.local.md / .claude/CLAUDE.md / GEMINI.md / …,
-   │     pointer or not, managed block or not)
-   ├─ Production signals for step 11 (deploy workflow on push to base, vercel.json /
-   │    netlify.toml, branch protection requiring review, live URL in README)
-   ├─ Migration dirs (supabase/migrations, prisma/migrations, drizzle, **/migrations/*.sql,
+0. SILENT DETECT (no questions, nothing printed but the start screen)
+   ├─ answers file, .claude/super-board/configs/*.json → resume / re-run screens
+   ├─ instruction files: python3 $SB/super-board-agents-md.py detect
+   ├─ manifests + README (board names), branches + deploy signals ($SB/super-board-setup.py branch)
+   ├─ migration dirs (supabase/migrations, prisma/migrations, drizzle, **/migrations/*.sql,
    │    db/migrate, alembic/versions) and migrate scripts in the manifest (db:migrate, …)
-   ├─ Collect sources (step 14 detection list) + key names:
-   │    bash .claude/bin/super-board-env-check.sh SENTRY_AUTH_TOKEN POSTHOG_PERSONAL_API_KEY
-   ├─ Guard hooks: .claude/hooks/guard-protected-push.py present? wired in settings.json?
-   ├─ Machine time zone (IANA name) for config `timezone`: $TZ if set, else
-   │    readlink /etc/localtime | sed 's#.*zoneinfo/##' (macOS, most Linux), else
-   │    timedatectl show -p Timezone --value, else "UTC". No question — shown on the review screen.
-   └─ settings.json permissions.allow (for the step 13 diff)
+   ├─ collect signals: Sentry (@sentry/* / sentry-sdk in manifests, Sentry.init(, .sentryclirc),
+   │    PostHog (posthog-js / posthog-node / posthog, posthog.init(, NEXT_PUBLIC_POSTHOG_* names);
+   │    key names: bash $SB/super-board-env-check.sh SENTRY_AUTH_TOKEN POSTHOG_PERSONAL_API_KEY
+   └─ machine time zone for config `timezone`: $TZ, else readlink /etc/localtime | sed
+      's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 8.
 
-1. RE-RUN CHECK (only when a config or answers file exists)
-   ├─ Show current values in one table (config + answers).
-   ├─ AskUserQuestion "Onboard found an existing setup. What now?"
-   │    • Keep all — check and repair (Recommended)   ← = option D below
-   │    • Edit which?   → multiSelect of the steps (goal, project, AGENTS.md, base branch,
-   │                      policies, permissions, collect sources); walk only those, every
-   │                      other value kept; then step 15
-   │    • Start over    → answers file renamed .bak, full flow
-   ├─ Interrupted run (answers.last_step set, no config yet) → "Resume at <step>? (Recommended)"
-   └─ ALWAYS, on every re-run and after every install/update: if detect says
-      `offer_merge: true` (a CLAUDE.md that is not the `@AGENTS.md` pointer), offer step 9
-      again even under "Keep all".
+1. 🔍 CHECKS — nothing asked except system tools and sign-ins
+   ├─ python3 $SB/super-board-setup.py fix --text
+   │    Fixes with NO question, backed up first to .claude/super-board/backup/<ts>/:
+   │    skills, .claude/bin scripts, workflows, guard hooks + settings.json entries (runs the
+   │    pack's install.sh), removes old skill folders (super-refine, cleanup-wt, arch-loop),
+   │    migrates every config to the v3 keys, git init, Matt Pocock's helper skills (Node present).
+   ├─ Print its list exactly, one ✓ per line:
+   │      ⏺ Fixed for you:
+   │        ✓ super-board skills and scripts installed
+   │        ✓ board engine (workflow) installed
+   │        ✓ 6 safety guards switched on
+   │        ✓ settings.json entries added (backup kept)
+   │        ✓ git repo found
+   ├─ Each `needs` item (a system tool): one line, then run its `command` with Bash — Claude
+   │    Code's permission prompt IS the question. No AskUserQuestion.
+   │      Needs your machine: Node.js isn't installed. It's needed for Matt Pocock's coding
+   │      skills (tests, code review, debugging) the board uses.
+   │      → Bash(brew install node && npx -y skills@latest add mattpocock/skills)
+   │    The command is per OS (brew / apt / dnf / winget) and comes from the script.
+   │    Declined: node → the board runs with built-in checklists instead (say so, continue);
+   │    git or gh → halt: "Without <tool> the board can't <why>. Your answers are saved — run
+   │    the command, then re-run onboard."
+   ├─ Re-check (`check --text`) after every install; move on only when it says all green.
+   ├─ Workflow runtime: syntax-check the installed workflow (same command run.md uses):
+   │      { echo '(async function(){'; sed 's/^export const meta/const meta/' \
+   │        .claude/workflows/super-board-wave.js; echo '})'; } | node --check --input-type=module
+   │    Fails → fix re-copies it; still failing → 🛑 (error table). Remind once: dynamic
+   │    workflows must be ON in /config.
+   └─ OLDER SUPER-BOARD (the result says `upgraded: true`): same rule, no question. Header
+      `1 of 8 · 🔍 Checks — found super-board v<from>; upgrading to v<pack>.` and the list:
+          ⏺ Upgraded for you (backup: .claude/super-board/backup/<ts>/)
+            ✓ skills updated; added super-collect, visual, ui-refine-loop
+            ✓ removed old folders: super-refine, cleanup-wt, arch-loop
+            ✓ scripts, board engine and safety guards updated
+            ✓ config moved to the new keys (merge rule, migrations, sources)
+            ✓ labels mapped: build→feature · bug-fix→bug · qa-only→qa (14)
+            ✓ Skipped column: 4 cards moved to Done, column removed
+            ✓ re-checked: all green
+          Your CLAUDE.md still has its own rules — step 5 offers to move them.
+      The two board lines come from `python3 $SB/super-board-setup.py board-migrate --config
+      <config>` — run it here when `gh auth status` already has the project scope, else in
+      step 3 (it then prints them there). It adds missing columns, creates qa · bug · feature,
+      maps old labels, labels every card `qa` on a board that was "qa-only", moves Skipped
+      cards to Done, removes Skipped and restores any status the change cleared.
 
-2. INSTALL CHECKS + WORKFLOW RUNTIME (before the first real question — halt early, not late)
-   2a. What is installed? A plugin install (`/plugin install super-board@super-board`) ships
-       ONLY the 7 skills — invoked with the plugin prefix, `/super-board:super-board onboard`.
-       It lacks everything below, so check each:
-       ├─ .claude/bin/super-board-*.sh|py      (merge gate, wave plan, env-check, helpers)
-       ├─ .claude/workflows/super-board-wave.js, ui-refine-loop.js
-       ├─ .claude/hooks/guard-*.py, cleanup-wt.py + their entries in .claude/settings.json
-       └─ Matt Pocock's helper skills the lanes load (code-review, codebase-design,
-          resolving-merge-conflicts, tdd …) under .claude/skills/ or ~/.claude/skills/
-       Anything missing → say what, then AskUserQuestion "Install the missing pieces?"
-         • Install everything, guard hooks included (Recommended)
-         • Install without guard hooks (--no-hooks)
-         • Stop — I'll install by hand
-       Install = run the pack's own install.sh from the PLUGIN's copy (outside the project),
-       never a copy inside the repo:
-         PACK=$(dirname "$(find ~/.claude/plugins -path '*super-board*' -name install.sh \
-                -not -path '*/node_modules/*' 2>/dev/null | head -1)")
-         bash "$PACK/install.sh" [--no-hooks] "$PWD"
-         npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y
-       ($PACK empty → "🛑 Can't find the super-board plugin files. Run the one-line installer
-        (get.sh) or `./install.sh <this-dir>` from a checkout, then re-run onboard.")
-       Protect main is NOT a flag here — step 12 asks it once.
-       After installing, the unprefixed `/super-board onboard` also works (project skills).
-   2b. Workflow runtime. (Skip only when an existing config sets worker_backend: "claude-p".)
-   The default backend launches .claude/workflows/super-board-wave.js. That file IS the
-   dynamic workflow; without it `run` dies at its precondition #4.
-   ├─ Present? → syntax-check it (same command run.md uses):
-   │    { echo '(async function(){'; \
-   │      sed 's/^export const meta/const meta/' .claude/workflows/super-board-wave.js; \
-   │      echo '})'; } | node --check --input-type=module
-   ├─ Missing → self-heal, first hit nearest first:
-   │    a. <git-root>/.claude/workflows/super-board-wave.js
-   │    b. find <up to 4 parents> -maxdepth 6 -path '*/super-board/workflows/super-board-wave.js' -print -quit
-   │    → mkdir -p .claude/workflows && cp <hit> .claude/workflows/ → syntax-check the copy
-   ├─ No hit / check fails → HALT now (nothing asked yet, nothing lost):
-   │    "🛑 Missing or corrupt .claude/workflows/super-board-wave.js. Run `./install.sh <this-dir>`
-   │     from your super-board checkout, then re-run super-board onboard."
-   └─ Remind once: dynamic workflows must be ON in /config (the run will refuse otherwise).
+2. 🔑 GITHUB
+   ├─ Bash(gh auth status). Signed in with project scopes → `✓ GitHub connected.` and on.
+   ├─ Not signed in → one line, then Bash(gh auth login) — the permission prompt asks.
+   ├─ Missing scopes → "This opens a browser to approve board access — needed to move cards and
+   │    create the board for you." then Bash(gh auth refresh -s project,read:project,repo)
+   ├─ Bash(git remote get-url origin). No remote → AskUserQuestion "This project isn't on GitHub
+   │    yet. Create a repo?" [Create a private repo (Recommended) / Use an existing repo /
+   │    Not now — the robot can't open pull requests]. Create → gh repo create <login>/<folder>
+   │    --private --source . --remote origin
+   └─ bot_identity: `super-board-bot[bot]` when a GitHub App is installed on the repo, else the
+      login. Then `✓ GitHub connected.`
 
-3. ONE BIG QUESTION — "What do you want to run in a loop?"
-   ├─ B) Build features for a local repo (Recommended when CWD is a repo)
-   │       → variant = full, target = repo (+ optional URL)
-   ├─ C) QA a local repo (already built)          → variant = qa-only, target = repo (+ URL)
-   ├─ A) Test a live URL (no code access)         → variant = qa-only, target = url
-   └─ D) Use an existing config — check and repair (Recommended when a config exists)
-           → pick the config → run the five self-checks (bottom of this file), repair what is
-             missing (columns, PROJECT.md, runtime, active pointer, collect pings), ask
-             NOTHING else, then step 16. Offers step 9 only when offer_merge is true.
-   (Order the options so the recommended one is first for THIS folder.)
+3. 🗂️ BOARD — one question: which board
+   ├─ One checklist line, one labels line, no question about either:
+   │      Columns: ✓ Backlog ✓ Ready ✓ Building ✓ QA ✓ Review ✓ Blocked ✓ Done
+   │      Labels: feature · bug · qa (qa skips Building; no label = feature)
+   ├─ python3 $SB/super-board-setup.py board-rank --owner <owner>   (boards ranked by matching
+   │    columns; `recommend` = the best with ≥ 4 of 7)
+   │  python3 $SB/super-board-setup.py names                         (two names from
+   │    package.json / README / folder)
+   ├─ AskUserQuestion "Which board?" (header "Board"):
+   │    • Use <title> (#<n>) — <m> of 7 columns match, I'll add <missing> (Recommended)
+   │        description: its URL (github.com/users/<owner>/projects/<n>)
+   │    • Create a new board named "<names[0]>"       (Recommended when nothing is recommended)
+   │    • Create a new board named "<names[1]>"
+   │    "Other" = Type a name.
+   ├─ Reuse → board-migrate --owner <o> --number <n> --repo <owner/repo>: adds the missing
+   │    columns, the three labels, keeps every card. Prints `<title> ready`.
+   └─ New → gh project create --owner <o> --title "<name>", link it to the repo, then
+      board-migrate --prune-empty on it (the seven columns replace GitHub's default Todo /
+      In Progress; labels). Prints its URL.
+   There is no "Needs you" column and no Skipped column: a card waiting on a person goes to
+   Blocked with 🙋 (block-template.md); a card dropped on purpose is closed and moved to Done.
 
-4. GITHUB AUTH (always)
-   ├─ `gh auth status` — must be authenticated; scopes `project`, `read:project`, `repo`
-   ├─ Missing scope → say first: "This opens a browser to approve the project scopes —
-   │    needed to move cards and create the board for you." Then
-   │    `gh auth refresh -s project,read:project,repo`
-   └─ Record bot_identity: `super-board-bot[bot]` when a GitHub App is installed on the repo,
-      else the user's login.
+4. 🌿 BRANCH
+   ├─ python3 $SB/super-board-setup.py branch → one line:
+   │      Found: main (deploys to production via Vercel), no staging.
+   ├─ AskUserQuestion "Where should finished work merge?" (header "Branch"):
+   │    no staging:   • Create staging from main (Recommended) — "nothing goes live until you
+   │                    move it to main" (or "keeps main clean" with no deploy signal)
+   │                  • main — every merge goes live (or just "main" with no deploy signal)
+   │    staging found: • staging (Recommended) — already exists · • main — every merge goes live
+   ├─ Create staging → Bash(git push origin main:staging) right away (the pick is the OK).
+   └─ main kept with a deploy signal → step 6 defaults to "you merge everything", target_env "live".
 
-5. GIT REPO (skip for A — a URL-only board needs no repo; say so in one line)
-   ├─ B/C and CWD is not a repo → AskUserQuestion "Init git here? — worktrees, branches and
-   │    merges need it" [Init git (Recommended) / Stop]
-   └─ No remote → offer `gh repo create` [Create private repo (Recommended) / Pick existing /
-      Local only]
+5. 📜 AGENTS.md — one line, one question; one short question per conflict
+   ├─ detect says CLAUDE.md is already the pointer → `✓ Already done — CLAUDE.md is "@AGENTS.md".`
+   ├─ No instruction files → "Create AGENTS.md for your project rules?" [Yes (Recommended) —
+   │    CLAUDE.md becomes "@AGENTS.md" / Skip]
+   ├─ Otherwise N = rule units in CLAUDE.md (`units --file CLAUDE.md`):
+   │    AskUserQuestion "Move your N CLAUDE.md rules into AGENTS.md?" (header "AGENTS.md")
+   │      • Yes, move them (Recommended) — backup first, diff before saving
+   │      • Only add the super-board section
+   │      • Skip
+   ├─ Yes → draft the merge into onboard-staged/ by the rules below. Each conflict = its own
+   │    AskUserQuestion, header "Conflict k of n", question "<Subject>: which rule wins?",
+   │    options quoting BOTH lines verbatim with file:line, the more specific one Recommended.
+   │    Then one tool line: Bash(super-board-agents-md.py coverage && check) ⎿ 31/31 rules kept ·
+   │    118 lines. Written at step 8.
+   ├─ Only the section → stage `block --create`; a CLAUDE.md alone gets `@AGENTS.md` prepended.
+   └─ Writing standard, always, no question: stage docs/agents/issue-tracker.md with a
+      `## Ticket format` section from references/ticket-format.md (create, or replace only that
+      section). The block's "Writing (super-board)" table links it and writing-standard.md.
 
-6. TARGET / SCAFFOLD
-   ├─ A: ask for the URL → target.url; repo = null
-   ├─ B: no commits → "Scaffold from a template?" [Blank + README (Recommended) / Next.js /
-   │      Vite / NestJS]. Optional target.url.
-   └─ C: ask only for a target URL, if any
-
-7. GITHUB PROJECT
-   ├─ List projects under the repo owner (or @me)
-   ├─ [Create "<repo> board" (Recommended when none fits) / <existing projects…>]
-   └─ Picked → validate columns (step 8). Created → `gh project create --title <name>`
-
-8. COLUMNS (idempotent, no question)
-   ├─ Full (7):    Ready · Building · QA · Review · Done · Blocked · Skipped
-   ├─ QA-only (6): Ready ·            QA · Review · Done · Blocked · Skipped
-   ├─ Add missing Status options, re-read to confirm.
-   └─ There is NO "Needs you" column. A card waiting on a person goes to Blocked with the
-      🙋 reason tag, the `needs-you` label and the exact command in the comment
-      (block-template.md → "🙋 Needs you"). Say this once here.
-
-9. AGENTS.md — SOURCE OF TRUTH (any flow with a local repo)
-   See "AGENTS.md source of truth" below for the merge rules.
-   ├─ AskUserQuestion "Refine AGENTS.md and make it the source of truth?"
-   │    • Yes — merge CLAUDE.md into AGENTS.md, CLAUDE.md becomes @AGENTS.md (Recommended)
-   │    • Only add the super-board section
-   │    • Skip
-   ├─ Yes → draft the merged AGENTS.md + CLAUDE.md into onboard-staged/, resolve conflicts one
-   │    question at a time, show the unit→line mapping + diff, approve. Written in step 15.
-   ├─ Only section → stage `block --create`; if only CLAUDE.md exists, stage `@AGENTS.md`
-   │    prepended to it (nothing else changes).
-   └─ Writing standard (no question, no opt-out — super-board's writing standard is always
-      applied; never ask about writing style): stage docs/agents/issue-tracker.md with a
-      `## Ticket format` section from references/ticket-format.md (create the file, or add /
-      replace only that section). The AGENTS.md block's "Writing (super-board)" table links
-      there and to .claude/skills/super-board/references/writing-standard.md — one copy, no drift.
-
-10. PROJECT.md (skip for A, or if the user opts out)
-    ├─ Sub-agent drafts it from manifests (package.json, pyproject.toml / requirements.txt,
-    │    Cargo.toml, go.mod, Gemfile) + README + top-level tree. No manifest → ask
-    │    "What does this project do? (one short paragraph)" and seed from the answer.
-    ├─ Show draft → [Looks right (Recommended) / Edit]. Staged → docs/super-board/PROJECT.md
-    └─ New or empty repo → offer "Turn this into your first tickets with /to-tickets?"
-       [Yes, draft first tickets (Recommended) / Later]. Tickets use references/ticket-format.md
-       and are created after step 15, straight into Ready.
-
-11. BASE BRANCH (any flow with a local repo)
-    ├─ Detect current + remote default branch; production signals from step 0
-    ├─ "Which branch should super-board cut feature branches from and merge back into?"
-    │    No production signal → [main (Recommended) / staging / develop]
-    │    Production signal    → [Create staging from main (Recommended) / main — every merge
-    │                            lands in production / develop]
-    └─ Production base kept → policies step recommends "human" and target_env "live".
-
-12. POLICIES — "What may the robot do?" (any flow with a local repo; ONE screen)
-    First AskUserQuestion: "Accept the recommended policies?" showing the three picks
-    (merge line reads "Recommended: auto-merge up to 400 changed lines"):
-       [Accept all recommended (Recommended) / Review each]
-    Review each → ONE AskUserQuestion call with three questions:
-    a. Merge policy (header "Merge")
-       Non-production base:
-         • Auto-merge up to 400 changed lines; bigger PRs, money, auth and
-           destructive schema (DROP/TRUNCATE/RENAME) wait for you (Recommended)
-         • A human merges everything
-       Production base kept:
-         • A human merges everything (Recommended)
-         • Auto-merge up to 400 changed lines; bigger PRs, money, auth and destructive schema
-           wait for you → sets merge_policy.allow_auto_on_production: true (run.md's guard needs it)
+6. 🛡️ POLICIES — ONE AskUserQuestion call, two questions; details folded
+   Q1 header "Rules", "Use the safe defaults?"
+      • Yes (Recommended) — description: "robot merges normal changes · money/logins/DB wait for
+        you · no pushes to main · migrate test + staging only"
+        (production base kept: "you merge everything (main goes live) · no pushes to main ·
+        migrate test + staging")
+      • Review each
+   Q2 header "Permissions", "Let it run its commands without asking each time?"
+      • Yes, add <N> lines to settings.json (Recommended)
+      • No, ask me each time
+   Folded details = ONE dim line under each, never a table:
+      merge_policy.default auto · always_human: money, auth, schema · push guard on (main, master,
+      <base>) · migrations.allowed_envs: test, staging
+      + Bash(gh project:*) + Bash(gh issue:*) + Bash(gh pr:*) + … (the --dry-run output, joined)
+   Review each → ONE more AskUserQuestion call, up to three questions:
+    a. "Merge" — "Who merges a change that passes review?" [Robot merges normal changes
+       (Recommended) / I merge everything]; production base: the order flips, and robot-merges
+       sets merge_policy.allow_auto_on_production: true (run.md's guard needs it).
        → merge_policy.default "auto" | "human"; auto_max_lines 400 (lockfiles, generated,
-         snapshots, migration SQL not counted — size_exclude); always_human = schema defaults
-         (labels / path globs / added-line keywords — config-schema.json). A matching PR is
-         parked in Blocked with 🙋: you merge it, or comment `done` to approve. A PR over the cap
-         shows as "big PR — please review".
-    b. Protect the base branch (header "Push guard") — asked ONLY here, once
-       Skip entirely if settings.json already wires guard-protected-push.py.
-         • Block direct and force pushes to main/master/<base> (Recommended for existing apps)
-         • No (fine for a brand-new repo)
-       Yes + `.claude/hooks/guard-protected-push.py` present → staged settings merge (step 15).
-       Yes + script MISSING (installed with --no-hooks) → do NOT wire a missing script; record
-       the answer and tell the user: "Run `./install.sh --no-hooks --protect-main <this-dir>`
-       from your super-board checkout — it installs only this guard."
-    c. Databases the robot may migrate at merge (header "Migrations", multiSelect)
-       Skip when step 0 found no migration dirs (write the defaults anyway).
-         • test (Recommended) • staging (Recommended) • live
-       → migrations.allowed_envs; target_env = "live" on a production base, else "staging";
-         commands from the manifest's migrate scripts (ask only for a missing one, one line
-         each; "-" = the deploy pipeline applies it). Secrets stay in env vars — check the
-         names with super-board-env-check.sh, never the values.
-    Say in ONE line, always: "The robot runs additive migrations on the databases you picked to
-    test its work; a live database, or a destructive schema change (DROP/TRUNCATE/RENAME), always
-    waits for you — 🙋 in Blocked with the exact command."
+         snapshots, migration SQL not counted); always_human = schema defaults (money, auth,
+         destructive schema). A matching PR parks in Blocked with 🙋.
+    b. "Push guard" — "Block pushing straight to main?" [Yes (Recommended for a repo with
+       commits) / No]. Skipped when settings.json already wires guard-protected-push.py. Script
+       missing (--no-hooks install) → record the answer and say: "Run ./install.sh --no-hooks
+       --protect-main <this-dir> — it installs only this guard."
+    c. "Databases" (multiSelect, only when migration dirs exist) — "Which databases may the robot
+       migrate?" [test (Recommended) / staging (Recommended) / live] → migrations.allowed_envs;
+       target_env "live" on a production base, else "staging"; commands from the manifest's
+       migrate scripts (ask only for a missing one).
+   Permission lines: the base list in run-workflow.md → "Mid-run permission prompts", plus the
+   merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
+   "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash
+   .claude/bin/super-board-env-check.sh:*)" and the test runner. N counts what is NOT already in
+   settings.json: `super-board-settings.py allow .claude/settings.json <rules…> --dry-run`.
 
-13. PERMISSIONS (after policies, before any run can stall on a prompt)
-    Build the allowlist from the answers and show it as a diff:
-      python3 .claude/bin/super-board-settings.py allow .claude/settings.json <rules…> --dry-run
-    Rules: the base list in run-workflow.md → "Mid-run permission prompts", plus
-      • merge_policy.default "auto": "Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
-        "Bash(gh pr merge:*)"
-      • one "Bash(<command>)" per migrate command of an allowed env
-      • "Bash(bash .claude/bin/super-board-env-check.sh:*)"
-      • the project's test runner (from the manifest, e.g. "Bash(npm test:*)")
-    AskUserQuestion [Add these lines (Recommended) / Skip — every merge will ask you].
-    Approved → staged; written in step 15 (same helper, no --dry-run).
+7. 📥 BUG SOURCES — tick sources; "Add another source" is the free-text box
+   ├─ AskUserQuestion multiSelect "Where should I look for problems?" (header "Bug sources"):
+   │    Sentry — app errors (Recommended when detected) · PostHog — rage clicks, errors, slow pages
+   │    (Recommended when detected) · GitHub issues — bugs filed but not on the board · Past PRs —
+   │    review comments that keep repeating · Architecture — tangled or duplicated code.
+   │    Undetected Sentry / PostHog are left out. More than 4 options → split into two questions
+   │    in the same call ("Error sources", "Code sources") — the tool takes 4 per question.
+   │    "Other" = ➕ Add another source (link, app, API URL, MCP or command).
+   ├─ Built-ins: ask only what detection missed (Sentry org/project/host, PostHog host/project_id).
+   │    Missing key → the exact .env line to add (name only) + scopes: Sentry `event:read
+   │    project:read`; PostHog personal key `query:read error_tracking:read`. PostHog failure
+   │    events: grep capture() calls for *_failed / *_error, propose them, user confirms.
+   ├─ ➕ typed text → C=.claude/skills/super-collect/scripts/collect_custom.py
+   │    python3 $C classify "<text>" → kind mcp | http | cli (an app name resolves to one)
+   │    python3 $C ping --kind <k> --target <t> [--auth-env <E>] --name <n>   (read-only)
+   │      mcp → status "agent": call that server's read/list tool yourself, limit 1, read-only;
+   │            pipe its JSON into `$C normalize --name <n>` to count what it returned.
+   │    ✅ → `$C add … --config <staged config>` (collect.custom[] + collect.sources).
+   │    ❌ → say why in one line (401 → the token name to add to .env); never saved; re-test by
+   │         typing it again.
+   ├─ Ping each built-in, read-only, before step 8:
+   │      python3 .claude/skills/super-collect/scripts/collect_sentry.py  --config <staged> ping
+   │      python3 .claude/skills/super-collect/scripts/collect_posthog.py --config <staged> ping
+   │      gh api graphql -f query='{viewer{login}}'          (github, prs)
+   └─ One result block, one line per source; a failure leaves that source out, never halts:
+          ✅ linear — can read issues (12 open bugs); saved in this project's config
+          ✅ sentry · github · prs · architecture
+          ❌ posthog — key missing: add POSTHOG_PERSONAL_API_KEY to .env (left out)
 
-14. COLLECT SOURCES (any flow with a local repo; this config only)
-    Sets up the `collect` block `/super-collect` reads.
-    ├─ Detected in step 0:
-    │    • Sentry:  @sentry/* / sentry-sdk / sentry_sdk in manifests, Sentry.init(,
-    │               .sentryclirc, sentry.*.config.*; org/project from those or the DSN
-    │    • PostHog: posthog-js / posthog-node / posthog in manifests, posthog.init(,
-    │               NEXT_PUBLIC_POSTHOG_* / POSTHOG_HOST / POSTHOG_PROJECT_ID key names
-    │    • Keys:    super-board-env-check.sh output (present / empty / missing) — NEVER values
-    ├─ AskUserQuestion multiSelect "Enable which collect sources?" — detected ones first and
-    │    marked (Recommended); github, prs, architecture need nothing extra
-    ├─ Ask only what detection missed: Sentry org/project/region host, PostHog host/project_id.
-    │    Missing key → the exact .env line to add (name only) + scopes: Sentry
-    │    `event:read project:read`; PostHog personal key `query:read error_tracking:read`.
-    ├─ PostHog failure events: grep the app's capture() calls for *_failed / *_error /
-    │    status 'failed'; propose them for collect.posthog.failure_events, user confirms.
-    └─ Test each enabled source now, read-only, BEFORE the review screen:
-         python3 .claude/skills/super-collect/scripts/collect_sentry.py  --config <staged cfg> ping
-         python3 .claude/skills/super-collect/scripts/collect_posthog.py --config <staged cfg> ping
-         gh api graphql -f query='{viewer{login}}'          (github, prs)
-       ✅/❌ per source. PostHog `silent` signals get a one-line suggestion (never edit the
-       app). A failed ping leaves that source out of collect.sources and says how to re-test;
-       it never halts onboard.
+8. ✅ REVIEW — compact table, then write once
+   ├─ Two columns, no borders:
+   │      Board    Ledgerly Roadmap #4 (+QA)    Branch   staging (new)
+   │      Rules    safe defaults                Perms    7 lines
+   │      AGENTS   rules moved, CLAUDE.md→@     Sources  sentry, github, prs, arch, linear
+   ├─ AskUserQuestion "Write everything?" (header "Save") [Write everything (Recommended) /
+   │    Change one thing → pick the step, walk only it, back here / Cancel — nothing written].
+   ├─ Write, in order (each atomic; stop and report on the first failure — answers are kept):
+   │    ├─ .claude/super-board/configs/<slug>.json (committed): description, project, target
+   │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
+   │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
+   │    │    "session", bot_identity}, worker_backend "workflow". No `variant`.
+   │    ├─ .claude/super-board/active ← <slug>
+   │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
+   │    │    backup/, inflight/, upgrade.json (all under .claude/super-board/)
+   │    ├─ settings.json: super-board-settings.py allow … ; protect main →
+   │    │    super-board-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
+   │    ├─ AGENTS.md / CLAUDE.md: super-board-agents-md.py backup, then write --src <staged>
+   │    │    --dest AGENTS.md, pointer --tail <staged tail> --force, block, check
+   │    └─ docs/agents/issue-tracker.md; docs/super-board/PROJECT.md (a sub-agent drafts it from
+   │       manifests + README + tree, no question; listed in the table as "PROJECT.md drafted")
+   └─ Delete onboard-staged/; keep the answers file (re-runs use it).
 
-15. REVIEW SCREEN → WRITE ONCE
-    Show ONE table: every answer + every file that will change (config path, active pointer,
-    .gitignore lines, settings.json allow/hook additions, AGENTS.md, CLAUDE.md,
-    docs/agents/issue-tracker.md, PROJECT.md). AskUserQuestion
-      [Write everything (Recommended) / Change one thing → back to that step / Cancel].
-    Write, in order (each atomic; stop and report on the first failure — answers are kept):
-    ├─ .claude/super-board/configs/<slug>.json (committed): description, variant, project,
-    │    target, repo, base_branch, timezone (the machine zone from step 0), columns, paths,
-    │    merge_policy, migrations, collect, notifications {channel: "session", bot_identity},
-    │    worker_backend "workflow"
-    ├─ .claude/super-board/active ← <slug>
-    ├─ .gitignore += .claude/super-board/active, .claude/super-board/onboard-answers.json,
-    │    .claude/super-board/onboard-staged/, .claude/super-board/backup/, .claude/super-board/inflight/
-    ├─ settings.json: super-board-settings.py allow … ; protect main →
-    │    super-board-settings.py hooks .claude/settings.json <protect-main snippet>
-    │    (snippet = the pack's hooks/settings-protect-main.json: PreToolUse Bash →
-    │     python3 "$CLAUDE_PROJECT_DIR"/.claude/hooks/guard-protected-push.py)
-    ├─ AGENTS.md / CLAUDE.md: super-board-agents-md.py backup, then write --src staged
-    │    --dest AGENTS.md, pointer --tail <staged tail> --force, block, check
-    ├─ docs/agents/issue-tracker.md, docs/super-board/PROJECT.md
-    └─ Then: first tickets (step 10) if accepted; delete onboard-staged/; keep the answers file
-       (re-runs use it).
-
-16. SELF-CHECK + SUMMARY — the summary is the ONE place that names the next command.
-    "✅ Onboard complete.
-     📋 Board: <project URL>
-     🧹 Next: run `/super-board lint` — it checks every ticket has clear success criteria.
-     🤖 Then: `/super-board run`."
+DONE — self-check, then the ONE place that names the next command:
+      ⏺ Bash(self-check)  ⎿  all good
+      ⏺ 🎉 Onboard complete.
+        📋 Board: github.com/users/<owner>/projects/<n> (<title>)
+        🧹 Next: /super-board lint — checks every ticket has clear success criteria.
+        🤖 Then: /super-board run.
 ```
 
 ---
@@ -364,79 +378,53 @@ and a committed symlink breaks on Windows.
      prohibition into a suggestion.
    - ≤ 200 lines. Overflow → `docs/agents/<topic>.md` with a one-line pointer in AGENTS.md
      (a pointer, not an `@import` — imports do not cut context cost).
-5. **Show** the unit → line mapping and the diff of AGENTS.md and CLAUDE.md;
-   [Approve (Recommended) / Change something / Skip the merge]. Nothing is written before
-   step 15.
+5. **Show** the diff of AGENTS.md and CLAUDE.md folded under the coverage line; the step-8
+   "Write everything" is the approval. Nothing is written before step 8.
 
 **The super-board section** sits between `<!-- super-board:begin vX.Y.Z … -->` and
-`<!-- super-board:end -->`, rendered from `references/agents-md-block.md`. It tells the agent
-which super-board skill to use when, the merge/migration rule, the 🙋 tag, and links the ticket
-format. Re-install (`install.sh`) and re-onboard rewrite ONLY that block; text outside the
-markers is never touched. Re-install also prints a hint when CLAUDE.md is no longer a pointer,
-and the next onboard offers the merge again (step 1).
+`<!-- super-board:end -->`, rendered from `references/agents-md-block.md`. Re-install and
+re-onboard rewrite ONLY that block; text outside the markers is never touched.
 
 ---
 
 ## Error recovery during onboard
 
-The user never sees a raw `gh` stack trace — they get a diagnosis and the exact next command.
-Every halt says (a) what was tried, (b) what failed, (c) the exact fix, (d) "re-run
-`super-board onboard` — your answers are kept and it resumes at <step>".
+The user never sees a raw stack trace — they get a diagnosis and the exact next command. Every
+halt says what was tried, what failed, the exact fix, and "re-run `/super-board onboard` — your
+answers are kept and it resumes at <step>".
 
 | Step | Failure | What the user sees |
 |---|---|---|
-| 2a install | Plugin files not found under ~/.claude/plugins | `🛑 Can't find the super-board plugin files. Run the one-line installer (get.sh) or \`./install.sh <this-dir>\` from a checkout, then re-run onboard.` |
-| 2a install | `npx skills add mattpocock/skills` fails (offline, npm missing) | `⚠️ Couldn't install Matt Pocock's skills — lanes fall back to inline checklists. Re-run later: \`npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y\`.` Onboard continues. |
-| 2 runtime | `super-board-wave.js` missing, no copy to self-heal from | `🛑 Missing .claude/workflows/super-board-wave.js — the dynamic workflow itself. Run \`./install.sh <this-dir>\` from your super-board checkout, then re-run super-board onboard.` |
-| 2 runtime | `node --check` fails | `🛑 .claude/workflows/super-board-wave.js is corrupt or truncated. Re-copy it (\`./install.sh <this-dir>\`) — don't hand-edit it.` |
-| 4 auth | Not logged in | `🔑 You're not signed in to GitHub. Run: \`gh auth login\` — then re-run super-board onboard.` |
-| 4 auth | Scope refused in the browser | `🔑 GitHub asked for project,read:project,repo and you said no. Without them I can't read or move cards. Re-run: \`gh auth refresh -s project,read:project,repo\`.` |
-| 5 git | User declined git init | `🛑 A build or QA board needs a git repo (worktrees, branches, merges). Pick "Test a live URL" for a no-repo board, or re-run when ready.` |
-| 5 repo create | Quota / permission denied | `📦 GitHub refused to create the repo (org admin required, or the free-repo quota). Options: (a) pick an existing repo, (b) create one in the web UI then re-run, (c) run URL-only.` |
-| 7 project create | Org project denied | `🔑 You can't create projects under <org>. Ask an org admin, or use your account: \`gh project create --owner @me\`.` |
-| 7 project pick | Deleted between list and pick | `📋 That project was deleted after I listed it. Reloading…` then auto-retry. |
-| 8 columns | Read-only project | `🔑 Project is read-only for your account. Get write access, or pick a different project.` |
-| 9 AGENTS.md | `coverage` exits 1 | Not shown as an error: fix the mapping, re-run `coverage`, then show the diff. |
-| 9 AGENTS.md | Two managed blocks / dangling marker | `✋ AGENTS.md has <n> super-board markers. Leave one begin/end pair (or none) and re-run.` |
-| 10 PROJECT.md | Sub-agent timeout / empty draft | `📝 Couldn't auto-draft PROJECT.md. Skip for now, or write one paragraph and I'll seed from that.` |
-| 11 base | Rate limit on the protection lookup | Soft-fail detection, warn, ask the question without a production default. |
-| 12 protect main | Guard script missing (`--no-hooks` install) | `ℹ️ The push guard isn't installed. Run \`./install.sh --no-hooks --protect-main <this-dir>\` — it installs only that guard. Nothing was wired.` |
-| 14 collect | A `ping` returns `unavailable` | `❌ posthog: HTTP 401. Check POSTHOG_PERSONAL_API_KEY (scopes query:read, error_tracking:read), then re-test: \`python3 .claude/skills/super-collect/scripts/collect_posthog.py ping\`.` Source left out; onboard continues. |
-| 15 write | File not writable | `🛑 Can't write <path> — check permissions.` Answers kept; re-run resumes at the review screen. |
-| 15 write | settings.json invalid JSON | `✋ .claude/settings.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings step repeats.` |
+| 1 | Pack files not found (plugin) | `🛑 Can't find the super-board plugin files. Run the one-line installer (get.sh) or ./install.sh <this-dir> from a checkout, then re-run onboard.` |
+| 1 | A tool install declined (git, gh) | `Without <tool> the board can't <why>. Your answers are saved — run <command>, then re-run onboard.` |
+| 1 | Node declined, or `npx skills add` fails | `⚠️ Matt Pocock's skills aren't installed — lanes use built-in checklists. Later: <command>.` Continues. |
+| 1 | Workflow still fails `node --check` after the re-copy | `🛑 .claude/workflows/super-board-wave.js is corrupt. Re-run ./install.sh <this-dir> — don't hand-edit it.` |
+| 1 | settings.json invalid JSON | `✋ .claude/settings.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings entries repeat.` |
+| 2 | Scope refused in the browser | `🔑 GitHub asked for project,read:project,repo and you said no. Without them I can't read or move cards. Re-run: gh auth refresh -s project,read:project,repo.` |
+| 2 | Repo create refused | `📦 GitHub refused to create the repo (org admin required, or the free-repo quota). Pick an existing repo, or create one in the web UI, then re-run.` |
+| 3 | Org project denied | `🔑 You can't create projects under <org>. Ask an org admin, or use your account: gh project create --owner @me.` |
+| 3 | Board read-only | `🔑 That board is read-only for your account. Get write access, or pick another.` |
+| 3 | board-migrate exits 2 | Show its `error` in one line; the board is left as it was (no card moved). |
+| 4 | `git push origin main:staging` rejected | `🌿 Couldn't create staging (<reason>). Create it on GitHub, or pick main.` |
+| 5 | `coverage` exits 1 | Not an error: fix the mapping, re-run `coverage`, then show the result. |
+| 5 | Two managed blocks / dangling marker | `✋ AGENTS.md has <n> super-board markers. Leave one begin/end pair (or none) and re-run.` |
+| 7 | A ping fails | One ❌ line with the reason and what to add; the source is left out; onboard continues. |
+| 8 | File not writable | `🛑 Can't write <path> — check permissions.` Answers kept; re-run resumes at Review. |
 
 ---
 
-## Re-running onboard
+## Worker self-check (mandatory before the 🎉 screen)
 
-- Step 1 decides: **Keep all — check and repair** (Recommended), **Edit which?** (multiSelect;
-  only the picked steps run, everything else kept), or **Start over**.
-- An interrupted run resumes at `last_step` from the answers file.
-- Variant switches (Full ↔ QA-only) warn that column shape changes.
-- A CLAUDE.md that is no longer the `@AGENTS.md` pointer → step 9 is offered again.
-- A config with no `timezone` → check and repair adds the machine zone from step 0 (no question).
+1. **Config validates** — `.claude/super-board/configs/<slug>.json` parses, has every required
+   field from `config-schema.json` (incl. `notifications.bot_identity`, `merge_policy`,
+   `migrations`), has no `variant`, and `columns` is the seven.
+2. **Active pointer** — `.claude/super-board/active` holds exactly the slug + `\n`.
+3. **Board columns and labels** — `gh project field-list <n> --owner <o>` returns Backlog, Ready,
+   Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
+4. **Setup green** — `python3 .claude/bin/super-board-setup.py check` exits 0 (or only `needs`
+   the user declined).
+5. **Workflow runtime** — unless `worker_backend` is `"claude-p"`, the step-1 `node --check` passes.
 
----
-
-## Worker self-check (mandatory before exit)
-
-Before printing the step-16 summary, verify:
-
-1. **Config file exists and validates** — `.claude/super-board/configs/<slug>.json` parses as
-   JSON and has every required field from `config-schema.json` (incl.
-   `notifications.bot_identity`; `merge_policy` and `migrations` when a local repo exists).
-2. **Active pointer is updated** — `.claude/super-board/active` holds exactly the slug + `\n`.
-3. **Project columns are present on GitHub** —
-   `gh project field-list <number> --owner <owner>` returns all options for the variant:
-   Full `Ready, Building, QA, Review, Done, Blocked, Skipped`; QA-only
-   `Ready, QA, Review, Done, Blocked, Skipped`.
-4. **PROJECT.md exists** — when `paths.project_md` is non-null, the file exists and is non-empty.
-5. **Workflow runtime is installed** — unless `worker_backend` is `"claude-p"`,
-   `.claude/workflows/super-board-wave.js` exists and passes the step-2 `node --check`.
-
-Also, when step 9 wrote files: `super-board-agents-md.py check --file AGENTS.md` passes and
-`detect` reports CLAUDE.md as a pointer (unless the user chose "Only add the super-board section").
-
-If any check fails, do NOT print the summary: name the failed check and say "re-run
-`super-board onboard` — it resumes there". Option D runs these same checks and repairs what it
-can before asking anything.
+When step 5 wrote files: `super-board-agents-md.py check --file AGENTS.md` passes and `detect`
+reports CLAUDE.md as a pointer (unless "Only add the super-board section"). Any check fails →
+no 🎉: name the failed check and say "re-run `/super-board onboard` — it resumes there".

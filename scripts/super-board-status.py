@@ -13,7 +13,7 @@ the layout as a single Python pass.
 What it does:
   1. Resolve config slug: arg | `.claude/super-board/active` | sole config.
   2. ONE GraphQL call for project items (number, title, labels, Status).
-  3. ONE `gh issue view` per Blocked/Skipped card for reason-tag extraction.
+  3. ONE `gh issue view` per Blocked card for reason-tag extraction.
   4. Read today's manifest and pipe everything to the locked-template
      renderer that prints the 80-col snapshot matching the spec in
      references/status.md.
@@ -287,7 +287,6 @@ REASON_TABLE: list[tuple[str, str]] = [
     ("💳", "quota / billing"),
     ("❓", "ambiguous AC"),
     ("⚙",  "infra / tooling"),
-    ("⏭", "skipped"),
 ]
 
 
@@ -498,15 +497,15 @@ def main() -> int:
 
     by_status: dict[str, list[dict[str, Any]]] = {
         s: sorted([i for i in items if i["status"] == s], key=lambda x: -x["number"])
-        for s in ("Ready", "Building", "QA", "Review", "Done", "Blocked", "Skipped")
+        for s in ("Ready", "Building", "QA", "Review", "Done", "Blocked")
     }
 
-    # ── fetch reason-tag comments for Blocked + Skipped only ──
+    # ── fetch reason-tag comments for Blocked only ──
     # Skip silently on error so a stale token doesn't break the rest of the
     # snapshot. The body is capped at 4000 chars; emojis in the locked
     # vocabulary land at the top of any well-formed reason-tag comment.
     reasons: dict[int, str] = {}
-    for it in by_status["Blocked"] + by_status["Skipped"]:
+    for it in by_status["Blocked"]:
         n = it["number"]
         out = gh("issue", "view", str(n), "--json", "comments", check=False)
         if not out:
@@ -588,7 +587,7 @@ def main() -> int:
 
     print(f"📊 super-board · {proj['title']} (#{proj['number']})")
     print("─" * 80)
-    print(f"config: {config_slug}   variant: {cfg.get('variant', '?')}   base: {cfg.get('base_branch', '?')}")
+    print(f"config: {config_slug}   labels: qa · bug · feature   base: {cfg.get('base_branch', '?')}")
     print(f"mode:   {mode_label:<22} truth gate: {gate_label}")
     print()
 
@@ -658,7 +657,6 @@ def main() -> int:
         return "\n".join(out)
 
     print(render_blocklane("Blocked", by_status["Blocked"]))
-    print(render_blocklane("Skipped", by_status["Skipped"]))
 
     # ── workers ──
     print()
@@ -693,7 +691,7 @@ def main() -> int:
     # ── block reasons ──
     print()
     print("▎Block reasons")
-    blockers = by_status["Blocked"] + by_status["Skipped"]
+    blockers = by_status["Blocked"]
     if not blockers:
         print("   (none)")
     else:

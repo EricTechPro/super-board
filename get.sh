@@ -78,17 +78,22 @@ main() {
   fi
   have python3 || die "python3 is missing. super-board's installer and scripts use it. Install Python 3 (https://www.python.org/downloads/) and run this again." 69
 
-  local later=""
-  have jq || later="$later jq"
-  have gh || later="$later gh"
+  # One grouped line: what is here ✓, what is not ✗ (onboard's 🔍 Checks installs it).
+  local later="" ok="" t
+  for t in curl tar git python3 gh jq node; do
+    case "$t" in
+      curl|tar) [ "$fetch" = "tar" ] || continue ;;
+      git) [ "$fetch" = "git" ] || continue ;;
+    esac
+    if have "$t" && { [ "$t" != node ] || have npx; }; then ok="${ok:+$ok · }$t"; else later="$later $t"; fi
+  done
+  say "🔍 checking what you need"
   if [ -n "$later" ]; then
-    warn "not found:$later. The install will finish, but the board needs these to run (macOS: brew install$later)."
+    say "   ✓ $ok   ✗$later (🔍 Checks in onboard installs them)"
+  else
+    say "   ✓ $ok"
   fi
-  if [ "$helpers" -eq 1 ] && ! have npx; then
-    warn "npx (Node.js) not found, so Matt Pocock's helper skills can't be added now. Install Node.js (https://nodejs.org) and later run: npx skills@latest add mattpocock/skills"
-    helpers=0
-    later="$later node"
-  fi
+  case " $later " in *" node "*) helpers=0 ;; esac
 
   # --- download ---------------------------------------------------------
   local tmp
@@ -139,39 +144,31 @@ except Exception: print("")' 2>/dev/null || true)"
   [ -f "$src/VERSION" ] && version="$(tr -d '[:space:]' < "$src/VERSION")"
 
   # --- install ----------------------------------------------------------
-  say "🔧 installing super-board $version"
-  # install.sh would print its own "Next: …" line; the summary below ends with it once.
+  # Quiet mode: install.sh prints only its "🔧 installing" group; the summary is ours.
   SUPER_BOARD_QUIET_NEXT=1 bash "$src/install.sh" ${pass[@]+"${pass[@]}"} "$target" || die "install.sh stopped with an error (see above). Nothing else was changed after that point." 1
 
   # --- helper skills ----------------------------------------------------
   local helper_note
   if [ "$helpers" -eq 0 ]; then
-    helper_note="skipped"
+    case " $later " in
+      *" node "*) helper_note="skipped — 🔍 Checks will fix this" ;;
+      *) helper_note="skipped (--no-helper-skills)" ;;
+    esac
   elif helper_skills_present "$target"; then
     helper_note="already installed"
-    say "🧠 Matt Pocock's skills are already here — skipping"
   else
-    say "🧠 adding Matt Pocock's skills (npx skills@latest add mattpocock/skills)"
-    # stdin is this script when piped into bash, so give npx nothing to read.
-    if (cd "$target" && npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y </dev/null); then
+    # stdin is this script when piped into bash, so give npx nothing to read. npx's
+    # own chatter goes to a log so the summary stays grouped.
+    if (cd "$target" && npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y </dev/null >"$tmp/npx.log" 2>&1); then
       helper_note="installed"
     else
-      helper_note="FAILED — run later: npx skills@latest add mattpocock/skills"
-      warn "adding Matt Pocock's skills failed. super-board is installed; run this later in $target: npx skills@latest add mattpocock/skills"
+      helper_note="failed — 🔍 Checks retries it (or: npx skills@latest add mattpocock/skills)"
     fi
   fi
 
   # --- summary ----------------------------------------------------------
-  say ""
-  say "🎉 super-board $version is installed in $target"
-  say "   ✅ skills, scripts and workflows → .claude/"
-  case " ${pass[*]-} " in
-    *" --no-hooks "*) say "   ⏭️  guard hooks skipped (--no-hooks)" ;;
-    *) say "   🛡️  guard hooks wired into .claude/settings.json" ;;
-  esac
-  say "   🧠 helper skills: $helper_note"
-  [ -z "$later" ] || say "   ⚠️  still to install before running the board:$later"
-  say ""
+  say "🧠 helper skills: $helper_note"
+  say "🎉 super-board $version is installed"
   say "👉 next: open Claude Code here and run /super-board onboard"
 }
 

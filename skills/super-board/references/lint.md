@@ -40,8 +40,8 @@ PHASE 0 — Pick config
 
 PHASE 1 — Confirm GitHub project
   "🎯 Linting: <project title> (#<number>) under <owner>
-   Variant: <full|qa-only>
-   Columns to scan: Ready, [Building,] QA, Review
+   Columns to scan: Ready, Building, QA, Review
+   Labels: qa · bug · feature (a card with none is built; lint proposes one)
    Proceed? (y/n)"
 
 PHASE 2 — Read the project, then ask "do I understand it?"
@@ -95,7 +95,7 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 8 | Ambiguous scope (`etc.`, `TODO`, `TBD`) | "Tabs, dropdowns, modals, etc." | Enumerate or split |
 | 9 | Multiple unrelated features bundled (>3 disconnected ACs) | Auth + billing + UI polish in one ticket | Recommend splitting |
 | 10 | Title ↔ body mismatch | Title says login, body says signup | Ask which is correct |
-| 11 | Out-of-scope vs PROJECT.md | Backend AC for a URL-only QA project | Move to Skipped or rewrite |
+| 11 | Out-of-scope vs PROJECT.md | AC for a feature the project explicitly excludes | Drop it (close as not planned, Done, 🤷) or rewrite |
 | 12 | Sub-agent ambiguity flag | "this could mean ≥2 different things" | Surface both interpretations |
 | 13 | `## Blocked by` missing, empty, or unparseable | No section; or `- None — but #26 must merge first` | Rewrite to `- #N — why` bullets, or a bare `- None.` |
 | 14 | An AC proves behaviour against a fake, and no card owns the real thing | "proven with a fake repository, no database" | Name the ticket that builds it, or offer to file one |
@@ -238,7 +238,7 @@ Saved to `docs/super-board/pre-flight.md`. Each `[ ]` is a halt gate for `super-
    • 23 already clear
    • 3 ACs added (approved)
    • 1 moved to Blocked
-   • 0 moved to Skipped
+   • 0 dropped (closed as not planned)
 
 💾 All changes saved to GitHub (no local commits needed).
 🔄 Reset this session, then run `super-board run` to start the loop.
@@ -250,7 +250,8 @@ Saved to `docs/super-board/pre-flight.md`. Each `[ ]` is a halt gate for `super-
 
 - **Idempotent** — re-running on already-clear issues is silent.
 - **Resumable** — Ctrl-C anywhere is safe; re-run lint to continue.
-- **Walks active-pipeline columns only** — Ready + (Building) + QA + Review. Skips Done/Blocked/Skipped.
+- **Labels** — a card with no `qa` / `bug` / `feature` label gets one proposed with its AC fix (`qa` only when the ACs test what already exists and change nothing; it routes the card past Building). Applied on approve, like the AC edits.
+- **Walks active-pipeline columns only** — Ready + Building + QA + Review. Skips Backlog/Done/Blocked.
 - **No local file writes** during Phase 4 — all state lives on GitHub issues. Session-reset is safe.
 
 ---
@@ -260,9 +261,9 @@ Saved to `docs/super-board/pre-flight.md`. Each `[ ]` is a halt gate for `super-
 Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
-- [ ] Every issue in active-pipeline columns (Ready, Building if present, QA, Review) either:
+- [ ] Every issue in active-pipeline columns (Ready, Building, QA, Review) either:
   - has a populated `## Acceptance Criteria` section that passes all 18 criteria, OR
-  - carries a `🤷 Skipped` comment explaining why it was deferred, OR
+  - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).
 
