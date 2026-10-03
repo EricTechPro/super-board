@@ -151,9 +151,9 @@
   // (🙋 needs you → Blocked, block-template.md) instead when: target_env is not
   // in allowed_envs, an allowed command fails, target_env is allowed but has no
   // command, or human_steps is non-empty. A `needs-you: <command>` line in the
-  // PR body does the same for any PR. The `needs-you:done` PR label (or a
-  // "done" comment, which the orchestrator turns into the label) clears the
-  // human steps; the next wave re-verifies and merges.
+  // PR body does the same for any PR. A trusted human comments "done" after a
+  // pinned approval request for the current head and steps (block-template.md).
+  // The gate rechecks that evidence; needs-you:done labels never authorize it.
   // In one line, for the user: the robot migrates the DBs you allow to test its
   // work; a live database, or a destructive schema change, waits for you.
   "migrations": {

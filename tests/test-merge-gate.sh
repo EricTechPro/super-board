@@ -110,12 +110,27 @@ printf '%s\n' "$*" >> "$GH_LOG"
 case "$1 $2" in
   "pr view")
     case "$*" in *labels*)
+      if [ -n "${STUB_META_AFTER:-}" ] && [ -f "$STUB_VERIFIED" ]; then printf '%s\n' "$STUB_META_AFTER"; exit 0; fi
       if [ -n "${STUB_META:-}" ]; then printf '%s\n' "$STUB_META"; else echo '{"files":[],"labels":[]}'; fi
       exit 0 ;; esac
     oid="$STUB_OID"; grep -q '^pr merge' "$GH_LOG" && oid="${STUB_OID_AFTER:-$STUB_OID}"
     echo "feat $oid" ;;
   "pr merge") exit "${STUB_MERGE_RC:-0}" ;;
   "pr diff") printf '%b' "${STUB_DIFF:-}" ;;
+  "api graphql")
+    [ "${STUB_APPROVAL:-0}" = 1 ] || exit 1
+    jq -n --arg head "$STUB_OID" '[{data:{repository:{pullRequest:{headRefOid:$head,state:"OPEN",closingIssuesReferences:{pageInfo:{hasNextPage:false,endCursor:null},nodes:[{number:42,repository:{nameWithOwner:"x/y"}}]}}}}}]' ;;
+  "api --paginate")
+    [ "${STUB_APPROVAL:-0}" = 1 ] || exit 1
+    case "$*" in
+      */issues/42/comments*) cat "$STUB_COMMENTS" ;;
+      */issues/1/comments*) echo '[[]]' ;;
+      *) exit 1 ;;
+    esac ;;
+  "api repos/x/y/collaborators/owner/permission")
+    [ "${STUB_PERMISSION_FAIL:-0}" = 0 ] || exit 1
+    echo '{"permission":"admin"}' ;;
+  *) exit 1 ;;
 esac
 STUB
   chmod +x "$TMP/bin/gh"
@@ -259,10 +274,81 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" db/x.sql)" STUB_DIFF='-DROP TABLE use
 [ "$RC" -eq 0 ] || fail "a removed DROP TABLE must not gate, got $RC"
 teardown
 
-# 16b — a human approved the policy gate (needs-you:done): the gate merges.
+# 16b — a stale UI label cannot approve a policy gate.
 head_setup
 RC=0; STUB_OID="$SHA" STUB_META="$(meta money,needs-you:done src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 0 ] || fail "needs-you:done should clear the policy gate, got $RC"
+[ "$RC" -eq 7 ] || fail "a needs-you:done label alone must not authorize a policy bypass, got $RC"
+teardown
+
+# 16c — a trusted done confirms the request emitted for the exact current head.
+# The request exists before the human comment; processing never binds old done
+# to whatever head happens to exist now.
+head_setup
+export STUB_APPROVAL=1 STUB_COMMENTS="$TMP/comments.json"
+echo '[[]]' > "$STUB_COMMENTS"
+OUT=$(STUB_OID="$SHA" STUB_META="$(meta money src/x.ts)" gate --expect-head "$SHA" 2>/dev/null || true)
+REQUEST=$(echo "$OUT" | sed -n 's/^approval-request: //p')
+[ -n "$REQUEST" ] || fail "a hold must emit a pinned request"
+make_approval() {
+  jq -n --argjson request "$REQUEST" '[[
+    {id:1,body:("Reason tag: 🙋 needs you\napproval-request: " + ($request|tojson)),created_at:"2026-10-03T00:00:01Z",updated_at:"2026-10-03T00:00:01Z",user:{login:"owner",type:"User"}},
+    {id:2,body:"done",created_at:"2026-10-03T00:00:02Z",updated_at:"2026-10-03T00:00:02Z",user:{login:"owner",type:"User"}}
+  ]]' > "$STUB_COMMENTS"
+}
+make_approval
+RC=0; STUB_OID="$SHA" STUB_META="$(meta money src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "current trusted approval must merge, got $RC"
+: > "$GH_LOG"
+# A later code version cannot reuse the same human's done.
+REQUEST=$(echo "$REQUEST" | jq '.head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"')
+make_approval
+RC=0; STUB_OID="$SHA" STUB_META="$(meta money,needs-you:done src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 7 ] || fail "old-head approval must hold, got $RC"
+grep -q '^pr merge' "$GH_LOG" && fail "old approval must never reach merge"
+# Neither unreadable authority nor a newer human block can authorize.
+REQUEST=$(echo "$REQUEST" | jq --arg head "$SHA" '.head=$head')
+make_approval
+RC=0; STUB_PERMISSION_FAIL=1 STUB_OID="$SHA" STUB_META="$(meta money src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 7 ] || fail "unreadable authority must hold, got $RC"
+jq '.[0] += [{id:3,body:"Reason tag: 🙋 new decision",created_at:"2026-10-03T00:00:03Z",updated_at:"2026-10-03T00:00:03Z",user:{login:"owner",type:"User"}}]' "$STUB_COMMENTS" > "$TMP/new.json"
+mv "$TMP/new.json" "$STUB_COMMENTS"
+RC=0; STUB_OID="$SHA" STUB_META="$(meta money,needs-you:done src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 7 ] || fail "new human block must revoke prior approval, got $RC"
+# Verify takes time: a same-head body edit adds a new human step during it.
+make_approval
+export STUB_VERIFIED="$TMP/verified"
+jq --arg cmd "touch $STUB_VERIFIED" '.verify_commands=[$cmd]' "$TMP/c.json" > "$TMP/new.json"
+mv "$TMP/new.json" "$TMP/c.json"
+RC=0; STUB_META_AFTER="$(meta money src/x.ts 'needs-you: run a new command')" STUB_OID="$SHA" STUB_META="$(meta money src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 7 ] || fail "changed human steps during verify must revoke approval, got $RC"
+grep -q '^pr merge' "$GH_LOG" && fail "stale approval after verification must not merge"
+unset STUB_APPROVAL STUB_COMMENTS STUB_VERIFIED
+teardown
+
+# 16d — head-bound approval also covers a declared human-only command; label
+# changes cannot grant it, and a later human request during verification revokes it.
+head_setup
+export STUB_APPROVAL=1 STUB_COMMENTS="$TMP/comments.json"
+echo '[[]]' > "$STUB_COMMENTS"
+OUT=$(STUB_OID="$SHA" STUB_META="$(meta '' src/x.ts 'needs-you: confirm live setting')" gate --expect-head "$SHA" 2>/dev/null || true)
+REQUEST=$(echo "$OUT" | sed -n 's/^approval-request: //p')
+make_approval
+RC=0; STUB_OID="$SHA" STUB_META="$(meta '' src/x.ts 'needs-you: confirm live setting')" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "trusted confirmation of current human step must merge, got $RC"
+: > "$GH_LOG"
+cat > "$TMP/new-block.py" <<'NEWBLOCK'
+import json, os
+p=os.environ["STUB_COMMENTS"]
+x=json.load(open(p))
+x[0].append({"id":3,"body":"Reason tag: 🙋 a new human decision","created_at":"2026-10-03T00:00:03Z","updated_at":"2026-10-03T00:00:03Z","user":{"login":"owner","type":"User"}})
+with open(p,"w") as f: json.dump(x,f)
+NEWBLOCK
+jq --arg cmd "python3 $TMP/new-block.py" '.verify_commands=[$cmd]' "$TMP/c.json" > "$TMP/new.json"
+mv "$TMP/new.json" "$TMP/c.json"
+RC=0; STUB_OID="$SHA" STUB_META="$(meta '' src/x.ts 'needs-you: confirm live setting')" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 8 ] || fail "a newer human request during verification must hold, got $RC"
+grep -q '^pr merge' "$GH_LOG" && fail "revoked human approval must not reach merge"
+unset STUB_APPROVAL STUB_COMMENTS
 teardown
 
 # 17 — custom categories replace the defaults: with always_human = {} a money
@@ -295,12 +381,12 @@ echo "$OUT" | grep -q "^needs-you: npm run db:migrate:live" || fail "exit 8 must
 grep -q '^pr merge' "$GH_LOG" && fail "no merge while a human step is open"
 teardown
 
-# 20 — the human ran it and the PR carries needs-you:done: re-verify, merge.
+# 20 — a UI label cannot confirm that human-only steps ran.
 head_setup
 cfgset ".migrations = {allowed_envs: [\"staging\"], target_env: \"live\",
         commands: {staging: \"true\", live: \"npm run db:migrate:live\"}}"
 RC=0; STUB_OID="$SHA" STUB_META="$(meta needs-you:done prisma/migrations/2026/migration.sql)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 0 ] || fail "needs-you:done should let the gate merge, got $RC"
+[ "$RC" -eq 8 ] || fail "a needs-you:done label alone must not confirm human steps, got $RC"
 teardown
 
 # 21 — an allowed migrate command that FAILS is a needs-you, and needs-you:done
@@ -344,4 +430,4 @@ pol "$(meta "" a/b/migrations/1.sql)"      | jq -e '.migrations | length == 1' >
 pol "$(meta "" migrations/old/1.sql)"      | jq -e '.migrations | length == 0' >/dev/null || fail "* must not cross a /"
 rm -rf "$T25"
 
-echo "PASS: test-merge-gate.sh (27 scenarios)"
+echo "PASS: test-merge-gate.sh (merge, policy and approval scenarios)"

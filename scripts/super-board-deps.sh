@@ -48,9 +48,9 @@
 #
 # `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
-# `needsYouDone` — the human said it is done: the issue has the `needs-you:done`
-# label, or a comment AFTER that 🙋 comment reads just "done". The wave planner
-# reports these in `resume`; they go back to Review and the merge gate re-runs.
+# `needsYouDone` — verified by super-board-approval.py: a trusted human replied
+# done after a pinned request for the current PR head. Labels are never authority.
+# Saved --from payloads stay offline and cannot assert verified human approval.
 # A 🙋 card stays humanGated either way — only the resume path moves it.
 #
 # `runnable` is true only when the line parses, no blocker is still open, AND the
@@ -93,6 +93,8 @@ else
     echo "could not read issues for $REPO" >&2; exit 69; }
 fi
 
+APPROVAL_REPO="$REPO"
+[ -z "$FROM" ] || APPROVAL_REPO=""
 echo "$ISSUES" | jq --arg only "$ONLY" '
   # ---- the parser ---------------------------------------------------------
   # Everything after the LAST "## Blocked by" heading, stopping at the next
@@ -144,10 +146,7 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
   def needs_at: ( bodies | to_entries
                   | map(select(.value | test("Reason tag:[^\n]*🙋"))) | last | .key ) // null;
   def needs_you: (label_names | index("needs-you") != null) or (needs_at != null);
-  def needs_you_done:
-    (label_names | index("needs-you:done") != null)
-    or ( needs_at as $at | $at != null
-         and ( bodies[($at + 1):] | any(.[]; test("^[ \t\n]*done[.!]?[ \t\n]*$"; "i")) ) );
+
 
   ( [ .[] | .number ] ) as $open
   | ( if $only == "" then null else ($only / "," | map(tonumber)) end ) as $filter
@@ -190,7 +189,7 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           runnable: ($p.parseable and ($p.human_gated | not) and (($stillOpen | length) == 0)),
           why: $p.why,
           needsYou: ($i | needs_you),
-          needsYouDone: (($i | needs_you) and ($i | needs_you_done)) }
+          needsYouDone: false }
     ]
   | ( if $filter == null then . else map(select(.number as $n | $filter | index($n))) end )
-  | INDEX(.number | tostring)'
+  | INDEX(.number | tostring)' | python3 "$(dirname "${BASH_SOURCE[0]}")/super-board-approval.py" --deps --repo "$APPROVAL_REPO"
