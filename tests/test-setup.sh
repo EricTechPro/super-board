@@ -107,6 +107,16 @@ a = sys.argv[1:]
 st = json.load(open(os.environ["GH_STATE"]))
 open(os.environ["GH_LOG"], "a").write(" ".join(a) + "\n")
 def save(): json.dump(st, open(os.environ["GH_STATE"], "w"))
+def page(rows, cursor=None):
+    start = int(cursor or 0); end = start + 100
+    return {"nodes": rows[start:end], "totalCount": len(rows),
+            "pageInfo": {"hasNextPage": end < len(rows), "endCursor": str(end)}}
+def node(it):
+    status = None if it.get("status") is None else {"name": it["status"], "optionId": next(o["id"] for o in st["options"]["2"] if o["name"] == it["status"])}
+    n = it["content"]["number"]
+    return {"id": it["id"], "updatedAt": it.get("updatedAt", "t0"), "type": "ISSUE", "status": status,
+            "content": {"__typename": "Issue", "id": "ISS"+str(n), "number": n, "repository": {"nameWithOwner": "eric/books"},
+                        "labels": page([{"name": n} for n in it.get("labels", [])])}}
 if a[:2] == ["project", "list"]:
     print(json.dumps({"projects": st["projects"]}))
 elif a[:2] == ["project", "field-list"]:
@@ -121,12 +131,22 @@ elif a[:2] == ["project", "item-edit"]:
     item, opt = a[a.index("--id") + 1], a[a.index("--single-select-option-id") + 1]
     name = next(o["name"] for o in st["options"]["2"] if o["id"] == opt)
     for it in st["items"]:
-        if it["id"] == item: it["status"] = name
+        if it["id"] == item: it["status"], it["updatedAt"] = name, it.get("updatedAt", "t0") + "w"
     save()
 elif a[:2] == ["api", "graphql"]:
     body = json.loads(sys.stdin.read())
     if body["query"].startswith("query"):
-        print(json.dumps({"data": {"node": {"options": st["options"]["2"]}}}))
+        query, v = body["query"], body["variables"]
+        if "items(first:" in query:
+            value = {"items": page([node(it) for it in st["items"]], v.get("after"))}
+        elif "... on ProjectV2Item{" in query:
+            value = node(next(it for it in st["items"] if it["id"] == v["id"]))
+        elif "... on Issue{" in query:
+            it = next(it for it in st["items"] if "ISS"+str(it["content"]["number"]) == v["id"])
+            value = {"labels": page([{"name": n} for n in it.get("labels", [])], v.get("after"))}
+        else:
+            value = {"options": st["options"]["2"]}
+        print(json.dumps({"data": {"node": value}}))
     else:
         st["gen"] = st.get("gen", 0) + 1
         new = [{"id": f"o{st['gen']}-{i}", "name": o["name"], "color": o["color"], "description": o["description"]}
@@ -138,12 +158,18 @@ elif a[:2] == ["api", "graphql"]:
             if it.get("status") == "Ready" or it.get("status") not in names: it["status"] = None
         save()
         print(json.dumps({"data": {"updateProjectV2Field": {"projectV2Field": {"options": [{"id": o["id"], "name": o["name"]} for o in new]}}}}))
+elif a[0] == "api" and a[1].startswith("repos/"):
+    print(json.dumps([[{"name": n} for n in st["labels"]]]))
 elif a[:2] == ["label", "list"]:
     print(json.dumps([{"name": n} for n in st["labels"]]))
 elif a[:2] == ["label", "create"]:
     st["labels"].append(a[2]); save()
 elif a[:2] == ["issue", "edit"]:
-    pass
+    it = next(it for it in st["items"] if str(it["content"]["number"]) == a[2])
+    labels = set(it.get("labels", []))
+    if "--add-label" in a: labels.update(a[a.index("--add-label")+1].split(","))
+    if "--remove-label" in a: labels.difference_update(a[a.index("--remove-label")+1].split(","))
+    it["labels"] = sorted(labels); save()
 else:
     sys.exit(f"unexpected gh call: {a}")
 PY
@@ -185,7 +211,7 @@ JSON
 : > "$GH_LOG"
 CFG="$WORK/books.json"
 echo '{"project":{"owner":"eric","number":2},"repo":{"remote":"https://github.com/eric/books.git"},"_qa_all":true}' > "$CFG"
-OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --config "$CFG")
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --root "$WORK/board8" --config "$CFG")
 echo "$OUT" | q '.added_columns == ["Backlog","Building"] and .labels_created == ["qa","feature"]' || fail "columns/labels wrong: $OUT"
 echo "$OUT" | q '.labels_mapped == 1 and .qa_labelled == 1 and .skipped_moved == 1 and .skipped_removed == true' \
   || fail "mapping / qa-all / Skipped counts wrong: $OUT"
@@ -204,7 +230,7 @@ cat > "$GH_STATE" <<'JSON'
  "options":{"2":[{"id":"t","name":"Todo","color":"GRAY","description":""},{"id":"p","name":"In Progress","color":"YELLOW","description":""},
                  {"id":"d","name":"Done","color":"GREEN","description":""}]},"items":[]}
 JSON
-OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --owner eric --number 2 --repo eric/books --prune-empty)
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --root "$WORK/board9" --owner eric --number 2 --repo eric/books --prune-empty)
 q '[.options["2"][].name] == ["Backlog","Ready","Building","QA","Review","Blocked","Done"]' "$GH_STATE" \
   || fail "a new board should end with exactly the seven: $(jq -c '.options["2"]' "$GH_STATE")"
 echo "$OUT" | q '.labels_created == []' || fail "existing labels are not created again: $OUT"
