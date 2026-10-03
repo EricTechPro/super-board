@@ -62,13 +62,13 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | | |
 | --- | --- |
 | [guard-worktree-path](hooks/guard-worktree-path.py) | Blocks `git worktree add` outside `.claude/worktrees/` |
-| [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files |
+| [guard-secrets](hooks/guard-secrets.py) | Blocks reading or piping dotenv files, SSH keys and credential files; key names via `super-board-env-check.sh` |
 | [guard-key-literals](hooks/guard-key-literals.py) | Blocks a live-looking API key written into a file; flags one already there |
 | [guard-delete-outside](hooks/guard-delete-outside.py) | Blocks `rm`, `find -delete` and `git clean` aimed outside the project, `~` or `/` |
 | [guard-protected-push](hooks/guard-protected-push.py) | Opt-in (`onboard` asks, or `install.sh --protect-main`): blocks direct and force pushes to main/master/base |
 | [README sync](scripts/super-board-readme-sync.py) | Regenerates this skill table; pre-commit and PostToolUse hooks keep it fresh |
 | [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |
-| [merge gate](scripts/super-board-merge-gate.sh) | Merges only after the current base plus your `verify_commands` pass, pinned to the reviewed commit |
+| [merge gate](scripts/super-board-merge-gate.sh) | Merges only after the current base plus your `verify_commands` pass, pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
 
 ## Setup notes
 
@@ -76,7 +76,9 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 - The board is a GitHub Project (v2) with a `Status` field: `Ready, Building, QA, Review, Done, Blocked, Skipped` (`qa-only` drops `Building`), plus a holding column such as `Backlog` for filed cards.
 - Default backend is in-session dynamic workflows: turn them on in `/config`. Headless `claude -p` is opt-in (`worker_backend: "claude-p"`).
 - Set `verify_commands` in the config. Without them the merge gate cannot prove the result builds, and says so.
-- Auto-merge on the workflow backend needs `Bash(gh pr merge:*)` in your allowlist; `human_approves_merge: true` keeps a person on every merge.
+- `onboard` asks once what the robot may do: auto-merge normal changes (money, auth, destructive schema wait for you), protect main, and which databases it may migrate (default test + staging). Anything only you may run lands in Blocked tagged 🙋 with the exact command; comment `done` and the next wave merges.
+- Auto-merge needs the merge-gate and `gh pr merge` lines in your allowlist; `onboard` offers them as a diff.
+- `onboard` can make AGENTS.md the source of truth (CLAUDE.md becomes `@AGENTS.md`) and keeps a managed super-board section in it. Plugin install: the command is `/super-board:super-board onboard`, and it installs the missing scripts, workflows and hooks.
 - To enable the usage check, add `printf '%s' "$input" | bash <repo>/.claude/bin/super-board-usage.sh record` to your status-line script.
 - Cards need acceptance criteria: QA grades against them, and `lint` tells you which are missing.
 

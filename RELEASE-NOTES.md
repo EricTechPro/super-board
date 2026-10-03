@@ -95,6 +95,54 @@ The `gh` stub now serves a per-case `issue.json` for `gh issue view`.
   `claude -p`; the install contract matches what `install.sh` copies; script paths are `.claude/bin/`.
 - Version 2.6.0 in `VERSION`, `skills/super-board/VERSION`, `plugin.json` and the README badge.
 
+### Also
+
+**Onboarding rebuilt (16 gaps).** Install and workflow-runtime checks run first (step 2), so a
+missing `super-board-wave.js` halts before any question; a plugin install (`/super-board:super-board
+onboard`) detects the missing bin scripts, workflows, hooks and Matt Pocock's skills and installs
+them from the plugin's own copy. Every question leads with a `(Recommended)` option. Answers save
+to `.claude/super-board/onboard-answers.json` as they come: a halt resumes where it stopped, and a
+re-run offers keep all (check and repair) or edit which. Merge policy, protect main (asked once;
+with `--no-hooks` it is never wired to a missing script) and migration envs share one Policies
+screen with "Accept all recommended". The allowlist (merge gate, `gh pr merge`, migrate commands)
+is offered as a diff up front. Collect sources are pinged before one review screen, and the config
+is written once. URL-only boards skip git; option D is check and repair; the ticket format lives
+once, in `docs/agents/issue-tracker.md`. `install.sh` ends with one line: run `/super-board onboard`.
+
+**AGENTS.md as the source of truth.** Onboard asks to merge CLAUDE.md into AGENTS.md (backup
+first; rule units, duplicates once, conflicts asked one by one quoting both lines, every unit
+mapped to a line, diff and approve) and leaves CLAUDE.md as `@AGENTS.md` plus any Claude-only
+rules. A managed super-board section (tables, terse, NEVER/DON'T in caps, which skill when) sits
+between `<!-- super-board:begin -->` / `<!-- super-board:end -->`; re-install rewrites only that
+block, and a CLAUDE.md that is no longer a pointer gets the merge offered again. Deterministic
+parts in `scripts/super-board-agents-md.py` (detect, backup, block, pointer, units, coverage,
+check, atomic writes).
+
+**Merge policy.** New `merge_policy`: normal changes auto-merge; money, auth and destructive schema
+(labels, path globs, added-line keywords, all configurable) and diffs over `auto_max_lines` always
+go to a human. The merge gate decides (`scripts/super-board-merge-policy.py`) and exits 7; the card
+goes to Blocked with 🙋, and the human merges it or comments `done` to approve.
+
+**DB migrations at merge.** New `migrations` block: onboard asks which databases the robot may
+migrate (test / staging / live, default test + staging). A PR touching the migration globs gets
+the configured migrate command run against each allowed env inside the merge lock, after verify.
+A target env that is not allowed, a failed command, or a declared human step (`needs-you:` in the
+PR body, `migrations.human_steps`) exits 8: Blocked with 🙋 and the exact commands. A `done`
+comment or the `needs-you:done` label puts the card in the planner's new `resume` list → Review →
+the gate re-verifies and merges.
+
+**🙋 Needs you** reason tag in `block-template.md`, for any step only a human may run. There is no
+extra column: Blocked + 🙋 + the `needs-you` label.
+
+**Helpers.** `scripts/super-board-env-check.sh` prints present / empty / missing per env key and
+never a value; `guard-secrets.py` allows a plain call to it. `scripts/super-board-settings.py`
+merges hooks and permission rules into settings.json (backup, atomic, `--dry-run` diff);
+`install.sh` uses it, and `--no-hooks --protect-main` now installs only the push guard.
+
+Tests: new `test-env-check.sh`, `test-agents-md.sh`, `test-settings.sh`; `test-merge-gate.sh`
+13 → 26 scenarios, `test-deps.sh` 17 → 18, `test-wave-plan.sh` 17 → 18, `test-install.sh` 10 → 12,
+`test-guard-hooks.sh` 77 → 82 cases.
+
 ## v2.5.0 — 2026-10-02
 
 Review remembers, sharper lanes, five new skills, guard hooks, and a pack that installs and

@@ -1,0 +1,14 @@
+{
+  "name": "super-board",
+  "description": "Eric Tech's super-board pack: an autonomous GitHub Project board runner and its lane skills.",
+  "owner": { "name": "Eric Tech", "url": "https://github.com/EricTechPro" },
+  "plugins": [
+    {
+      "name": "super-board",
+      "source": "./",
+      "description": "Autonomous GitHub Project board runner: super-board, super-build, super-qa, super-review, super-collect, visual, ui-refine-loop. After install, run /super-board onboard to add the guard hooks, .claude/bin scripts and workflows a plugin cannot ship.",
+      "category": "development",
+      "homepage": "https://github.com/EricTechPro/super-board"
+    }
+  ]
+}

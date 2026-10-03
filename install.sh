@@ -8,8 +8,12 @@
 #   ./install.sh [--no-hooks] [--protect-main] [target-project-dir]
 # Defaults to the current working directory. --no-hooks skips the guard hooks
 # and leaves settings.json untouched. --protect-main also wires the opt-in
-# guard that blocks direct and force pushes to main/master/base_branch
-# (super-board onboard offers the same thing as one question).
+# guard that blocks direct and force pushes to main/master/base_branch; with
+# --no-hooks it installs that one guard alone. The installer asks nothing:
+# super-board onboard asks the questions (protect main is one of them).
+#
+# Environment: SUPER_BOARD_QUIET_NEXT=1 skips the closing "Next: …" line
+# (get.sh sets it and prints its own summary with the next step).
 
 set -euo pipefail
 
@@ -21,7 +25,7 @@ for arg in "$@"; do
   case "$arg" in
     --no-hooks) HOOKS=0 ;;
     --protect-main) PROTECT=1 ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     -*) echo "unknown option: $arg" >&2; exit 64 ;;
     *) TARGET="$arg" ;;
   esac
@@ -107,6 +111,12 @@ for wf in super-board-wave.js ui-refine-loop.js; do
   fi
 done
 
+SETTINGS_PY="$REPO_ROOT/scripts/super-board-settings.py"
+# Stdlib-only merge (scripts/super-board-settings.py): keeps every existing key
+# and hook, adds each guard command once per event + matcher, backs the file up
+# before writing, and leaves an invalid settings.json untouched (exit 2).
+merge_settings() { python3 "$SETTINGS_PY" hooks "$TARGET/.claude/settings.json" "$@" || [ $? -eq 2 ]; }
+
 if [ "$HOOKS" -eq 1 ]; then
   echo "→ installing guard hooks into $TARGET/.claude/hooks/"
   mkdir -p "$TARGET/.claude/hooks"
@@ -119,64 +129,38 @@ if [ "$HOOKS" -eq 1 ]; then
   done
 
   echo "→ merging hook settings into $TARGET/.claude/settings.json"
-  # Stdlib-only merge: keeps every existing key and hook, adds each guard
-  # command once per event + matcher, and backs the file up before writing.
   SNIPPETS="$REPO_ROOT/hooks/settings-snippet.json"
   if [ "$PROTECT" -eq 1 ]; then SNIPPETS="$SNIPPETS $REPO_ROOT/hooks/settings-protect-main.json"; fi
   # shellcheck disable=SC2086
-  python3 - "$TARGET/.claude/settings.json" $SNIPPETS <<'PY'
-import json, os, shutil, sys, time
-settings_path, snippet_paths = sys.argv[1], sys.argv[2:]
-snippets = [json.load(open(p)) for p in snippet_paths]
-settings = {}
-if os.path.exists(settings_path):
-    try:
-        settings = json.load(open(settings_path))
-    except ValueError as e:
-        print(f"    ✗ {settings_path} is not valid JSON ({e}); left untouched — merge hooks/settings-snippet.json by hand", file=sys.stderr)
-        sys.exit(0)
-    if not isinstance(settings, dict):
-        print(f"    ✗ {settings_path} is not a JSON object; left untouched", file=sys.stderr)
-        sys.exit(0)
-hooks = settings.setdefault("hooks", {})
-added = 0
-for event, entries in [kv for s in snippets for kv in s["hooks"].items()]:
-    current = hooks.setdefault(event, [])
-    for entry in entries:
-        matcher = entry.get("matcher")
-        target = next((e for e in current if e.get("matcher") == matcher), None)
-        if target is None:
-            target = {"matcher": matcher} if matcher is not None else {}
-            target["hooks"] = []
-            current.append(target)
-        have = {h.get("command") for e in current if e.get("matcher") == matcher for h in e.get("hooks", [])}
-        for h in entry["hooks"]:
-            if h["command"] not in have:
-                target.setdefault("hooks", []).append(h)
-                have.add(h["command"])
-                added += 1
-if added == 0:
-    print("    ✓ already present — nothing to change")
-    sys.exit(0)
-if os.path.exists(settings_path):
-    backup = f"{settings_path}.bak-{time.strftime('%Y%m%d%H%M%S')}"
-    shutil.copy2(settings_path, backup)
-    print(f"    ✓ backup: {backup}")
-tmp = settings_path + ".tmp"
-with open(tmp, "w") as f:
-    json.dump(settings, f, indent=2)
-    f.write("\n")
-os.replace(tmp, settings_path)
-print(f"    ✓ {added} hook command(s) added")
-PY
+  merge_settings $SNIPPETS
+elif [ "$PROTECT" -eq 1 ]; then
+  # --no-hooks --protect-main: the one guard asked for, nothing else. This is the
+  # command onboard names when its protect-main question finds no guard script.
+  echo "→ --no-hooks: installing only the protected-branch push guard"
+  mkdir -p "$TARGET/.claude/hooks"
+  cp "$REPO_ROOT/hooks/guard-protected-push.py" "$TARGET/.claude/hooks/"
+  chmod +x "$TARGET/.claude/hooks/guard-protected-push.py"
+  echo "    ✓ guard-protected-push.py"
+  merge_settings "$REPO_ROOT/hooks/settings-protect-main.json"
 else
   echo "→ skipping guard hooks (--no-hooks)"
-  if [ "$PROTECT" -eq 1 ]; then echo "    ✗ --protect-main ignored: it is a hook, and --no-hooks skips hooks" >&2; fi
+fi
+
+# AGENTS.md: a re-install refreshes the managed super-board block and touches
+# nothing outside its markers. No block yet → onboard writes it (with consent).
+if [ -f "$TARGET/AGENTS.md" ] && grep -q '^<!-- super-board:begin' "$TARGET/AGENTS.md"; then
+  echo "→ refreshing the super-board block in AGENTS.md"
+  printf '    ✓ %s\n' "$(python3 "$REPO_ROOT/scripts/super-board-agents-md.py" block --root "$TARGET" \
+    --template "$REPO_ROOT/skills/super-board/references/agents-md-block.md" \
+    --version "$(cat "$REPO_ROOT/VERSION")" 2>&1 || true)"
+fi
+if [ -f "$TARGET/CLAUDE.md" ] && ! grep -m1 -v '^[[:space:]]*$' "$TARGET/CLAUDE.md" | grep -qx '@AGENTS.md'; then
+  echo "    ! CLAUDE.md holds its own rules — /super-board onboard offers to merge them into AGENTS.md"
 fi
 
 echo
-echo "✓ installed. next steps:"
-echo "  1. write a config at $TARGET/.claude/super-board/configs/<slug>.json (or run /super-board onboard)"
-echo "  2. from inside Claude Code, run /super-board run <slug>"
-echo
-echo "see README.md and docs/super-board/README.md for the config schema."
+if [ "${SUPER_BOARD_QUIET_NEXT:-}" = "1" ]; then
+  echo "✓ installed."
+else
+  echo "✓ installed. Next: open Claude Code here and run /super-board onboard"
+fi

@@ -167,6 +167,22 @@ outside the project, and merged-worktree cleanup at session start. Blocking dire
 to the base branch is opt-in (`onboard` asks once, or `install.sh --protect-main`). See
 `hooks/README.md`.
 
+**Who merges, and which databases the robot touches** (v2.6.0, config `merge_policy` and
+`migrations`, enforced inside the merge gate):
+
+```
+  PR is …                                      gate        card
+  ─────────────────────────────────────────    ────────    ─────────────────────────────
+  a normal change, verify green                merge (0)   Done
+  money / auth / destructive schema (labels,   exit 7      Blocked 🙋 — you merge it, or
+    path globs, added-line keywords), or                   comment `done` to approve
+    over auto_max_lines
+  migrations, target env allowed               migrate,    Done
+                                               merge (0)
+  migrations for live (not allowed), a failed  exit 8      Blocked 🙋 — exact commands;
+    migrate command, a `needs-you:` step                   comment `done` → next wave merges
+```
+
 ## Configuration
 
 Minimal config at `.claude/super-board/configs/<slug>.json`:
@@ -187,7 +203,9 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```
   variant               full | qa-only
   worker_backend        workflow | claude-p
-  human_approves_merge  true = never auto-merge, always hand to you
+  human_approves_merge  legacy: true = never auto-merge (prefer merge_policy.default "human")
+  merge_policy          default auto|human · auto_max_lines · always_human {money, auth, schema}
+  migrations            globs · allowed_envs (test, staging, live) · target_env · commands
   verify_commands       run by the merge gate against the current base before every merge
   rebuild_cap           bounces allowed before a card goes Blocked
   max_workers           optional wave throttle; absent or 0 = unlimited (claude-p defaults to 3)

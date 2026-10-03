@@ -132,6 +132,15 @@ T=$(mktemp -d)
 [ -f "$T/.claude/skills/super-board/SKILL.md" ] || fail "--no-hooks must still install the skills"
 rm -rf "$T"
 
+# 7b — --no-hooks --protect-main: exactly the one guard, wired; no other hook.
+#      Onboard names this command when protect-main finds no guard script.
+T=$(mktemp -d)
+"$INSTALL" --no-hooks --protect-main "$T" >/dev/null 2>&1
+[ "$(ls "$T/.claude/hooks")" = "guard-protected-push.py" ] || fail "--no-hooks --protect-main should install only the push guard, got: $(ls "$T/.claude/hooks")"
+jq -e '[.hooks[][].hooks[].command] == ["python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-protected-push.py"]' "$T/.claude/settings.json" >/dev/null \
+  || fail "--no-hooks --protect-main should wire only the push guard"
+rm -rf "$T"
+
 # 8 — a settings.json that is not valid JSON is left exactly as it was.
 T=$(mktemp -d)
 mkdir -p "$T/.claude"; printf '{ not json' > "$T/.claude/settings.json"
@@ -151,6 +160,32 @@ OUT=$("$INSTALL" --protect-main "$T" 2>&1)
 echo "$OUT" | grep -q "already present" || fail "a second --protect-main install should change nothing"
 rm -rf "$T"
 
+# 11 — AGENTS.md: a re-install refreshes only the managed block; a project without
+#      a block is left alone; a rules-bearing CLAUDE.md gets the onboard hint; the
+#      last line names onboard as the one next step.
+T=$(mktemp -d)
+printf '# AGENTS.md\n\n- keep me\n<!-- super-board:begin v0.0.1 -->\nold\n<!-- super-board:end -->\n- and me\n' > "$T/AGENTS.md"
+printf '# Rules\n- pnpm\n' > "$T/CLAUDE.md"
+OUT=$("$INSTALL" --no-hooks "$T" 2>&1)
+grep -q '^- keep me$' "$T/AGENTS.md" && grep -q '^- and me$' "$T/AGENTS.md" || fail "install changed AGENTS.md outside the markers"
+grep -q '^old$' "$T/AGENTS.md" && fail "install should refresh the managed block"
+grep -q "super-board:begin v$(cat ../VERSION)" "$T/AGENTS.md" || fail "block should carry the pack version"
+echo "$OUT" | grep -q "CLAUDE.md holds its own rules" || fail "a non-pointer CLAUDE.md should get the onboard hint"
+[ "$(echo "$OUT" | tail -1)" = "✓ installed. Next: open Claude Code here and run /super-board onboard" ] || fail "last line should name onboard, got: $(echo "$OUT" | tail -1)"
+rm -rf "$T"
+# SUPER_BOARD_QUIET_NEXT=1 (set by get.sh, which prints its own next step) drops the Next line.
+T=$(mktemp -d)
+OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" --no-hooks "$T" 2>&1)
+[ "$(echo "$OUT" | tail -1)" = "✓ installed." ] || fail "SUPER_BOARD_QUIET_NEXT=1 should drop the Next line, got: $(echo "$OUT" | tail -1)"
+rm -rf "$T"
+T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
+"$INSTALL" --no-hooks "$T" >/dev/null 2>&1
+[ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
+for s in super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py; do
+  [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
+done
+rm -rf "$T"
+
 # 9 — the snippet the installer merges is the one hooks/README.md documents.
 python3 - ../hooks/README.md ../hooks/settings-snippet.json <<'PY' || fail "hooks/README.md snippet and hooks/settings-snippet.json differ"
 import json, re, sys
@@ -158,4 +193,4 @@ doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
 sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
 PY
 
-echo "PASS: test-install.sh (10 scenarios)"
+echo "PASS: test-install.sh (12 scenarios)"

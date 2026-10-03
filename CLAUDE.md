@@ -39,14 +39,17 @@ See `skills/super-board/references/rate-limit-etiquette.md` for the full discipl
 
 ## Installation contract
 
-`install.sh [--no-hooks] <target>` copies the pack into the target project's `.claude/` tree:
+`install.sh [--no-hooks] [--protect-main] <target>` copies the pack into the target project's `.claude/` tree:
 
 ```
 .claude/
 ├── skills/<all seven>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/super-board-wave.js, ui-refine-loop.js
-└── bin/super-board-*.sh, super-board-status.py, super-qa-file-bug.sh, super-review-file-refactor.sh
+└── bin/super-board-*.sh, super-board-*.py (status, merge-policy, agents-md, settings), super-qa-file-bug.sh, super-review-file-refactor.sh
 ```
+
+It also refreshes the managed `<!-- super-board:begin … -->` block in the target's AGENTS.md when
+one exists (nothing outside the markers), and asks nothing: `super-board onboard` asks the questions.
 
 Skills call the dispatcher scripts as `.claude/bin/<script>`.
