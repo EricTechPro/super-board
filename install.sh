@@ -145,7 +145,7 @@ copy_file() {
   fi
 }
 
-for script in super-board-run.sh super-board-gh-guard.sh super-board-status.py super-board-wave-plan.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh; do
+for script in super-board-github-read.py super-board-run.sh super-board-gh-guard.sh super-board-status.py super-board-wave-plan.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$TARGET/.claude/bin/$script"
     chmod +x "$TARGET/.claude/bin/$script"

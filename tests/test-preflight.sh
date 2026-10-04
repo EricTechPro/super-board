@@ -11,7 +11,7 @@ PRE="$(pwd)/../scripts/super-board-preflight.sh"
 
 fail() { echo "FAIL: $1" >&2; exit 1; }
 
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+TMP=$(mktemp -d); export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$TMP/halt.json"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/bin" "$TMP/fx"; export GH_LOG="$TMP/gh.log" FX="$TMP/fx"
 cat > "$TMP/bin/gh" <<'STUB'
 #!/usr/bin/env bash
@@ -100,7 +100,7 @@ echo "$OUT8b" | jq -e '.["26"].verdict == "proceed"' >/dev/null \
 
 # 9 — a blind pre-flight never says proceed: gh failing exits 69.
 RC=0; PATH="$TMP/bin:$PATH" "$PRE" --repo o/r --issues 99 >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 69 ] || fail "an unreadable issue should exit 69, got $RC"
+[ "$RC" -eq 79 ] || fail "an unreadable issue should halt (79), got $RC"
 RC=0; "$PRE" --repo o/r >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 64 ] || fail "missing --issues should exit 64, got $RC"
 

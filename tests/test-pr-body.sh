@@ -8,6 +8,7 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT="$REPO_ROOT/scripts/super-board-pr-body.sh"
 WORK="$(mktemp -d)"
+export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
 trap 'rm -rf "$WORK"' EXIT
 
 PASS=0; FAIL=0

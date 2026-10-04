@@ -360,6 +360,11 @@ two complete builds. In order, no shortcuts:
    - The rule in one line: the robot migrates the databases it was allowed to test its
      work; live databases, money, auth and destructive schema changes wait for a person.
 3. **Confirm the merge landed** — never trust the merge command's exit code:
+   **Exit 79 — required GitHub evidence unavailable:** stop the current run. Leave
+   the card, approval, claims, and worktree intact. Report the local halt reason;
+   do not classify missing data as safe, bounce it to Build, or post a new approval
+   request. Explicit recovery is in run-workflow.md → Required GitHub evidence.
+
    `gh pr view <PR> --json state,mergeCommit` must report `MERGED` plus a commit sha,
    and that sha must be an ancestor of the base branch
    (`git merge-base --is-ancestor <sha> origin/<base>`).

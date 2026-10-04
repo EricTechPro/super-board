@@ -11,6 +11,7 @@ set -uo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SCRIPT="$REPO_ROOT/scripts/super-review-file-refactor.sh"
 WORK="$(mktemp -d)"
+export SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$WORK/halt.json"
 trap 'rm -rf "$WORK"' EXIT
 
 PASS=0
@@ -36,8 +37,10 @@ cat > "$WORK/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$GH_LOG"
 case "$1 ${2:-}" in
-  "issue list")    echo "${DEDUPE_HIT:-}" ;;
-  "issue comment") exit 0 ;;
+  "issue list")    [ -z "${FAIL_DEDUPE:-}" ] || exit 1; if [ -n "${DEDUPE_HIT:-}" ]; then
+      jq -n --argjson n "$DEDUPE_HIT" '[{number:$n,body:"imports|tc-1|silent-drop OrderIntake|shallow outage|test"}]'
+    else echo '[]'; fi ;;
+  "issue comment") [ -z "${FAIL_COMMENT:-}" ] || exit 1; exit 0 ;;
   "issue create")
     # Keep the rendered body. The command log holds a temp path, not its
     # contents, so without this a test cannot see what was actually filed.
@@ -171,7 +174,19 @@ has "reports the multi-word alias intact" "$(cat "$WORK/err")" "filed #412 into 
 OUT=$(DEDUPE_HIT="" FAIL_ITEMADD=1 run --config "$WORK/config.json" --title "Board down" \
   --body-file "$WORK/body.md" --fingerprint "X|z")
 is  "survives a board failure" "412" "$OUT"
-has "warns about placement"    "$(cat "$WORK/err")" "could not place it"
+has "warns about placement"    "$(cat "$WORK/err")" "outcome unknown"
+
+echo "── required-read and uncertain-write failure"
+rm -f "$SB_GITHUB_HALT_FILE"
+OUT=$(FAIL_DEDUPE=1 run --config "$WORK/config.json" --title "Read outage" --body-file "$WORK/body.md" --fingerprint "outage|test"); RC=$?
+is "three failed dedupe reads halt" 79 "$RC"
+case "$(cat "$GH_LOG")" in *"issue create"*|*"issue comment"*) bad "unreadable dedupe never writes" "no writes" "write attempted" ;; *) ok "unreadable dedupe never writes" ;; esac
+is "three dedupe attempts" 3 "$(grep -c '^issue list' "$GH_LOG")"
+rm -f "$SB_GITHUB_HALT_FILE"
+OUT=$(FAIL_COMMENT=1 DEDUPE_HIT=301 run --config "$WORK/config.json" --title "Write outage" --body-file "$WORK/body.md" --fingerprint "outage|test"); RC=$?
+is "uncertain comment outcome halts" 79 "$RC"
+is "comment is attempted once" 1 "$(grep -c '^issue comment' "$GH_LOG")"
+is "failed comment does not report success ID" "" "$OUT"
 
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

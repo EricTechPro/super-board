@@ -71,7 +71,7 @@
 # Exit codes, all meaningful to the caller:
 #   0  merged
 #   2  verification failed — branch needs a rebase pass, NOT a Blocked card
-#   3  merge refused by GitHub after a green verification (branch protection, checks)
+#   3  PR is closed without a merge; no merge attempted
 #   4  could not take the lock within the timeout
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
 #   6  the PR head is not the commit that was reviewed — review evidence is void,
@@ -83,6 +83,8 @@
 #      card → Blocked with the 🙋 template: the human reviews and merges it, or
 #      comments "done" after its pinned request to approve — the next wave re-runs
 #      the gate, which then skips the policy check and merges.
+#   79 required GitHub evidence unavailable: local run halt; preserve card and
+#      approval state, stop dispatch, and explicitly restart after diagnosis.
 #   8  🙋 needs you — the PR has migrations for a database the robot may not
 #      touch (merge_policy → migrations.allowed_envs), an allowed migrate command
 #      failed, or a human-only step is declared (`needs-you:` line in the PR body,
@@ -105,6 +107,8 @@
 # and migrations run after verification, inside the lock, right before the
 # merge. `--dry-run` reports both and runs neither.
 set -euo pipefail
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+GITHUB_READ="$HERE/super-board-github-read.py"
 
 CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""; SUBJECT=""; MSG_FILE=""
 while [ $# -gt 0 ]; do
@@ -139,6 +143,8 @@ CONFIG_JSON=$(cat "$CONFIG")
 BASE=$(echo "$CONFIG_JSON" | jq -r '.base_branch // "main"')
 REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // ""' | sed -E 's#^https?://github\.com/##; s#\.git$##')
 REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
+export SB_REPO_PATH="$REPO_PATH"
+python3 "$GITHUB_READ" --check
 # Read with a while-loop rather than `mapfile`: macOS ships bash 3.2 and every
 # other script in this repo runs there, so this one does too.
 VERIFY=()
@@ -190,10 +196,18 @@ trap cleanup EXIT
 # ---- the head guard --------------------------------------------------------
 # Review evidence belongs to one commit. If the branch moved after the Reviewer
 # passed it, the tests it reran and the diff it read describe something else.
-pr_head() { gh pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName,headRefOid \
+pr_head() { python3 "$GITHUB_READ" --kind head -- pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName,headRefOid \
               -q '.headRefName + " " + .headRefOid'; }
-read -r HEAD_REF HEAD_SHA <<<"$(pr_head)"
+HEAD=$(pr_head) || exit $?
+read -r HEAD_REF HEAD_SHA <<<"$HEAD"
 [ -n "${HEAD_SHA:-}" ] || { say "could not read the PR head from GitHub"; exit 1; }
+pr_state() { python3 "$GITHUB_READ" --kind merge-state -- pr view "$PR" ${REPO:+--repo "$REPO"} --json state,mergeCommit,headRefOid; }
+STATE=$(pr_state) || exit $?
+if [ "$(echo "$STATE" | jq -r .state)" = MERGED ]; then
+  say "already merged; no verification, migration, or merge is repeated"
+  exit 0
+fi
+[ "$(echo "$STATE" | jq -r .state)" = OPEN ] || { say "PR is closed; refusing merge"; exit 3; }
 if [ -n "$EXPECT_HEAD" ]; then
   case "$HEAD_SHA" in
     "$EXPECT_HEAD"*) : ;;
@@ -212,8 +226,8 @@ fi
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Outside $SCRATCH: `git worktree add` below needs that directory empty.
 META=$(mktemp); DIFF=$(mktemp)
-gh pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,body > "$META" 2>/dev/null || echo '{}' > "$META"
-gh pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF" 2>/dev/null || : > "$DIFF"
+python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
+python3 "$GITHUB_READ" --kind diff --meta "$META" -- pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF"
 PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
   echo "human-gate: policy — could not classify the PR (unreadable metadata)"
   say "merge policy could not be evaluated — a human merges this one"; exit 7; }
@@ -224,6 +238,7 @@ APPROVED=false
 approval_check() {
   APPROVAL=$(python3 "$HERE/super-board-approval.py" --repo "$REPO" --pr "$PR" \
     --head "$HEAD_SHA" --plan "$PLAN") || APPROVAL='{"approved":false}'
+  python3 "$GITHUB_READ" --check || exit $?
   APPROVED=$(echo "$APPROVAL" | jq -r '.approved // false')
 }
 approval_request() {
@@ -269,6 +284,8 @@ else
   say "verified green against ${BASE} (${#VERIFY[@]} command(s))"
 fi
 
+python3 "$GITHUB_READ" --check
+
 # ---- migrations (inside the lock, after the build proof) -------------------
 # Run the configured migrate command for every allowed env, from the verified
 # scratch tree. Collect, never stop early, so a human gets every command at once.
@@ -281,6 +298,7 @@ if [ "$(echo "$PLAN" | jq '.migrations | length')" -gt 0 ]; then
     [ -n "$env" ] || continue
     if [ "$DRY" -eq 1 ]; then say "dry run: would migrate ${env}: ${cmd}"; continue; fi
     say "migrate ${env}: ${cmd}"
+    python3 "$GITHUB_READ" --check
     if ! ( cd "$SCRATCH" && eval "$cmd" ) >"$SCRATCH/.migrate.log" 2>&1; then
       say "FAILED: migrate ${env}"; tail -20 "$SCRATCH/.migrate.log" >&2
       NEEDS+=("${cmd}   # ${env}: failed in the merge gate — fix, run it, then mark done")
@@ -303,7 +321,7 @@ fi
 if [ "$APPROVED" = true ]; then
   # Code remains pinned; body-declared human steps and config can change without
   # a commit. Reclassify them too instead of reusing the old approval scope.
-  gh pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,body > "$META" 2>/dev/null || echo '{}' > "$META"
+  python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
   PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
     say "human approval scope could not be refreshed"; exit 7; }
   approval_check
@@ -322,6 +340,7 @@ fi
 
 # --match-head-commit makes GitHub refuse if anything was pushed after HEAD_SHA,
 # including during the verification run above.
+python3 "$GITHUB_READ" --check
 if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
      ${SUBJECT:+--subject "$SUBJECT"} ${MSG_FILE:+--body-file "$MSG_FILE"} \
      --match-head-commit "$HEAD_SHA" 2>&1 | tail -3 >&2; then
@@ -334,11 +353,15 @@ if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
   fi
   exit 0
 fi
-read -r _ NOW_SHA <<<"$(pr_head 2>/dev/null || echo "? ?")"
+STATE=$(pr_state) || exit $?
+if [ "$(echo "$STATE" | jq -r .state)" = MERGED ]; then
+  say "merge response was lost; GitHub confirms the merge commit"
+  exit 0
+fi
+NOW_SHA=$(echo "$STATE" | jq -r .headRefOid)
 if [ "$NOW_SHA" != "$HEAD_SHA" ]; then
   say "head moved during the gate: verified ${HEAD_SHA}, PR head is now ${NOW_SHA}"
   say "the review evidence is void — send the card back to Review"
   exit 6
 fi
-say "GitHub refused the merge after a green verification (branch protection or a required check)"
-exit 3
+python3 "$GITHUB_READ" --halt "Merge response failed and GitHub has not confirmed a merge; reconcile PR #${PR} before restarting. No merge was retried."

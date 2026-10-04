@@ -71,7 +71,7 @@ OLD_LABELS = {
 }
 SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
-BIN = ["super-board-run.sh", "super-board-gh-guard.sh", "super-board-status.py", "super-board-wave-plan.sh",
+BIN = ["super-board-github-read.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-status.py", "super-board-wave-plan.sh",
        "super-board-deps.sh", "super-board-preflight.sh", "super-board-merge-gate.sh",
        "super-board-merge-policy.py", "super-board-approval.py", "super-board-env-check.sh", "super-board-agents-md.py",
        "super-board-settings.py", "super-board-setup.py", "super-board-usage.sh", "super-board-pr-body.sh",

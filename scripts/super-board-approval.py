@@ -7,12 +7,18 @@ Labels only describe UI state. They never authorize a merge. No GitHub writes.
 from __future__ import annotations
 
 import argparse
+import importlib.util
+from pathlib import Path
 from datetime import datetime
 import hashlib
 import json
 import re
 import subprocess
 import sys
+
+_reader_spec = importlib.util.spec_from_file_location("github_read", Path(__file__).with_name("super-board-github-read.py"))
+github_read = importlib.util.module_from_spec(_reader_spec)
+_reader_spec.loader.exec_module(github_read)
 
 PREFIX = "approval-request: "
 SHA = re.compile(r"[0-9a-f]{40}\Z")
@@ -129,10 +135,9 @@ class GitHub:
 
     @staticmethod
     def read(*args):
-        result = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=30)
-        if result.returncode:
-            raise ValueError("GitHub evidence could not be read")
-        return json.loads(result.stdout)
+        kind = ("approval" if "graphql" in args else "comments" if "--paginate" in args
+                else "permission" if args[-1].endswith("/permission") else "json")
+        return github_read.read(list(args), kind)[1]
 
     def permission(self, login):
         if not re.fullmatch(r"[A-Za-z0-9_-]+(?:\[bot\])?", login):
@@ -245,4 +250,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except github_read.ReadHalted as error:
+        print(f"GitHub read halt: {error}", file=sys.stderr)
+        sys.exit(github_read.HALTED)

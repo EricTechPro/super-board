@@ -39,10 +39,14 @@ if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
   throw new Error(`super-board-wave: unknown tier "${input.tier}" — use low | medium | high`)
 }
 
+let halted = false
+const READ_FAILURE = `Required GitHub reads use .claude/bin/super-board-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
+
 const CLASSIFY_SCHEMA = {
   type: 'object',
   properties: {
     kind: { type: 'string', enum: ['feature', 'bug', 'qa'] },
+    status: { type: 'string', enum: ['ok', 'halted'] },
     complexity: { type: 'string', enum: ['low', 'medium', 'high'] },
   },
   required: ['kind', 'complexity'],
@@ -51,7 +55,7 @@ const CLASSIFY_SCHEMA = {
 const STAGE_SCHEMA = {
   type: 'object',
   properties: {
-    status: { type: 'string', enum: ['advanced', 'bounced', 'blocked', 'human-gate', 'failed'] },
+    status: { type: 'string', enum: ['advanced', 'bounced', 'blocked', 'human-gate', 'failed', 'halted'] },
     column: { type: 'string' },
     detail: { type: 'string' },
     prUrl: { type: 'string' },
@@ -111,6 +115,7 @@ const REVIEW_MEMORY = [
 ]
 
 const lanePrompt = (lane, card) => [
+  READ_FAILURE,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .claude/worktrees/, work on the issue branch, post the required PR/issue comments,`,
@@ -125,6 +130,7 @@ const lanePrompt = (lane, card) => [
   `- status=advanced  → card moved forward (Building→QA, QA→Review, Review→Done/merged)`,
   `- status=bounced   → card moved backward (QA fail → Ready, Reviewer bounce → Ready/QA)`,
   `- status=blocked or human-gate → you wrote the Block template and moved the card to Blocked`,
+  `- status=halted    → required service evidence is unavailable; leave card state unchanged and stop the run`,
   `- status=failed    → you could not complete the lifecycle (say why in detail)`,
   `column = the column the card is in when you exit. detail = one line. Include prUrl/branch when they exist.`,
 ].join('\n')
@@ -147,6 +153,11 @@ const tierFor = (cls) => (cls ? ladder[cls.complexity] : undefined)
 const classifyModel = (input.tier || 'medium') === 'high' ? 'sonnet' : 'haiku'
 
 const runLane = async (lane, card, model, history) => {
+  if (halted) {
+    const result = { status: 'halted', column: card.status, detail: 'run halted by a required GitHub read failure' }
+    history.push({ lane, ...result })
+    return result
+  }
   const r = await agent(lanePrompt(lane, card), {
     label: `${lane}:#${card.number}`,
     phase: LANE[lane].phase,
@@ -154,6 +165,7 @@ const runLane = async (lane, card, model, history) => {
     ...(model ? { model } : {}),
   })
   const result = r || { status: 'failed', column: 'unknown', detail: `${lane} agent returned no result` }
+  if (result.status === 'halted') halted = true
   history.push({ lane, ...result })
   return result
 }
@@ -177,7 +189,7 @@ const PREFLIGHT_SCHEMA = {
         type: 'object',
         properties: {
           number: { type: 'integer' },
-          verdict: { type: 'string', enum: ['proceed', 'hold', 'sequence', 'skipped'] },
+          verdict: { type: 'string', enum: ['proceed', 'hold', 'sequence', 'skipped', 'halted'] },
           column: { type: 'string' },
           detail: { type: 'string' },
         },
@@ -190,6 +202,7 @@ const PREFLIGHT_SCHEMA = {
 const PREFLIGHT_BATCH = 5
 const preflightModel = (input.tier || 'medium') === 'low' ? 'haiku' : 'sonnet'
 const preflightPrompt = (batch) => [
+  READ_FAILURE,
   `Builder pre-flight for issues ${batch.map((c) => `#${c.number} ("${c.title}")`).join(', ')}. Config: ${input.configPath}.`,
   `Read .claude/skills/super-board/references/run.md → "Builder pre-flight" and follow it EXACTLY. You write no code.`,
   `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
@@ -210,7 +223,10 @@ await Promise.all(batches.map(async (batch) => {
     model: preflightModel,
     schema: PREFLIGHT_SCHEMA,
   })
-  for (const v of (r && r.verdicts) || []) verdicts.set(v.number, v)
+  for (const v of (r && r.verdicts) || []) {
+    verdicts.set(v.number, v)
+    if (v.verdict === 'halted') halted = true
+  }
 }))
 // sequence with nothing to wait on = proceed with a conflict note (the agent posted it).
 const preflightGo = (card) => {
@@ -222,8 +238,8 @@ const preflightExit = (card) => {
     { verdict: 'skipped', detail: 'pre-flight returned no verdict — not built unchecked; retried next wave' }
   return {
     lane: 'preflight',
-    status: v.verdict === 'skipped' ? 'failed' : 'blocked',
-    column: v.column || (v.verdict === 'skipped' ? 'Ready' : 'Blocked'),
+    status: v.verdict === 'halted' ? 'halted' : v.verdict === 'skipped' ? 'failed' : 'blocked',
+    column: v.column || (['skipped', 'halted'].includes(v.verdict) ? 'Ready' : 'Blocked'),
     detail: `${v.verdict}: ${v.detail}`,
   }
 }
@@ -232,11 +248,12 @@ const results = await pipeline(
   input.cards,
   // Stage 1: classify cards entering at Ready (router for model tiering)
   async (card) => {
+    if (halted) return { card, cls: null }
     if (card.status !== 'Ready') return { card, cls: null }
     const labels = labelsOf(card)
     const typed = ['qa', 'bug', 'feature'].find((l) => labels.includes(l))
     const cls = await agent(
-      `Read GitHub issue #${card.number} ("${card.title}") — body and all comments — using gh issue view. ` +
+      READ_FAILURE + '\n' + `Read GitHub issue #${card.number} ("${card.title}") — body and all comments — using gh issue view. ` +
       `Classify it: kind (feature|bug|qa) and complexity (low|medium|high) judged by the scope of change required. ` +
       (typed
         ? `Its label says "${typed}": return kind "${typed}" — the label routes the card, you never override it.`
@@ -244,6 +261,7 @@ const results = await pipeline(
           `which only a person sets — and add that label: gh issue edit ${card.number} --add-label <kind>.`),
       { label: `classify:#${card.number}`, phase: 'Classify', model: classifyModel, schema: CLASSIFY_SCHEMA }
     )
+    if (cls && cls.status === 'halted') halted = true
     return { card, cls }
   },
   // Stage 2: lane chain — entry point depends on the card's current column.
@@ -251,6 +269,7 @@ const results = await pipeline(
   // from wherever it landed (the board is the loop state, not this script).
   async (prev, card) => {
     const history = []
+    if (halted) return { number: card.number, history: [{ lane: 'none', status: 'halted', column: card.status, detail: 'run halted; preserve current work and resume explicitly' }] }
     const model = tierFor(prev && prev.cls)
     let at = card.status
 
@@ -296,4 +315,4 @@ const summary = results.filter(Boolean).map((r) => {
 })
 log(`wave complete: ${summary.length} cards — ` +
     summary.map((s) => `#${s.number}=${s.finalStatus}@${s.column}`).join(', '))
-return { cards: summary }
+return { cards: summary, halted }

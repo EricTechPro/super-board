@@ -182,7 +182,7 @@ import json, os, sys
 f=json.load(open(os.environ["APPROVAL_FIXTURE"]))
 args=" ".join(sys.argv[1:])
 if "issues(states:OPEN" in args:
-    out=[{"data":{"repository":{"issues":{"nodes":[f["issue"]]}}}}]
+    out=[{"data":{"repository":{"issues":{"nodes":[f["issue"]],"pageInfo":{"hasNextPage":False,"endCursor":None}}}}}]
 elif "graphql" in args:
     out=[{"data":{"repository":{"pullRequest":{"headRefOid":f["head"],"state":"OPEN","closingIssuesReferences":{"pageInfo":{"hasNextPage":False},"nodes":[{"number":3,"repository":{"nameWithOwner":"x/y"}}]}}}}}]
 elif "/issues/3/comments" in args:
@@ -198,7 +198,7 @@ else:
 print(json.dumps(out))
 ''')
             stub.chmod(0o755)
-            env = dict(os.environ, PATH=str(work) + os.pathsep + os.environ["PATH"], APPROVAL_FIXTURE=str(fixture_path))
+            env = dict(os.environ, PATH=str(work) + os.pathsep + os.environ["PATH"], APPROVAL_FIXTURE=str(fixture_path), SB_GITHUB_RETRY_DELAY="0", SB_GITHUB_HALT_FILE=str(work / "halt.json"))
             def deps():
                 fixture_path.write_text(json.dumps(fixture))
                 run = subprocess.run([str(ROOT / "scripts/super-board-deps.sh"), "--repo", "x/y"], env=env,

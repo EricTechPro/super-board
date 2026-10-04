@@ -28,6 +28,7 @@ case "$1 ${2:-}" in
       [ "$n" = "$3" ] && { echo "CLOSED"; exit 0; }
     done
     echo "OPEN" ;;
+  "project field-list") echo '{"fields":[{"id":"PVTSSF_stub","name":"Status","options":[{"id":"opt_ready","name":"Ready"},{"id":"opt_done","name":"Done"},{"id":"opt_review","name":"Review"}]}]}' ;;
   "project item-edit") exit 0 ;;
   "project view")      echo '{"id":"PVT_stub"}' ;;
   "issue edit")        exit 0 ;;
@@ -45,7 +46,7 @@ STUB
 chmod +x "$STUB_DIR/gh"
 export PATH="$STUB_DIR:$PATH"
 export GH_LOG="$STUB_DIR/gh.log"
-export CLOSED_ISSUES=""
+export CLOSED_ISSUES="" SB_GITHUB_RETRY_DELAY=0 SB_GITHUB_HALT_FILE="$STUB_DIR/halt.json"
 
 # ── Load the dispatcher's helpers without starting a run.
 export SB_LIB_ONLY=1

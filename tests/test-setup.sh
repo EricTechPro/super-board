@@ -30,6 +30,17 @@ echo "$OUT" | q '.missing == [] and .git == true and .upgraded == false' || fail
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
 echo "$TXT" | grep -q "✓ super-board skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
 
+# 1b — missing safety helpers must trigger a repair even on a current installation.
+for helper in super-board-approval.py super-board-github-read.py; do
+  rm "$T/.claude/bin/$helper"
+  OUT=$(python3 "$SETUP" check --root "$T" || true)
+  echo "$OUT" | q --arg helper "script $helper" '.missing | index($helper)' \
+    || fail "missing $helper must be reported: $OUT"
+  OUT=$(python3 "$SETUP" fix --root "$T" --no-helpers || true)
+  [ -x "$T/.claude/bin/$helper" ] || fail "repair must restore $helper"
+  echo "$OUT" | q '.missing == []' || fail "repair must leave no missing scripts: $OUT"
+done
+
 # 2 — upgrade: an older super-board (VERSION 1.8.2, removed skill folders, a qa-only
 #     config with Skipped, old collect keys, telegram) is detected and upgraded with
 #     no question, backed up first, and listed as "Upgraded for you".

@@ -31,6 +31,15 @@
 # (no subshell, no `exec` of a native PE), so `$!` names the worker itself rather than a bash stub.
 
 set -euo pipefail
+SB_GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
+gh_checkpoint() { python3 "$SB_GITHUB_READ" --check || exit $?; }
+gh_write_once() {
+  gh_checkpoint
+  gh "$@" || {
+    python3 "$SB_GITHUB_READ" --halt "GitHub $1 $2 response failed; reconcile the write before restarting" >&2 || true
+    exit 79
+  }
+}
 
 # ───────────────────────────── args + paths ─────────────────────────────
 # SB_LIB_ONLY=1 sources this file for its helpers only (gate tests). Config discovery,
@@ -109,7 +118,9 @@ log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$RUN_MANIFEST"; }
 PROJECT_ITEMS_JSON=""
 fetch_project_items() {
   # One gh call per tick; all column lookups read from this cache.
-  PROJECT_ITEMS_JSON=$(gh project item-list "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json --limit 500 2>/dev/null || echo '{"items":[]}')
+  local fresh
+  fresh=$(python3 "$SB_GITHUB_READ" --kind items -- project item-list "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json --limit 500) || return $?
+  PROJECT_ITEMS_JSON="$fresh"
 }
 
 column_count() {
@@ -125,17 +136,9 @@ STATUS_OPTIONS_JSON=""
 resolve_status_field() {
   [ -n "$STATUS_FIELD_ID" ] && return 0
   local payload
-  payload=$(gh api graphql -f query='
-    query($owner:String!, $number:Int!) {
-      user(login:$owner) { projectV2(number:$number) { field(name:"Status") {
-        ... on ProjectV2SingleSelectField { id options { id name } } } } }
-      organization(login:$owner) { projectV2(number:$number) { field(name:"Status") {
-        ... on ProjectV2SingleSelectField { id options { id name } } } } }
-    }' -f owner="$PROJECT_OWNER" -F number="$PROJECT_NUMBER" 2>/dev/null) || return 1
-  STATUS_FIELD_ID=$(echo "$payload" | jq -r '
-    (.data.user.projectV2.field.id // .data.organization.projectV2.field.id // "")')
-  STATUS_OPTIONS_JSON=$(echo "$payload" | jq -c '
-    (.data.user.projectV2.field.options // .data.organization.projectV2.field.options // [])')
+  payload=$(python3 "$SB_GITHUB_READ" --kind fields -- project field-list "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json) || return $?
+  STATUS_FIELD_ID=$(echo "$payload" | jq -r '.fields[] | select(.name == "Status") | .id')
+  STATUS_OPTIONS_JSON=$(echo "$payload" | jq -c '.fields[] | select(.name == "Status") | .options')
   [ -n "$STATUS_FIELD_ID" ] && [ "$STATUS_FIELD_ID" != "null" ]
 }
 
@@ -152,28 +155,31 @@ status_option_id() {
 set_card_status() {
   # $1 = project item id, $2 = target status name. Returns non-zero if unresolvable.
   local item_id="$1" name="$2" opt_id
-  resolve_status_field || { log "⚠ could not resolve Status field — skipping reconcile"; return 1; }
+  resolve_status_field || { gh_checkpoint; log "⚠ could not resolve Status field — skipping reconcile"; return 1; }
   opt_id=$(status_option_id "$name") || {
     log "⚠ Status option '${name}' not present on the board — skipping reconcile"; return 1; }
-  gh project item-edit --id "$item_id" --project-id "$(project_node_id)" \
+  local project_id
+  project_id=$(project_node_id) || return $?
+  gh_checkpoint
+  gh_write_once project item-edit --id "$item_id" --project-id "$project_id" \
     --field-id "$STATUS_FIELD_ID" --single-select-option-id "$opt_id" >/dev/null 2>&1
 }
 
 PROJECT_NODE_ID=""
 project_node_id() {
   if [ -z "$PROJECT_NODE_ID" ]; then
-    PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json 2>/dev/null \
-      | jq -r '.id // ""')
+    local payload
+    payload=$(python3 "$SB_GITHUB_READ" --kind project -- project view "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json) || return $?
+    PROJECT_NODE_ID=$(echo "$payload" | jq -r .id)
   fi
   echo "$PROJECT_NODE_ID"
 }
 
 issue_is_open() {
   # $1 = issue number. Returns 0 when OPEN, 1 when CLOSED.
-  # Unknown/erroring lookups return 0 (open) so a transient gh failure never
-  # silently reconciles a live card into Done.
+  # Unreadable is distinct from both OPEN and CLOSED: exit 79 halts the run.
   local state
-  state=$(gh issue view "$1" --json state -q '.state' 2>/dev/null) || return 0
+  state=$(python3 "$SB_GITHUB_READ" --kind state -- issue view "$1" --json state -q '.state') || return 79
   [ "$state" != "CLOSED" ]
 }
 
@@ -203,10 +209,14 @@ top_card_in_column() {
   while IFS=$'\t' read -r issue item_id; do
     [ -n "$issue" ] || continue
     issue_locked "$issue" && continue
-    if ! issue_is_open "$issue"; then
+    local issue_rc=0
+    issue_is_open "$issue" || issue_rc=$?
+    [ "$issue_rc" -le 1 ] || exit "$issue_rc"
+    if [ "$issue_rc" -ne 0 ]; then
       log "reconciled closed #${issue} -> Done (was '${col}') — dispatching 0 workers for it"
-      set_card_status "$item_id" "Done" || log "  ↳ reconcile of #${issue} could not be written to the board"
-      [ -n "$BOT_LOGIN" ] && gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+      set_card_status "$item_id" "Done" || { gh_checkpoint; log "  ↳ reconcile of #${issue} could not be written to the board"; return 1; }
+      gh_checkpoint
+      [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
       rm -f "$INFLIGHT_DIR/$issue"
       continue
     fi
@@ -240,6 +250,7 @@ read_lock() {
 
 issue_locked() {
   # Returns 0 if the issue has a live in-flight lock; cleans stale locks.
+  gh_checkpoint
   local issue="$1" lock="$INFLIGHT_DIR/$1"
   [ -f "$lock" ] || return 1
   read_lock "$issue"
@@ -258,7 +269,7 @@ lane_idle() {
 gh_rate_guard() {
   # Sleep until rate limit resets if GraphQL remaining < 200.
   local payload remaining reset now wait
-  payload=$(gh api rate_limit 2>/dev/null || echo '{"resources":{"graphql":{"remaining":5000,"reset":0}}}')
+  payload=$(python3 "$SB_GITHUB_READ" --kind quota -- api rate_limit) || return $?
   remaining=$(echo "$payload" | jq -r '.resources.graphql.remaining // 5000')
   if [ "$remaining" -lt 200 ]; then
     reset=$(echo "$payload" | jq -r '.resources.graphql.reset // 0')
@@ -279,7 +290,8 @@ try_claim_assignee() {
   # idempotent for self-assign; on race-loss, gh returns non-zero and we skip.
   local issue="$1"
   [ -z "$BOT_LOGIN" ] && return 0
-  gh issue edit "$issue" --add-assignee "$BOT_LOGIN" >/dev/null 2>&1 || {
+  gh_checkpoint
+  gh_write_once issue edit "$issue" --add-assignee "$BOT_LOGIN" >/dev/null 2>&1 || {
     log "claim failed on #${issue} (race or gh api error) — skipping this tick"
     return 1
   }
@@ -295,7 +307,11 @@ dispatch_lane() {
   fi
   # Authoritative closed-issue gate (issue #10). top_card_in_column also filters and
   # reconciles, but every dispatch path funnels through here — one guard, one place.
-  if ! issue_is_open "$issue"; then
+  gh_checkpoint
+  local issue_rc=0
+  issue_is_open "$issue" || issue_rc=$?
+  [ "$issue_rc" -le 1 ] || exit "$issue_rc"
+  if [ "$issue_rc" -ne 0 ]; then
     log "skip dispatch lane=${lane} issue=#${issue} — issue is CLOSED"
     return 0
   fi
@@ -316,6 +332,7 @@ dispatch_lane() {
     printf '=== dispatch lane=%s issue=#%s at %s ===\n' "$lane" "$issue" "$(date -u +%FT%TZ)"
     printf 'prompt: %s\n\n' "$prompt"
   } >> "$worker_log"
+  gh_checkpoint
   nohup claude -p "$prompt" >> "$worker_log" 2>&1 &
   pid=$!
   DISPATCH_COUNT=$((DISPATCH_COUNT + 1))
@@ -361,12 +378,15 @@ check_lane_zombie() {
     [ "$cur" = "$col" ] && found=1
   done
   if [ "$found" -eq 0 ]; then
+    gh_checkpoint
     log "💀 zombie ${lane} worker on #${issue} (pid=${pid}) — card moved to '${cur}'; killing"
     kill "$pid" 2>/dev/null || true
     sleep 1
     kill -9 "$pid" 2>/dev/null || true
+    gh_checkpoint
+    [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+    gh_checkpoint
     rm -f "$INFLIGHT_DIR/$issue"
-    [ -n "$BOT_LOGIN" ] && gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
     case "$lane" in
       build)  BUILD_PID="";  BUILD_ISSUE="" ;;
       qa)     QA_PID="";     QA_ISSUE="" ;;
@@ -431,6 +451,7 @@ reap_finished_locks() {
   # The assignee remove is idempotent — no-op if the worker exited cleanly.
   local lock issue
   for lock in "$INFLIGHT_DIR"/*; do
+    gh_checkpoint
     [ -f "$lock" ] || continue
     issue=$(basename "$lock")
     # Issue locks only: basenames are issue numbers. Anything else (e.g. the
@@ -439,14 +460,17 @@ reap_finished_locks() {
     case "$issue" in *[!0-9]*|'') continue ;; esac
     read_lock "$issue"
     if [ -z "$PID" ] || ! kill -0 "$PID" 2>/dev/null; then
-      rm -f "$lock"
-      REAP_COUNT=$((REAP_COUNT + 1))
+      gh_checkpoint
       if [ -n "$BOT_LOGIN" ]; then
-        gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+        gh_checkpoint
+        gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
         log "reaped stale lock + swept assignee on #${issue} (pid=${PID:-empty})"
       else
         log "reaped stale lock for #${issue} (pid=${PID:-empty})"
       fi
+      gh_checkpoint
+      rm -f "$lock"
+      REAP_COUNT=$((REAP_COUNT + 1))
     fi
   done
 }
@@ -505,12 +529,14 @@ reclaim_stranded_building() {
       fi
     fi
     if ! set_card_status "$item_id" "Ready"; then
+      gh_checkpoint
       log "⚠ stranded #${issue} in Building — could not move it to Ready; drag it by hand"
       continue
     fi
-    [ -n "$BOT_LOGIN" ] && gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+    [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
     # Comment format: writing-standard.md § 4.
-    gh issue comment "$issue" --body "[orchestrator] [report] ↩️ back to Ready · stranded in Building
+    gh_checkpoint
+    gh_write_once issue comment "$issue" --body "[orchestrator] [report] ↩️ back to Ready · stranded in Building
 Did: found no live worker; the last run stopped mid-build
 ✅ Done: card moved to Ready · branch ${branch:-none found}${branch:+ kept}
 Next: builder (next tick${branch:+, continues on the branch})" >/dev/null 2>&1 || true
@@ -535,6 +561,18 @@ DISPATCH_LOG=""
 if [ "${SB_LIB_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
+
+# A read failure stops only workers launched by this dispatcher. Keep their
+# locks, worktrees, claims, and approval evidence for explicit recovery.
+halt_cleanup() {
+  if ! python3 "$SB_GITHUB_READ" --check >/dev/null 2>&1; then
+    for pid in "${BUILD_PID:-}" "${QA_PID:-}" "${REVIEW_PID:-}"; do
+      [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
+    done
+  fi
+}
+trap halt_cleanup EXIT
+gh_checkpoint
 
 # ───────────────────────────── preconditions ─────────────────────────────
 log "super-board run started — config=${CONFIG_SLUG} base=${BASE_BRANCH} tick=${TICK_SECONDS}s max_workers=${MAX_WORKERS} no_progress_cycles=${NO_PROGRESS_CYCLES} max_dispatches=${MAX_DISPATCHES}"
@@ -589,6 +627,7 @@ QA_PID=""; QA_ISSUE=""
 REVIEW_PID=""; REVIEW_ISSUE=""
 
 while true; do
+  gh_checkpoint
   # Workflow-backend mutual exclusion, re-checked every tick: the startup
   # check alone leaves a TOCTOU window where a workflow run starting at the
   # same moment as this dispatcher is never detected by either side.
@@ -693,6 +732,8 @@ while true; do
       fi
     fi
   fi
+
+  gh_checkpoint
 
   # ── Landed-work halt gate (issue #8).
   #    Progress = the Done/Skipped set changed since the last dispatch cycle. Lane
