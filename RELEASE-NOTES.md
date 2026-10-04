@@ -1,5 +1,18 @@
 # Release notes
 
+## v3.0.4 — 2026-10-03
+
+The skill map reads from left to right, with nested skill families and clearer drill-down
+views. The landing board and impeccable map follow the same visual flow.
+
+- 🗺️ **Skill map redesign.** Nested families group related skills; main-step views reveal
+  the work in order. Click highlights keep a selected path visible, bullet details make
+  each node easier to scan, and the column browser opens related views side by side.
+- 💄 **Landing board polish.** Column colours distinguish each lane in light and dark
+  themes, with Done before Blocked. Skill-map links use the public Pages route.
+- ➡️ **Impeccable map.** The main rail reads left to right through setup, planning,
+  diagnosis, optional refinements and polish, with utilities in a separate lane.
+
 ## v3.0.3 — 2026-10-03
 
 Refreshing a vendored installation now preserves skills and helpers that already point at
