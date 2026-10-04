@@ -8,11 +8,14 @@
 #   2. Already in progress? an open PR from ANOTHER branch closes it or has the same
 #                           title, or another card in Building/QA/Review (or a lower-
 #                           numbered Ready peer in this wave) has the same title.
-#   3. File overlap?        an open PR touches files this card names. Not a duplicate —
+#   3. File overlap?        an open PR touches files this card names, or a lower-numbered
+#                           card in the same --issues batch names them. Not a duplicate —
 #                           a sequencing problem. The card goes behind the issue that
 #                           PR closes (blocked-by, so the wave-start sweep frees it when
 #                           that issue closes), or, if the PR closes nothing, proceeds
-#                           with an expected-conflict note so the merge gate rebases.
+#                           with an expected-conflict note so the merge gate rebases. Two
+#                           batch peers: the lower number proceeds, the other is sequenced
+#                           `blockedBy: [<lower>]` — never both against each other.
 #   4. Unclear?             no `## Acceptance Criteria` section with at least one bullet.
 #
 # Outcomes: proceed · hold (dup done / dup in progress / unclear) · sequence.
@@ -132,7 +135,7 @@ jq -n --argjson targets "$TARGETS" --argjson merged "$MERGED" --argjson open "$O
         + [ $cards[] | select(.number != $n) | { ref: "#\(.number)", kind: "card:\(.status)", title, sim: sim(.title; $i.title) } ]
         | map(select(.sim >= 0.25 and .sim < $th)) | sort_by(-.sim) | .[:5] ) as $near
 
-    | { number: $n, title: $i.title, candidates: $near, blockedBy: [], conflictWith: [] }
+    | { number: $n, title: $i.title, candidates: $near, blockedBy: [], conflictWith: [], _files: $mine }
       + ( if ($done | length) > 0 then
             { verdict: "hold", tag: "done", reason: "already delivered", evidence: $done }
           elif ($busy | length) > 0 then
@@ -148,4 +151,19 @@ jq -n --argjson targets "$TARGETS" --argjson merged "$MERGED" --argjson open "$O
           else
             { verdict: "proceed", tag: "clean", reason: "no duplicate, no overlap", evidence: [] }
           end ) ]
+  # Peer overlap: two cards checked together name the same files and neither has an open
+  # PR yet. The lower-numbered one goes first; the other waits behind it. Sequencing both
+  # against each other parks both forever (#180/#181 on 2026-10-03, corpus.ts).
+  | sort_by(.number)
+  | reduce .[] as $c ({out: [], go: []};
+      ([ .go[] | select((.files - (.files - $c._files)) | length > 0) ] | first) as $first
+      | if $c.verdict == "proceed" and $first != null then
+          .out += [ $c + { verdict: "sequence", tag: "overlap",
+                           reason: "a lower-numbered card in this check touches the same files — build after it",
+                           evidence: [ "#\($first.number) touches \(($first.files - ($first.files - $c._files)) | join(", "))" ],
+                           blockedBy: [ $first.number ] } ]
+        elif $c.verdict == "proceed" then
+          .out += [ $c ] | .go += [ { number: $c.number, files: $c._files } ]
+        else .out += [ $c ] end)
+  | .out | map(del(._files))
   | INDEX(.number | tostring)'

@@ -26,12 +26,30 @@ SB_GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github
 sb_gh_required_read() { local kind="$1"; shift; python3 "$SB_GITHUB_READ" --kind "$kind" -- "$@"; }
 sb_gh_halt_check() { python3 "$SB_GITHUB_READ" --check; }
 
+# `gh api rate_limit` (REST) misreports the GraphQL bucket. Measured 2026-10-04,
+# back to back on one token: REST said graphql used=2 remaining=4998 while
+# GraphQL's own rateLimit said used=930 — and an hour earlier REST said 4999
+# while the board was stalled at 0. So the GraphQL numbers come from GraphQL's
+# rateLimit object (a rateLimit-only query is not charged), the core numbers
+# from REST. Arg 1: the REST payload; prints it with .resources.graphql replaced
+# when the GraphQL read succeeds, unchanged when it does not.
+sb_gh_quota_merge() {
+  local rest="$1" gql
+  gql=$(gh api graphql -f query='query{rateLimit{limit remaining used resetAt}}' 2>/dev/null) || { echo "$rest"; return 0; }
+  echo "$rest" | jq --argjson g "$gql" '
+    ($g.data.rateLimit // null) as $r
+    | if $r == null then . else
+        .resources.graphql = { limit: $r.limit, remaining: $r.remaining, used: $r.used,
+                               reset: ($r.resetAt | fromdateiso8601) } end' 2>/dev/null || echo "$rest"
+}
+
 sb_gh_guard_check() {
   # Sleep until GraphQL quota recovers. Also checks REST.
   # Arg 1: optional minimum-remaining threshold (default 200).
   local min="${1:-$SB_GH_GUARD_MIN_REMAINING_DEFAULT}"
   local payload graphql_remaining graphql_reset rest_remaining now wait
   payload=$(sb_gh_required_read quota api rate_limit) || return $?
+  payload=$(sb_gh_quota_merge "$payload")
   graphql_remaining=$(echo "$payload" | jq -r '.resources.graphql.remaining // 5000')
   rest_remaining=$(echo "$payload" | jq -r '.resources.core.remaining // 5000')
 
@@ -55,7 +73,7 @@ sb_gh_guard_check() {
 sb_gh_guard_summary() {
   # One-line snapshot. Use in worker exit messages for trend tracking.
   local payload
-  payload=$(gh api rate_limit 2>/dev/null || echo '{}')
+  payload=$(sb_gh_quota_merge "$(gh api rate_limit 2>/dev/null || echo '{}')")
   echo "[gh-guard] $(echo "$payload" | jq -r '"graphql=\(.resources.graphql.remaining // "?")/\(.resources.graphql.limit // "?") rest=\(.resources.core.remaining // "?")/\(.resources.core.limit // "?")"')"
 }
 

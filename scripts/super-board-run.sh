@@ -117,9 +117,11 @@ log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*" | tee -a "$RUN_MANIFEST"; }
 
 PROJECT_ITEMS_JSON=""
 fetch_project_items() {
-  # One gh call per tick; all column lookups read from this cache.
+  # One board read per tick; all column lookups read from this cache.
+  # super-board-card.sh items: ~1 GraphQL point per 100 cards, where
+  # `gh project item-list` spends 101 per 100.
   local fresh
-  fresh=$(python3 "$SB_GITHUB_READ" --kind items -- project item-list "$PROJECT_NUMBER" --owner "$PROJECT_OWNER" --format json --limit 500) || return $?
+  fresh=$("$(dirname "$SB_GITHUB_READ")/super-board-card.sh" --owner "$PROJECT_OWNER" --number "$PROJECT_NUMBER" items) || return $?
   PROJECT_ITEMS_JSON="$fresh"
 }
 
@@ -270,6 +272,8 @@ gh_rate_guard() {
   # Sleep until rate limit resets if GraphQL remaining < 200.
   local payload remaining reset now wait
   payload=$(python3 "$SB_GITHUB_READ" --kind quota -- api rate_limit) || return $?
+  # REST misreports the GraphQL bucket; super-board-gh-guard.sh → sb_gh_quota_merge.
+  payload=$(. "$(dirname "$SB_GITHUB_READ")/super-board-gh-guard.sh" && sb_gh_quota_merge "$payload")
   remaining=$(echo "$payload" | jq -r '.resources.graphql.remaining // 5000')
   if [ "$remaining" -lt 200 ]; then
     reset=$(echo "$payload" | jq -r '.resources.graphql.reset // 0')

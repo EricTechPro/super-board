@@ -62,7 +62,8 @@ Progress: ✅ onboard  →  ✅ lint  →  🤖 run (you are here)
 | Stale worktree scan | Scan only `.claude/worktrees/issue-<N>` and `issue-<N>-build/qa/review`. If its named branch is gone, use `git worktree remove` without force. Keep detached, dirty, locked, unregistered, or unrelated folders; log failures for inspection. A missing board label alone is not permission to delete work. |
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `🛡 Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run super-board onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*super-board run'` must return zero. If any super-board worker is already alive from a prior crashed run, halt with: `🛑 ${N} super-board workers already running. Stop them first: pkill -f 'claude -p .*super-board run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
-| GraphQL rate-limit guard | Before each tick, query `gh api rate_limit`. If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
+| Database reach | Run every `migrations.checks[env]` for an env in `allowed_envs` (read-only, e.g. `supabase migration list --db-url …`). On failure halt with its error: "Migrate URL for <env> does not connect — fix it before a wave builds work the gate cannot land." |
+| GraphQL rate-limit guard | Before each tick, `sb_gh_guard_check` (super-board-gh-guard.sh — it reads GraphQL's own `rateLimit`, because `gh api rate_limit` misreports the GraphQL bucket). If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
 
 ## Lanes and label routing
 
@@ -242,7 +243,7 @@ in a sub-agent, before touching a worktree.
 
 ```
 [ ] source .claude/bin/super-board-gh-guard.sh; sb_gh_guard_check 200
-[ ] build the in-flight list: gh project item-list (one call) → [{number,title,status}] for
+[ ] build the in-flight list: .claude/bin/super-board-card.sh --config <cfg> items (one call) → [{number,title,status}] for
     Building / QA / Review / Ready cards; save it to a temp file
 [ ] bash .claude/bin/super-board-preflight.sh --repo <owner/name> --issues <N[,M…]> \
          --inflight <file> [--files <paths you expect to touch>]
@@ -256,9 +257,14 @@ The script asks four questions and the agent adds a fifth; the agent owns the ju
 |---|---|---|---|
 | 1 | Already done? | merged PR closes `#N`; merged PR / closed issue with the same `fingerprint:` or title | a merged PR that delivers the same behaviour under other words |
 | 2 | Already in progress? | open PR on another branch closes `#N` or has the same title; a card in Building/QA/Review (or a lower-numbered Ready peer) with the same title | same feature, different words — not merely the same files |
-| 3 | File overlap? | open PR touches files the card names | expected files from reading the issue (`--files`) |
+| 3 | File overlap? | open PR touches files the card names; a lower-numbered card in the same `--issues` batch names the same files | expected files from reading the issue (`--files`); the same overlap with a Ready peer in another batch |
 | 4 | Unclear? | no `## Acceptance Criteria` bullets | AC that contradicts the current code (cite `file:line`) |
 | 5 | Too big? | — | likely over ~400 changed lines (`merge_policy.auto_max_lines`; lockfiles, generated, snapshots, migration SQL excluded) or spans many areas (UI + API + DB + jobs …) — lint.md criterion 15 |
+
+**Two Ready cards that overlap each other, neither with an open PR, go one at a time.** The
+lower-numbered card proceeds; only the other is sequenced, with `blocked-by: #<lower>`, and the
+wave-start sweep frees it once the lower one closes. Sequencing each against the other leaves
+both with nothing to wait on and neither built — the same deadlock comes back every wave.
 
 The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanical `hold` into
 `proceed` only by naming why the match is a different feature. Its own branch's PR
@@ -274,7 +280,7 @@ The agent may turn a `proceed` into a `hold` on evidence. It may turn a mechanic
 | `hold` — unclear | move card to Blocked | `❓` · the missing AC or the contradiction with `file:line` · `blocked-by: -` |
 | `hold` — too big | move card to Blocked | `❓` · "too big — likely over <cap> changed lines / spans <areas>" · suggests splitting with `/to-tickets` into vertical slices, each under the cap · `blocked-by: -` |
 | `sequence` — `blockedBy` non-empty | move card to Blocked | `⏳` · the overlapping PR and files · `blocked-by: <blockedBy>` — the wave-start sweep frees it |
-| `sequence` — `blockedBy` empty | proceed (card stays Ready), comment `⚠️ expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
+| `sequence` — `blockedBy` empty | proceed (card stays Ready, return column `Ready`), comment `⚠️ expected conflict with PR #<P> on <files> — the merge gate will rebase` | — |
 | `halted` | script exit 79: required evidence unavailable; leave the card untouched, stop this run, resume explicitly after recovery | — |
 
 A card the pre-flight agent returns no verdict for is treated as `skipped` (a verdict, not a
@@ -618,7 +624,7 @@ The dispatcher MUST also:
 3. **Cap one worker per lane** — track `BUILD_PID` / `QA_PID` / `REVIEW_PID`; do not dispatch to a lane whose prior PID is still alive.
 4. **Reap stale locks each tick** — `reap_finished_locks` removes any lock whose PID no longer exists.
 5. **Orphan-scan on startup** — refuse to start if any `claude -p .*super-board run` worker is already running from a prior crashed dispatcher.
-6. **Cache `gh project item-list` per tick** — one API call per tick, not per column lookup. Cuts rate consumption ~7×.
+6. **One board read per tick** — `super-board-card.sh items` once per tick, not per column lookup (~1 GraphQL point per 100 cards).
 
 The three locks (assignee, in-flight file, lane PID) are defense in depth: any one of them alone has a race window; together they make a duplicate dispatch effectively impossible.
 
@@ -743,6 +749,8 @@ Records: config used, columns, target, per-card history (claim → completion �
 
 Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_guard` does NOT protect worker traffic. Every worker MUST follow `rate-limit-etiquette.md` (in this directory):
 
+- Move and read cards with `.claude/bin/super-board-card.sh --config <cfg> move <issue> <Status>` / `status <issue>` — 1 GraphQL point. Every "move card X → Y" in the lifecycles above means this call. Comments, labels and PR reads go over REST (`rate-limit-etiquette.md` → "Price list").
+
 - Source `scripts/super-board-gh-guard.sh` at worker start.
 - Call `sb_gh_guard_check 200` before any burst of gh calls (thread reads, sub-agent spawn, exit verification).
 - Adversarial sub-agents are capped at 50 gh calls each — prefer `git blame` (local) over `gh api graphql`.
@@ -754,7 +762,7 @@ Workers share the dispatcher's gh-auth token bucket. The dispatcher's `gh_rate_g
 Before releasing the claim assignee and exiting, every worker MUST verify:
 
 - [ ] Issue comment AND PR comment both written (per "Commenting cadence" above).
-- [ ] Card column move's mutation returned success. **Do NOT re-query `gh project item-list` for verification** — trust the mutation exit code (the 500-item GraphQL refetch was the per-worker quota tax; see `rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
+- [ ] Card column move's mutation returned success. **Trust the exit code of `super-board-card.sh move`** — a re-read of the board was the per-worker quota tax (`rate-limit-etiquette.md` §3). If the mutation returned non-zero, preserve its unknown outcome, leave the assignee in place, and pause the run locally. Reconcile the remote card state before any repeat; never blindly retry a write or depend on a successful halt comment.
 - [ ] Claim assignee released (`gh issue edit --remove-assignee <bot_identity>`) and the descriptive `loop:in-*` label removed.
 - [ ] On failure handoff: `root-cause-hash:` line is present in the PR handoff comment (per "Root-cause hash" above).
 - [ ] On Block/Skip exit: the full template from `block-template.md` is populated on BOTH the issue and the PR (if a PR exists); the reason emoji is one of the nine in the vocabulary table (🔐 💳 🔑 ❓ 🛡 🧑 🤷 📦 🎨).

@@ -9,7 +9,7 @@
 <p>8 skills (5 you type, 3 the board runs) · 9 commands · 6 guard hooks</p>
 
 <p>
-<img alt="Version" src="https://img.shields.io/badge/version-3.0.5-1f883d?style=flat-square">
+<img alt="Version" src="https://img.shields.io/badge/version-3.1.0-1f883d?style=flat-square">
 <img alt="Host" src="https://img.shields.io/badge/Claude%20Code-skills-d97757?style=flat-square">
 <img alt="License" src="https://img.shields.io/badge/license-MIT-0969da?style=flat-square">
 </p>
@@ -111,7 +111,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /git-sync                     # commit, pull, push
 ```
 
-Flags: `run --low|--high` · `super-collect --since 30d`
+Flags: `run --low|--high` · `run --codex[=<model>]` · `super-collect --since 30d`
 
 ## Guards & hooks
 
@@ -127,6 +127,21 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 | [README sync](scripts/super-board-readme-sync.py) | Regenerates the skill table; pre-commit and PostToolUse hooks keep it fresh |
 | [cleanup-wt](hooks/cleanup-wt.py) | Removes merged worktrees and branches after each merge and at session start, with a recovery file |
 | [merge gate](scripts/super-board-merge-gate.sh) | Merges only after the current base plus your `verify_commands` pass, pinned to the reviewed commit; applies `merge_policy` and runs allowed DB migrations |
+
+## Models
+
+A cheap router grades each card easy, medium or hard first; the run flag picks the model for each grade. With `--codex`, every lane runs on Codex GPT models instead of Claude.
+
+| Command | Router | Easy card | Medium card | Hard card |
+| --- | --- | --- | --- | --- |
+| `/super-board run` | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 | session model |
+| `/super-board run --low` | Haiku 4.5 | Haiku 4.5 | Sonnet 5.5 | Opus 5.5 |
+| `/super-board run --high` | Sonnet 5.5 | Opus 5.5 | Opus 5.5 | Opus 5.5 |
+| `/super-board run --codex` | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol | gpt-6-astra |
+| `/super-board run --codex --low` | gpt-6-luna | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol |
+| `/super-board run --codex --high` | gpt-6-luna | gpt-6-astra | gpt-6-astra | gpt-6-astra |
+
+`/super-board run --codex=<model>` pins one model for every card and skips the router.
 
 ## Writing standard
 

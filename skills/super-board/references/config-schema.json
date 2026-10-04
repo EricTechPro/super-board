@@ -35,8 +35,17 @@
   // the classify router. Overridden per run by `super-board run --low|--high`.
   //   "low"    — haiku (low) / sonnet (medium) / opus (high)
   //   "medium" — (default) sonnet / opus / session model
-  //   "high"   — opus floor; medium+ inherit the session model
+  //   "high"   — opus for every card
   "model_tier": "medium",
+
+  // Optional Codex lane settings. Used by explicit `run --codex` and usage
+  // fallback; never selects the backend or grants Review/merge ownership.
+  "codex": {
+    // Optional model name passed to `codex exec -m` for every card, over the
+    // Codex ladder. `--codex=<model>` wins; absent/null lets the ladder pick
+    // (run tier x card grade, see scripts/super-board-codex-lane.sh).
+    "model": null
+  },
 
   "target": {
     // "repo" | "repo+url". A board always drives a repo; `url` is the live or
@@ -166,12 +175,23 @@
     // base_branch is main/master, else "staging".
     "target_env": "staging",
     // Run from the root of the verified scratch worktree. "-" = the deploy
-    // pipeline applies it, nothing to run. Secrets come from the environment,
-    // never from this file.
+    // pipeline applies it, nothing to run. Secrets never go in this file. Nor
+    // can they come from the session's environment: every lane agent's Bash
+    // call is a fresh shell and nothing loads .env. Resolve the URL from the
+    // project's own .env, with an absolute path (the gate runs in a scratch
+    // worktree), falling back from the variable to the file:
+    //   "${LIVE_DB_URL:-$(sed -n 's/^LIVE_DB_URL=//p' /abs/repo/.env)}"
     "commands": {
       "test": "npm run db:migrate -- --env test",
       "staging": "supabase db push --db-url \"$STAGING_DB_URL\"",
-      "live": "supabase db push --db-url \"$LIVE_DB_URL\""
+      "live": "supabase db push --db-url \"${LIVE_DB_URL:-$(sed -n 's/^LIVE_DB_URL=//p' /abs/repo/.env)}\""
+    },
+    // Read-only proof per env that the command above can reach its database,
+    // resolved the same way. The run preconditions run each one before the
+    // first wave (run-workflow.md → Preconditions); a failure halts the run
+    // there, not at merge time after a whole wave of work.
+    "checks": {
+      "live": "supabase migration list --db-url \"${LIVE_DB_URL:-$(sed -n 's/^LIVE_DB_URL=//p' /abs/repo/.env)}\""
     },
     // Extra human-only steps every migration PR needs (e.g. a backfill).
     "human_steps": []
@@ -184,6 +204,7 @@
   // runaway this gate exists to catch. Default `6`.
   "no_progress_cycles": 6,
 
+  // LEGACY `claude-p` backend only — the workflow backend never reads it.
   // Hard ceiling on total worker dispatches for one run; the loop halts with a
   // runaway summary when it is reached. `0` disables the ceiling. Bounds
   // worst-case spend even when a board trickles just enough Done movement to
@@ -221,7 +242,16 @@
   // orchestrator runs super-board-usage.sh check; if the 5-hour or weekly
   // window is at or above this percentage, no new wave launches until it
   // resets. Default 95. See references/run-workflow.md → wave loop step 1.
+  // Explicit `run --codex` skips this Claude-only guard.
   "usage_pause_pct": 95,
+
+  // What the orchestrator does while the usage guard pauses (exit 10).
+  //   "none"  — (default) launch nothing; wait for the reset.
+  //   "codex" — keep Build and QA moving one card at a time on Codex, headless
+  //             (super-board-codex-lane.sh without --codex). Review stays on
+  //             Claude: cards that reach Review wait there for the next Claude
+  //             wave. The launcher refuses a fallback lane without this value.
+  "usage_fallback": "none",
 
   "verify_commands": [
     "cd server && npm ci --silent && npm run typecheck && npm test"
@@ -230,10 +260,17 @@
   // Optional throttle on how many cards a single wave dispatches. ABSENT OR 0
   // MEANS UNLIMITED, which is the default and is usually what you want.
   //
+  // It is also the GitHub-limit valve. A wave that hits the hourly GraphQL
+  // limit steps it down for the next wave — unlimited → 3 → 2 → 1, floor 1 —
+  // written back here by super-board-throttle.sh (run-workflow.md → Reconcile).
+  // One 14-card wave spent the whole 5000/hr bucket in ~40 minutes (2026-10-03).
+  //
   // Wave width is decided by the dependency graph, not by this number: the
   // planner picks every Ready card whose `## Blocked by` issues have all closed,
   // plus whatever is already in flight. The workflow runtime caps CONCURRENT
   // agents at min(16, cpus-2) and queues the rest, so a 19-card wave is normal.
+  // Codex waves also cap concurrent cards at a positive max_workers; absent/0
+  // uses max(1, min(16, cpus-2)), with each card's lanes running sequentially.
   //
   // Set it only to deliberately throttle a machine. A fixed cap used to do the
   // wave sizing, and it sized it badly: on a board where 23 of 32 Ready cards

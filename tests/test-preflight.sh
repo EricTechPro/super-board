@@ -104,4 +104,18 @@ RC=0; PATH="$TMP/bin:$PATH" "$PRE" --repo o/r --issues 99 >/dev/null 2>&1 || RC=
 RC=0; "$PRE" --repo o/r >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 64 ] || fail "missing --issues should exit 64, got $RC"
 
-echo "PASS: test-preflight.sh (9 scenarios)"
+# 10 — two batch peers name the same file and neither has an open PR: the lower
+#      number proceeds, only the higher one is sequenced behind it. Both sequenced
+#      against each other parked both forever (#180/#181, 2026-10-03).
+rm -f "$SB_GITHUB_HALT_FILE"   # scenario 9 halted reads on purpose
+issue 60 "Corpus loader caching"  $'Touches `src/corpus.ts`.\n'"$AC"
+issue 61 "Corpus search ranking"  $'Touches `src/corpus.ts`.\n'"$AC"
+issue 62 "Unrelated footer copy"  $'Touches `src/footer.tsx`.\n'"$AC"
+OUT10=$(run --issues 61,60,62)
+echo "$OUT10" | jq -e '.["60"].verdict == "proceed"' >/dev/null || fail "lower peer #60 must proceed: $OUT10"
+echo "$OUT10" | jq -e '.["61"].verdict == "sequence" and .["61"].tag == "overlap" and .["61"].blockedBy == [60]' >/dev/null \
+  || fail "#61 must sit behind #60: $OUT10"
+echo "$OUT10" | jq -e '.["62"].verdict == "proceed" and (.["60"] | has("_files") | not)' >/dev/null \
+  || fail "#62 is clean and no internal _files leaks: $OUT10"
+
+echo "PASS: test-preflight.sh (10 scenarios)"

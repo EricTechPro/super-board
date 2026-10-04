@@ -59,7 +59,9 @@
 # Usage:
 #   super-board-wave-plan.sh --config <config.json> [--items <project-items.json>]
 #                            [--deps <deps.json>]
-# Without --items, fetches live board state via `gh project item-list`.
+# Without --items, fetches live board state via super-board-card.sh items — the
+# item-list shape for ~1 GraphQL point per 100 cards, where `gh project item-list`
+# spends 101 per 100 (fieldValues x four nested connections).
 # Without --deps, derives the graph via super-board-deps.sh. Pass --deps in tests
 # to keep the script offline.
 #
@@ -98,7 +100,7 @@ NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 if [ -n "$ITEMS_FILE" ]; then
   ITEMS=$(cat "$ITEMS_FILE")
 else
-  ITEMS=$(python3 "$HERE/super-board-github-read.py" --kind items -- project item-list "$NUMBER" --owner "$OWNER" --format json --limit 500)
+  ITEMS=$("$HERE/super-board-card.sh" --owner "$OWNER" --number "$NUMBER" items)
 fi
 
 # `variant` was removed in v3.0.0 (labels route cards now). Absent or "full" is

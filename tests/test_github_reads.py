@@ -112,6 +112,7 @@ sys.exit(r.get('rc', 0))
         self.env['READ_RESPONSES'] = json.dumps([{'rc': 1}])
         script = """SB_LIB_ONLY=1 . "$1"
 set +e
+PROJECT_OWNER=acme PROJECT_NUMBER=1
 PROJECT_ITEMS_JSON='{"items":[{"id":"preserved"}]}'
 fetch_project_items; rc=$?
 printf '%s %s\n' "$rc" "$PROJECT_ITEMS_JSON"

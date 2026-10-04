@@ -17,6 +17,8 @@ Super Build is the canonical builder. Do not use a separate `build-feature` work
 
 Super Build may implement, test, commit, push, open PRs, and move project cards to `QA`. It never merges, closes issues, or moves cards to `Done` — the Reviewer does that through the merge gate. It should not invent new product scope beyond the issue body. If the issue needs product/design/security judgment, apply the human-gate or WIP-partial path instead of guessing.
 
+**GitHub budget** — every "move card" is `.claude/bin/super-board-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
+
 ## Configuration
 
 The orchestrator needs to know which project board to read.
@@ -50,18 +52,20 @@ Source column is `Ready` (override with `BUILD_LOOP_SOURCE_COLUMN`):
 ```bash
 SOURCE_COLUMN="${BUILD_LOOP_SOURCE_COLUMN:-Ready}"
 
-gh project item-list "$BUILD_LOOP_PROJECT" --owner "$BUILD_LOOP_OWNER" --limit 200 --format json \
+.claude/bin/super-board-card.sh --owner "$BUILD_LOOP_OWNER" --number "$BUILD_LOOP_PROJECT" items \
   | jq --arg col "$SOURCE_COLUMN" '.items[] | select(.status == $col and .content.type == "Issue")'
 ```
 
+`super-board-card.sh items` is the `gh project item-list` shape for ~1 GraphQL point per 100 cards (item-list spends 101) — without bodies.
+
 For each Ready item:
-- Capture `content.number` (issue #), `content.title`, `content.body`, `content.labels` (via separate `gh issue view N --json labels` if `item-list` doesn't include them).
+- Capture `content.number` (issue #), `content.title` and `labels`; read the body over REST: `gh api repos/{owner}/{repo}/issues/<N> --jq .body`.
 - **Skip** issues with the `loop:in-progress` label (in flight in another orchestrator) or `loop:halted` label (manually paused) or `human-gated` label (requires manual handling).
 - Parse `body` for `Depends on: #N1, #N2` lines (case-insensitive). If any dep is still open AND not in the current Ready set, the issue is blocked — leave it for a future run.
 - Parse `body` for an optional `Skills:` line (e.g. `Skills: mattpocock-skills:tdd, verification-before-completion`). If absent, the worker uses defaults from the preamble.
 
 **Ordering:**
-1. **Board order first** — `gh project item-list` returns items in the human's manual board order. Respect that. If the user wants Issue X before Issue Y, they drag X above Y on the board.
+1. **Board order first** — `items` returns cards in the human's manual board order. Respect that. If the user wants Issue X before Issue Y, they drag X above Y on the board.
 2. **Tiebreaker (rare):** within the same drag-position, sort by priority extracted from title regex `^\[?(P[1-4])\]?`: `P1` < `P2` < `P4` < `P3` < no priority. Then issue number ascending.
 
 If `Ready` is empty: print `📭 Project board "Ready" column is empty — nothing to dispatch.` and exit 0. This is not an error; it means the human hasn't curated work yet.

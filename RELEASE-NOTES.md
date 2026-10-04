@@ -1,5 +1,34 @@
 # Release notes
 
+## v3.1.0 — 2026-10-04
+
+The board spends about a twentieth of the GitHub budget it did, can run every lane on Codex,
+and steps itself down when it hits the hourly limit anyway.
+
+- ⚡ **About 20x fewer GraphQL points.** A new `scripts/super-board-card.sh` moves and reads
+  cards with cached project and field ids — 1 point a move, where `gh project item-list`
+  plus `field-list` cost ~300 on a 131-card board. Comments, labels and PR reads go over
+  REST. Measured before: a 3-card wave spent ~2,850 of 5,000 points/hr.
+- 📏 **An honest quota reading.** `gh api rate_limit` misreports the GraphQL bucket (REST
+  said used=2 while GraphQL said used=930). `sb_gh_quota_merge` in `super-board-gh-guard.sh`
+  takes GraphQL's own `rateLimit` numbers; the guard and the summary use it.
+- 🤖 **Second account onboarding.** Onboard offers a robot GitHub account so the board gets
+  its own 5,000 points/hr (`references/second-account.md`).
+- ✨ **`run --codex[=<model>] [--low|--high]`.** Every lane runs on headless Codex
+  (`super-board-codex-wave.sh` → `super-board-codex-lane.sh`), cards in parallel under
+  `max_workers`. Ladders: Sol/Sol/Astra by default, Luna/Sol/Sol on `--low`, Astra on
+  `--high`; a Luna router grades each Ready card. `--codex=<model>` or `codex.model` pins one.
+  Review and merge on Codex need the explicit flag; the usage fallback
+  (`usage_fallback: "codex"`, now required) builds and tests only.
+- 🐢 **Throttle.** `super-board-throttle.sh` lowers `max_workers` after a wave that hit the
+  hourly limit — unlimited → 3 → 2 → 1 — and writes it to the config.
+- 🧭 **Preflight sequences overlapping peers.** Two Ready cards naming the same files, with
+  no open PR, go one at a time: the lower number builds, the other waits behind it. Before,
+  each was sequenced behind the other and neither was built.
+- 🗄️ **Migration reach checks.** `migrations.checks[env]` is a read-only probe run before the
+  first wave, so a broken database URL halts the run instead of a merge.
+- 📝 **Models table** in the README; `--high` is now Opus for every card.
+
 ## v3.0.5 — 2026-10-03
 
 Migrating a board no longer leaves its cards with no status.

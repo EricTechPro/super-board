@@ -114,12 +114,21 @@ const REVIEW_MEMORY = [
   `Exit 8 = 🙋 needs you (migration for a DB the robot may not touch, failed migrate, declared human step): Blocked with the 🙋 template, exact commands from its needs-you lines, label needs-you.`,
 ]
 
+// GitHub budget (rate-limit-etiquette.md → "Price list"). Measured 2026-10-04: a
+// 3-card wave spent ~2,850 of 5,000 GraphQL points/hr, nearly all of it lanes
+// finding a card with `gh project item-list` (~203 points on a 131-card board)
+// and its Status options with `gh project field-list` (101) before each move.
+const BOARD_IO = () =>
+  `Board moves and reads: .claude/bin/super-board-card.sh --config ${input.configPath} move <issue> <Status> ` +
+  `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per .claude/skills/super-board/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`
+
 const lanePrompt = (lane, card) => [
   READ_FAILURE,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .claude/worktrees/, work on the issue branch, post the required PR/issue comments,`,
   `move the project card yourself, clean up the worktree on exit. Config: ${input.configPath}.`,
+  BOARD_IO(),
   `Commits, PR title, PR body blocks, comments: .claude/skills/super-board/references/writing-standard.md. Rewrite only your own PR body blocks, with .claude/bin/super-board-pr-body.sh.`,
   ...(lane === 'review' ? REVIEW_MEMORY : []),
   ...(lane === 'qa' && card.status === 'Ready'
@@ -141,11 +150,11 @@ const lanePrompt = (lane, card) => [
 // always inherit the session model.
 //   low    (run --low):  haiku / sonnet / opus
 //   medium (default):    sonnet / opus / session
-//   high   (run --high): opus / session / session
+//   high   (run --high): opus for every card
 const LADDERS = {
   low: { low: 'haiku', medium: 'sonnet', high: 'opus' },
   medium: { low: 'sonnet', medium: 'opus', high: undefined },
-  high: { low: 'opus', medium: undefined, high: undefined },
+  high: { low: 'opus', medium: 'opus', high: 'opus' },
 }
 const ladder = LADDERS[input.tier || 'medium']
 const tierFor = (cls) => (cls ? ladder[cls.complexity] : undefined)
@@ -191,6 +200,7 @@ const PREFLIGHT_SCHEMA = {
           number: { type: 'integer' },
           verdict: { type: 'string', enum: ['proceed', 'hold', 'sequence', 'skipped', 'halted'] },
           column: { type: 'string' },
+          blockedBy: { type: 'array', items: { type: 'integer' } },
           detail: { type: 'string' },
         },
         required: ['number', 'verdict', 'detail'],
@@ -208,6 +218,9 @@ const preflightPrompt = (batch) => [
   `Other cards in this wave: ${JSON.stringify(input.cards.map(({ number, status, title }) => ({ number, status, title })))}`,
   `Run .claude/bin/super-board-preflight.sh once for the whole batch, then judge its candidates semantically.`,
   `hold / sequence-behind → post the Block template (block-template.md) and move the card to Blocked yourself.`,
+  `Two Ready cards overlapping each other with no open PR: the lower-numbered one proceeds; sequence only the other, blockedBy [the lower]. Never both.`,
+  `A sequence with nothing to wait on (empty blockedBy) leaves the card in Ready: return column Ready and it builds.`,
+  BOARD_IO(),
   `Return one verdict per issue: proceed | hold | sequence | skipped (pre-flight blind). Never drop a card silently.`,
 ].join('\n')
 
@@ -229,9 +242,14 @@ await Promise.all(batches.map(async (batch) => {
   }
 }))
 // sequence with nothing to wait on = proceed with a conflict note (the agent posted it).
+// No column and an empty blockedBy is the same case: nothing to wait on never parks a
+// card (2026-10-03: #180/#181 each "sequenced" behind the other, neither built).
 const preflightGo = (card) => {
   const v = verdicts.get(card.number)
-  return !!v && (v.verdict === 'proceed' || (v.verdict === 'sequence' && v.column === 'Ready'))
+  if (!v) return false
+  if (v.verdict === 'proceed') return true
+  return v.verdict === 'sequence' && (v.column === 'Ready' ||
+    (!v.column && Array.isArray(v.blockedBy) && v.blockedBy.length === 0))
 }
 const preflightExit = (card) => {
   const v = verdicts.get(card.number) ||

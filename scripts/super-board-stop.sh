@@ -3,11 +3,12 @@
 #
 # What it does:
 #   1. Find every in-flight worker (lock files under .claude/super-board/inflight/).
+#      Stop any Codex wave and its lane process groups before comments/releases.
 #   2. For each one, post a "stopped mid-flight" comment on the issue AND its PR
 #      (with last commit, lane, and resume hint) — so context survives the kill.
 #   3. Release the GitHub assignee mutex on each claimed issue.
 #   4. SIGTERM → 1s → SIGKILL the worker PIDs.
-#   5. Kill the dispatcher loop (super-board-run.sh).
+#   5. Kill the legacy dispatcher loop (super-board-run.sh).
 #   6. Remove in-flight locks. Leave worktrees in place (Builder can resume).
 #   7. Print summary + resume command.
 #
@@ -127,13 +128,16 @@ release_claim() {
 }
 
 kill_pid() {
-  local pid="$1" name="${2:-process}"
+  local pid="$1" name="${2:-process}" grace="${3:-1}" waited=0
   if [ -z "$pid" ] || ! kill -0 "$pid" 2>/dev/null; then
     log "  ⊘ ${name} pid=${pid:-empty} already dead"
     return 0
   fi
   kill -TERM "$pid" 2>/dev/null || true
-  sleep 1
+  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$grace" ]; do
+    sleep 1
+    waited=$((waited + 1))
+  done
   if kill -0 "$pid" 2>/dev/null; then
     kill -KILL "$pid" 2>/dev/null || true
     log "  ☠ ${name} pid=${pid} SIGKILLed (didn't respond to SIGTERM)"
@@ -151,8 +155,10 @@ echo "════════════════════════�
 WORKERS=()
 if [ -d "$INFLIGHT_DIR" ]; then
   for lock in "$INFLIGHT_DIR"/*; do
-    [ -e "$lock" ] || continue
+    [ -f "$lock" ] || continue
     issue=$(basename "$lock")
+    # Wave/merge control markers are not GitHub issue numbers.
+    case "$issue" in ''|*[!0-9]*) continue ;; esac
     read_lock "$issue"
     WORKERS+=("${issue}|${LANE:-unknown}|${PID:-}")
   done
@@ -160,11 +166,35 @@ fi
 
 DISPATCHER_PIDS=$(pgrep -f 'super-board-run\.sh' 2>/dev/null || true)
 ORPHAN_WORKERS=$(pgrep -f 'claude -p .*super-board' 2>/dev/null || true)
+CODEX_WAVE_MARKER=".claude/super-board/codex-wave.pid"
+CODEX_WAVE_PID=""
+if [ -f "$CODEX_WAVE_MARKER" ]; then
+  CODEX_WAVE_PID=$(cat "$CODEX_WAVE_MARKER")
+  case "$CODEX_WAVE_PID" in ''|*[!0-9]*)
+    log "🛑 invalid Codex wave PID marker; preserve claims and inspect $CODEX_WAVE_MARKER"
+    exit 1 ;;
+  esac
+  if kill -0 "$CODEX_WAVE_PID" 2>/dev/null; then
+    # Refuse a reused PID, or an unavailable process identity, rather than
+    # signal an unrelated process and release a still-running wave's claims.
+    if ! ps -p "$CODEX_WAVE_PID" -o args= 2>/dev/null | grep -q 'super-board-codex-wave'; then
+      log "🛑 cannot identify Codex wave PID $CODEX_WAVE_PID; preserve claims and inspect $CODEX_WAVE_MARKER"
+      exit 1
+    fi
+  fi
+fi
 
-if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER_PIDS" ] && [ -z "$ORPHAN_WORKERS" ]; then
+if [ "${#WORKERS[@]}" -eq 0 ] && [ -z "$DISPATCHER_PIDS" ] && [ -z "$ORPHAN_WORKERS" ] && [ -z "$CODEX_WAVE_PID" ]; then
   echo "  ✓ nothing to stop — no dispatcher, no in-flight workers, no orphans"
   echo "════════════════════════════════════════════════════════"
   exit 0
+fi
+
+# Stop new Codex dispatch first. Its TERM handler cancels lane process groups
+# and reaps them (up to five seconds), before any claim can be released.
+if [ -n "$CODEX_WAVE_PID" ]; then
+  log "🛑 stopping Codex wave and its lane workers"
+  kill_pid "$CODEX_WAVE_PID" "codex-wave" 7
 fi
 
 # 2. Per-worker wrap-up: comment, release claim, kill.
@@ -200,13 +230,18 @@ fi
 
 # 5. Clear in-flight locks (PIDs are dead now).
 if [ -d "$INFLIGHT_DIR" ] && [ -n "$(ls -A "$INFLIGHT_DIR" 2>/dev/null)" ]; then
-  rm -f "$INFLIGHT_DIR"/*
+  for entry in "${WORKERS[@]}"; do
+    IFS='|' read -r issue lane pid <<< "$entry"
+    rm -f "$INFLIGHT_DIR/$issue"
+  done
   log ""
   log "🧽 cleared $INFLIGHT_DIR"
 fi
+[ -z "$CODEX_WAVE_PID" ] || rm -f "$INFLIGHT_DIR/workflow-wave.lock" "$CODEX_WAVE_MARKER"
 
 # 6. Summary.
 DISP_COUNT=$(echo "$DISPATCHER_PIDS" | tr ' ' '\n' | grep -c . || true)
+[ -z "$CODEX_WAVE_PID" ] || DISP_COUNT=$((DISP_COUNT + 1))
 echo ""
 echo "════════════════════════════════════════════════════════"
 echo "  ✅ stopped: ${#WORKERS[@]} worker(s), ${DISP_COUNT} dispatcher(s)"

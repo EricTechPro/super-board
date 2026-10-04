@@ -179,7 +179,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       it never takes a new snapshot over a partially upgraded board. No extra setup question.
 
 2. 🔑 GITHUB
-   ├─ Bash(gh auth status). Signed in with project scopes → `✓ GitHub connected.` and on.
+   ├─ Bash(gh auth status). Signed in with project scopes → `✓ GitHub connected.`; continue below.
    ├─ Not signed in → one line, then Bash(gh auth login) — the permission prompt asks.
    ├─ Missing scopes → "This opens a browser to approve board access — needed to move cards and
    │    create the board for you." then Bash(gh auth refresh -s project,read:project,repo)
@@ -187,8 +187,21 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    yet. Create a repo?" [Create a private repo (Recommended) / Use an existing repo /
    │    Not now — the robot can't open pull requests]. Create → gh repo create <login>/<folder>
    │    --private --source . --remote origin
-   └─ bot_identity: `super-board-bot[bot]` when a GitHub App is installed on the repo, else the
-      login. Then `✓ GitHub connected.`
+   ├─ Second account (AskUserQuestion, header "Robot account"); explain in four short lines:
+   │      The robot's gh issue, gh pr and gh project GraphQL calls share your 5,000 points/hr.
+   │      Finfluencer (2026-10-03/04): 3 cards cost ~2,850 (~950/card); 14 used all 5,000 in ~40 min.
+   │      Board moves then failed; nearly every wave left the board idle for up to an hour.
+   │      Your browsing and tools share that budget. A bot gets its own 5,000 points/hr.
+   │    "Want a second GitHub account for the robot? It gives the board its own hourly budget,
+   │    so it can run more cards before pausing. Takes about 10 minutes."
+   │      • Yes, set it up now (Recommended)
+   │      • Not now — stay on my account; waves pause when the hourly limit runs out
+   │    Save the choice with the GitHub answers. Yes → follow references/second-account.md;
+   │    keep the owner active through step 3, then finish bot access before step 4. Keep the
+   │    repo/project owner unchanged. Already on a verified bot → keep it; don't create another.
+   └─ bot_identity: new board with a machine account → bot username; existing board → keep its
+      configured claim identity. Otherwise `super-board-bot[bot]` when a GitHub App is installed
+      on the repo, else the login. Stage `notifications.bot_identity` for step 8; see second-account.md.
 
 3. 🗂️ BOARD — one question: which board
    ├─ One checklist line, one labels line, no question about either:
@@ -211,6 +224,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       In Progress; labels). Prints its URL.
    There is no "Needs you" column and no Skipped column: a card waiting on a person goes to
    Blocked with 🙋 (block-template.md); a card dropped on purpose is closed and moved to Done.
+   Second account chosen in step 2 → finish references/second-account.md now; verify bot access.
 
 4. 🌿 BRANCH
    ├─ python3 $SB/super-board-setup.py branch → one line:
@@ -270,7 +284,13 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
     c. "Databases" (multiSelect, only when migration dirs exist) — "Which databases may the robot
        migrate?" [test (Recommended) / staging (Recommended) / live] → migrations.allowed_envs;
        target_env "live" on a production base, else "staging"; commands from the manifest's
-       migrate scripts (ask only for a missing one).
+       migrate scripts (ask only for a missing one). A command needing a DB URL resolves it
+       from the project's `.env` by absolute path, never from the session, since a lane agent's
+       shell loads nothing (config-schema → `migrations.commands`). Write a matching read-only
+       `migrations.checks[env]` (e.g. `supabase migration list --db-url …`) and run it now; a
+       failure is fixed here, not discovered at the first merge. For Supabase the URL is the
+       Session pooler string (port 5432) with special characters in the password URL-encoded,
+       and a just-reset password takes ~20 s to reach the pooler — retry once before calling it wrong.
    Permission lines: the base list in run-workflow.md → "Mid-run permission prompts", plus the
    merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
    "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash

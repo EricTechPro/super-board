@@ -18,14 +18,15 @@ is()  { [ "$2" = "$3" ] && ok "$1" || bad "$1" "$2" "$3"; }
 has() { case "$2" in *"$3"*) ok "$1" ;; *) bad "$1" "contains: $3" "$2" ;; esac; }
 hasnt() { case "$2" in *"$3"*) bad "$1" "no '$3'" "found it" ;; *) ok "$1" ;; esac; }
 
-# gh stub: `pr view` serves $WORK/body.md and $HEAD_OID; `pr edit --body-file` stores the new body.
+# gh stub (REST): GET pulls/N serves $WORK/body.md and $HEAD_OID; PATCH pulls/N --input - stores the new body.
 cat > "$WORK/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$GH_LOG"
-case "$1 $2" in
-  "pr view") jq -n --arg h "$HEAD_OID" --rawfile b "$BODY" '{headRefOid: $h, body: $b}' ;;
-  "pr edit")
-    while [ $# -gt 0 ]; do [ "$1" = "--body-file" ] && cp "$2" "$BODY"; shift; done ;;
+case "$*" in
+  "api -X PATCH repos/{owner}/{repo}/pulls/"*" --input -") jq -j .body > "$BODY" ;;
+  "api repos/{owner}/{repo}/pulls/"*)
+    jq -n --arg h "$HEAD_OID" --rawfile b "$BODY" '{head: {sha: $h}, body: $b}' | jq '{headRefOid: .head.sha, body: (.body // "")}' ;;
+  *) echo "unexpected gh call: $*" >&2; exit 1 ;;
 esac
 STUB
 chmod +x "$WORK/gh"
@@ -64,7 +65,7 @@ has "problem block untouched" "$(cat "$BODY")" '- **Where:** `/x`'
 
 echo "── idempotent"
 is  "same content twice is a no-op" "unchanged" "$(run --pr 7 --block status --expect-head 3f9c2a1 --body-file "$WORK/status.md")"
-hasnt "no edit call on a no-op"     "$(cat "$GH_LOG")" "pr edit"
+hasnt "no edit call on a no-op"     "$(cat "$GH_LOG")" "PATCH"
 
 echo "── missing block inserted in order"
 run --pr 7 --block risk --expect-head 3f9c2a1 --body-file "$WORK/risk.md" >/dev/null
@@ -87,7 +88,7 @@ echo "── refuses when the head moved"
 cp "$BODY" "$WORK/before.md"
 RC=0; run --pr 7 --block status --expect-head deadbee --body-file "$WORK/risk.md" >/dev/null || RC=$?
 is  "moved head exits 6" "6" "$RC"
-hasnt "no edit on a moved head" "$(cat "$GH_LOG")" "pr edit"
+hasnt "no edit on a moved head" "$(cat "$GH_LOG")" "PATCH"
 is  "body unchanged" "$(cat "$WORK/before.md")" "$(cat "$BODY")"
 
 echo "── usage"
@@ -95,7 +96,7 @@ RC=0; run --pr 7 --block status --body-file "$WORK/risk.md" >/dev/null || RC=$?;
 RC=0; run --pr 7 --block nope --expect-head x --body-file "$WORK/risk.md" >/dev/null || RC=$?; is "block is an enum" 64 "$RC"
 RC=0; run --pr 7 --block ac --expect-head x >/dev/null || RC=$?; is "content file required" 64 "$RC"
 OUT=$(run --pr 7 --block ac --dry-run --body-file "$WORK/risk.md"); has "dry run prints the body" "$OUT" "<!-- sb:ac -->"
-hasnt "dry run edits nothing" "$(cat "$GH_LOG")" "pr edit"
+hasnt "dry run edits nothing" "$(cat "$GH_LOG")" "PATCH"
 
 echo "── skeleton"
 SK=$("$SCRIPT" --skeleton)

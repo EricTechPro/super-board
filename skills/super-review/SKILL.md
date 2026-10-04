@@ -287,6 +287,7 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 
 ### State protocol
 - Read from issue + PR comments + PR review threads.
+- **GitHub budget** — every "move card" is `.claude/bin/super-board-card.sh --config <cfg> move <N> <Status>` (1 GraphQL point; `gh project item-list` / `field-list` cost ~100–200). Comments, labels and PR reads go over REST; [rate-limit-etiquette.md](../super-board/references/rate-limit-etiquette.md) → "Price list" has the calls.
 - Respect handed-down worktree at `.claude/worktrees/issue-<N>-review/` and branch `issue-<N>-<slug>`.
 
 ### Two card types

@@ -71,7 +71,11 @@ SRC="${BODY_FILE:-$APPEND_FILE}"
 [ "$DRY" -eq 1 ] || [ -n "$HEAD" ] || die "--expect-head <sha> is required (the PR head your edit is based on)" 64
 
 GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
-META=$(python3 "$GITHUB_READ" --kind body -- pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefOid,body ) || exit $?
+# REST, not `gh pr view`/`gh pr edit`: this script runs ~3 times per lane per
+# card, and the REST core bucket is separate from the GraphQL one the board
+# lives on. GH_REPO fills {owner}/{repo}; unset, gh uses the current checkout.
+export GH_REPO="${REPO:-${GH_REPO:-}}"; [ -n "$GH_REPO" ] || unset GH_REPO
+META=$(python3 "$GITHUB_READ" --kind body -- api "repos/{owner}/{repo}/pulls/$PR" --jq '{headRefOid: .head.sha, body: (.body // "")}' ) || exit $?
 NOW=$(printf '%s' "$META" | jq -r '.headRefOid // empty')
 if [ -n "$HEAD" ]; then
   # Short or full sha both work: the PR head must start with what you passed.
@@ -146,5 +150,5 @@ if [ "$DRY" -eq 1 ]; then cat "$NEW_TMP"; exit 0; fi
 # $(…) drops trailing newlines, which GitHub does not keep either.
 if [ "$(cat "$OLD_TMP")" = "$(cat "$NEW_TMP")" ]; then echo unchanged; exit 0; fi
 python3 "$GITHUB_READ" --check || exit $?
-gh pr edit "$PR" ${REPO:+--repo "$REPO"} --body-file "$NEW_TMP" >/dev/null 2>&1 || { python3 "$GITHUB_READ" --halt "PR body update outcome unknown for #$PR; read the body before retrying"; exit 79; }
+jq -n --rawfile b "$NEW_TMP" '{body: $b}' | gh api -X PATCH "repos/{owner}/{repo}/pulls/$PR" --input - >/dev/null 2>&1 || { python3 "$GITHUB_READ" --halt "PR body update outcome unknown for #$PR; read the body before retrying"; exit 79; }
 echo updated
