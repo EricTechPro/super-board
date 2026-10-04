@@ -11,7 +11,7 @@ so step 1 (Checks) can say "Fixed for you" without asking anything.
     super-board-setup.py names   [--root DIR]                          two board-name suggestions
     super-board-setup.py branch  [--root DIR]                          branches, deploy source, recommendation
     super-board-setup.py board-rank    --owner O                       the user's boards, best column match first
-    super-board-setup.py board-migrate (--config C | --owner O --number N --repo R) [--qa-all] [--prune-empty] [--dry-run]
+    super-board-setup.py board-migrate (--config C | --owner O --number N --repo R) [--qa-all] [--prune-empty] [--root DIR] [--dry-run]
                                                                        columns + labels + Skipped → Done
 
 Every command prints one JSON object. `--text` on check/fix prints the short ✓ lists the
@@ -32,16 +32,21 @@ command for this OS, for onboard to ask about.
 Status options (--prune-empty also drops unused extras such as a new board's Todo),
 creates the three labels, maps old type labels, labels every card `qa`
 on a board that was "qa-only" (--qa-all), moves Skipped cards to Done, removes the Skipped
-option, and puts back any card status the option rewrite cleared. Cards are never lost.
-Before the first option rewrite it saves every card's status to
-.claude/super-board/backup/board-<number>-<ts>.json, so a run that dies mid-way can still
-be put back by hand.
+option, and puts back any card status the option rewrite cleared. Before any write it saves
+all cards and conversion intent in .claude/super-board/migrations/ (under --root, the config project root, or cwd).
+Re-run the same command from the same root to recover an interrupted upgrade. Keep the
+board idle during migration: GitHub has no atomic compare-and-swap for field rewrites.
+Before the first option rewrite it also saves the original card statuses to
+.claude/super-board/backup/board-<number>-<ts>.json for manual recovery.
+No card is deleted. Detected concurrent edits are preserved or halt recovery.
 
 Exit: 0 ok · 1 check found red items · 2 a gh call failed · 64 usage · 66 pack not found.
 Stdlib only.
 """
 from __future__ import annotations
 
+import contextlib
+import hashlib
 import datetime as dt
 import glob
 import json
@@ -540,144 +545,378 @@ def item_labels(it):
     return {(x.get("name") if isinstance(x, dict) else str(x)).lower() for x in raw}
 
 
-ITEM_STATUS_Q = ("query($id:ID!,$after:String){node(id:$id){... on ProjectV2{items(first:100,after:$after){"
-                 "pageInfo{hasNextPage endCursor} nodes{id fieldValueByName(name:\"Status\"){"
-                 "... on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}")
+# Explicit cursors keep the recovery snapshot complete on boards of any size.
+ITEMS_Q = '''query($id:ID!,$after:String){node(id:$id){... on ProjectV2{
+items(first:100,after:$after){totalCount pageInfo{hasNextPage endCursor} nodes{
+id updatedAt type status:fieldValueByName(name:"Status"){
+... on ProjectV2ItemFieldSingleSelectValue{name optionId}}
+content{__typename ... on Issue{id number repository{nameWithOwner}
+labels(first:100){totalCount pageInfo{hasNextPage endCursor} nodes{name}}}}}}}}}'''
+ITEM_Q = '''query($id:ID!){node(id:$id){... on ProjectV2Item{
+id updatedAt type status:fieldValueByName(name:"Status"){
+... on ProjectV2ItemFieldSingleSelectValue{name optionId}}}}}'''
+LABELS_Q = '''query($id:ID!,$after:String){node(id:$id){... on Issue{
+labels(first:100,after:$after){totalCount pageInfo{hasNextPage endCursor} nodes{name}}}}}'''
 
 
-def board_items(owner, number, pid):
-    """Every card and its Status, as {item_id: status-or-None} beside the raw items.
-
-    `gh project item-list` names the Status column by its lowercased field name
-    (`status`) and leaves the key out on a card with no status. When no card carries
-    the key at all, it is read again over GraphQL (fieldValueByName "Status") rather
-    than trusted: a snapshot of all-None would make the restore a silent no-op."""
-    items = gh_json("project", "item-list", str(number), "--owner", owner, "--format", "json",
-                    "--limit", "5000").get("items", [])
-    if items and not any("status" in it for it in items):
-        statuses, after = {}, None
-        while True:
-            page = gql(ITEM_STATUS_Q, {"id": pid, "after": after})["data"]["node"]["items"]
-            for n in page["nodes"]:
-                statuses[n["id"]] = (n.get("fieldValueByName") or {}).get("name")
-            if not page["pageInfo"]["hasNextPage"]:
-                break
-            after = page["pageInfo"]["endCursor"]
-        for it in items:
-            if statuses.get(it["id"]):
-                it["status"] = statuses[it["id"]]
-    return items, {it["id"]: it.get("status") for it in items}
+def node_query(query, variables):
+    result = gql(query, variables)
+    if not isinstance(result, dict) or result.get('errors'):
+        raise RuntimeError('GitHub returned an incomplete GraphQL response')
+    node = (result.get('data') or {}).get('node')
+    if not isinstance(node, dict):
+        raise RuntimeError('GitHub did not return the requested board, field or item')
+    return node
 
 
-def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=False, root=None):
-    """Bring one GitHub Project to the v3 shape. Never removes a card.
+def connection_page(connection, seen, expected=None):
+    if not isinstance(connection, dict):
+        raise RuntimeError('GitHub omitted a required page')
+    total, page, nodes = connection.get('totalCount'), connection.get('pageInfo'), connection.get('nodes')
+    if (type(total) is not int or total < 0 or not isinstance(nodes, list) or
+            not isinstance(page, dict) or type(page.get('hasNextPage')) is not bool or
+            (expected is not None and total != expected)):
+        raise RuntimeError('GitHub returned an incomplete or changing page count')
+    cursor = page.get('endCursor') if page['hasNextPage'] else None
+    if page['hasNextPage'] and (not isinstance(cursor, str) or not cursor or cursor in seen or not nodes):
+        raise RuntimeError('GitHub pagination did not advance')
+    return nodes, total, cursor
 
-    updateProjectV2Field with singleSelectOptions replaces the whole option list: every
-    option gets a new id and GitHub clears the Status of EVERY card on the board. So every
-    rewrite is preceded by a snapshot on disk and followed by a restore, whatever path
-    triggered it (added columns, --prune-empty, Skipped removal)."""
-    res = {"added_columns": [], "labels_created": [], "labels_mapped": 0, "qa_labelled": 0,
-           "skipped_moved": 0, "skipped_removed": False, "restored": 0, "status_backup": None}
-    proj = gh_json("project", "view", str(number), "--owner", owner, "--format", "json")
-    pid, res["url"] = proj.get("id"), proj.get("url")
-    field = status_field(owner, number)
-    if not field:
-        raise RuntimeError("project has no Status field")
-    fid = field["id"]
-    opts = gql(OPTIONS_Q, {"id": fid})["data"]["node"]["options"]
-    items, snapshot = board_items(owner, number, pid)
 
-    names_low = {o["name"].lower(): o for o in opts}
-    in_use = {it.get("status") for it in items}
-    res["added_columns"] = [c for c in COLUMNS if c.lower() not in names_low]
+def issue_labels(issue_id, first=None):
+    labels, seen, total, cursor = [], set(), None, None
+    while True:
+        conn = first if first is not None else node_query(LABELS_Q, {'id': issue_id, 'after': cursor}).get('labels')
+        first = None
+        nodes, total, cursor = connection_page(conn, seen, total)
+        for label in nodes:
+            if not isinstance(label, dict) or not isinstance(label.get('name'), str):
+                raise RuntimeError('GitHub omitted an issue label')
+            labels.append(label['name'])
+        if cursor is None:
+            break
+        seen.add(cursor)
+    if len(labels) != total or len(set(labels)) != total:
+        raise RuntimeError('GitHub returned incomplete or duplicate issue labels')
+    return sorted(labels)
 
-    def option_inputs(keep_skipped):
-        out_ = []
-        for c in COLUMNS:
-            o = names_low.get(c.lower())
-            out_.append({"name": o["name"] if o else c, "color": (o or {}).get("color") or COLORS[c],
-                         "description": (o or {}).get("description") or ""})
-        for o in opts:
-            if o["name"].lower() in {c.lower() for c in COLUMNS}:
-                continue
-            if o["name"].lower() == "skipped" and not keep_skipped:
-                continue
-            if prune_empty and o["name"] not in in_use:
-                continue  # a brand-new board's default Todo / In Progress, holding nothing
-            out_.append({"name": o["name"], "color": o.get("color") or "GRAY", "description": o.get("description") or ""})
-        return out_
 
-    has_skipped = "skipped" in names_low
-    rewrote = False
+def item_state(node):
+    if (not isinstance(node, dict) or not isinstance(node.get('id'), str) or
+            not isinstance(node.get('updatedAt'), str) or 'status' not in node):
+        raise RuntimeError('GitHub returned an incomplete board item')
+    status = node['status']
+    if status is not None and (not isinstance(status, dict) or not isinstance(status.get('name'), str)
+                               or not isinstance(status.get('optionId'), str)):
+        raise RuntimeError('GitHub omitted the item Status value')
+    return {'id': node['id'], 'status': status and status['name'], 'updatedAt': node['updatedAt']}
 
-    def rewrite(keep_skipped):
-        nonlocal rewrote
-        if not rewrote:
-            # On disk before the first rewrite: a crash after it still leaves a way back.
-            bdir = os.path.join(root or os.getcwd(), ".claude", "super-board", "backup")
-            os.makedirs(bdir, exist_ok=True)
-            path = os.path.join(bdir, f"board-{number}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
-            write_json(path, snapshot)
-            res["status_backup"] = path
-        rewrote = True
-        got = gql(UPDATE_M, {"id": fid, "opts": option_inputs(keep_skipped)})
-        return got["data"]["updateProjectV2Field"]["projectV2Field"]["options"]
 
-    if (res["added_columns"] or prune_empty) and not dry:
-        opts_now = rewrite(keep_skipped=True)
-    else:
-        opts_now = opts
-    ids = {o["name"].lower(): o["id"] for o in opts_now}
+def board_items(pid):
+    items, seen, total, cursor = [], set(), None, None
+    while True:
+        conn = node_query(ITEMS_Q, {'id': pid, 'after': cursor}).get('items')
+        nodes, total, cursor = connection_page(conn, seen, total)
+        for node in nodes:
+            item = item_state(node)
+            content = node.get('content')
+            types = {'ISSUE': 'Issue', 'PULL_REQUEST': 'PullRequest', 'DRAFT_ISSUE': 'DraftIssue', 'REDACTED': None}
+            kind = node.get('type')
+            if kind not in types or 'content' not in node or (
+                    kind == 'REDACTED' and content is not None) or (
+                    kind != 'REDACTED' and (not isinstance(content, dict) or content.get('__typename') != types[kind])):
+                raise RuntimeError('GitHub omitted the board item type or content; cannot safely migrate its labels')
+            if isinstance(content, dict) and content.get('__typename') == 'Issue':
+                repo = (content.get('repository') or {}).get('nameWithOwner')
+                if not content.get('id') or type(content.get('number')) is not int or not repo:
+                    raise RuntimeError('GitHub omitted the issue identity')
+                item['issue'] = {'id': content['id'], 'number': content['number'], 'repo': repo,
+                                 'labels': issue_labels(content['id'], content.get('labels'))}
+            items.append(item)
+        if cursor is None:
+            break
+        seen.add(cursor)
+    if len(items) != total or len({it['id'] for it in items}) != total:
+        raise RuntimeError('GitHub returned incomplete or duplicate board items')
+    return items
 
-    # Labels on the repo: create the three, then map old type labels on every card.
-    existing = {l["name"].lower() for l in gh_json("label", "list", "--repo", repo, "--json", "name", "--limit", "300")}
-    for name, (color, desc) in LABELS.items():
-        if name not in existing:
-            res["labels_created"].append(name)
-            if not dry:
-                run(["gh", "label", "create", name, "--repo", repo, "--color", color, "--description", desc], check=True)
-    for it in items:
-        content = it.get("content") or {}
-        if content.get("type") != "Issue":
+
+def field_options(fid):
+    opts = node_query(OPTIONS_Q, {'id': fid}).get('options')
+    if not isinstance(opts, list) or not opts or any(
+            not isinstance(o, dict) or any(not isinstance(o.get(k), str) for k in ('id', 'name', 'color', 'description'))
+            for o in opts):
+        raise RuntimeError('GitHub returned incomplete Status options')
+    if len({o['name'].lower() for o in opts}) != len(opts) or len({o['id'] for o in opts}) != len(opts):
+        raise RuntimeError('GitHub returned ambiguous Status options')
+    return opts
+
+
+def option_values(opts):
+    return [{k: o[k] for k in ('name', 'color', 'description')} for o in opts]
+
+
+def recovery_digest(saved):
+    payload = {k: v for k, v in saved.items() if k != 'checksum'}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def save_recovery(path, saved):
+    saved['checksum'] = recovery_digest(saved)
+    durable_json(path, saved)
+
+
+def durable_json(path, data):
+    """Commit and read back each checkpoint before allowing the next remote write."""
+    parent = os.path.dirname(path)
+    os.makedirs(parent, exist_ok=True)
+    temp = path + '.tmp'
+    with open(temp, 'w') as stream:
+        json.dump(data, stream, indent=2)
+        stream.write('\n')
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temp, path)
+    if os.name != 'nt':
+        fd = os.open(parent, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    if load_json(path) != data:
+        raise RuntimeError('Could not verify the saved upgrade recovery record')
+
+
+@contextlib.contextmanager
+def migration_lock(path):
+    """OS-released lock: a crashed upgrade never leaves a stale lock blocking recovery."""
+    directory = os.path.dirname(path)
+    os.makedirs(directory, exist_ok=True)
+    # Upgrades of existing installations need this before onboard reaches its ignore-file step.
+    try:
+        with open(os.path.join(directory, '.gitignore'), 'x') as ignore:
+            ignore.write('*\n')
+    except FileExistsError:
+        pass
+    with open(path + '.lock', 'a+b') as stream:
+        try:
+            if os.name == 'nt':
+                import msvcrt
+                stream.write(b'\0'); stream.flush(); stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise RuntimeError('Another upgrade is using this board recovery record') from exc
+        try:
+            yield
+        finally:
+            if os.name == 'nt':
+                stream.seek(0)
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+
+
+def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=False, root=None, config_path=None):
+    """Save first, reconcile each write, resume an interrupted upgrade without re-snapshotting."""
+    proj = gh_json('project', 'view', str(number), '--owner', owner, '--format', 'json')
+    if not isinstance(proj, dict) or not isinstance(proj.get('id'), str) or not proj.get('url'):
+        raise RuntimeError('GitHub omitted the project identity')
+    pid = proj['id']
+    path = os.path.join(root or os.getcwd(), '.claude', 'super-board', 'migrations',
+                        hashlib.sha256(pid.encode()).hexdigest()[:24] + '.json')
+    binding = {'project': pid, 'owner': owner, 'number': number, 'repo': repo}
+    if dry:
+        return prepare_migration(binding, proj['url'], qa_all, prune_empty)['result']
+    try:
+        with migration_lock(path):
+            saved = load_json(path)
+            if os.path.exists(path) and not isinstance(saved, dict):
+                raise RuntimeError('Recovery record is unreadable; restore it from backup before retrying')
+            if os.path.exists(path) and saved.get('checksum') != recovery_digest(saved):
+                raise RuntimeError('Recovery record is damaged; restore it from backup before retrying')
+            if saved and not saved.get('complete'):
+                if saved.get('version') != 1 or saved.get('binding') != binding:
+                    raise RuntimeError('Recovery record does not match this board/repository')
+            else:
+                saved = prepare_migration(binding, proj['url'], qa_all, prune_empty)
+                save_recovery(path, saved)  # no GitHub mutation has occurred
+            saved['result']['recovery_file'] = path
+            resume_migration(saved, path)
+            if config_path:
+                current = load_json(config_path)
+                if not isinstance(current, dict):
+                    raise RuntimeError('Config is unreadable; keeping the upgrade pending')
+                configured = current.get('project') or {}
+                if configured.get('owner') != owner or int(configured.get('number', 0)) != number:
+                    raise RuntimeError('Board config changed during upgrade; keeping the recovery record')
+                if current.pop('_qa_all', None) is not None:
+                    durable_json(os.path.abspath(config_path), current)
+            saved['complete'] = True
+            save_recovery(path, saved)
+            return saved['result']
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+        raise RuntimeError(f'{exc}. Upgrade incomplete; keep {path}, fix the error and re-run the same board-migrate command. '
+                           'Do not run the board until recovery succeeds.') from exc
+
+
+def prepare_migration(binding, url, qa_all, prune_empty):
+    field = status_field(binding['owner'], binding['number'])
+    if not field or not field.get('id'):
+        raise RuntimeError('project has no Status field')
+    opts = field_options(field['id'])
+    items = board_items(binding['project'])
+    names = {o['name'].lower(): o for o in opts}
+    in_use = {it['status'] for it in items}
+    if any(s and s.lower() not in names for s in in_use):
+        raise RuntimeError('Board Status values changed while taking the snapshot')
+    desired = []
+    for c in COLUMNS:
+        desired.append(option_values([names[c.lower()]])[0] if c.lower() in names else
+                       {'name': c, 'color': COLORS[c], 'description': ''})
+    desired += option_values([o for o in opts if o['name'].lower() not in {c.lower() for c in COLUMNS}
+                              and o['name'].lower() != 'skipped' and (not prune_empty or o['name'] in in_use)])
+    result = {'url': url, 'added_columns': [c for c in COLUMNS if c.lower() not in names],
+              'labels_created': [], 'labels_mapped': 0, 'qa_labelled': 0,
+              'skipped_moved': 0, 'skipped_removed': 'skipped' in names, 'restored': 0,
+              'preserved_edits': [], 'removed_items': [], 'status_backup': None}
+    for item in items:
+        item['want'] = 'Done' if (item['status'] or '').lower() == 'skipped' else item['status']
+        result['skipped_moved'] += int(item['want'] != item['status'])
+        issue = item.get('issue')
+        if not issue:
+            if qa_all and item['status'] not in ('Done', 'Skipped'):
+                raise RuntimeError('QA-only conversion needs an accessible issue for every active card')
             continue
-        n, labels = content.get("number"), item_labels(it)
-        for old, new in OLD_LABELS.items():
-            if old in labels:
-                res["labels_mapped"] += 1
-                if not dry:
-                    run(["gh", "issue", "edit", str(n), "--repo", repo, "--add-label", new, "--remove-label", old])
-                labels.add(new)
-        if qa_all and it.get("status") not in ("Done", "Skipped") and not labels & set(LABELS):
-            res["qa_labelled"] += 1
-            if not dry:
-                run(["gh", "issue", "edit", str(n), "--repo", repo, "--add-label", "qa"])
+        before = issue['labels']
+        after = set(before)
+        for label in before:
+            if label.lower() in OLD_LABELS:
+                after.discard(label)
+                after.add(OLD_LABELS[label.lower()])
+                result['labels_mapped'] += 1
+        if qa_all and item['status'] not in ('Done', 'Skipped') and not {n.lower() for n in after} & set(LABELS):
+            after.add('qa')
+            result['qa_labelled'] += 1
+        issue['want'] = sorted(after)
+        if before != issue['want'] and issue['repo'].lower() != binding['repo'].lower():
+            raise RuntimeError('Board has an issue from another repository needing label conversion; migrate it in its own repository first')
+    labels = repository_labels(binding['repo'])
+    result['labels_created'] = [n for n in LABELS if n not in {s.lower() for s in labels}]
+    return {'version': 1, 'qa_all': qa_all, 'prune_empty': prune_empty, 'binding': binding, 'field': field['id'], 'options': opts, 'desired': desired,
+            'items': items, 'result': result, 'options_started': False, 'options_done': False,
+            'labels_done': [], 'statuses_done': [], 'complete': False}
 
-    def set_status(item_id, name):
-        if dry:
-            return
-        run(["gh", "project", "item-edit", "--id", item_id, "--project-id", pid, "--field-id", fid,
-             "--single-select-option-id", ids[name.lower()]], check=True)
 
-    if has_skipped:
-        for it in items:
-            if it.get("status") == "Skipped":
-                set_status(it["id"], "Done")
-                snapshot[it["id"]] = "Done"
-                res["skipped_moved"] += 1
-        if not dry:
-            opts_now = rewrite(keep_skipped=False)
-            ids = {o["name"].lower(): o["id"] for o in opts_now}
-        res["skipped_removed"] = True
+def repository_labels(repo):
+    # --slurp yields every page separately, so a capped CLI list cannot hide a label.
+    pages = gh_json('api', f'repos/{repo}/labels?per_page=100', '--paginate', '--slurp')
+    if not isinstance(pages, list) or not pages or any(not isinstance(p, list) for p in pages):
+        raise RuntimeError('GitHub returned incomplete repository labels')
+    labels = [label for page in pages for label in page]
+    if any(not isinstance(l, dict) or not isinstance(l.get('name'), str) for l in labels):
+        raise RuntimeError('GitHub omitted a repository label')
+    return [l['name'] for l in labels]
 
-    # Rewriting options clears card statuses. After ANY rewrite, put every one back.
-    if rewrote and not dry:
-        _, now = board_items(owner, number, pid)
-        for item_id, have in now.items():
-            want = snapshot.get(item_id)
-            if want and have != want and want.lower() in ids:
-                set_status(item_id, want)
-                res["restored"] += 1
-    return res
+
+def resume_migration(saved, path):
+    repo, pid, fid = saved['binding']['repo'], saved['binding']['project'], saved['field']
+    checkpoint = lambda: save_recovery(path, saved)
+    # Reconcile first; a lost response never causes a blind create/edit replay.
+    for name, (color, desc) in LABELS.items():
+        if name not in {s.lower() for s in repository_labels(repo)}:
+            run(['gh', 'label', 'create', name, '--repo', repo, '--color', color, '--description', desc])
+            if name not in {s.lower() for s in repository_labels(repo)}:
+                raise RuntimeError(f'Could not verify creation of label {name}')
+    for item in saved['items']:
+        issue = item.get('issue')
+        if not issue or issue['labels'] == issue['want']:
+            continue
+        current = issue_labels(issue['id'])
+        if item['id'] in saved['labels_done']:
+            if current != issue['want']:
+                raise RuntimeError('Issue labels changed after conversion; review the saved recovery record')
+            continue
+        if current == issue['want']:
+            saved['labels_done'].append(item['id']); checkpoint(); continue
+        if current != issue['labels']:
+            raise RuntimeError('Issue labels changed during upgrade; preserving the edit and stopping')
+        checkpoint()  # persist the original and desired labels before the mutation
+        args = ['gh', 'issue', 'edit', str(issue['number']), '--repo', issue['repo']]
+        added, removed = set(issue['want']) - set(current), set(current) - set(issue['want'])
+        if added:
+            args += ['--add-label', ','.join(sorted(added))]
+        if removed:
+            args += ['--remove-label', ','.join(sorted(removed))]
+        run(args)
+        if issue_labels(issue['id']) != issue['want']:
+            raise RuntimeError('Could not verify issue label conversion')
+        saved['labels_done'].append(item['id']); checkpoint()
+
+    opts = field_options(fid)
+    rewrite = option_values(saved['options']) != saved['desired']
+    if not saved['options_done']:
+        if saved['options_started'] and option_values(opts) == saved['desired']:
+            saved['options_done'] = True; checkpoint()
+        else:
+            if opts != saved['options']:
+                raise RuntimeError('Status options changed during upgrade; preserving the edit and stopping')
+            now = board_items(pid)
+            signature = lambda items: sorted((i['id'], i['status'], i['updatedAt']) for i in items)
+            if signature(now) != signature(saved['items']):
+                raise RuntimeError('Board cards changed before the Status rewrite; preserving edits and stopping')
+            if rewrite:
+                if not saved['result'].get('status_backup'):
+                    # Keep the original manual backup alongside the resumable recovery record.
+                    directory = os.path.join(os.path.dirname(os.path.dirname(path)), 'backup')
+                    backup = os.path.join(directory, f"board-{saved['binding']['number']}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.json")
+                    durable_json(backup, {item['id']: item['status'] for item in saved['items']})
+                    saved['result']['status_backup'] = backup
+                saved['options_started'] = True; checkpoint()
+                try:
+                    gql(UPDATE_M, {'id': fid, 'opts': saved['desired']})
+                except (RuntimeError, ValueError):
+                    pass  # the server may have applied it; only read-back settles this
+                opts = field_options(fid)
+                if option_values(opts) != saved['desired']:
+                    raise RuntimeError('Could not verify the Status options rewrite')
+            saved['options_done'] = True; checkpoint()
+    if option_values(opts) != saved['desired']:
+        raise RuntimeError('Status options changed after the rewrite; recovery will not overwrite them')
+    ids = {o['name'].lower(): o['id'] for o in opts}
+    # One complete read also distinguishes removed cards from unavailable partial responses.
+    now = {it['id']: it for it in board_items(pid)}
+    for item in saved['items']:
+        key, want = item['id'], item['want']
+        if key in saved['statuses_done']:
+            continue  # later user edits, including clearing Status, belong to the user
+        if key not in now:
+            saved['result']['removed_items'].append(key)
+            saved['statuses_done'].append(key); checkpoint(); continue
+        current = item_state(node_query(ITEM_Q, {'id': key}))
+        if current['status'] == want or want is None:
+            saved['statuses_done'].append(key); checkpoint(); continue
+        if current['status'] is not None and not (current['status'] == item['status'] and (current['status'] or '').lower() == 'skipped'):
+            saved['result']['preserved_edits'].append(key)
+            saved['statuses_done'].append(key); checkpoint(); continue
+        pending = saved.get('pending_status')
+        if pending and pending['id'] == key and current != pending:
+            raise RuntimeError('An unfinished status restore conflicts with a newer edit; review it before resuming')
+        saved['pending_status'] = current; checkpoint()
+        run(['gh', 'project', 'item-edit', '--id', key, '--project-id', pid, '--field-id', fid,
+             '--single-select-option-id', ids[want.lower()]])
+        if item_state(node_query(ITEM_Q, {'id': key}))['status'] != want:
+            raise RuntimeError('Could not verify a restored task status')
+        saved['result']['restored'] += 1
+        saved['statuses_done'].append(key)
+        saved.pop('pending_status', None); checkpoint()
+    # The upgrade is not complete until labels and columns still read back correctly.
+    if option_values(field_options(fid)) != saved['desired']:
+        raise RuntimeError('Status options changed before upgrade completion')
+    for item in saved['items']:
+        issue = item.get('issue')
+        if issue and issue['labels'] != issue['want'] and issue_labels(issue['id']) != issue['want']:
+            raise RuntimeError('Issue labels changed before upgrade completion')
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
@@ -729,6 +968,10 @@ def main(argv):
             # --config fills owner / number / repo and the qa-all flag an upgraded
             # "qa-only" config left behind (`_qa_all`, removed once applied).
             cfg_path = flag(rest, "--config")
+            if cfg_path and "--root" not in rest:
+                config_dir = os.path.dirname(os.path.abspath(cfg_path))
+                suffix = os.path.join('.claude', 'super-board', 'configs')
+                root = config_dir[:-len(suffix)].rstrip(os.sep) if config_dir.endswith(os.sep + suffix) else config_dir
             cfg = load_json(cfg_path) if cfg_path else {}
             cfg = cfg if isinstance(cfg, dict) else {}
             proj = cfg.get("project") or {}
@@ -739,11 +982,9 @@ def main(argv):
             if not (owner and number and repo):
                 return 64
             qa_all = "--qa-all" in rest or bool(cfg.get("_qa_all"))
-            res = board_migrate(owner, int(number), repo, qa_all, dry, "--prune-empty" in rest, root)
-            if cfg_path and cfg.pop("_qa_all", None) is not None and not dry:
-                write_json(cfg_path, cfg)
+            res = board_migrate(owner, int(number), repo, qa_all, dry, "--prune-empty" in rest, root, cfg_path)
             return out(res)
-    except RuntimeError as e:
+    except (RuntimeError, OSError, ValueError, KeyError, TypeError) as e:
         return out({"error": str(e)}, 2)
     print(__doc__, file=sys.stderr)
     return 64
