@@ -757,28 +757,41 @@ def find_chrome() -> str | None:
 def chrome(binary: str, *args: str, done=None, timeout: int = 45) -> str:
     """Run headless Chrome and return stdout. Headless Chrome on macOS can linger after it has
     written its output, so poll for `done(stdout_text)` and stop it ourselves."""
+    import shutil
     import tempfile
     # Chrome subprocesses can still write to the profile after the parent exits.
-    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as prof, tempfile.TemporaryFile("w+") as out:
-        proc = subprocess.Popen([binary, "--headless", "--disable-gpu", "--hide-scrollbars",
-                                 "--no-first-run", "--no-default-browser-check", "--mute-audio",
-                                 f"--user-data-dir={prof}", *args],
-                                stdout=out, stderr=subprocess.DEVNULL, text=True)
-        t0, text = time.time(), ""
-        while time.time() - t0 < timeout:
-            if proc.poll() is not None:
-                break
+    prof = tempfile.mkdtemp()
+    try:
+        with tempfile.TemporaryFile("w+") as out:
+            proc = subprocess.Popen([binary, "--headless", "--disable-gpu", "--hide-scrollbars",
+                                     "--no-first-run", "--no-default-browser-check", "--mute-audio",
+                                     f"--user-data-dir={prof}", *args],
+                                    stdout=out, stderr=subprocess.DEVNULL, text=True)
+            t0, text = time.time(), ""
+            while time.time() - t0 < timeout:
+                if proc.poll() is not None:
+                    break
+                out.seek(0)
+                text = out.read()
+                if done and done(text):
+                    time.sleep(0.3)
+                    break
+                time.sleep(0.25)
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
             out.seek(0)
-            text = out.read()
-            if done and done(text):
-                time.sleep(0.3)
+            return out.read()
+    finally:
+        # Python 3.9 has no TemporaryDirectory(ignore_cleanup_errors=...).
+        # Retry late profile writes briefly; cleanup must never hide Chrome's result/error.
+        for attempt in range(3):
+            shutil.rmtree(prof, onerror=lambda *_: None)
+            if not os.path.exists(prof):
                 break
-            time.sleep(0.25)
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait()
-        out.seek(0)
-        return out.read()
+            if attempt < 2:
+                time.sleep(0.1)
+
 
 
 def run_check(page: Path, shots: Path | None, is_map: bool) -> dict:
