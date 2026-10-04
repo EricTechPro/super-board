@@ -758,7 +758,8 @@ def chrome(binary: str, *args: str, done=None, timeout: int = 45) -> str:
     """Run headless Chrome and return stdout. Headless Chrome on macOS can linger after it has
     written its output, so poll for `done(stdout_text)` and stop it ourselves."""
     import tempfile
-    with tempfile.TemporaryDirectory() as prof, tempfile.TemporaryFile("w+") as out:
+    # Chrome subprocesses can still write to the profile after the parent exits.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as prof, tempfile.TemporaryFile("w+") as out:
         proc = subprocess.Popen([binary, "--headless", "--disable-gpu", "--hide-scrollbars",
                                  "--no-first-run", "--no-default-browser-check", "--mute-audio",
                                  f"--user-data-dir={prof}", *args],
