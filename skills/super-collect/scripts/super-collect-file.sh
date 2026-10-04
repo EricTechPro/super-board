@@ -28,6 +28,7 @@
 #         --yes   → the issue number (new, existing on a dedupe hit, or adopted).
 # Exits:  0 ok · 64 bad args · 65 no holding column · 66 unreadable/weak body
 #         70 gh failure · 71 filed but not placed (number still on stdout)
+#         79 repository paused (existing issue number still on stdout after discovery)
 set -uo pipefail
 
 CONFIG=""; TYPE=""; SOURCE=""; TITLE=""; BODY_FILE=""; FP=""
@@ -82,6 +83,20 @@ REMOTE=$(jq -r '.repo.remote // empty' "$CONFIG")
 REPO_FLAG=()
 [ -z "$REMOTE" ] || REPO_FLAG=(-R "$(echo "$REMOTE" | sed -E 's#(git@github\.com:|https://github\.com/)##; s#\.git$##')")
 
+BIN="${SUPER_BOARD_BIN:-}"
+if [ -z "$BIN" ]; then
+  # Installed: .claude/skills/super-collect/scripts → .claude/bin. Pack: skills/… → scripts/.
+  ROOT3=$(cd "$(dirname "$0")/../../.." 2>/dev/null && pwd)
+  for d in ".claude/bin" "$ROOT3/bin" "$ROOT3/scripts"; do
+    [ -x "$d/super-qa-file-bug.sh" ] && { BIN="$d"; break; }
+  done
+fi
+[ -n "$BIN" ] || die "cannot find super-qa-file-bug.sh — set SUPER_BOARD_BIN or run install.sh" 70
+
+# Router-owned duplicate/adopt writes share the same halt as the child filers.
+GITHUB_READ="$BIN/super-board-github-read.py"
+python3 "$GITHUB_READ" --check || exit $?
+
 # --- body sections ----------------------------------------------------------
 # The ticket format is writing-standard.md § 3. super-qa-file-bug.sh enforces the
 # full bug shape (lettered steps, the 12-row Evidence table). Features and
@@ -119,26 +134,36 @@ done
 
 place() { # $1 = issue url
   local item_id project_id field_id option_id
+  python3 "$GITHUB_READ" --check || return $?
   item_id=$(gh project item-add "$NUMBER" --owner "$OWNER" --url "$1" --format json --jq '.id') || return 1
+  python3 "$GITHUB_READ" --check || return $?
   project_id=$(gh project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return 1
   field_id=$(echo "$FIELDS" | jq -r '.fields[] | select(.name=="Status") | .id')
   option_id=$(echo "$FIELDS" | jq -r --arg c "$HOLD" '.fields[] | select(.name=="Status") | .options[] | select(.name==$c) | .id')
+  python3 "$GITHUB_READ" --check || return $?
   gh project item-edit --id "$item_id" --project-id "$project_id" \
     --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null
 }
 
 tag() { # $1 = issue number, rest = labels; best-effort
   local n="$1"; shift
-  for l in "$@"; do gh label create "$l" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --color 5319E7 --force >/dev/null 2>&1 || true; done
-  for l in "$@"; do gh issue edit "$n" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --add-label "$l" >/dev/null 2>&1 || echo "warn: could not label #${n} ${l}" >&2; done
+  for l in "$@"; do
+    python3 "$GITHUB_READ" --check || return $?
+    gh label create "$l" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --color 5319E7 --force >/dev/null 2>&1 || true
+  done
+  for l in "$@"; do
+    python3 "$GITHUB_READ" --check || return $?
+    gh issue edit "$n" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --add-label "$l" >/dev/null 2>&1 || echo "warn: could not label #${n} ${l}" >&2
+  done
+  return 0
 }
 
 # --- adopt ------------------------------------------------------------------
 if [ -n "$ADOPT" ]; then
   if [ "$YES" -ne 1 ]; then echo "would-adopt|#${ADOPT}|${TYPE}|${HOLD}"; exit 0; fi
   URL=$(gh issue view "$ADOPT" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --json url --jq .url 2>/dev/null) || die "cannot read issue #${ADOPT}" 70
-  tag "$ADOPT" "$TYPE" "source:collect" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"}
-  place "$URL" || { echo "warn: #${ADOPT} not placed in '${HOLD}'" >&2; echo "$ADOPT"; exit 71; }
+  tag "$ADOPT" "$TYPE" "source:collect" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"} || { RC=$?; echo "$ADOPT"; exit "$RC"; }
+  place "$URL" || { RC=$?; echo "$ADOPT"; [ "$RC" -eq 79 ] && exit 79; echo "warn: #${ADOPT} not placed in '${HOLD}'" >&2; exit 71; }
   echo "$ADOPT"; exit 0
 fi
 
@@ -153,6 +178,7 @@ CLOSED_HIT=$(echo "$HITS" | awk '$2!="OPEN" && $1!=""{print $1; exit}')
 
 if [ -n "$OPEN_HIT" ]; then
   if [ "$YES" -ne 1 ]; then echo "duplicate|#${OPEN_HIT}|${TYPE}|${TITLE}"; exit 0; fi
+  python3 "$GITHUB_READ" --check || { RC=$?; echo "$OPEN_HIT"; exit "$RC"; }
   gh issue comment "$OPEN_HIT" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --body "Seen again by super-collect (${SOURCE}).
 
 $(cat "$BODY_FILE")" >/dev/null 2>&1 || echo "warn: could not comment on #${OPEN_HIT}" >&2
@@ -177,16 +203,6 @@ trap 'rm -f "$BODY_TMP"' EXIT
   echo "<!-- super-collect-source: ${SOURCE} -->"
 } > "$BODY_TMP"
 
-BIN="${SUPER_BOARD_BIN:-}"
-if [ -z "$BIN" ]; then
-  # Installed: .claude/skills/super-collect/scripts → .claude/bin. Pack: skills/… → scripts/.
-  ROOT3=$(cd "$(dirname "$0")/../../.." 2>/dev/null && pwd)
-  for d in ".claude/bin" "$ROOT3/bin" "$ROOT3/scripts"; do
-    [ -x "$d/super-qa-file-bug.sh" ] && { BIN="$d"; break; }
-  done
-fi
-[ -n "$BIN" ] || die "cannot find super-qa-file-bug.sh — set SUPER_BOARD_BIN or run install.sh" 70
-
 ERR=$(mktemp)
 case "$TYPE" in
   refactor)
@@ -205,6 +221,6 @@ N=$(echo "$OUT" | tail -1)
 # Preserve its identity without tagging or making further writes after the halt.
 if [ "$RC" -eq 79 ]; then [ -z "$N" ] || echo "$N"; exit 79; fi
 case "$N" in ''|*[!0-9]*) die "filer failed (exit ${RC})" "$([ "$RC" -ne 0 ] && echo "$RC" || echo 70)" ;; esac
-tag "$N" "source:collect" "collect:${SOURCE}" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"}
+tag "$N" "source:collect" "collect:${SOURCE}" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"} || { RC=$?; echo "$N"; exit "$RC"; }
 echo "$N"
 exit "$RC"

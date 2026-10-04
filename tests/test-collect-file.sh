@@ -83,6 +83,9 @@ MD
 cat > "$WORK/gh" <<'STUB'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$GH_LOG"
+if [ "${STUB_PAUSE_AFTER:-}" = "$1 ${2:-}" ]; then
+  printf '{"reason":"another worker paused during discovery"}\n' > "$SB_GITHUB_HALT_FILE"
+fi
 case "$1 ${2:-}" in
   "repo view")     echo "acme" ;;
   "issue list")
@@ -195,6 +198,53 @@ OUT=$(run --adopt 55 --type feature --yes)
 is  "adopt returns the issue" "55" "$OUT"
 lacks "adopt files nothing new" "$(cat "$GH_LOG")" "issue create"
 has "adopt places in Backlog"  "$(cat "$GH_LOG")" "opt_Backlog"
+
+echo "── duplicate and adopt stop when the repository is paused"
+for path in duplicate adopt; do
+  printf '{"reason":"another worker paused GitHub writes"}\n' > "$SB_GITHUB_HALT_FILE"
+  RC=0
+  if [ "$path" = duplicate ]; then
+    STUB_HITS='[{"number":301,"state":"OPEN","body":"err|sentry|4411"}]' run "${BUG[@]}" --yes >/dev/null || RC=$?
+  else
+    run --adopt 55 --type feature --yes >/dev/null || RC=$?
+  fi
+  is "$path reports the paused run" 79 "$RC"
+  WRITES=$(awk '/^(issue (create|comment|edit)|label create|project (item-add|item-edit)) /' "$GH_LOG")
+  is "$path makes no GitHub mutations while paused" "" "$WRITES"
+  rm -f "$SB_GITHUB_HALT_FILE"
+done
+
+echo "── a pause discovered during a read stops the next write"
+for path in duplicate adopt; do
+  RC=0
+  if [ "$path" = duplicate ]; then
+    OUT=$(STUB_PAUSE_AFTER="issue list" STUB_HITS='[{"number":301,"state":"OPEN","body":"err|sentry|4411"}]' run "${BUG[@]}" --yes) || RC=$?
+    EXPECTED=301
+  else
+    OUT=$(STUB_PAUSE_AFTER="issue view" run --adopt 55 --type feature --yes) || RC=$?
+    EXPECTED=55
+  fi
+  is "$path propagates a pause after its read" 79 "$RC"
+  is "$path preserves the existing issue identity after a pause" "$EXPECTED" "$OUT"
+  WRITES=$(awk '/^(issue (create|comment|edit)|label create|project (item-add|item-edit)) /' "$GH_LOG")
+  is "$path makes no mutations after the discovery pause" "" "$WRITES"
+  rm -f "$SB_GITHUB_HALT_FILE"
+done
+
+echo "── pauses during adoption stop labeling and placement"
+RC=0
+OUT=$(STUB_PAUSE_AFTER="label create" run --adopt 55 --type feature --yes) || RC=$?
+is "adoption pauses between label writes" 79 "$RC"
+is "mid-label pause preserves adopted issue" 55 "$OUT"
+COUNT=$(awk '/^(issue (create|comment|edit)|label create|project (item-add|item-edit)) / {n++} END {print n+0}' "$GH_LOG")
+is "only the first pre-pause label mutation happened" 1 "$COUNT"
+rm -f "$SB_GITHUB_HALT_FILE"
+RC=0
+OUT=$(STUB_PAUSE_AFTER="project view" run --adopt 55 --type feature --yes) || RC=$?
+is "placement pause stays exit 79" 79 "$RC"
+is "placement pause preserves adopted issue" 55 "$OUT"
+lacks "placement pause prevents a column write" "$(cat "$GH_LOG")" "project item-edit"
+rm -f "$SB_GITHUB_HALT_FILE"
 
 echo
 echo "passed: $PASS  failed: $FAIL"
