@@ -36,17 +36,28 @@ for field, value, message in (
 probe = r"""
 <style>* { transition-duration: 0s !important; }</style>
 <script>
-setTimeout(async () => {
+(async () => {
   const failures = [], facts = {};
   const check = (ok, message) => { if (!ok) failures.push(message); };
   const $ = s => document.querySelector(s), all = s => [...document.querySelectorAll(s)];
-  const settle = () => new Promise(r => setTimeout(r, 100));
+  const waitFor = async (ready, name) => {
+    const deadline = performance.now() + 6000;
+    while (!ready()) {
+      if (performance.now() >= deadline) throw Error('Timed out waiting for ' + name + ': ' + JSON.stringify({hash:location.hash,ghosts:!!$('#m-ghosts'),fonts:document.fonts.status,columns:all('.mcol').length}));
+      await new Promise(r => setTimeout(r, 20));
+    }
+  };
+  const viewReady = id => new URLSearchParams(location.hash.slice(1)).get('view') === id &&
+    !!$('.mit[data-v="'+id+'"][aria-current="page"]');
   const click = el => { if (el) el.dispatchEvent(new MouseEvent('click', {bubbles:true})); };
   const box = el => { const b = el.getBBox(); return {x:b.x,y:b.y,w:b.width,h:b.height}; };
   const nodeBox = id => box($('.stage .node[data-id="'+id+'"] .n-body'));
   const frame = id => $('.stage .family[data-family="'+id+'"] .family-box');
   const contains = (a,b) => a.x < b.x && a.y < b.y && a.x+a.w > b.x+b.w && a.y+a.h > b.y+b.h;
   try {
+    await waitFor(() => !$('#m-ghosts') && !!$('.mcol'), 'initial column browser');
+    await waitFor(() => document.fonts.status === 'loaded', 'fonts');
+    await document.fonts.ready;
     const collect = frame('collect-family'), board = frame('board-family');
     check(!!collect && !!board, 'root draws nested intake and board family boxes');
     if (collect && board) {
@@ -69,18 +80,20 @@ setTimeout(async () => {
       const miller = $('.miller');
       check(getComputedStyle(miller).overflowX === 'auto', 'column browser scrolls horizontally');
       const button = column.querySelector('[data-v="super-board"]');
-      button.scrollIntoView({block:'nearest',inline:'nearest'}); await settle();
+      // renderTree initially reveals the last column. Virtual timers cannot wait for
+      // the inherited smooth scroll's compositor animation; reveal this row synchronously.
+      button.scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'});
       const r = button.getBoundingClientRect();
       const target = document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
       check(target && target.closest('button') === button, 'board row is physically clickable');
-      click(target); await settle();
+      click(target); await waitFor(() => viewReady('super-board'), 'board navigation');
       check(new URLSearchParams(location.hash.slice(1)).get('view') === 'super-board', 'board row opens its view');
       const childColumn = all('.mcol').find(c => c.querySelector('[data-v="sb-onboard"]'));
       facts.boardChildren = childColumn ? [...childColumn.querySelectorAll('.mit')].map(b => b.dataset.v) : [];
       check(facts.boardChildren.slice(0,3).join(',') === 'super-build,super-qa,super-review', 'board column lists its three lanes first');
       for (const id of ['sb-onboard','sb-lint','super-board-run','sb-status','sb-stop']) check(facts.boardChildren.includes(id), 'board column exposes '+id);
     }
-    click($('.mit[data-v="ui-refine-loop"]')); await settle();
+    click($('.mit[data-v="ui-refine-loop"]')); await waitFor(() => viewReady('ui-refine-loop'), 'loop navigation');
     check(new URLSearchParams(location.hash.slice(1)).get('view') === 'ui-refine-loop', 'standalone loop is reachable');
     const loop = frame('refine-family');
     check(!!loop, 'loop has a family container');
@@ -97,7 +110,7 @@ setTimeout(async () => {
     check($('#m-pillbtn .n').textContent === '6 steps', 'view counts primary steps separately from nested tools');
   } catch (e) { failures.push(e.stack || String(e)); }
   const pre=document.createElement('pre'); pre.id='family-report'; pre.textContent=JSON.stringify({failures,facts}); document.body.appendChild(pre);
-}, 150);
+})();
 </script>
 """
 
@@ -125,10 +138,21 @@ try {
   const cdp=(method,params={})=>new Promise((resolve,reject)=>{const id=++next;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
   const evaluate=async expression=>{const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
   await cdp('Page.enable'); await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-  await cdp('Page.navigate',{url}); await delay(500);
+  const waitFor=async (expression,name)=>{const end=Date.now()+10000;while(!await evaluate(expression)){if(Date.now()>end)throw Error('Timed out waiting for '+name+': '+JSON.stringify(await evaluate('({hash:location.hash,ghosts:!!document.querySelector("#m-ghosts"),fonts:document.fonts.status,columns:document.querySelectorAll(".mcol").length})')));await delay(20);}};
+  await cdp('Page.navigate',{url});
+  await waitFor('!!document.querySelector(".mcol") && !document.querySelector("#m-ghosts")','initial column browser');
+  await waitFor('document.fonts.status === "loaded"','fonts');
+  await evaluate('document.fonts.ready.then(()=>true)');
   check(await evaluate('!window.__instant && !matchMedia("(prefers-reduced-motion: reduce)").matches'),'normal motion is enabled without screenshot flags');
   facts.beforeWidth=await evaluate('document.querySelector("#m-tree").getBoundingClientRect().width');
-  const click=async id=>{const p=await evaluate(`(()=>{const el=document.querySelector('.mit[data-v="${id}"]');const r=el.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};})()`);await cdp('Input.dispatchMouseEvent',{type:'mousePressed',...p,button:'left',clickCount:1});await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',...p,button:'left',clickCount:1});await delay(1600);};
+  const click=async id=>{
+    await evaluate(`document.querySelector('.mit[data-v="${id}"]').scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'})`);
+    await waitFor(`(()=>{const el=document.querySelector('.mit[data-v="${id}"]');const r=el.getBoundingClientRect();return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('button')===el;})()`,'hittable '+id);
+    const p=await evaluate(`(()=>{const r=document.querySelector('.mit[data-v="${id}"]').getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2};})()`);
+    await cdp('Input.dispatchMouseEvent',{type:'mousePressed',...p,button:'left',clickCount:1});
+    await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',...p,button:'left',clickCount:1});
+    await waitFor(`new URLSearchParams(location.hash.slice(1)).get('view')==='${id}' && !!document.querySelector('.mit[data-v="${id}"][aria-current="page"]')`,'completed '+id+' navigation');
+  };
   await click('super-board');
   facts.boardView=await evaluate('new URLSearchParams(location.hash.slice(1)).get("view")');
   facts.afterWidth=await evaluate('document.querySelector("#m-tree").getBoundingClientRect().width');
