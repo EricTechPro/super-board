@@ -109,7 +109,8 @@ import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 const [binary,url]=process.argv.slice(1), delay=ms=>new Promise(r=>setTimeout(r,ms));
 const profile=await mkdtemp(tmpdir()+'/visual-navigation-');
-const browser=spawn(binary,['--headless','--disable-gpu','--remote-debugging-port=0','--no-first-run','--no-default-browser-check','--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
+// Test normal motion explicitly: macOS CI can default to reduced motion.
+const browser=spawn(binary,['--headless','--disable-gpu','--force-prefers-no-reduced-motion','--remote-debugging-port=0','--no-first-run','--no-default-browser-check','--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
 const failures=[],facts={}; let ws;
 const check=(ok,message)=>{if(!ok)failures.push(message);};
 try {

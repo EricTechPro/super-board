@@ -113,8 +113,8 @@ with tempfile.TemporaryDirectory() as directory:
     page.write_text(page.read_text().replace("</body>", probe + "</body>"))
     for reduced in (False, True):
         args = ["--virtual-time-budget=5000", "--window-size=1440,1000", "--dump-dom"]
-        if reduced:
-            args.append("--force-prefers-reduced-motion")
+        # Select both fixture preferences explicitly instead of inheriting the host OS.
+        args.append("--force-prefers-reduced-motion" if reduced else "--force-prefers-no-reduced-motion")
         dom = visual.chrome(binary, *args, page.as_uri() + "#shot=1", done=lambda s: 'id="interaction-report"' in s)
         match = re.search(r'<pre id="interaction-report"[^>]*>(.*?)</pre>', dom, re.S)
         assert match, "interaction probe did not finish"
