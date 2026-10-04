@@ -14,6 +14,7 @@ Board: Backlog · Ready · Building · QA · Review · Blocked · Done. Labels r
 | File bugs from Sentry, PostHog, PRs | `/super-collect` | DON'T file without a verifier pass |
 | UI polish | `/ui-refine-loop` (human runs it) | board NEVER runs it |
 | Diagram / explainer page | `/visual` | |
+| Commit, pull, push this branch | `/git-sync` | NEVER force push or rebase shared history |
 
 | Rule | Value |
 |---|---|

@@ -345,3 +345,12 @@ Tables plus CAPS rules (NEVER / DON'T / ALWAYS). No prose paragraphs. The manage
 - Numbers over adjectives: "1.2 s", not "fast".
 - Active voice: "QA found", not "it was found".
 - No em-dash chains. No rhetorical questions. No closing summary line.
+
+## Human approval evidence
+
+A 🙋 merge hold has one canonical request comment on the linked issue (or on the PR
+when it has no linked issue). Copy the gate's `approval-request:` line verbatim into
+that comment; it pins the repository, PR, full head and policy/human-step scope.
+Other threads link to that request without repeating its machine lines. A trusted
+human replies `done` in that same thread. Labels are status display, never approval.
+Do not edit the request or approval comment; changed code or steps need a fresh request.

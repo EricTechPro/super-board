@@ -2,9 +2,10 @@
 import html,sys,json
 from data import *
 out=sys.argv[1]; e=html.escape
-src=open("commands.html",encoding="utf-8").read()
+root=__import__("pathlib").Path(__file__).resolve().parent
+src=(root / "commands.html").read_text(encoding="utf-8")
 gname={g[0]:g[1].split(" · ")[0] for g in GROUPS}
-ORDER=["ctx","plan","diag","fix","style","motion","fin","sys","util"]
+ORDER=["ctx","plan","diag","fix","style","motion","fin","util"]
 cards=""
 for g in ORDER:
     items=[c for c in C if c[2]==g]
@@ -15,9 +16,11 @@ for g in ORDER:
         cs+=f'''<details class="c g-{g}"><summary><code>{e(name)}</code><span class="t">{e(TRIG[cid])}</span><span class="d">{e(DEF[cid])}</span></summary>
 <div class="more"><p class="pair"><b>Use with</b> {e(PAIR[cid])}</p><ol>{st}</ol><p><b>In</b> {e(inp)}<br><b>Out</b> {e(outp)}</p><p class="ref">reference/{e(ref)}</p></div></details>'''
     cards+=f'<div class="grp"><h3 class="g-{g}">{e(gname[g])}</h3>{cs}</div>'
-FLOW=[("1","Context","init · document","ctx"),("2","Plan / build","shape · craft","plan"),("3","Diagnose","critique + audit","diag"),("4","Fix & style","harden … bolder, animate","fix"),("5","Finish","polish, always last","fin")]
+FLOW=[("1","Setup","init · document · extract","ctx"),("2","Plan / build","shape · craft","plan"),("3","Diagnose","critique + audit","diag"),("4","Fix & style","harden … bolder, animate","fix"),("5","Finish","polish, always last","fin")]
 flow="".join(f'<div class="step g-{g}"><span class="n">{n}</span><b>{e(t)}</b><small>{e(s)}</small></div>' for n,t,s,g in FLOW)
 INFO={cid:{"def":DEF[cid],"pair":PAIR[cid]} for cid in DEF}
+for group,title,subtitle,ids in STAGES:
+    INFO["stage_"+group]={"def": " · ".join(ids) + ". " + ("Choose only the commands your findings need." if group in ("fix","style","motion") else subtitle.capitalize()+"."), "pair": "Read the groups from left to right. Polish is always the final pass; utilities run independently."}
 page=f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>impeccable commands map</title>
 <style>
@@ -45,11 +48,13 @@ summary .d{{grid-column:1/3;color:var(--muted);font-size:12.5px;overflow:hidden;
 details[open] summary .d{{white-space:normal;color:var(--fg)}}
 .more{{padding:0 10px 8px;font-size:12.5px}} .more ol{{margin:4px 0;padding-left:18px}} .more p{{margin:4px 0}} .ref{{color:var(--muted);font:11px ui-monospace,Menlo,monospace}}
 .pair b,.more p b{{color:var(--c)}}
+.map-hint{{color:var(--muted);font-size:12.5px;margin:0 0 10px}}
 .note{{color:var(--muted);font-size:12.5px;margin-top:18px;max-width:1100px}} code{{font:12.5px ui-monospace,Menlo,monospace}}
 @media (max-width:760px){{.flow{{grid-template-columns:1fr}}}}
 </style></head><body><main>
 <h1>impeccable · slash commands</h1>
-<p class="sub">v4.0.4 · {len(C)} commands · click a node for what it does and what to use it with.</p>
+<p class="sub">v4.0.4 · {len(C)} commands · read left to right, then click a command for what it does and what to use it with.</p>
+<p class="map-hint">Setup → plan / build → diagnose → choose fix &amp; style commands → polish. Utilities sit in their own bottom lane.</p>
 <iframe class="d" title="impeccable command map" srcdoc="{e(src,quote=True)}"></iframe>
 <h2>Best-practice order</h2><div class="flow">{flow}</div>
 <h2>Commands <small style="color:var(--muted);font-weight:400">· click to expand steps</small></h2>
@@ -61,6 +66,8 @@ var INFO={json.dumps(INFO)};
 var CSS='.imp-def{{display:block;margin:.3rem 0 .2rem;font-size:.72rem;line-height:1.45;color:var(--text,inherit);white-space:normal;max-width:22rem}}.imp-def b{{display:block;margin-top:.25rem;font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;opacity:.65}}';
 function wire(f){{try{{var d=f.contentDocument;if(!d||d.__imp)return;var id=d.getElementById('focus-id'),det=d.getElementById('focus-detail');if(!id||!det)return;d.__imp=1;
 var st=d.createElement('style');st.textContent=CSS;d.head.appendChild(st);
+function theme(){{var t=d.documentElement.getAttribute('data-theme');if(t)document.documentElement.setAttribute('data-theme',t);}}
+new MutationObserver(theme).observe(d.documentElement,{{attributes:true,attributeFilter:['data-theme']}});theme();
 var box=d.createElement('span');box.className='imp-def';box.id='focus-def';det.parentNode.insertBefore(box,det.nextSibling);
 function upd(){{var i=INFO[(id.textContent||'').trim()];box.hidden=!i;if(i){{box.innerHTML='';box.appendChild(d.createTextNode(i.def));var b=d.createElement('b');b.textContent='Use with';box.appendChild(b);box.appendChild(d.createTextNode(i.pair));}}}}
 new MutationObserver(upd).observe(id,{{childList:true,characterData:true,subtree:true}});upd();}}catch(err){{}}}}

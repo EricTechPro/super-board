@@ -19,40 +19,59 @@
   try { const t = localStorage.getItem('visual-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
 <style>
+  /* Clean flowchart (GitHub Primer-like): light first, dark when the system or the toggle asks. */
   :root {
-    --bg: #020617; --bg-2: #0b1222; --panel: #0f172a; --panel-2: #111c33; --border: #1e293b; --border-2: #334155;
-    --text: #f8fafc; --muted: #94a3b8; --dim: #64748b; --grid: rgba(148,163,184,.07); --mask: #0f172a;
-    --arrow: #64748b; --shadow: 0 18px 48px rgba(0,0,0,.30);
-    --dot: rgba(148,163,184,.16); --gridline: rgba(148,163,184,.045); --chrome: rgba(15,23,42,.82);
-    --cyan: #22d3ee; --green: #34d399; --violet: #a78bfa; --amber: #fbbf24; --rose: #fb7185; --orange: #fb923c; --slate: #94a3b8; --fuchsia: #e879f9;
-    --cyan-f: rgba(8,51,68,.45); --green-f: rgba(6,78,59,.45); --violet-f: rgba(76,29,149,.42); --amber-f: rgba(120,53,15,.38);
-    --rose-f: rgba(136,19,55,.42); --orange-f: rgba(154,52,18,.35); --slate-f: rgba(30,41,59,.6); --fuchsia-f: rgba(112,26,117,.38);
-    --add-bg: rgba(52,211,153,.10); --add-tx: #6ee7b7; --del-bg: rgba(251,113,133,.10); --del-tx: #fda4af;
-    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    color-scheme: dark;
+    --bg: #ffffff; --bg-2: #f6f8fa; --panel: #ffffff; --panel-2: #f6f8fa; --border: #d8dee4; --border-2: #d1d9e0;
+    --text: #1f2328; --muted: #59636e; --dim: #818b98; --grid: rgba(31,35,40,.06); --mask: #ffffff; --arrow: #8c959f;
+    --shadow: 0 8px 24px rgba(31,35,40,.10); --dot: #e6eaef; --gridline: transparent; --chrome: rgba(255,255,255,.94);
+    --accent: #0969da; --accent-fg: #ffffff; --lane: rgba(31,35,40,.025);
+    --cyan: #0969da; --green: #1a7f37; --violet: #8250df; --amber: #9a6700; --rose: #cf222e; --orange: #bc4c00; --slate: #59636e; --fuchsia: #bf3989;
+    --k-public: #0969da; --k-lane: #0f766e; --k-ext: #8250df; --k-verb: #bf3989; --k-script: #6e7781; --k-hook: #cf222e; --k-board: #9a6700;
+    --w-calls: #424a53; --w-feeds: #0969da; --w-triggers: #8250df; --w-state: #afb8c1; --w-guard: #cf222e;
+    --add-bg: rgba(26,127,55,.10); --add-tx: #1a7f37; --del-bg: rgba(207,34,46,.08); --del-tx: #cf222e;
+    color-scheme: light;
+    --accent-f: color-mix(in srgb, var(--accent) 12%, var(--panel));
+    --cyan-f: color-mix(in srgb, var(--cyan) 9%, var(--panel));
+    --green-f: color-mix(in srgb, var(--green) 9%, var(--panel));
+    --violet-f: color-mix(in srgb, var(--violet) 9%, var(--panel));
+    --amber-f: color-mix(in srgb, var(--amber) 10%, var(--panel));
+    --rose-f: color-mix(in srgb, var(--rose) 8%, var(--panel));
+    --orange-f: color-mix(in srgb, var(--orange) 9%, var(--panel));
+    --slate-f: color-mix(in srgb, var(--slate) 8%, var(--panel));
+    --fuchsia-f: color-mix(in srgb, var(--fuchsia) 8%, var(--panel));
+    --k-public-f: color-mix(in srgb, var(--k-public) 8%, var(--panel));
+    --k-lane-f: color-mix(in srgb, var(--k-lane) 8%, var(--panel));
+    --k-ext-f: color-mix(in srgb, var(--k-ext) 7%, var(--panel));
+    --k-verb-f: color-mix(in srgb, var(--k-verb) 7%, var(--panel));
+    --k-script-f: color-mix(in srgb, var(--k-script) 5%, var(--panel));
+    --k-hook-f: color-mix(in srgb, var(--k-hook) 12%, var(--panel));
+    --k-board-f: color-mix(in srgb, var(--k-board) 9%, var(--panel));
+    --sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   }
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) {
-      --bg: #f4f5f7; --bg-2: #eef0f4; --panel: #ffffff; --panel-2: #f8fafc; --border: #e5e7eb; --border-2: #cbd5e1;
-      --text: #0f172a; --muted: #5b6474; --dim: #8a93a3; --grid: rgba(15,23,42,.05); --mask: #ffffff; --arrow: #94a3b8; --shadow: 0 12px 32px rgba(15,23,42,.08);
-      --dot: #d5dbe3; --gridline: rgba(15,23,42,.035); --chrome: rgba(255,255,255,.9);
-      --cyan: #0e7490; --green: #047857; --violet: #6d28d9; --amber: #b45309; --rose: #be123c; --orange: #c2410c; --slate: #475569; --fuchsia: #a21caf;
-      --cyan-f: rgba(34,211,238,.13); --green-f: rgba(52,211,153,.16); --violet-f: rgba(167,139,250,.18); --amber-f: rgba(251,191,36,.18);
-      --rose-f: rgba(251,113,133,.14); --orange-f: rgba(251,146,60,.15); --slate-f: rgba(148,163,184,.16); --fuchsia-f: rgba(232,121,249,.14);
-      --add-bg: rgba(16,185,129,.10); --add-tx: #047857; --del-bg: rgba(225,29,72,.08); --del-tx: #be123c;
-      color-scheme: light;
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+    --bg: #0d1117; --bg-2: #010409; --panel: #0d1117; --panel-2: #151b23; --border: #262c36; --border-2: #3d444d;
+    --text: #f0f6fc; --muted: #9198a1; --dim: #656c76; --grid: rgba(240,246,252,.05); --mask: #0d1117; --arrow: #656c76;
+    --shadow: 0 10px 30px rgba(1,4,9,.55); --dot: #161b22; --gridline: transparent; --chrome: rgba(13,17,23,.92);
+    --accent: #4493f8; --accent-fg: #ffffff; --lane: rgba(240,246,252,.025);
+    --cyan: #4493f8; --green: #3fb950; --violet: #ab7df8; --amber: #d29922; --rose: #f85149; --orange: #db6d28; --slate: #9198a1; --fuchsia: #db61a2;
+    --k-public: #4493f8; --k-lane: #2dd4bf; --k-ext: #ab7df8; --k-verb: #f778ba; --k-script: #9198a1; --k-hook: #f85149; --k-board: #d29922;
+    --w-calls: #b7bdc8; --w-feeds: #4493f8; --w-triggers: #ab7df8; --w-state: #4d5562; --w-guard: #f85149;
+    --add-bg: rgba(63,185,80,.13); --add-tx: #56d364; --del-bg: rgba(248,81,73,.12); --del-tx: #ff7b72;
+    color-scheme: dark;
     }
   }
-  :root[data-theme="light"] {
-    --bg: #f4f5f7; --bg-2: #eef0f4; --panel: #ffffff; --panel-2: #f8fafc; --border: #e5e7eb; --border-2: #cbd5e1;
-    --text: #0f172a; --muted: #5b6474; --dim: #8a93a3; --grid: rgba(15,23,42,.05); --mask: #ffffff; --arrow: #94a3b8; --shadow: 0 12px 32px rgba(15,23,42,.08);
-      --dot: #d5dbe3; --gridline: rgba(15,23,42,.035); --chrome: rgba(255,255,255,.9);
-    --cyan: #0e7490; --green: #047857; --violet: #6d28d9; --amber: #b45309; --rose: #be123c; --orange: #c2410c; --slate: #475569; --fuchsia: #a21caf;
-    --cyan-f: rgba(34,211,238,.13); --green-f: rgba(52,211,153,.16); --violet-f: rgba(167,139,250,.18); --amber-f: rgba(251,191,36,.18);
-    --rose-f: rgba(251,113,133,.14); --orange-f: rgba(251,146,60,.15); --slate-f: rgba(148,163,184,.16); --fuchsia-f: rgba(232,121,249,.14);
-    --add-bg: rgba(16,185,129,.10); --add-tx: #047857; --del-bg: rgba(225,29,72,.08); --del-tx: #be123c;
-    color-scheme: light;
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --bg-2: #010409; --panel: #0d1117; --panel-2: #151b23; --border: #262c36; --border-2: #3d444d;
+    --text: #f0f6fc; --muted: #9198a1; --dim: #656c76; --grid: rgba(240,246,252,.05); --mask: #0d1117; --arrow: #656c76;
+    --shadow: 0 10px 30px rgba(1,4,9,.55); --dot: #161b22; --gridline: transparent; --chrome: rgba(13,17,23,.92);
+    --accent: #4493f8; --accent-fg: #ffffff; --lane: rgba(240,246,252,.025);
+    --cyan: #4493f8; --green: #3fb950; --violet: #ab7df8; --amber: #d29922; --rose: #f85149; --orange: #db6d28; --slate: #9198a1; --fuchsia: #db61a2;
+    --k-public: #4493f8; --k-lane: #2dd4bf; --k-ext: #ab7df8; --k-verb: #f778ba; --k-script: #9198a1; --k-hook: #f85149; --k-board: #d29922;
+    --w-calls: #b7bdc8; --w-feeds: #4493f8; --w-triggers: #ab7df8; --w-state: #4d5562; --w-guard: #f85149;
+    --add-bg: rgba(63,185,80,.13); --add-tx: #56d364; --del-bg: rgba(248,81,73,.12); --del-tx: #ff7b72;
+    color-scheme: dark;
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
@@ -171,10 +190,10 @@
   svg .edge { fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: stroke-width .15s, opacity .2s; }
   svg .halo { fill: none; stroke: var(--bg-2); stroke-width: 6; }
   svg .hitline { fill: none; stroke: transparent; stroke-width: 12; }
-  svg .flowline { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 1.5 13; opacity: 0; pointer-events: none; }
-  .flowing svg .flowline { opacity: .95; animation: flowdash 1.1s linear infinite; }
-  .flowing svg .edge { opacity: .55; }
-  @keyframes flowdash { to { stroke-dashoffset: -14.5; } }
+  svg .flowline { fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 10 70; opacity: 0; pointer-events: none; }
+  .flowing svg .flowline { opacity: .9; animation: flowdash 2.4s linear infinite; }
+  .flowing svg .edge { opacity: .8; }
+  @keyframes flowdash { to { stroke-dashoffset: -160; } }
   @media (prefers-reduced-motion: reduce) { .flowing svg .flowline { animation: none; opacity: 0; } .flowing svg .edge { opacity: 1; } }
   .ctl button.on { color: var(--cyan); background: var(--cyan-f); }
   svg .flow { stroke-dasharray: 6 6; animation: flow 1.2s linear infinite; }
@@ -208,131 +227,250 @@
   .focusing svg .e-lab:not(.hot) { opacity: .15; }
   svg .node, svg .edge-g, svg .e-lab { transition: opacity .2s; }
   svg .node.sel .n-body { stroke-width: 3.2; }
-  svg .node.sel .n-mask { stroke: var(--text); stroke-width: 1; stroke-dasharray: 3 3; }
+  svg .node.sel .n-mask { stroke: var(--accent); stroke-width: 2; }
+  svg .node.sel .n-body { animation: select-glow .65s ease-out; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 40%, transparent)); }
+  svg .node.nb .n-body { stroke-width: 2.6; stroke-opacity: 1; }
+  svg .n-port { fill: var(--panel); stroke-width: 1.5; pointer-events: none; transition: fill .2s, stroke-width .2s; }
+  svg .node.sel .n-port, svg .node.nb .n-port.hot { fill: var(--accent); stroke: var(--accent); stroke-width: 2.2; }
+  body.map-mode .focusing svg .edge-g.hot .flowline { opacity: .95; stroke-width: 3.4; stroke-dasharray: 8 13; animation: selected-flow 1.1s linear infinite; }
+  body.map-mode .focusing svg .edge-g.hot .edge { stroke-width: 2.8; }
+  @keyframes selected-flow { to { stroke-dashoffset: -42; } }
+  @keyframes select-glow { from { filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 70%, transparent)); stroke-width: 5; } }
+  svg .node.main-step .n-body { stroke-width: 2.2; }
+  svg .node.main-step .n-label { font-weight: 800; }
+  @media (prefers-reduced-motion: reduce) {
+    svg .node, svg .edge-g, svg .e-lab, svg .n-port { transition: none; }
+    svg .node.sel .n-body, svg .node.flash .n-mask { animation: none; }
+    body.map-mode .focusing svg .edge-g.hot .flowline { animation: none; opacity: .8; }
+    .panel { animation: none !important; }
+  }
   svg .node.flash .n-mask { animation: flash 1.3s ease-out; }
   @keyframes flash { 0%, 40% { stroke: var(--amber); stroke-width: 8; } 100% { stroke-width: 0; } }
 
-  /* ================= map mode app shell ================= */
-  body.map-mode { overflow: hidden; height: 100dvh; background-image: none; }
-  .mapapp { display: grid; grid-template-columns: 0 minmax(0, 1fr) 0; grid-template-rows: 54px minmax(0, 1fr); height: 100dvh; max-width: none; padding: 0; transition: grid-template-columns .25s ease; }
-  body.tree-open .mapapp { grid-template-columns: 248px minmax(0, 1fr) 0; }
-  .mapapp:has(.panel:not([hidden])) { grid-template-columns: 0 minmax(0, 1fr) 380px; }
-  body.tree-open .mapapp:has(.panel:not([hidden])) { grid-template-columns: 248px minmax(0, 1fr) 380px; }
-  .mbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--chrome); backdrop-filter: blur(12px); z-index: 10; min-width: 0; }
-  .mbrand { display: flex; align-items: center; gap: 9px; font: 700 15px var(--sans); letter-spacing: -.01em; white-space: nowrap; }
-  .mbrand i { width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 0 4px var(--cyan-f); }
-  .crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: none; padding-left: 8px; border-left: 1px solid var(--border); }
-  .crumb { font: 600 12.5px var(--mono); color: var(--muted); background: none; border: 0; padding: 4px 8px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+
+  /* map: rounded wires with pill labels, lanes, step badges, author name tags */
+  body.map-mode svg .e-lbg { fill: var(--panel); stroke: var(--border-2); }
+  body.map-mode svg .e-label { fill: var(--text); font: 600 10.5px var(--sans); }
+  body.map-mode svg .edge { stroke-width: 1.8; }
+  body.map-mode svg .w-state .edge { stroke-width: 1.4; }
+  body.map-mode .flowing svg .flowline { opacity: .45; }
+  body.map-mode .flowing svg .edge { opacity: 1; }
+  body.map-mode .flowing svg .w-state .flowline { opacity: 0; }
+  svg .e-lab.ctag .e-lbg { fill: var(--accent-f); stroke: color-mix(in srgb, var(--accent) 45%, transparent); } svg .e-lab.ctag .e-label { fill: var(--accent); }
+  svg .e-lab.w-state .e-label { fill: var(--muted); font-weight: 500; }
+  .lgi i.w { width: 18px; height: 0; border: 0; border-top: 2px solid; border-radius: 0; }
+  .lgi i.w.dash { border-top-style: dashed; }
+  svg .e-step { fill: var(--accent); } svg .e-step-tx { fill: var(--accent-fg); font: 700 9.5px var(--sans); }
+  svg .lane-box { fill: var(--lane); stroke: var(--border); }
+  svg .lane-num { fill: var(--accent); } svg .lane-num-tx { fill: var(--accent-fg); font: 700 11px var(--sans); }
+  svg .lane-t { fill: var(--text); font: 700 11px var(--sans); } svg .lane-c { fill: var(--muted); font: 500 11px var(--sans); }
+  svg .lane-arrow { fill: var(--dim); font: 600 16px var(--sans); }
+  svg .stp { fill: var(--text); } svg .stp-tx { fill: var(--bg); font: 700 9.5px var(--sans); }
+  svg .ntag-bg { fill: var(--panel); stroke: var(--border-2); }
+  svg .ntag-tx { fill: var(--muted); font: 600 10px var(--sans); }
+  svg .ntag-ring { fill: none; stroke-width: 1.6; }
+  svg .ini-tx2 { font: 700 9px var(--sans); }
+  /* ================= map mode app shell =================
+     Layout: views (column browser) left, map on top, details strip below the map. */
+  body.map-mode { overflow: hidden; height: 100dvh; background: var(--bg); background-image: none; }
+  body.map-mode svg .n-label, body.map-mode svg .e-label { font-family: var(--sans); }
+  body.map-mode svg .n-sub, body.map-mode svg .verb-tx { font-family: var(--sans); }
+  body.map-mode svg .n-label { font-weight: 650; letter-spacing: 0; }
+  .mapapp { display: grid; grid-template-columns: 0 minmax(0, 1fr); grid-template-rows: 52px minmax(0, 1fr); height: 100dvh; max-width: none; padding: 0; transition: grid-template-columns .22s ease; }
+  body.tree-open .mapapp { grid-template-columns: min(var(--browser-width, 224px), 38vw) minmax(0, 1fr); }
+  .mbar { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--border); background: var(--bg); z-index: 10; min-width: 0; }
+  .mbrand { display: flex; align-items: center; gap: 8px; font: 650 14.5px var(--sans); white-space: nowrap; min-width: 0; }
+  .mbrand i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex: none; }
+  .crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; overflow-x: auto; scrollbar-width: none; padding-left: 10px; border-left: 1px solid var(--border); }
+  .crumb { font: 500 12.5px var(--sans); color: var(--muted); background: none; border: 0; padding: 3px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
   button.crumb:hover { color: var(--text); background: var(--panel-2); }
-  .crumb.cur { color: var(--text); background: var(--cyan-f); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cyan) 45%, transparent); cursor: default; }
-  .crumb-sep { color: var(--dim); font: 12px var(--mono); }
-  .ibtn { width: 34px; height: 34px; flex: none; border-radius: 9px; border: 1px solid var(--border-2); background: var(--panel); color: var(--text); cursor: pointer; font: 600 14px var(--mono); }
-  .ibtn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .crumb.cur { color: var(--text); font-weight: 600; background: var(--accent-f, var(--cyan-f)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent); cursor: default; }
+  .crumb-sep { color: var(--dim); font-size: 12px; }
+  .ibtn { width: 32px; height: 32px; flex: none; border-radius: 8px; border: 1px solid var(--border-2); background: var(--panel); color: var(--text); cursor: pointer; font: 600 14px var(--sans); }
+  .ibtn:hover, .ibtn[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
   .ibtn.sm { width: 26px; height: 26px; font-size: 12px; border-radius: 7px; }
-  .pbtn { height: 34px; padding: 0 14px; border-radius: 9px; border: 0; background: var(--text); color: var(--bg); font: 600 13px var(--sans); cursor: pointer; white-space: nowrap; }
+  .pbtn { height: 32px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--text); background: var(--text); color: var(--bg); font: 600 13px var(--sans); cursor: pointer; white-space: nowrap; }
   .pbtn:hover { opacity: .88; }
+  .kbd { font: 600 10.5px var(--mono); border: 1px solid var(--border-2); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--muted); background: var(--panel); white-space: nowrap; }
+  .findbtn { display: flex; align-items: center; gap: 8px; width: min(250px, 24vw); height: 32px; padding: 0 8px 0 10px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--panel); color: var(--muted); font: 13px var(--sans); cursor: pointer; flex: none; }
+  .findbtn:hover { border-color: var(--accent); }
+  .findbtn .ft { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .menu { position: relative; }
   .menu-pop[hidden] { display: none; }
-  .menu-pop { position: absolute; right: 0; top: 40px; min-width: 210px; padding: 5px; border-radius: 11px; background: var(--panel); border: 1px solid var(--border-2); box-shadow: var(--shadow); display: grid; z-index: 30; }
-  .menu-pop button { text-align: left; background: none; border: 0; color: var(--text); font: 500 13px var(--sans); padding: 8px 10px; border-radius: 7px; cursor: pointer; }
-  .menu-pop button:hover { background: var(--panel-2); color: var(--cyan); }
-  .finder { position: relative; width: min(280px, 26vw); }
-  .finder input { width: 100%; height: 34px; border-radius: 9px; border: 1px solid var(--border-2); background: var(--panel); color: var(--text); font: 500 13px var(--mono); padding: 0 12px; outline: none; }
-  .finder input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--cyan-f); }
-  .finds { position: absolute; top: 40px; left: 0; right: 0; min-width: 300px; display: none; padding: 5px; border-radius: 11px; background: var(--panel); border: 1px solid var(--border-2); box-shadow: var(--shadow); z-index: 30; }
-  .finds.on { display: grid; }
-  .fh { display: grid; grid-template-columns: 10px 1fr; gap: 2px 9px; text-align: left; background: none; border: 0; padding: 7px 9px; border-radius: 7px; cursor: pointer; color: var(--text); }
-  .fh i { width: 9px; height: 9px; border-radius: 3px; margin-top: 5px; grid-row: span 2; }
-  .fh-l { font: 600 13px var(--mono); } .fh-v { font: 11px var(--sans); color: var(--muted); }
-  .fh.on, .fh:hover { background: var(--panel-2); } .fh-none { padding: 10px; color: var(--dim); font-size: 13px; }
+  .menu-pop { position: absolute; right: 0; top: 40px; min-width: 210px; padding: 5px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border-2); box-shadow: var(--shadow); display: grid; z-index: 30; }
+  .menu-pop button { text-align: left; background: none; border: 0; color: var(--text); font: 500 13px var(--sans); padding: 7px 10px; border-radius: 6px; cursor: pointer; }
+  .menu-pop button:hover { background: var(--panel-2); color: var(--accent); }
+  .menu-pop hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; width: 100%; }
 
-  .outline { grid-row: 2; overflow: auto; border-right: 1px solid var(--border); background: var(--bg); padding: 12px 8px; visibility: hidden; }
+  /* views: Finder-style column browser */
+  .outline { grid-row: 2; grid-column: 1; overflow: hidden; border-right: 1px solid var(--border); background: var(--bg); visibility: hidden; min-width: 0; }
   body.tree-open .outline { visibility: visible; }
-  .tree-h { font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); padding: 4px 10px 10px; display: flex; justify-content: space-between; }
-  .tv { display: flex; width: 100%; align-items: center; gap: 8px; text-align: left; border: 0; background: none; color: var(--muted); padding: 6px 10px 6px calc(10px + var(--d) * 16px); border-radius: 8px; cursor: pointer; font: 500 13px var(--mono); position: relative; }
-  .tv::before { content: ""; position: absolute; left: calc(var(--d) * 16px - 2px); top: 0; bottom: 0; width: 1px; background: var(--border); }
-  .tv[style*="--d:0"]::before { display: none; }
-  .tv:hover { background: var(--panel); color: var(--text); }
-  .tv.path { color: var(--text); }
-  .tv.on { background: var(--cyan-f); color: var(--text); box-shadow: inset 2px 0 0 var(--cyan); }
-  .tv-t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .tv-n { font-size: 11px; color: var(--dim); }
+  .miller { display: flex; height: 100%; overflow-x: auto; overflow-y: hidden; scroll-behavior: smooth; scrollbar-width: thin; }
+  .mcol { flex: 0 0 224px; min-width: 224px; border-right: 1px solid var(--border); padding: 8px 6px; overflow-y: auto; }
+  .mcol:last-child { border-right: 0; flex-grow: 1; }
+  .mch { font: 700 10px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 2px 8px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mit { display: flex; justify-content: space-between; align-items: center; gap: 6px; width: 100%; min-height: 34px; padding: 7px 8px; border-radius: 6px; border: 0; background: none; color: var(--text); font: 500 12.5px/1.4 var(--sans); cursor: pointer; text-align: left; }
+  .mit span { min-width: 0; overflow-wrap: anywhere; white-space: normal; }
+  .mit em { font-style: normal; color: var(--muted); font-size: 11px; white-space: nowrap; flex: none; }
+  .mit:hover { background: var(--panel-2); }
+  .mit.path { background: var(--panel-2); font-weight: 650; }
+  .mit.on { background: var(--accent); color: var(--accent-fg); font-weight: 650; }
+  .mit.on em { color: inherit; opacity: .8; }
+  .family-box { fill: var(--panel); fill-opacity: .45; stroke-width: 1.5; }
+  .family-title { font: 650 11px var(--mono); }
 
-  .stage { grid-row: 2; grid-column: 2; position: relative; overflow: hidden; touch-action: none; cursor: grab; outline: none; background-color: var(--bg);
-    background-image: radial-gradient(circle, var(--dot) 1.1px, transparent 1.4px), linear-gradient(var(--gridline) 1px, transparent 1px), linear-gradient(90deg, var(--gridline) 1px, transparent 1px); }
+  .mmain { grid-row: 2; grid-column: 2; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .stage { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; cursor: grab; outline: none; background: var(--bg-2); }
+  :root:not([data-theme="dark"]) .stage { background: #fbfcfd; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stage { background: var(--bg-2); } }
   .stage svg.map-svg { position: absolute; inset: 0; display: block; transition: opacity .13s ease; }
   .stage.fading svg.map-svg { opacity: 0; }
-  .vcard { position: absolute; left: 16px; top: 14px; max-width: min(440px, calc(100% - 32px)); padding: 12px 14px; border-radius: 13px; background: var(--chrome); border: 1px solid var(--border); backdrop-filter: blur(10px); box-shadow: var(--shadow); z-index: 3; }
-  .vcard .vt { font: 700 18px var(--sans); letter-spacing: -.02em; }
-  .vcard .vc { color: var(--muted); font-size: 13.5px; margin-top: 3px; }
-  .vcard .vm { font: 500 11px var(--mono); color: var(--dim); margin-top: 6px; }
-  .vcard .vseq { margin-top: 8px; font-size: 12.5px; color: var(--muted); } .vcard .vseq summary { cursor: pointer; font: 600 11px var(--mono); color: var(--cyan); }
-  .vcard .vseq ol { margin: 6px 0 0; padding-left: 20px; max-height: 40vh; overflow: auto; } .vcard .vseq b { color: var(--text); font: 600 12px var(--mono); }
-  .vcard .back { border: 0; background: none; color: var(--cyan); font: 600 12px var(--mono); padding: 0 0 4px; cursor: pointer; }
-  .vcard .back:hover { text-decoration: underline; }
-  .m-legend { position: absolute; left: 16px; bottom: 14px; max-width: calc(100% - 520px); padding: 8px 12px; border-radius: 11px; background: var(--chrome); border: 1px solid var(--border); backdrop-filter: blur(10px); z-index: 3; }
-  .m-legend .lg-av i { border-radius: 50%; border: 1.5px solid var(--muted); }
-  .m-legend b { color: var(--text); font-weight: 700; margin-right: 2px; }
-  .m-legend .lg-m-public i { border-width: 2.6px; } .m-legend .lg-m-ext i { border-style: dashed; } .m-legend .lg-m-verb i { border-radius: 6px; width: 16px; } .m-legend .lg-m-script i { height: 7px; opacity: .75; }
-  .m-legend .lg-stack i { border: 1.5px solid var(--muted); box-shadow: 2px 2px 0 -.5px var(--mask), 2px 2px 0 .5px var(--muted); background: var(--mask); }
-  .minimap { position: absolute; right: 14px; bottom: 58px; width: 210px; height: 132px; border-radius: 11px; background: var(--chrome); border: 1px solid var(--border-2); box-shadow: var(--shadow); overflow: hidden; z-index: 3; cursor: crosshair; padding: 6px; backdrop-filter: blur(10px); transition: opacity .2s; }
-  .minimap.all { opacity: .55; } .minimap:hover { opacity: 1; }
+  /* view header: a pill that opens on tap */
+  .vpill { position: absolute; left: 16px; top: 14px; z-index: 4; max-width: calc(100% - 32px); }
+  .vpill .pill { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; background: var(--panel); border: 1px solid var(--border-2); border-radius: 999px; padding: 5px 8px 5px 14px; box-shadow: var(--shadow); font: 13px var(--sans); color: var(--text); white-space: nowrap; cursor: pointer; }
+  .vpill .pill b { overflow: hidden; text-overflow: ellipsis; font-weight: 650; }
+  .vpill .pill .n { background: var(--panel-2); border-radius: 999px; padding: 1px 8px; font-size: 11.5px; color: var(--muted); }
+  .vpill .pill:hover, .vpill .pill[aria-expanded="true"] { border-color: var(--accent); }
+  .view-note { margin: 8px 4px 0; max-width: 760px; color: var(--muted); font: 12px/1.55 var(--sans); }
+  .vpop { margin-top: 8px; width: 380px; max-width: 100%; background: var(--panel); border: 1px solid var(--border-2); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px; font-size: 12.5px; max-height: 60vh; overflow: auto; }
+  .vpop[hidden] { display: none; }
+  .vpop h4 { margin: 0 0 4px; font: 650 14px var(--sans); }
+  .vpop p { margin: 0 0 8px; color: var(--muted); }
+  .vpop ol { margin: 0 0 8px; padding-left: 20px; columns: 2; column-gap: 20px; }
+  .vpop li { break-inside: avoid; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vpop .vm { font: 11px var(--mono); color: var(--dim); }
+  .vpop .back { border: 0; background: none; color: var(--accent); font: 600 12px var(--sans); padding: 0 0 6px; cursor: pointer; }
+  .vlanes { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; margin: 0 0 8px; font-size: 12px; }
+  .vlanes span { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border-2); border-radius: 999px; padding: 1px 9px 1px 3px; font-weight: 600; }
+  .vlanes em { font-style: normal; display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: var(--accent-fg); font-size: 9.5px; }
+  .vlanes i { font-style: normal; color: var(--dim); }
+  /* legend: a box in the corner that folds away */
+  .m-legend { position: absolute; left: 16px; bottom: 40px; z-index: 3; background: var(--panel); border: 1px solid var(--border-2); border-radius: 12px; box-shadow: var(--shadow); padding: 8px 12px; font: 11.5px var(--sans); display: grid; grid-template-columns: repeat(2, auto); gap: 3px 16px; max-width: calc(100% - 290px); }
+  .m-legend .t { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; gap: 12px; font: 700 10px var(--sans); letter-spacing: .1em; color: var(--muted); }
+  .m-legend .t button { border: 0; background: none; color: var(--muted); cursor: pointer; font: 700 13px var(--sans); padding: 0 2px; line-height: 1; }
+  .m-legend.folded .lgi { display: none; }
+  .lgi { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .lgi i { width: 14px; height: 10px; border: 1.5px solid var(--muted); border-radius: 3px; flex: none; }
+  .lgi i.p { border-radius: 999px; } .lgi i.d { border-style: dashed; } .lgi i.h { border-radius: 0; clip-path: polygon(3px 0, calc(100% - 3px) 0, 100% 50%, calc(100% - 3px) 100%, 3px 100%, 0 50%); border: 0; }
+  .lgi i.s { box-shadow: 2px 2px 0 -.5px var(--panel), 2px 2px 0 .5px var(--muted); background: var(--panel); }
+  .lgi i.num { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--text); color: var(--bg); font: 700 8px/14px var(--sans); text-align: center; font-style: normal; }
+  .lgi i.tag { width: 20px; border-radius: 999px; border-width: 1px; }
+  .lgi b { font-weight: 650; } .lgi span { color: var(--muted); }
+  /* controls + minimap, bottom right */
+  .mctl { position: absolute; right: 16px; bottom: 40px; z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .minimap { width: 200px; height: 112px; border-radius: 10px; background: var(--panel); border: 1px solid var(--border-2); box-shadow: var(--shadow); overflow: hidden; cursor: crosshair; padding: 6px; transition: opacity .2s; }
+  .minimap.all { opacity: .6; } .minimap:hover { opacity: 1; }
   .minimap svg { width: 100%; height: 100%; display: block; }
-  .minimap .vp { fill: color-mix(in srgb, var(--cyan) 12%, transparent); stroke: var(--cyan); }
-  .stage .ctl { right: 14px; bottom: 14px; }
-  .toast { position: absolute; left: 50%; top: 16px; transform: translate(-50%, -8px); padding: 8px 14px; border-radius: 999px; background: var(--text); color: var(--bg); font: 500 13px var(--sans); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 8; white-space: nowrap; max-width: 90%; overflow: hidden; text-overflow: ellipsis; }
-  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .minimap .vp { fill: color-mix(in srgb, var(--accent) 10%, transparent); stroke: var(--accent); }
+  .mctl .ctl { position: static; border-radius: 12px; padding: 4px; background: var(--panel); border-color: var(--border-2); }
+  .mctl .ctl button.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .mctl .ctl button:hover:not(:disabled) { color: var(--accent); }
+  /* help: one quiet line at the bottom, keys in a popover */
+  .hint { position: absolute; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; gap: 16px; justify-content: center; align-items: center; height: 28px; padding: 0 12px; font: 11.5px var(--sans); color: var(--muted); background: color-mix(in srgb, var(--bg) 88%, transparent); border-top: 1px solid var(--border); white-space: nowrap; overflow: hidden; }
+  .hint b { color: var(--text); font-weight: 600; }
+  .hint.msg { color: var(--accent); font-weight: 600; }
+  .hpop { position: fixed; right: 14px; top: 58px; width: 300px; background: var(--panel); border: 1px solid var(--border-2); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 14px; z-index: 40; font-size: 12.5px; }
+  .hpop[hidden] { display: none; }
+  .hpop::before { content: ""; position: absolute; right: 9px; top: -6px; width: 10px; height: 10px; background: var(--panel); border-left: 1px solid var(--border-2); border-top: 1px solid var(--border-2); transform: rotate(45deg); }
+  .hpop dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 8px 0 0; }
+  .hpop dt { font: 600 11px var(--mono); color: var(--accent); } .hpop dd { margin: 0; color: var(--muted); }
+  /* loading: ghost nodes; empty: a friendly card */
+  .ghosts { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  .ghosts span { position: absolute; height: 52px; border-radius: 10px; border: 1px solid var(--border); background: linear-gradient(90deg, var(--panel-2) 0%, var(--panel) 50%, var(--panel-2) 100%); background-size: 200% 100%; animation: shim 1.4s linear infinite; }
+  @keyframes shim { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .ghosts span { animation: none; } }
+  .empty-view { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); text-align: center; width: min(380px, 86%); z-index: 2; }
+  .empty-view .ico { font-size: 28px; color: var(--dim); }
+  .empty-view h4 { margin: 6px 0 4px; font: 650 16px var(--sans); }
+  .empty-view p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  /* ⌘K command box */
+  .scrim { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(2px); }
+  .scrim[hidden] { display: none; }
+  .pal { width: min(560px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--border-2); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+  .pal .in { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .pal input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: 16px var(--sans); }
+  .pal .res { max-height: min(52vh, 440px); overflow: auto; padding: 4px 6px 6px; }
+  .pal .gt { font: 700 10.5px var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 8px 3px; }
+  .fr { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px; border-radius: 8px; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; font: 13px var(--sans); }
+  .fr.on { background: var(--panel-2); box-shadow: inset 2px 0 0 var(--accent); }
+  .fr i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .fr b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fr span { margin-left: auto; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+  .fr mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: inherit; border-radius: 2px; }
+  .pal .none { padding: 22px 16px; text-align: center; color: var(--muted); font-size: 13px; }
+  .pal .none h4 { margin: 4px 0; color: var(--text); font: 650 14px var(--sans); }
+  .pal .none button { border: 0; background: none; color: var(--accent); font: 600 13px var(--sans); cursor: pointer; }
+  .pal .pft { display: flex; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
 
-  .panel { grid-row: 2; grid-column: 3; overflow: auto; border-left: 1px solid var(--border); background: var(--panel); z-index: 5; animation: slidein .22s ease; }
-  @keyframes slidein { from { transform: translateX(24px); opacity: 0; } }
-  .ph { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); background: linear-gradient(180deg, color-mix(in srgb, var(--c) 9%, transparent), transparent); position: sticky; top: 0; backdrop-filter: blur(10px); z-index: 1; }
-  .ph-top { display: flex; align-items: center; gap: 8px; }
-  .kchip { display: inline-flex; align-items: center; gap: 6px; font: 700 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
-  .vis { font: 800 9.5px var(--mono); letter-spacing: .14em; padding: 2px 7px; border-radius: 5px; }
-  .vis.pub { background: var(--cyan); color: var(--mask); } .vis.ext { border: 1px dashed var(--violet); color: var(--violet); } .vis.priv { border: 1px solid var(--border-2); color: var(--dim); }
-  .ph .x { margin-left: auto; width: 30px; height: 30px; font-size: 18px; line-height: 1; }
-  .ph h3 { font: 700 20px var(--mono); letter-spacing: -.02em; margin: 10px 0 2px; overflow-wrap: anywhere; }
-  .pid { font: 11px var(--mono); color: var(--dim); }
-  .authors { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; font-size: 12.5px; }
-  .authors .by { font: 700 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
-  .author { display: inline-flex; align-items: center; gap: 7px; padding: 2px 9px 2px 2px; border-radius: 999px; border: 1px solid var(--border-2); color: var(--text); text-decoration: none; background: var(--panel-2); }
-  .author:hover { border-color: var(--cyan); }
-  .author img, .author i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 9px var(--mono); font-style: normal; background: var(--panel); }
-  .author b { color: var(--muted); font-weight: 500; font-family: var(--mono); font-size: 11.5px; }
-  .authors .origin { color: var(--dim); font: 11.5px var(--mono); }
-  .pverbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .pverb { font: 600 12px var(--mono); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 10%, transparent); padding: 2px 9px; border-radius: 999px; }
-  button.pverb { cursor: pointer; } button.pverb:hover { background: color-mix(in srgb, var(--c) 22%, transparent); }
-  .open-btn { display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--text); font: 600 13.5px var(--sans); cursor: pointer; text-align: left; }
-  .open-btn span { font: 500 11px var(--mono); color: var(--muted); white-space: nowrap; }
-  .open-btn:hover { background: color-mix(in srgb, var(--c) 24%, transparent); }
-  .pb { padding: 4px 18px 24px; }
-  .ps { padding: 12px 0 4px; border-bottom: 1px dashed var(--border); } .ps:last-child { border-bottom: 0; }
-  .ps h4 { margin: 0 0 6px; font: 700 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--dim); display: flex; gap: 6px; }
-  .ps h4 span { color: var(--muted); }
-  .ps .prose { font-size: 14px; color: var(--text); } .ps .prose p { margin: 0 0 8px; }
-  .src { display: flex; align-items: center; gap: 8px; } .src a { font: 500 12.5px var(--mono); overflow-wrap: anywhere; flex: 1; }
-  .rel { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 1px 9px; width: 100%; align-items: center; text-align: left; background: none; border: 0; padding: 6px 8px; margin: 0 -8px; width: calc(100% + 16px); border-radius: 8px; cursor: pointer; color: var(--text); }
+  /* details: a short strip under the map — compact header, then What · When · How · Links tabs */
+  .panel { flex: none; height: 234px; max-height: 44%; overflow: auto; border-top: 1px solid var(--border-2); background: var(--panel); z-index: 5; animation: rise .2s ease; }
+  .panel[hidden] { display: none; }
+  @keyframes rise { from { transform: translateY(12px); opacity: 0; } }
+  .ph { display: flex; align-items: center; gap: 12px; padding: 12px 18px 6px; }
+  .ph .big { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: #fff; flex: none; }
+  .ph .pt { min-width: 0; flex: 1; }
+  .ph h3 { margin: 0; font: 650 17px var(--sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ph small { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; color: var(--muted); font-size: 12.5px; }
+  .ph .acts { display: flex; gap: 8px; align-items: center; flex: none; }
+  .vis { font: 700 9px var(--sans); letter-spacing: .1em; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border-2); color: var(--muted); }
+  .vis.pub { background: var(--k-public); border-color: var(--k-public); color: #fff; } .vis.ext { border-style: dashed; border-color: var(--k-ext); color: var(--k-ext); }
+  .author { display: inline-flex; align-items: center; gap: 6px; padding: 1px 9px 1px 1px; border-radius: 999px; border: 1px solid var(--border-2); color: var(--text); text-decoration: none; background: var(--panel); font-size: 12px; }
+  .author:hover { border-color: var(--accent); }
+  .author img, .author i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 9px var(--sans); font-style: normal; background: var(--panel-2); }
+  .author b { color: var(--muted); font-weight: 500; }
+  .origin { color: var(--dim); font-size: 12px; }
+  .obtn { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--c); background: color-mix(in srgb, var(--c) 10%, var(--panel)); color: var(--text); font: 600 13px var(--sans); cursor: pointer; white-space: nowrap; }
+  .obtn span { font-weight: 500; color: var(--muted); font-size: 11.5px; }
+  .obtn:hover { background: color-mix(in srgb, var(--c) 20%, var(--panel)); }
+  .ptabs { display: flex; align-items: center; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--border); }
+  .ptab { border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: 500 13px var(--sans); padding: 7px 10px; cursor: pointer; white-space: nowrap; }
+  .ptab em { font-style: normal; font-size: 11px; color: var(--dim); margin-left: 4px; }
+  .ptab:hover { color: var(--text); }
+  .ptab[aria-selected="true"] { color: var(--text); font-weight: 650; border-bottom-color: var(--accent); }
+  .pnav { margin-left: auto; display: flex; gap: 4px; }
+  .pbody { padding: 10px 18px 14px; }
+  .pbody h4 { margin: 0 0 4px; font: 700 10px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 6px; }
+  .pbody h4 span { color: var(--dim); }
+  .clamp { font-size: 14px; line-height: 1.55; max-width: 980px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .clamp.open { display: block; -webkit-line-clamp: unset; }
+  .clamp p { margin: 0 0 6px; } .clamp ul { margin: 0 0 6px; padding-left: 18px; }
+  .detail-bullets { margin: 0; padding-left: 18px; max-width: 1100px; font-size: 13px; line-height: 1.65; }
+  .detail-bullets li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-left: 2px; }
+  .detail-bullets li::before { content: '•'; margin-right: 8px; color: var(--accent); }
+  .links ul { margin: 0; padding: 0; list-style: none; }
+  .links li { margin: 0; }
+  .morebtn { border: 0; background: none; color: var(--accent); font: 600 12px var(--sans); padding: 2px 0 0; cursor: pointer; }
+  .pnone { color: var(--dim); font-size: 13px; }
+  .pverbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pverb { font: 600 12px var(--sans); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 50%, transparent); background: color-mix(in srgb, var(--c) 8%, transparent); padding: 1px 9px; border-radius: 999px; }
+  button.pverb { cursor: pointer; } button.pverb:hover { background: color-mix(in srgb, var(--c) 18%, transparent); }
+  .links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 22px; }
+  .src { display: flex; align-items: center; gap: 6px; min-width: 0; } .src a, .src span { font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+  .rel { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 0 8px; align-items: center; text-align: left; background: none; border: 0; padding: 4px 6px; margin: 0 -6px; width: calc(100% + 12px); border-radius: 6px; cursor: pointer; color: var(--text); font: 13px var(--sans); }
   .rel:hover { background: var(--panel-2); }
-  .rel i { width: 9px; height: 9px; border-radius: 3px; }
-  .rel-l { font: 600 13px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .rel-e { font: 500 11px var(--mono); color: var(--muted); }
-  .rel-w { grid-column: 2 / 4; font-size: 12px; color: var(--dim); }
-  .rel-none { color: var(--dim); font-size: 13px; padding: 2px 0 6px; }
-  .pviews { display: flex; flex-wrap: wrap; gap: 6px; }
-  .pview { font: 500 12px var(--mono); color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 3px 9px; cursor: pointer; }
-  .pview:hover { color: var(--text); border-color: var(--cyan); }
-  .help { position: fixed; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(4px); z-index: 50; }
-  .help[hidden] { display: none; }
-  .help-card { width: min(440px, calc(100vw - 32px)); padding: 20px 22px; border-radius: 16px; background: var(--panel); border: 1px solid var(--border-2); box-shadow: var(--shadow); }
-  .help-card dl { display: grid; grid-template-columns: auto 1fr; gap: 7px 16px; margin: 14px 0 18px; font-size: 13.5px; }
-  .help-card dt { font: 600 12px var(--mono); color: var(--cyan); } .help-card dd { margin: 0; color: var(--muted); }
+  .rel i { width: 8px; height: 8px; border-radius: 50%; }
+  .rel-l { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rel-e { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+  .rel-none { color: var(--dim); font-size: 12.5px; padding: 2px 0; }
+  .pviews { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .pview { font: 500 12px var(--sans); color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+  .pview:hover { color: var(--text); border-color: var(--accent); }
+
+  /* phone: still a map; the header folds to one line and details slide up from the bottom */
   @media (max-width: 820px) {
-    .mapapp, body.tree-open .mapapp, .mapapp:has(.panel:not([hidden])), body.tree-open .mapapp:has(.panel:not([hidden])) { grid-template-columns: 0 minmax(0, 1fr) 0; }
-    .outline { position: fixed; top: 54px; bottom: 0; left: 0; width: 260px; z-index: 20; box-shadow: var(--shadow); }
-    .panel { position: fixed; left: 0; right: 0; bottom: 0; max-height: 62dvh; border-left: 0; border-top: 1px solid var(--border-2); border-radius: 16px 16px 0 0; box-shadow: var(--shadow); animation: sheet .22s ease; }
-    @keyframes sheet { from { transform: translateY(30px); opacity: 0; } }
-    .finder { width: 120px; } .mbrand { display: none; } .minimap { display: none; } .m-legend { display: none; } #m-help { display: none; }
-    .vcard { max-width: calc(100% - 32px); }
+    .mapapp, body.tree-open .mapapp { grid-template-columns: 0 minmax(0, 1fr); grid-template-rows: 48px minmax(0, 1fr); }
+    .mbar { gap: 8px; padding: 0 10px; }
+    .crumbs, #m-export, .menu, #m-help, .findbtn .ft, .findbtn .kbd { display: none; }
+    .findbtn { width: 32px; padding: 0; justify-content: center; }
+    .mbrand { flex: 1; } .mbrand span { overflow: hidden; text-overflow: ellipsis; }
+    .outline { position: fixed; top: 48px; bottom: 0; left: 0; width: min(320px, 88vw); z-index: 20; box-shadow: var(--shadow); }
+    .panel { position: fixed; left: 0; right: 0; bottom: 0; height: auto; max-height: 58dvh; border-radius: 18px 18px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.15); }
+    .panel::before { content: ""; display: block; width: 38px; height: 4px; border-radius: 2px; background: var(--border-2); margin: 8px auto 0; }
+    .ph { padding-top: 6px; } .ph .obtn span { display: none; }
+    .links { grid-template-columns: 1fr; }
+    .minimap, .m-legend, .hint { display: none; }
+    .mctl { bottom: 14px; right: 12px; }
+    .vpop ol { columns: 1; }
   }
 
   /* endpoints */
@@ -430,12 +568,13 @@
     cloud: ['amber', 'Infra / Cloud'], security: ['rose', 'Auth / Security'], queue: ['orange', 'Queue / Event'],
     external: ['slate', 'External'], file: ['slate', 'File / Doc'], ai: ['fuchsia', 'Agent / AI'],
     // map-mode kinds (skill / architecture maps)
-    'm-public': ['cyan', 'Public skill', 'you run it'], 'm-lane': ['green', 'Board lane', 'the board starts it'],
-    'm-ext': ['violet', 'External skill', 'from another pack'], 'm-verb': ['fuchsia', 'Impeccable verb', 'a design command'],
-    'm-script': ['slate', 'Script', 'code a skill runs'], 'm-hook': ['rose', 'Hook / guard', 'fires on its own'],
-    'm-board': ['amber', 'State', 'board, config, ledgers'],
+    'm-public': ['k-public', 'Public skill', 'you run it'], 'm-lane': ['k-lane', 'Board lane', 'the board starts it'],
+    'm-ext': ['k-ext', 'External skill', 'from another pack'], 'm-verb': ['k-verb', 'Impeccable verb', 'a design command'],
+    'm-script': ['k-script', 'Script', 'code a skill runs'], 'm-hook': ['k-hook', 'Hook / guard', 'fires on its own'],
+    'm-board': ['k-board', 'State', 'board, config, ledgers'],
+    'm-step': ['k-public', 'Process step', 'open for implementation details'],
   };
-  const MAPK = { public: 'm-public', lane: 'm-lane', script: 'm-script', external: 'm-ext', 'skill-dep': 'm-ext', dep: 'm-ext', verb: 'm-verb', step: 'm-verb', hook: 'm-hook', guard: 'm-hook', board: 'm-board', state: 'm-board' };
+  const MAPK = { public: 'm-public', lane: 'm-lane', script: 'm-script', external: 'm-ext', 'skill-dep': 'm-ext', dep: 'm-ext', verb: 'm-verb', step: 'm-step', hook: 'm-hook', guard: 'm-hook', board: 'm-board', state: 'm-board' };
   const ALIAS = { client: 'frontend', ui: 'frontend', web: 'frontend', page: 'frontend', browser: 'frontend', app: 'frontend',
     api: 'backend', service: 'backend', server: 'backend', function: 'backend', endpoint: 'backend', route: 'backend', script: 'backend', cli: 'backend', worker: 'backend', module: 'backend',
     db: 'database', store: 'database', storage: 'database', cache: 'database', table: 'database', data: 'database',
@@ -462,6 +601,7 @@
     'm-ext': '<path d="M6.6 9.4 9.4 6.6"/><path d="m7.2 4.6 1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M8.8 11.4l-1 1a2.5 2.5 0 0 1-3.5-3.5l1-1"/>',
     'm-hook': '<path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/><path d="m5.8 8 1.5 1.5 3-3"/>',
     'm-verb': '<path d="M3 13 9.5 6.5M8 3l.7 1.6L10.3 5.3 8.7 6 8 7.6 7.3 6 5.7 5.3 7.3 4.6zM12 8.5l.45 1.05L13.5 10l-1.05.45L12 11.5l-.45-1.05L10.5 10l1.05-.45z"/>',
+    'm-step': '<path d="M2 8h11M9 4l4 4-4 4"/>',
     'm-board': '<rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M6 2.5v11M10 2.5v11"/><path d="M3.4 5.2h1.2M7.4 5.2h1.2M7.4 7.6h1.2M11.4 5.2h1.2"/>',
   };
   const CHG = { added: ['green', 'NEW'], new: ['green', 'NEW'], modified: ['amber', 'CHANGED'], changed: ['amber', 'CHANGED'], removed: ['rose', 'REMOVED'], planned: ['cyan', 'PLANNED'] };
@@ -583,22 +723,49 @@
     return pos;
   }
 
+  /* wire kinds on maps: colour says what the line means; state reads/writes stay light */
+  const WIRES = [['calls', 'calls', 'runs or invokes it'], ['feeds', 'feeds', 'hands work on'], ['triggers', 'triggers', 'suggests, offers, fires'], ['state', 'state', 'reads or writes a file, board, config'], ['guard', 'guard', 'a hook steps in']];
+  const mapTab = n => n.k === 'm-public' ? 'PUBLIC' : n.k === 'm-ext' ? 'EXTERNAL' : n.k === 'm-lane' ? 'LANE' : '';
+  const mapNodeW = n => {
+    const px = n.emphasis ? 15 : 13;
+    const sub = n.sub || n.sublabel || '';
+    return Math.min(n.emphasis ? 205 : 240, Math.max(n.emphasis ? 146 : 138,
+      Math.ceil(textW(n.label, px) + 38), Math.min(205, Math.ceil(textW(sub, 10) + 24))));
+  };
   /* Geometry: node boxes, ports, orthogonal routes, label slots. */
   function layoutGraph(dg, map) {
-    const CG = map ? 132 : CG0, RG = map ? 58 : RG0; // maps carry longer edge labels, so give them room
+    const CG = map ? (dg.mainSteps && !dg.containers ? 38 : 66) : CG0, RG = map ? 44 : RG0; // family borders also need clearance between columns
     const NH = dg.nodeH || 64, pitch = NH + RG;
     const nodes = (dg.nodes || []).map((n, i) => {
       const k = kindOf(n.kind, map);
-      const w = n.w || (map ? Math.min(340, Math.max(200, Math.ceil(textW(n.label, 13) + 64))) : NW);
-      return { ...n, k, col: n.col ?? i, row: n.row ?? 0, w, h: NH };
+      const w = n.w || (map ? mapNodeW(n) : NW);
+      return { ...n, k, col: n.col ?? i, row: n.row ?? 0, w, h: n.h || NH };
     });
     const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
-    const cols = [...new Set(nodes.map(n => n.col))].sort((a, b) => a - b);
+    const cols = dg.abs ? [] : [...new Set(nodes.map(n => n.col))].sort((a, b) => a - b);
     const colX = {}, colW = {}; let x = 0;
     cols.forEach(c => { colW[c] = Math.max(...nodes.filter(n => n.col === c).map(n => n.w)); });
     for (let c = Math.floor(cols[0] ?? 0); c <= Math.ceil(cols[cols.length - 1] ?? 0); c++) { colX[c] = x; x += (colW[c] || NW) + CG; }
     const cx = c => Number.isInteger(c) ? colX[c] : colX[Math.floor(c)] + (c % 1) * ((colW[Math.floor(c)] || NW) + CG);
-    nodes.forEach(n => { n.x = cx(n.col) + ((colW[n.col] || n.w) - n.w) / 2; n.y = n.row * pitch; if (map && n.k === 'm-script') { n.h = NH - 22; n.y += 11; } });
+    if (dg.abs) nodes.forEach(n => { n.x = n.ax; n.y = n.ay; if (map && n.k === 'm-script') { n.h -= 22; n.y += 11; } });
+    else nodes.forEach(n => { n.x = cx(n.col) + ((colW[n.col] || n.w) - n.w) / 2; n.y = n.row * pitch; if (map && n.k === 'm-script') { n.h = NH - 22; n.y += 11; } });
+    // decorations hanging on a node's top/bottom border (kind tab, step badge, ⤢ badge, author name tag):
+    // ports keep off them, routes and labels treat the name tag as an obstacle
+    if (map) nodes.forEach(n => {
+      n.decoT = []; n.decoB = [];
+      const tab = mapTab(n); if (tab) n.decoT.push([n.x + 12, tab.length * 6.4 + 10]);
+      if (n.step) n.decoT.push([n.x - 10, 24]);
+      if (n.kids) n.decoT.push([n.x + n.w - 46, 40]);
+      if (n.author || n.k === 'm-ext') {
+        const A = (D.authors || {})[n.author] || {}, max = n.w - 40;
+        let t = n.author ? '@' + n.author : 'unknown';
+        while (t.length > 4 && textW(t, 10) * .92 + 42 > max) t = t.slice(0, -2) + '…';
+        const w = Math.ceil(textW(t, 10) * .92 + 42);
+        n.tag = { x: n.x + n.w - 12 - w, y: n.y + n.h - 9, w, h: 22, text: t, img: A.avatar || '', name: A.name || '' };
+        n.decoB.push([n.tag.x - 2, n.tag.w + 4]);
+      }
+    });
+    const tagRects = nodes.filter(n => n.tag).map(n => ({ x: n.tag.x - 2, y: n.tag.y - 2, w: n.tag.w + 4, h: n.tag.h + 6 }));
     /* ---- routing: one orthogonal route per edge, no shared trunks ----
        Ported in approach from archify's router (MIT): renderers/shared/route-quality.mjs
        shortestOrthogonalGridRoute + renderers/architecture/routing.mjs. Each edge gets its own
@@ -608,19 +775,30 @@
        bend penalty. Earlier routes may never be overlapped and are crossed only when no clean
        route exists; earlier labels are obstacles, so later routes keep clear of them. */
     const edges = (dg.edges || []).filter(e => byId[e.from] && byId[e.to] && e.from !== e.to).map(e => ({ ...e, s: byId[e.from], t: byId[e.to] }));
+    // fixed edges arrive with their route already drawn (the hub comb); the router works around them
+    const free = edges.filter(e => !e.fixed);
+    edges.filter(e => e.fixed).forEach(e => { e.pts = e.fixed; e.p1 = e.pts[0]; e.p2 = e.pts[e.pts.length - 1]; e.fs = 'R'; e.ts = 'L'; e.stubs = []; e.how = 'comb'; });
     const sides = {};
     const pushSide = (n, side, e, other) => ((sides[n.id + '|' + side] ||= []).push({ e, other, n }));
-    edges.forEach(e => {
+    free.forEach(e => {
       const { s, t } = e, sc = s.x + s.w / 2, tc = t.x + t.w / 2, sy = s.y + s.h / 2, ty = t.y + t.h / 2;
       const gapX = tc > sc ? t.x - (s.x + s.w) : s.x - (t.x + t.w);
       if (gapX > 24) { e.fs = tc > sc ? 'R' : 'L'; e.ts = tc > sc ? 'L' : 'R'; }
       else { e.fs = ty >= sy ? 'B' : 'T'; e.ts = ty >= sy ? 'T' : 'B'; }
     });
     // a side holds only as many ports as fit 14px apart; the steepest extras move to the top/bottom side
-    const PORT = 14, cap = (n, side) => Math.max(1, Math.floor(((side === 'L' || side === 'R') ? n.h : n.w) * 0.84 / PORT));
+    const sideSpan = (n, side) => { // longest stretch of a top/bottom border free of decorations
+      const decos = side === 'T' ? n.decoT : side === 'B' ? n.decoB : null;
+      if (!decos || !decos.length) return null;
+      let spans = [[n.x + 8, n.x + n.w - 8]];
+      decos.forEach(([dx, dw]) => { spans = spans.flatMap(([a, b]) => { const c = dx - 8, d = dx + dw + 8; if (d <= a || c >= b) return [[a, b]]; return [[a, c], [d, b]].filter(([p, q]) => q - p > 0); }); });
+      const best = spans.sort((p, q) => (q[1] - q[0]) - (p[1] - p[0]))[0];
+      return best && best[1] - best[0] >= 24 ? best : null;
+    };
+    const PORT = 14, cap = (n, side) => { const sp = sideSpan(n, side); return Math.max(1, Math.floor(((side === 'L' || side === 'R') ? n.h : sp ? sp[1] - sp[0] : n.w) * 0.84 / PORT)); };
     for (let pass = 0; pass < 2; pass++) nodes.forEach(n => {
       ['R', 'L'].forEach(side => {
-        const mine = edges.filter(e => (e.s === n && e.fs === side) || (e.t === n && e.ts === side));
+        const mine = free.filter(e => (e.s === n && e.fs === side) || (e.t === n && e.ts === side));
         const over = mine.length - cap(n, side); if (over <= 0) return;
         const far = e => { const o = e.s === n ? e.t : e.s; return (o.y + o.h / 2) - (n.y + n.h / 2); };
         mine.sort((a, b) => Math.abs(far(b)) - Math.abs(far(a))).slice(0, over).forEach(e => {
@@ -629,27 +807,34 @@
         });
       });
     });
-    edges.forEach(e => { pushSide(e.s, e.fs, e, e.t); pushSide(e.t, e.ts, e, e.s); });
+    free.forEach(e => { pushSide(e.s, e.fs, e, e.t); pushSide(e.t, e.ts, e, e.s); });
     Object.entries(sides).forEach(([key, list]) => {
       const side = key.split('|').pop(), vertical = side === 'L' || side === 'R';
       const n = list[0].n;
       // order ports by where the far end lies, so neighbouring routes do not cross at the node
       list.sort((a, b) => vertical ? (a.other.y - b.other.y) || ((side === 'R' ? -1 : 1) * (a.other.x - b.other.x))
         : (a.other.x - b.other.x) || ((side === 'B' ? -1 : 1) * (a.other.y - b.other.y)));
-      const len = vertical ? n.h : n.w, gap = Math.min(vertical ? 16 : 26, (len * 0.84) / Math.max(1, list.length));
+      const sp = vertical ? null : sideSpan(n, side);
+      const len = vertical ? n.h : sp ? sp[1] - sp[0] : n.w, mid = sp ? (sp[0] + sp[1]) / 2 : n.x + n.w / 2;
+      const gap = Math.min(vertical ? 16 : 26, (len * 0.84) / Math.max(1, list.length));
       list.forEach((it, i) => {
         const off = (i - (list.length - 1) / 2) * gap;
         const p = side === 'R' ? [n.x + n.w, n.y + n.h / 2 + off] : side === 'L' ? [n.x, n.y + n.h / 2 + off]
-          : side === 'T' ? [n.x + n.w / 2 + off, n.y] : [n.x + n.w / 2 + off, n.y + n.h];
+          : side === 'T' ? [mid + off, n.y] : [mid + off, n.y + n.h];
         if (it.n === it.e.s && it.e.fs === side) it.e.p1 = p; else it.e.p2 = p;
       });
     });
-    const C = 12, STUB = C + 6, SEP = 10, BEND = 26, CROSS = 900;
+    const C = map ? 16 : 12, STUB = dg.mainSteps ? C : C + 6, SEP = 10, BEND = map ? 60 : 26, CROSS = 900; // maps: 16 px clear of other nodes, few bends
     const OUT = { R: [1, 0], L: [-1, 0], T: [0, -1], B: [0, 1] };
     const nodeRects = nodes.map(n => ({ x: n.x, y: n.y, w: n.w, h: n.h }));
     const gapLinesX = [], gapLinesY = [];
-    Object.keys(colX).map(Number).forEach(c => gapLinesX.push(colX[c] - CG / 2, colX[c] + (colW[c] || NW) + CG / 2));
-    [...new Set(nodes.map(n => n.y))].forEach(y => gapLinesY.push(y - RG / 2, y + NH + RG / 2));
+    if (dg.abs) {
+      (dg.lanes || []).forEach(l => gapLinesX.push(l.x - (dg.laneGap || 32) / 2, l.x + 8, l.x + l.w - 8, l.x + l.w + (dg.laneGap || 32) / 2));
+      nodes.forEach(n => gapLinesY.push(n.y - RG / 2, n.y + n.h + RG / 2));
+    } else {
+      Object.keys(colX).map(Number).forEach(c => gapLinesX.push(colX[c] - CG / 2, colX[c] + (colW[c] || NW) + CG / 2));
+      [...new Set(nodes.map(n => n.y))].forEach(y => gapLinesY.push(y - RG / 2, y + NH + RG / 2));
+    }
     const routed = [], reserved = [];
     const segsOf = pts => pts.slice(0, -1).map((a, i) => [a, pts[i + 1]]);
     const inRect = (p, r) => p[0] > r.x && p[0] < r.x + r.w && p[1] > r.y && p[1] < r.y + r.h;
@@ -665,8 +850,8 @@
       const st = [e.p1[0] + OUT[e.fs][0] * STUB, e.p1[1] + OUT[e.fs][1] * STUB];
       const en = [e.p2[0] + OUT[e.ts][0] * STUB, e.p2[1] + OUT[e.ts][1] * STUB];
       const W = win ? { x: Math.min(st[0], en[0]) - win, y: Math.min(st[1], en[1]) - win, x2: Math.max(st[0], en[0]) + win, y2: Math.max(st[1], en[1]) + win } : null;
-      const obs = [...nodeRects.map(r => ({ x: r.x - C, y: r.y - C, w: r.w + 2 * C, h: r.h + 2 * C })), ...reserved.map(r => ({ x: r.x - 3, y: r.y - 3, w: r.w + 6, h: r.h + 6 }))];
-      const avoid = [...routed.flatMap(r => segsOf(r.pts)), ...edges.filter(o => o !== e && !routed.includes(o)).flatMap(o => o.stubs || [])];
+      const obs = [...nodeRects.map(r => ({ x: r.x - C, y: r.y - C, w: r.w + 2 * C, h: r.h + 2 * C })), ...tagRects, ...reserved.map(r => ({ x: r.x - 3, y: r.y - 3, w: r.w + 6, h: r.h + 6 }))];
+      const avoid = [...routed.flatMap(r => segsOf(r.pts)), ...free.filter(o => o !== e && !routed.includes(o)).flatMap(o => o.stubs || [])];
       const xs = new Set([st[0], en[0], ...gapLinesX]), ys = new Set([st[1], en[1], ...gapLinesY]);
       obs.forEach(r => { xs.add(r.x - 1); xs.add(r.x + r.w + 1); ys.add(r.y - 1); ys.add(r.y + r.h + 1); });
       avoid.forEach(([a, b]) => { if (a[0] === b[0]) { xs.add(a[0]); xs.add(a[0] - SEP); xs.add(a[0] + SEP); } else { ys.add(a[1]); ys.add(a[1] - SEP); ys.add(a[1] + SEP); } });
@@ -739,12 +924,12 @@
     const placed = [];
     function placeLabel(e) {
       if (!e.label && e.step == null) return;
-      const full = fit((e.step != null ? e.step + ' · ' : '') + (e.label || ''), 10, map ? 190 : 150);
-      const tries = [full]; if (e.step != null && e.label) tries.push(String(e.step));
+      const full = map ? fit(e.label || '', 10.5, 170) : fit((e.step != null ? e.step + ' · ' : '') + (e.label || ''), 10, 150);
+      const tries = [full]; if (e.step != null && e.label && !dg.abs) tries.push(map ? '' : String(e.step));
       const segs = segsOf(e.pts).map((s, i) => ({ a: s[0], b: s[1], i, l: Math.hypot(s[1][0] - s[0][0], s[1][1] - s[0][1]), h: s[0][1] === s[1][1] }));
       const order = [...segs].sort((p, q) => (q.h - p.h) * 40 + (q.l - p.l));
       for (const text of tries) {
-        const w = textW(text, 10) + 12, hgt = 18;
+        const pill = map && e.step != null, w = map ? (text ? textW(text, 10.5) * .92 + 18 : 0) + (pill ? (text ? 20 : 22) : 0) : textW(text, 10) + 12, hgt = map ? 20 : 18;
         for (const sg of order) {
           if (sg.h && sg.l < w + 10) continue;
           if (!sg.h && sg.l < hgt + 14) continue;
@@ -753,21 +938,24 @@
             const box = { x: lx - w / 2, y: ly - hgt / 2, w, h: hgt };
             const grow = { x: box.x - 3, y: box.y - 3, w: box.w + 6, h: box.h + 6 };
             if (nodeRects.some(r => hit({ x: r.x - STUB - 4, y: r.y - STUB - 4, w: r.w + 2 * STUB + 8, h: r.h + 2 * STUB + 8 }, box))) continue; // keep port stubs free
+            if (tagRects.some(r => hit(r, grow))) continue;
             if (placed.some(r => hit(r, grow))) continue;
             if (routed.some(r => r !== e && segsOf(r.pts).some(([a, b]) => segHitsRect(a, b, grow)))) continue;
             if (segs.some(s2 => s2.i !== sg.i && segHitsRect(s2.a, s2.b, box))) continue;
-            placed.push(box); reserved.push(grow); e.lbl = { ...box, text, short: text !== full }; return;
+            placed.push(box); reserved.push(grow); e.lbl = { ...box, text, step: map ? e.step : null, short: text !== full }; return;
           }
         }
       }
     }
     let stats = {};
-    edges.forEach(e => { // every port's stub is reserved before routing starts
+    free.forEach(e => { // every port's stub is reserved before routing starts
       const st = [e.p1[0] + OUT[e.fs][0] * STUB, e.p1[1] + OUT[e.fs][1] * STUB], en = [e.p2[0] + OUT[e.ts][0] * STUB, e.p2[1] + OUT[e.ts][1] * STUB];
       e.stubs = [[e.p1, st], [en, e.p2]];
     });
     const runRouting = order => {
       routed.length = 0; reserved.length = 0; placed.length = 0; stats = {};
+      (dg.blocks || []).forEach(b => { reserved.push(b); placed.push(b); }); // lane headers and arrows stay clear
+      edges.filter(e => e.fixed).forEach(e => { routed.push(e); if (e.lbl) { placed.push(e.lbl); reserved.push({ x: e.lbl.x - 3, y: e.lbl.y - 3, w: e.lbl.w + 6, h: e.lbl.h + 6 }); } stats.comb = (stats.comb || 0) + 1; });
       order.forEach(e => {
         let how = 'grid'; e.lbl = null; e.pts = gridRoute(e, false, 320) || gridRoute(e, false, 0);
         if (!e.pts) { how = 'cross'; e.pts = gridRoute(e, true, 0); } if (!e.pts) { how = 'fallback'; e.pts = fallback(e); }
@@ -776,7 +964,7 @@
       });
       return (stats.cross || 0) + (stats.fallback || 0);
     };
-    let order = [...edges].sort((a, b) => (Math.abs(a.p1[0] - a.p2[0]) + Math.abs(a.p1[1] - a.p2[1])) - (Math.abs(b.p1[0] - b.p2[0]) + Math.abs(b.p1[1] - b.p2[1])));
+    let order = [...free].sort((a, b) => (Math.abs(a.p1[0] - a.p2[0]) + Math.abs(a.p1[1] - a.p2[1])) - (Math.abs(b.p1[0] - b.p2[0]) + Math.abs(b.p1[1] - b.p2[1])));
     let bad = runRouting(order);
     // rip-up and reroute: an edge that had to cross goes first next time; keep the best attempt
     for (let tries = 0; bad && tries < 4; tries++) {
@@ -801,18 +989,18 @@
       const pairs = []; edges.forEach((a, i) => edges.slice(i + 1).forEach(b => { if (xing(a, b)) pairs.push([a, b]); }));
       // a crossing pair, or a pair where one shares a node side with the other's crossing partner
       const cand = [];
-      pairs.forEach(([a, b]) => { cand.push([a, b]); edges.forEach(o => { if (o !== a && o !== b) { cand.push([a, o]); cand.push([b, o]); } }); });
-      outer3: for (const [a, b] of cand) {
+      pairs.forEach(([a, b]) => { cand.push([a, b]); free.forEach(o => { if (o !== a && o !== b) { cand.push([a, o]); cand.push([b, o]); } }); });
+      outer3: for (const [a, b] of cand.filter(([x, y]) => !x.fixed && !y.fixed)) {
         for (const n of [a.s, a.t]) for (const side of ['L', 'R', 'T', 'B']) {
           const ka = endAt(a, n, side), kb = endAt(b, n, side); if (!ka || !kb) continue;
           const pa = a[ka], pb = b[kb]; a[ka] = pb; b[kb] = pa;
-          edges.forEach(e => { e.stubs = [[e.p1, [e.p1[0] + OUT[e.fs][0] * STUB, e.p1[1] + OUT[e.fs][1] * STUB]], [[e.p2[0] + OUT[e.ts][0] * STUB, e.p2[1] + OUT[e.ts][1] * STUB], e.p2]]; });
+          free.forEach(e => { e.stubs = [[e.p1, [e.p1[0] + OUT[e.fs][0] * STUB, e.p1[1] + OUT[e.fs][1] * STUB]], [[e.p2[0] + OUT[e.ts][0] * STUB, e.p2[1] + OUT[e.ts][1] * STUB], e.p2]]; });
           const snap = edges.map(e => [e, e.pts, e.lbl, e.how]), snapStats = stats, snapR = [routed.slice(), reserved.slice(), placed.slice()];
           runRouting(order);
           const now = issueCount();
           if (now < issues) { issues = now; fixed = true; break outer3; }
           a[ka] = pa; b[kb] = pb;
-          edges.forEach(e => { e.stubs = [[e.p1, [e.p1[0] + OUT[e.fs][0] * STUB, e.p1[1] + OUT[e.fs][1] * STUB]], [[e.p2[0] + OUT[e.ts][0] * STUB, e.p2[1] + OUT[e.ts][1] * STUB], e.p2]]; });
+          free.forEach(e => { e.stubs = [[e.p1, [e.p1[0] + OUT[e.fs][0] * STUB, e.p1[1] + OUT[e.fs][1] * STUB]], [[e.p2[0] + OUT[e.ts][0] * STUB, e.p2[1] + OUT[e.ts][1] * STUB], e.p2]]; });
           snap.forEach(([e, p, l, hw]) => { e.pts = p; e.lbl = l; e.how = hw; }); stats = snapStats;
           routed.splice(0, routed.length, ...snapR[0]); reserved.splice(0, reserved.length, ...snapR[1]); placed.splice(0, placed.length, ...snapR[2]);
         }
@@ -826,10 +1014,25 @@
       return { ...g, k: kindOf(g.kind || 'external'), x: Math.min(...ms.map(n => n.x)) - P, y: Math.min(...ms.map(n => n.y)) - P - 16,
         x2: Math.max(...ms.map(n => n.x + n.w)) + P, y2: Math.max(...ms.map(n => n.y + n.h)) + P };
     }).filter(Boolean);
-    const xs = [...nodes.flatMap(n => [n.x - 8, n.x + n.w + 8]), ...groups.flatMap(g => [g.x, g.x2]), ...edges.flatMap(e => e.pts.map(p => p[0])), ...placed.flatMap(p => [p.x, p.x + p.w])];
-    const ys = [...nodes.flatMap(n => [n.y - 14, n.y + n.h + 8]), ...groups.flatMap(g => [g.y, g.y2]), ...edges.flatMap(e => e.pts.map(p => p[1])), ...placed.flatMap(p => [p.y, p.y + p.h])];
+    // Family frames enclose ordinary cards, so clicks, ports and focus keep their existing owners.
+    // Children contribute their entire frame to their parent's bounds, rather than just their cards.
+    const familyDefs = dg.containers || [], familyCache = {};
+    const frameOf = (f, trail = new Set()) => {
+      if (familyCache[f.id]) return familyCache[f.id];
+      if (trail.has(f.id)) return null;
+      const next = new Set([...trail, f.id]);
+      const children = familyDefs.filter(c => c.parent === f.id).map(c => frameOf(c, next)).filter(Boolean);
+      const members = (f.nodeIds || []).map(id => byId[id]).filter(Boolean);
+      const rects = [...members.map(n => ({x:n.x - 8,y:n.y - 14,w:n.w + 16,h:n.h + 22 + (n.tag ? 14 : 0)})), ...children];
+      if (!rects.length) return null;
+      const p = 12, x = Math.min(...rects.map(r => r.x)) - p, y = Math.min(...rects.map(r => r.y)) - p - 24;
+      return familyCache[f.id] = {...f, x, y, w:Math.max(...rects.map(r => r.x+r.w)) + p - x, h:Math.max(...rects.map(r => r.y+r.h)) + p - y};
+    };
+    const families = familyDefs.map(f => frameOf(f)).filter(Boolean);
+    const xs = [...families.flatMap(f => [f.x,f.x+f.w]), ...(dg.lanes || []).flatMap(l => [l.x, l.x + l.w]), ...nodes.flatMap(n => [n.x - 14, n.x + n.w + 8]), ...groups.flatMap(g => [g.x, g.x2]), ...edges.flatMap(e => e.pts.map(p => p[0])), ...placed.flatMap(p => [p.x, p.x + p.w])];
+    const ys = [...families.flatMap(f => [f.y,f.y+f.h]), ...(dg.lanes || []).flatMap(l => [l.y, l.y + l.h]), ...nodes.flatMap(n => [n.y - 14, n.y + n.h + (n.tag ? 18 : 8)]), ...groups.flatMap(g => [g.y, g.y2]), ...edges.flatMap(e => e.pts.map(p => p[1])), ...placed.flatMap(p => [p.y, p.y + p.h])];
     const M = 36, minX = Math.min(...xs) - M, minY = Math.min(...ys) - M;
-    return { stats, nodes, edges, groups, byId, map, bounds: { x: minX, y: minY, w: Math.max(...xs) - minX + M, h: Math.max(...ys) - minY + M } };
+    return { stats, nodes, edges, groups, families, byId, map, hub: dg.hub || null, lanes: dg.lanes || [], blocks: dg.blocks || [], bounds: { x: minX, y: minY, w: Math.max(...xs) - minX + M, h: Math.max(...ys) - minY + M } };
   }
 
   let svgSeq = 0;
@@ -838,6 +1041,7 @@
     const id = 'g' + (svgSeq++), { nodes, edges, groups, bounds: B, map } = geo;
     const col = k => `var(--${KIND[k][0]})`, fill = k => `var(--${KIND[k][0]}-f)`;
     const estyle = e => {
+      if (map && e.wk) return { c: `var(--w-${e.wk})`, m: e.wk, dash: e.back ? '6 5' : '', cls: ' w-' + e.wk + (e.back ? ' back' : '') };
       const st = e.style || (e.change === 'added' ? 'added' : e.change === 'removed' ? 'removed' : '');
       if (st === 'added' || st === 'emphasis') return { c: 'var(--green)', m: 'g', dash: '', flow: st === 'added' || e.animate };
       if (st === 'removed') return { c: 'var(--rose)', m: 'r', dash: '5 5', op: .7 };
@@ -847,7 +1051,19 @@
     };
     const marker = (n, c) => `<marker id="${id}-${n}" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path d="M0 0 L10 4 L0 8 Z" fill="${c}"/></marker>`;
     let s = `<svg viewBox="${B.x} ${B.y} ${B.w} ${B.h}" data-w="${B.w}" data-h="${B.h}" role="img" aria-label="${esc(opts.title || 'Diagram')}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-      <defs>${marker('d', 'var(--arrow)')}${marker('g', 'var(--green)')}${marker('r', 'var(--rose)')}${marker('v', 'var(--violet)')}${marker('h', 'var(--cyan)')}</defs>`;
+      <defs>${marker('d', 'var(--arrow)')}${marker('g', 'var(--green)')}${marker('r', 'var(--rose)')}${marker('v', 'var(--violet)')}${marker('h', 'var(--cyan)')}${map ? WIRES.map(w => marker(w[0], `var(--w-${w[0]})`)).join('') : ''}</defs>`;
+    const families = geo.families || [], familyDepth = f => f.parent ? 1 + familyDepth(families.find(p => p.id === f.parent) || {}) : 0;
+    families.slice().sort((a,b) => familyDepth(a)-familyDepth(b)).forEach(f => {
+      s += `<g class="family" data-family="${esc(f.id)}"${f.parent ? ` data-parent="${esc(f.parent)}"` : ''}><rect class="family-box" x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}" rx="14" stroke="var(--${familyDepth(f) ? 'cyan' : 'border-2'})"/>
+        <text class="family-title" x="${f.x+12}" y="${f.y+18}" fill="var(--muted)" data-t="ft" data-o="${esc(f.id)}">${esc(f.label || f.id)}</text></g>`;
+    });
+    (geo.lanes || []).forEach((l, i) => {
+      s += `<g class="lane" data-lane="${i}">${l.bare ? '' : `<rect x="${l.x}" y="${l.y}" width="${l.w}" height="${l.h}" rx="14" class="lane-box"/>`}
+        <circle cx="${l.x + 20}" cy="${l.y + 20}" r="8" class="lane-num"/><text x="${l.x + 20}" y="${l.y + 24}" text-anchor="middle" class="lane-num-tx">${i + 1}</text>
+        <text x="${l.x + 34}" y="${l.y + 24}" class="lane-t" data-t="lt" data-o="lane:${i}">${esc(l.title)}</text>
+        <text x="${l.x + 34 + textW(l.title, 11) * .95 + 8}" y="${l.y + 24}" class="lane-c">${l.ids.length} ${l.ids.length === 1 ? 'part' : 'parts'}</text></g>`;
+      if (!l.bare && i < geo.lanes.length - 1) s += `<text x="${l.x + l.w + (l.gap || 32) / 2}" y="${l.y + 25}" text-anchor="middle" class="lane-arrow">→</text>`;
+    });
     groups.forEach(g => {
       s += `<g class="grp"><rect x="${g.x}" y="${g.y}" width="${g.x2 - g.x}" height="${g.y2 - g.y}" rx="12" fill="${fill(g.k)}" fill-opacity=".35" stroke="${col(g.k)}" stroke-opacity=".55" stroke-dasharray="6 4"/>
         <text x="${g.x + 12}" y="${g.y + 16}" class="g-label" fill="${col(g.k)}">${esc(fit(g.label, 10, g.x2 - g.x - 24))}</text></g>`;
@@ -855,30 +1071,34 @@
     s += '<g class="edges">';
     edges.forEach((e, i) => {
       const st = estyle(e), d = roundPath(e.pts);
-      s += `<g class="edge-g" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-i="${i}"><path d="${d}" class="halo"/><path d="${d}" class="hitline"/>
-        <path d="${d}" class="flowline" stroke="${st.c}"/>
+      s += `<g class="edge-g${st.cls || ''}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-i="${i}"><path d="${d}" class="halo"/><path d="${d}" class="hitline"/>
         <path d="${d}" class="edge${st.flow ? ' flow' : ''}" stroke="${st.c}" ${st.dash && !st.flow ? `stroke-dasharray="${st.dash}"` : ''} ${st.op ? `opacity="${st.op}"` : ''} marker-end="url(#${id}-${st.m})" ${e.both ? `marker-start="url(#${id}-${st.m})"` : ''}/>
+        <path d="${d}" class="flowline" stroke="${st.c}"/>
         <title>${e.step != null ? 'Step ' + e.step + ': ' : ''}${esc(e.s.label)} ${e.both ? '⇄' : '→'} ${esc(e.t.label)}${e.label ? ': ' + esc(e.label) : ''}${e.when ? '\n' + esc(e.when) : ''}</title></g>`;
     });
     s += '</g><g class="nodes">';
     nodes.forEach(n => {
       const c = col(n.k), f = fill(n.k), removed = n.change === 'removed';
-      const pub = map && n.k === 'm-public', priv = map && n.k === 'm-script', ext = map && n.k === 'm-ext', verb = map && n.k === 'm-verb';
-      const rx = verb ? n.h / 2 : 9;
-      const kids = opts.childCount ? opts.childCount(n.id) : 0;
+      const pub = map && n.k === 'm-public', priv = map && n.k === 'm-script', ext = map && n.k === 'm-ext', verb = map && n.k === 'm-verb', hook = map && n.k === 'm-hook';
+      const rx = verb ? n.h / 2 : map ? 10 : 9;
+      const kids = n.kids != null ? n.kids : opts.childCount ? opts.childCount(n.id) : 0;
       const subject = opts.subject === n.id;
       const verbs = map && (n.verbs || []).length ? n.verbs : null;
       const subTxt = n.sub || (map && n.origin ? n.origin : '') || (map ? (n.what ? n.what.replace(/[`*]/g, '').split(/(?<=\.)\s/)[0] : KIND[n.k][1]) : '');
       const sub = subTxt && !verbs ? fit(subTxt, 10, n.w - 24) : '';
-      const lpx = textW(n.label, 13) > n.w - 44 ? Math.max(10, (n.w - 44) / (String(n.label).length * 0.6)) : 13;
+      const labelPx = n.emphasis ? 15 : 13;
+      const lpx = textW(n.label, labelPx) > n.w - 30 ? Math.max(11, (n.w - 30) / (String(n.label).length * 0.6)) : labelPx;
       const ly = n.y + n.h / 2 + (sub || verbs ? -3 : 4);
-      s += `<g class="node${pub ? ' pub' : ''}${priv ? ' priv' : ''}${kids ? ' has-child' : ''}${subject ? ' subject' : ''}" data-id="${esc(n.id)}" tabindex="${map ? 0 : -1}" role="${map ? 'button' : 'img'}" aria-label="${esc(n.label)}${kids ? ' (opens inner view)' : ''}">
+      s += `<g class="node${pub ? ' pub' : ''}${priv ? ' priv' : ''}${kids ? ' has-child' : ''}${subject ? ' subject' : ''}${n.emphasis ? ' main-step' : ''}" data-id="${esc(n.id)}" tabindex="${map ? 0 : -1}" role="${map ? 'button' : 'img'}" aria-label="${esc(n.label)}${kids ? ' (opens inner view)' : ''}">
         <title>${esc(n.label)}${subTxt ? ' · ' + esc(subTxt) : ''}${n.note ? '\n' + esc(n.note) : ''}${kids ? '\nDouble-click to open' : ''}</title>`;
-      if (kids) s += `<rect x="${n.x + 6}" y="${n.y + 6}" width="${n.w}" height="${n.h}" rx="9" class="n-stack" stroke="${c}"/><rect x="${n.x + 3}" y="${n.y + 3}" width="${n.w}" height="${n.h}" rx="9" class="n-stack" stroke="${c}"/>`;
-      if (pub) s += `<rect x="${n.x - 4}" y="${n.y - 4}" width="${n.w + 8}" height="${n.h + 8}" rx="12" class="n-ring" stroke="${c}"/>`;
-      s += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-mask"/>
-        <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-body" fill="${f}" stroke="${c}" ${removed || ext ? 'stroke-dasharray="6 4"' : ''} ${removed ? 'opacity=".6"' : ''}/>
-        <g transform="translate(${n.x + (verb ? 14 : 9)} ${n.y + (priv ? 6 : 9)}) scale(.8)" class="n-sigil" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[n.k]}</g>
+      if (kids) s += `<rect x="${n.x + 8}" y="${n.y + 8}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-stack" stroke="${c}"/><rect x="${n.x + 4}" y="${n.y + 4}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-stack" stroke="${c}"/>`;
+      if (pub) s += `<rect x="${n.x - 4}" y="${n.y - 4}" width="${n.w + 8}" height="${n.h + 8}" rx="14" class="n-ring" stroke="${c}"/>`;
+      if (hook) { const hx = Math.min(16, n.h / 3), pts = `${n.x + hx},${n.y} ${n.x + n.w - hx},${n.y} ${n.x + n.w},${n.y + n.h / 2} ${n.x + n.w - hx},${n.y + n.h} ${n.x + hx},${n.y + n.h} ${n.x},${n.y + n.h / 2}`;
+        s += `<polygon points="${pts}" class="n-mask"/><polygon points="${pts}" class="n-body" fill="${f}" stroke="${c}" stroke-linejoin="round"/>`; }
+      else s += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-mask"/>
+        <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-body" fill="${f}" stroke="${c}" ${removed || ext ? 'stroke-dasharray="6 4"' : ''} ${removed ? 'opacity=".6"' : ''}/>`;
+      s += `
+<g transform="translate(${n.x + (verb ? 14 : hook ? 17 : 9)} ${n.y + (priv ? 6 : 9)}) scale(.8)" class="n-sigil" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[n.k]}</g>
         <text x="${n.x + n.w / 2}" y="${ly}" text-anchor="middle" class="n-label" data-o="${esc(n.id)}" data-t="nl" style="font-size:${lpx.toFixed(1)}px" ${removed ? 'text-decoration="line-through"' : ''}>${esc(fit(n.label, lpx, n.w - 30))}</text>`;
       if (sub) s += `<text x="${n.x + n.w / 2}" y="${ly + 16}" text-anchor="middle" class="n-sub depth-read" data-o="${esc(n.id)}" data-t="ns">${esc(sub)}</text>`;
       if (verbs) { // verb chips: the node's public surface, at a glance
@@ -894,21 +1114,31 @@
         chips.forEach(([t, wv, more]) => { s += `<rect x="${px}" y="${py}" width="${wv}" height="14" rx="7" class="verb-chip" stroke="${c}"/><text x="${px + wv / 2}" y="${py + 10}" text-anchor="middle" class="verb-tx" data-o="${esc(n.id)}" data-t="nv" fill="${c}">${esc(t)}</text>`; px += wv + 4; });
         s += `</g>`;
       }
-      if (pub || ext) { const tab = pub ? 'PUBLIC' : 'EXTERNAL', tw = tab.length * 6.4 + 10;
+      const tab = map ? mapTab(n) : '';
+      if (tab) { const tw = tab.length * 6.4 + 10;
         s += `<g class="pub-tab"><rect x="${n.x + 12}" y="${n.y - 8}" width="${tw}" height="15" rx="4" fill="${c}"/><text x="${n.x + 12 + tw / 2}" y="${n.y + 3}" text-anchor="middle" class="tab-tx">${tab}</text></g>`; }
-      if (map && (n.author || ext)) { // author identity: avatar, or an initials badge when unknown
-        const A = (D.authors || {})[n.author] || {}, ax = n.x + n.w - 13, ay = n.y + 13, cid = 'av-' + (svgSeq) + '-' + String(n.id).replace(/[^\w-]/g, '_');
-        s += `<g class="avatar"><title>${esc(A.name ? 'by ' + A.name + ' (@' + n.author + ')' : 'author unknown')}</title>`;
-        if (A.avatar) s += `<clipPath id="${cid}"><circle cx="${ax}" cy="${ay}" r="8.5"/></clipPath><image href="${A.avatar}" x="${ax - 8.5}" y="${ay - 8.5}" width="17" height="17" clip-path="url(#${cid})" preserveAspectRatio="xMidYMid slice"/><circle cx="${ax}" cy="${ay}" r="8.5" fill="none" stroke="${c}" stroke-width="1.2"/>`;
-        else { const ini = String(n.author || n.label).replace(/^[/@]/, '').split(/[\s_-]+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(); s += `<circle cx="${ax}" cy="${ay}" r="8.5" class="n-mask" stroke="${c}" stroke-width="1.2" stroke-dasharray="2 2"/><text x="${ax}" y="${ay + 3}" text-anchor="middle" class="ini-tx" fill="${c}">${esc(ini)}</text>`; }
-        s += `</g>`;
-      }
-      if (kids) s += `<g class="open-hint depth-read"><rect x="${n.x + n.w - 40}" y="${n.y + n.h - 11}" width="34" height="16" rx="8" class="n-mask" stroke="${c}"/><text x="${n.x + n.w - 23}" y="${n.y + n.h + 1}" text-anchor="middle" class="badge-tx" fill="${c}">⤢ ${kids}</text></g>`;
+      if (map && n.step) { const t = String(n.step), sw = Math.max(20, textW(t, 9.5) * .9 + 10);
+        s += `<g class="step"><title>Step ${esc(t)}</title><rect x="${n.x - 10}" y="${n.y - 10}" width="${sw}" height="20" rx="10" class="stp"/><text x="${n.x - 10 + sw / 2}" y="${n.y + 3.5}" text-anchor="middle" class="stp-tx">${esc(t)}</text></g>`; }
+      if (n.tag) { // author name tag under the card: a bigger headshot + @handle (avatar inlined by render)
+        const T = n.tag, cxp = T.x + 11, cyp = T.y + 11, cid = 'av-' + id + '-' + String(n.id).replace(/[^\w-]/g, '_');
+        s += `<g class="ntag"><title>${esc(T.name ? 'by ' + T.name + ' (@' + n.author + ')' : n.author ? '@' + n.author : 'author unknown')}</title><rect x="${T.x}" y="${T.y}" width="${T.w}" height="${T.h}" rx="${T.h / 2}" class="ntag-bg"/>`;
+        if (T.img) s += `<clipPath id="${cid}"><circle cx="${cxp}" cy="${cyp}" r="13"/></clipPath><image href="${T.img}" x="${cxp - 13}" y="${cyp - 13}" width="26" height="26" clip-path="url(#${cid})" preserveAspectRatio="xMidYMid slice"/><circle cx="${cxp}" cy="${cyp}" r="13" class="ntag-ring" stroke="${c}"/>`;
+        else { const ini = String(n.author || '?').split(/[\s_-]+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(); s += `<circle cx="${cxp}" cy="${cyp}" r="13" class="n-mask" stroke="${c}" stroke-width="1.4" stroke-dasharray="2 2"/><text x="${cxp}" y="${cyp + 3}" text-anchor="middle" class="ini-tx2" fill="${c}">${esc(ini)}</text>`; }
+        s += `<text x="${T.x + 30}" y="${T.y + 14.5}" class="ntag-tx" data-t="nt" data-o="${esc(n.id)}">${esc(T.text)}</text></g>`;
+      } else if (!map && (n.author)) { /* documents carry no authors */ }
+      if (kids) { const kx = map ? n.x + n.w - 44 : n.x + n.w - 40, ky = map ? n.y - 8 : n.y + n.h - 11;
+        s += `<g class="open-hint${map ? '' : ' depth-read'}"><title>Double-click to open the inner view</title><rect x="${kx}" y="${ky}" width="36" height="16" rx="8" class="n-mask" stroke="${c}"/><text x="${kx + 18}" y="${ky + 12}" text-anchor="middle" class="badge-tx" fill="${c}">⤢ ${kids}</text></g>`; }
       const ch = CHG[String(n.change || '').toLowerCase()];
       if (ch) {
         const bw = ch[1].length * 6 + 12;
         s += `<rect x="${n.x + n.w - bw - 8}" y="${n.y - 8}" width="${bw}" height="16" rx="8" fill="var(--mask)" stroke="var(--${ch[0]})"/>
           <text x="${n.x + n.w - bw / 2 - 8}" y="${n.y + 3}" text-anchor="middle" class="badge-tx" fill="var(--${ch[0]})">${ch[1]}</text>`;
+      }
+      if (map) {
+        const ports = new Map();
+        edges.forEach((e, i) => { const point = e.from === n.id ? e.p1 : e.to === n.id ? e.p2 : null; if (!point) return;
+          const key = point.join(','); const port = ports.get(key) || { point, indices: [] }; port.indices.push(i); ports.set(key, port); });
+        ports.forEach(({ point, indices }) => { s += `<circle cx="${point[0]}" cy="${point[1]}" r="3.5" class="n-port" data-edges="${indices.join(',')}" stroke="${c}"/>`; });
       }
       s += `</g>`;
     });
@@ -916,6 +1146,11 @@
     edges.forEach((e, i) => {
       if (!e.lbl) return;
       const L = e.lbl;
+      if (map) {
+        const st = L.step != null ? `<circle cx="${L.x + 11}" cy="${L.y + L.h / 2}" r="8" class="e-step"/><text x="${L.x + 11}" y="${L.y + L.h / 2 + 3.3}" text-anchor="middle" class="e-step-tx">${esc(L.step)}</text>` : '';
+        const tx = L.text ? `<text x="${L.step != null ? L.x + 23 : L.x + L.w / 2}" y="${L.y + 14}" ${L.step != null ? '' : 'text-anchor="middle"'} class="e-label" data-t="el" data-o="${esc(e.from)}>${esc(e.to)}">${esc(L.text)}</text>` : '';
+        s += `<g class="e-lab${L.tag ? ' ctag' : ''}${e.wk ? ' w-' + e.wk : ''}" data-i="${i}"><rect x="${L.x}" y="${L.y}" width="${L.w}" height="${L.h}" rx="${L.h / 2}" class="e-lbg"/>${st}${tx}</g>`;
+      } else
       s += `<g class="e-lab" data-i="${i}"><rect x="${L.x}" y="${L.y}" width="${L.w}" height="${L.h}" rx="5" class="e-lbg"/><text x="${L.x + L.w / 2}" y="${L.y + 12.5}" text-anchor="middle" class="e-label" data-t="el" data-o="${esc(e.from)}>${esc(e.to)}">${esc(L.text)}</text></g>`;
     });
     return s + '</g></svg>';
@@ -938,16 +1173,20 @@
     }
     setSvg(svg, bounds) { this.svg = svg; this.b = bounds; }
     size() { return [this.el.clientWidth || 800, this.el.clientHeight || 500]; }
-    fitState(pad = 0.92) {
-      const [W, H] = this.size(), b = this.b;
-      const k = Math.min(W / b.w, H / b.h) * pad;
-      return { cx: b.x + b.w / 2, cy: b.y + b.h / 2, k: Math.min(k, this.o.maxFit || 1.25) };
+    fitState(pad = 0.94) { // fits the bounds inside the viewport minus the overlay insets (header pill, hint line)
+      const [W, H] = this.size(), b = this.b, opts = [].concat(this.o.inset ? this.o.inset() : { t: 0, r: 0, b: 0, l: 0 });
+      const kOf = I => Math.min(Math.max(80, W - I.l - I.r) / b.w, Math.max(80, H - I.t - I.b) / b.h);
+      const I = opts.reduce((a, o) => kOf(o) > kOf(a) + 1e-6 ? o : a); // several inset sets: keep the one that leaves the map largest
+      const aw = Math.max(80, W - I.l - I.r), ah = Math.max(80, H - I.t - I.b);
+      const k = Math.min(Math.min(aw / b.w, ah / b.h) * pad, this.o.maxFit || 1.25);
+      const sx = I.l + aw / 2 - W / 2, sy = I.t + ah / 2 - H / 2;
+      return { cx: b.x + b.w / 2 - sx / k, cy: b.y + b.h / 2 - sy / k, k };
     }
     limits() { const f = this.fitState(); return [Math.min(f.k * 0.5, 0.2), this.o.max || 4]; }
     clamp(s) {
       const [lo, hi] = this.limits(), b = this.b;
-      const k = Math.min(hi, Math.max(lo, s.k));
-      return { k, cx: Math.min(b.x + b.w, Math.max(b.x, s.cx)), cy: Math.min(b.y + b.h, Math.max(b.y, s.cy)) };
+      const k = Math.min(hi, Math.max(lo, s.k)), [W, H] = this.size(), mx = W / (2 * k) * .5, my = H / (2 * k) * .5;
+      return { k, cx: Math.min(b.x + b.w + mx, Math.max(b.x - mx, s.cx)), cy: Math.min(b.y + b.h + my, Math.max(b.y - my, s.cy)) };
     }
     apply() {
       const [W, H] = this.size(), { cx, cy, k } = this.s;
@@ -958,22 +1197,29 @@
       this.el.style.backgroundSize = `${g}px ${g}px, ${G}px ${G}px, ${G}px ${G}px`;
       const ox = -vx * k, oy = -vy * k;
       this.el.style.backgroundPosition = `${ox}px ${oy}px, ${ox}px ${oy}px, ${ox}px ${oy}px`;
-      this.el.dataset.depth = k < 0.5 ? 'map' : k < 1.6 ? 'read' : 'full';
+      this.el.dataset.depth = k < (this.o.mapDepth || 0.5) ? 'map' : k < 1.6 ? 'read' : 'full';
       this.o.onChange && this.o.onChange(this);
     }
-    set(s) { cancelAnimationFrame(this.anim); this.s = this.clamp({ ...this.s, ...s }); this.apply(); }
+    stopAnimation() {
+      cancelAnimationFrame(this.anim); this.anim = 0;
+      // Resize/refit interrupts camera motion. Navigation awaits that motion, so cancellation
+      // must settle its promise too; otherwise go() never releases its busy flag.
+      const done = this.animationDone; this.animationDone = null; if (done) done();
+    }
+    set(s) { this.stopAnimation(); this.s = this.clamp({ ...this.s, ...s }); this.apply(); }
     animate(to, ms = 380) {
-      cancelAnimationFrame(this.anim);
+      this.stopAnimation();
       const from = { ...this.s }, dest = this.clamp({ ...this.s, ...to });
       if (matchMedia('(prefers-reduced-motion: reduce)').matches || window.__instant) { this.set(dest); return Promise.resolve(); }
       return new Promise(res => {
+        this.animationDone = res;
         const t0 = performance.now(), ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
         const lk0 = Math.log(from.k), lk1 = Math.log(dest.k);
         const step = now => {
           const t = Math.min(1, (now - t0) / ms), e = ease(t);
           this.s = { cx: from.cx + (dest.cx - from.cx) * e, cy: from.cy + (dest.cy - from.cy) * e, k: Math.exp(lk0 + (lk1 - lk0) * e) };
           this.apply();
-          if (t < 1) this.anim = requestAnimationFrame(step); else res();
+          if (t < 1) this.anim = requestAnimationFrame(step); else { this.anim = 0; this.animationDone = null; res(); }
         };
         this.anim = requestAnimationFrame(step);
       });
@@ -1062,13 +1308,55 @@
       return inV && inH ? 'cross' : null;
     };
     for (let i = 0; i < segs.length; i++) for (let j = i + 1; j < segs.length; j++) {
+      if (geo.edges[i].fixed && geo.edges[j].fixed) continue; // one comb: its branches share the trunk by design
       let found = null;
       for (const s1 of segs[i]) { for (const s2 of segs[j]) { found = crossing(s1, s2); if (found) break; } if (found) break; }
       if (found === 'cross') issues.push(`${where}: edges ${name(geo.edges[i])} and ${name(geo.edges[j])} cross`);
       if (found === 'share') issues.push(`${where}: edges ${name(geo.edges[i])} and ${name(geo.edges[j])} share a line`);
     }
     geo.edges.forEach((e, i) => { if (!e.lbl) return; const L = { x: e.lbl.x + 1, y: e.lbl.y + 1, w: e.lbl.w - 2, h: e.lbl.h - 2 };
-      geo.edges.forEach((o, j) => { if (j !== i && segs[j].some(([a, b]) => Math.max(a[0], b[0]) > L.x && Math.min(a[0], b[0]) < L.x + L.w && Math.max(a[1], b[1]) > L.y && Math.min(a[1], b[1]) < L.y + L.h)) issues.push(`${where}: label "${e.lbl.text}" lies on edge ${name(o)}`); }); });
+      geo.edges.forEach((o, j) => { if (j !== i && segs[j].some(([a, b]) => Math.max(a[0], b[0]) > L.x && Math.min(a[0], b[0]) < L.x + L.w && Math.max(a[1], b[1]) > L.y && Math.min(a[1], b[1]) < L.y + L.h)) issues.push(`${where}: label "${e.lbl.text || e.lbl.step}" lies on edge ${name(o)}`); }); });
+    const segHit = (r, i) => segs[i].some(([a, b]) => Math.max(a[0], b[0]) > r.x && Math.min(a[0], b[0]) < r.x + r.w && Math.max(a[1], b[1]) > r.y && Math.min(a[1], b[1]) < r.y + r.h);
+    if (geo.map) {
+      const ex = 12;
+      geo.edges.forEach((e, i) => {
+        // clearance: a route keeps 12+ px from every node it does not connect
+        geo.nodes.forEach(n => { if (n.id === e.from || n.id === e.to) return;
+          if (segHit({ x: n.x - ex + .5, y: n.y - ex + .5, w: n.w + 2 * ex - 1, h: n.h + 2 * ex - 1 }, i)) issues.push(`${where}: edge ${name(e)} passes within ${ex}px of node "${n.label}"`); });
+        // no detours: a route stays under 2.5x the straight distance between its ends
+        const len = e.pts.slice(1).reduce((a, p, k) => a + Math.abs(p[0] - e.pts[k][0]) + Math.abs(p[1] - e.pts[k][1]), 0);
+        const d = Math.hypot(e.pts[e.pts.length - 1][0] - e.pts[0][0], e.pts[e.pts.length - 1][1] - e.pts[0][1]);
+        if (len > 2.5 * Math.max(d, 100)) issues.push(`${where}: edge ${name(e)} takes a detour (${Math.round(len)}px for ${Math.round(d)}px)`);
+        // reading order: every wire runs left to right, except one that closes a loop
+        if (!e.back && !e.both && e.t.x + e.t.w / 2 <= e.s.x + e.s.w / 2) issues.push(`${where}: edge ${name(e)} runs right-to-left`);
+      });
+      if (geo.hub) { // hub views: one visible line into each callee
+        const into = {}; geo.edges.forEach(e => { (into[e.to] ||= []).push(e); });
+        Object.entries(into).forEach(([id, es]) => { es = es.filter(e => !e.back); if (es.some(e => e.from === geo.hub) && es.length > 1) issues.push(`${where}: hub callee "${(geo.byId[id] || {}).label || id}" has ${es.length} incoming lines`); });
+      }
+    }
+    // author name tags hang under their card: no route may run through one
+    (geo.nodes || []).forEach(n => { if (!n.tag) return; const r = { x: n.tag.x + 1, y: n.tag.y + 1, w: n.tag.w - 2, h: n.tag.h - 2 };
+      geo.edges.forEach((o, j) => { if (segHit(r, j)) issues.push(`${where}: name tag "${n.tag.text}" lies on edge ${name(o)}`); }); });
+    // lanes: every part sits inside its own lane, lanes never overlap, no route crosses a lane header
+    const lanes = geo.lanes || [];
+    lanes.forEach((l, i) => {
+      lanes.slice(i + 1).forEach(m => { if (hit(l, m, -1)) issues.push(`${where}: lanes "${l.title}" and "${m.title}" overlap`); });
+      (geo.nodes || []).forEach(n => {
+        if (n.lane === i && (n.x < l.x || n.x + n.w > l.x + l.w || n.y < l.y || n.y + n.h + (n.tag ? 14 : 0) > l.y + l.h)) issues.push(`${where}: lane "${l.title}": node "${n.label}" sticks out`);
+        if (n.lane != null && n.lane !== i && hit(n, l, -1)) issues.push(`${where}: lane "${l.title}": node "${n.label}" of another lane sits in it`);
+        if (n.lane == null && hit(n, l, -1)) issues.push(`${where}: lane "${l.title}": node "${n.label}" belongs to no lane but sits in it`);
+      });
+    });
+    (geo.blocks || []).forEach(b => geo.edges.forEach((o, j) => { if (segHit({ x: b.x + 1, y: b.y + 1, w: b.w - 2, h: b.h - 2 }, j)) issues.push(`${where}: lane "${b.title || ''}": header crossed by edge ${name(o)}`); }));
+    const families = geo.families || [], inside = (a,b) => b.x > a.x && b.y > a.y && b.x+b.w < a.x+a.w && b.y+b.h < a.y+a.h;
+    families.forEach(f => {
+      const parent = families.find(p => p.id === f.parent);
+      if (f.parent && (!parent || !inside(parent,f))) issues.push(`${where}: family "${f.label}" sticks out of its parent`);
+      (f.nodeIds || []).forEach(id => { const n = geo.byId[id]; if (n && !inside(f,n)) issues.push(`${where}: family "${f.label}" does not contain "${n.label}"`); });
+      families.filter(g => g !== f && g.parent === f.parent && g.id > f.id).forEach(g => { if (hit(f,g,-1)) issues.push(`${where}: families "${f.label}" and "${g.label}" overlap`); });
+      geo.edges.forEach((e,i) => { if (segHit({x:f.x+8,y:f.y+3,w:Math.min(f.w-16,textW(f.label || f.id,11)+16),h:22},i)) issues.push(`${where}: family "${f.label}": header crossed by edge ${name(e)}`); });
+    });
     return issues;
   }
 
@@ -1079,7 +1367,10 @@
     const nodes = geo.nodes;
     for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) if (hit(R(nodes[i]), R(nodes[j]), -1)) issues.push(`${where}: nodes "${nodes[i].label}" and "${nodes[j].label}" overlap`);
     T.forEach(a => {
-      if (a.t === 'el') {
+      if (a.t === 'lt' || a.t === 'ft') {
+        nodes.forEach(n => { if (hit(a.b, R(n), -1)) issues.push(`${where}: lane "${a.txt}": header covers node "${n.label}"`); });
+        if (a.t === 'ft') { const f = (geo.families || []).find(f => f.id === a.o); if (f && (a.b.x < f.x || a.b.x+a.b.w > f.x+f.w)) issues.push(`${where}: family title "${a.txt}" overflows its box`); }
+      } else if (a.t === 'el') {
         nodes.forEach(n => { if (hit(a.b, R(n), -1)) issues.push(`${where}: edge label "${a.txt}" covers node "${n.label}"`); });
       } else {
         const own = geo.byId[a.o];
@@ -1094,7 +1385,7 @@
   }
 
   function toggleTheme() {
-    const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const next = cur === 'light' ? 'dark' : 'light';
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem('visual-theme', next); } catch (e) {}
@@ -1338,25 +1629,51 @@
   /* ================= map mode: drill-down skill / architecture map =================
      Viewer UX ported in spirit from archify (MIT): camera with reading depths, minimap
      ("semantic radar"), node focus panel ("semantic passport") with upstream/downstream
-     reach, node finder, export. Drill-down views, breadcrumbs and deep links are /visual's own. */
+     reach, node finder, export. Drill-down views, swimlanes, breadcrumbs and deep links are /visual's own.
+     Page: one-row top bar · column browser of views on the left · map on top · details strip below. */
+  /* Swimlanes for run-order views. A view may set `lanes` ([{title, nodeIds}] or false); otherwise a
+     sequence view is read step by step and each part is filed under the first workflow phase its own
+     label (then the step's label, then its sub line) names. Phases only move forward, so a lane is a
+     contiguous stretch of the run order. Fewer than three lanes, or a lane layout that would need a
+     crossing, falls back to the free graph. */
+  const PHASES = [
+    ['Ask', /\b(grill|ask|interview|question|intake|taste|intent|clarif)/i],
+    ['Plan', /\b(plan|spec\b|scope|claim|triage|ticket|backlog)/i],
+    ['Build', /\b(build|implement|launch|scaffold|develop)/i],
+    ['Check', /\b(check|review|detect|shots?\b|screenshot|audit|test|qa\b|verif|critique|lint|scan|grade)/i],
+    ['Fix', /\b(fix|polish|refine|repair|patch|rework)/i],
+    ['Finish', /\b(pr\b|pull request|merge|ship|publish|release|deploy|human|ledger|manifest|report)/i],
+  ];
+  function phaseOf(texts) {
+    for (const t of texts) {
+      let best = null;
+      PHASES.forEach((p, i) => { const m = p[1].exec(String(t || '')); if (m && (!best || m.index < best[1])) best = [i, m.index]; });
+      if (best) return best[0];
+    }
+    return null;
+  }
+
   function renderMap() {
     document.body.classList.add('map-mode');
-    const nodes = D.nodes || [], views = (D.views || []).filter(v => v && v.id);
+    const views = (D.views || []).filter(v => v && v.id);
+    const nodes = [...(D.nodes || []), ...views.flatMap(v => v.nodes || [])];
     const N = Object.fromEntries(nodes.map(n => [n.id, n]));
     const V = Object.fromEntries(views.map(v => [v.id, v]));
     const viewOfParent = p => V[p] ? p : (views.find(v => v.id === p || v.node === p) || {}).id; // parent may name a node
     views.forEach(v => { if (v.parent) v.parent = viewOfParent(v.parent) || null; });
     const rootId = (D.root && V[D.root]) ? D.root : (views.find(v => !v.parent) || views[0] || {}).id;
-    const childOf = nid => { const n = N[nid] || {}; const o = n.view || n.opensView; return o && V[o] ? o : V[nid] ? nid : (views.find(v => v.node === nid) || {}).id; };
+    const nodeIn = (nid, vid = cur) => ({ ...(N[nid] || {}), ...((V[vid] || {}).nodeOverrides || {})[nid] });
+    const childOf = (nid, vid = cur) => { const n = nodeIn(nid, vid); const o = n.view || n.opensView; return o && V[o] ? o : V[nid] ? nid : (views.find(v => v.node === nid) || {}).id; };
     const subjectOf = v => v.node || (N[v.id] ? v.id : null);
     const viewsWith = nid => views.filter(v => (v.nodeIds || []).includes(nid));
+    const kidsOf = id => views.filter(x => (x.parent || null) === id);
     const chain = vid => { const out = []; let c = V[vid]; const seen = new Set(); while (c && !seen.has(c.id)) { seen.add(c.id); out.unshift(c.id); c = V[c.parent]; } return out; };
     const viewEdges = v => {
       const ids = new Set(v.nodeIds || []);
-      const list = Array.isArray(v.edges) && v.edges.length ? v.edges : (D.edges || []).filter(e => ids.has(e.from) && ids.has(e.to));
+      const list = Array.isArray(v.edges) ? v.edges : (D.edges || []).filter(e => ids.has(e.from) && ids.has(e.to));
       return list.map(e => typeof e === 'string' ? (D.edges || []).find(x => x.id === e) : e).filter(e => e && ids.has(e.from) && ids.has(e.to));
     };
-    const kindLabel = k => KIND[kindOf(k, true)][1];
+    const shortT = t => String(t || '').split(' · ')[0];
     const root = D.meta && D.meta.root ? D.meta.root.replace(/\/$/, '') : '';
     const base = D.sourcesBase ? String(D.sourcesBase).replace(/\/$/, '') + '/' : '';
     const srcPath = p => p.replace(/:\d+(-\d+)?$/, '');
@@ -1372,77 +1689,289 @@
       : root.startsWith('/') ? 'file://' + encodeURI(root + '/' + base + srcPath(p))
       : encodeURI((root ? root + '/' : '') + base + srcPath(p));
     const srcList = n => (Array.isArray(n.source) ? n.source : n.source ? [n.source] : []);
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
+    const modK = mac ? '⌘K' : 'Ctrl K';
+    const touch = matchMedia('(hover: none)').matches;
+    const HINT = touch ? '<span>pinch = zoom</span><span>drag = move</span><span>tap = details</span>'
+      : `<span>scroll = zoom</span><span>drag = move</span><span>double-click ⤢ = open</span><span>${modK} = search</span><span>? = keys</span>`;
+    const ghost = [[10, 26, 22], [40, 18, 24], [40, 46, 24], [10, 60, 22], [70, 32, 20], [70, 70, 20]].map(([l, t, w]) => `<span style="left:${l}%;top:${t}%;width:${w}%"></span>`).join('');
 
     const app = document.getElementById('app'); app.className = 'mapapp';
     document.querySelector('.bar').remove();
     app.innerHTML = `
       <header class="mbar">
-        <button class="ibtn" id="m-outline" title="Views outline (O)" aria-label="Toggle views outline">☰</button>
-        <span class="mbrand"><i></i>${esc(D.title || 'Map')}</span>
+        <button class="ibtn" id="m-outline" title="Views (O)" aria-label="Toggle the views list" aria-expanded="false">☰</button>
+        <span class="mbrand"><i></i><span>${esc(D.title || 'Map')}</span></span>
         <nav class="crumbs" id="m-crumbs" aria-label="Breadcrumb"></nav>
-        <div class="finder"><input id="m-find" type="search" placeholder="Find a node…  /" autocomplete="off" aria-label="Find a node"><div class="finds" id="m-finds" role="listbox"></div></div>
-        <button class="ibtn" id="m-theme" title="Theme" aria-label="Toggle theme">◐</button>
-        <div class="menu"><button class="pbtn" id="m-export" aria-haspopup="true">Export ▾</button>
-          <div class="menu-pop" id="m-export-pop" hidden><button data-x="svg">SVG — this view</button><button data-x="png">PNG — this view (2×)</button><button data-x="link">Copy link to view</button><button data-x="json">Map model (JSON)</button></div></div>
-        <button class="ibtn" id="m-help" title="Shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+        <button class="findbtn" id="m-find" type="button" aria-label="Search nodes and views (${modK})"><span aria-hidden="true">⌕</span><span class="ft">Find a node or view…</span><span class="kbd">${modK}</span></button>
+        <button class="ibtn" id="m-theme" title="Light / dark" aria-label="Toggle theme">◐</button>
+        <div class="menu"><button class="pbtn" id="m-export" aria-haspopup="true" aria-expanded="false">Export ▾</button>
+          <div class="menu-pop" id="m-export-pop" hidden><button data-x="svg">SVG · this view</button><button data-x="png">PNG · this view (2×)</button><button data-x="link">Copy link to view</button><hr><button data-x="json">Map model (JSON)</button></div></div>
+        <button class="ibtn" id="m-help" title="Keys (?)" aria-label="Keyboard shortcuts" aria-haspopup="true" aria-expanded="false">?</button>
       </header>
       <aside class="outline" id="m-tree" aria-label="Views"></aside>
-      <div class="stage" id="m-stage" tabindex="-1">
-        <div class="vcard" id="m-vcard"></div>
-        <div class="legend m-legend" id="m-legend"></div>
-        <div class="minimap" id="m-mini" title="Overview — click or drag to move"></div>
-        <div class="ctl" id="m-ctl">
-          <button data-z="up" id="m-up" title="Up one level (Esc)">↑</button><span class="sep"></span>
-          <button data-z="out" title="Zoom out (−)">−</button><button data-z="fit" class="pct" id="m-pct" title="Fit to screen (0)">100%</button><button data-z="in" title="Zoom in (+)">+</button><span class="sep"></span>
-          <button data-z="one" title="Actual size (1)">1:1</button><button data-z="flow" id="m-flow" title="Animate flow direction (F)">≋</button><span class="depth" id="m-depth" title="Reading depth follows zoom">READ</span>
+      <div class="mmain">
+        <div class="stage" id="m-stage" tabindex="-1">
+          <div class="ghosts" id="m-ghosts" aria-hidden="true">${ghost}</div>
+          <div class="vpill" id="m-vpill"></div>
+          <div class="m-legend" id="m-legend"></div>
+          <div class="mctl">
+            <div class="minimap" id="m-mini" title="Overview — click or drag to move"></div>
+            <div class="ctl" id="m-ctl">
+              <button data-z="up" id="m-up" title="Up one level (Esc)" aria-label="Up one level">↑</button><span class="sep"></span>
+              <button data-z="out" title="Zoom out (−)" aria-label="Zoom out">−</button><button data-z="fit" class="pct" id="m-pct" title="Fit to screen (0)">100%</button><button data-z="in" title="Zoom in (+)" aria-label="Zoom in">+</button><span class="sep"></span>
+              <button data-z="one" title="Actual size (1)">1:1</button><button data-z="flow" id="m-flow" title="Animate flow direction (F)" aria-label="Animate flow">≋</button><span class="depth" id="m-depth" title="Reading depth follows zoom">READ</span>
+            </div>
+          </div>
+          <div class="hint" id="m-hint" role="status" aria-live="polite">${HINT}</div>
         </div>
-        <div class="toast" id="m-toast" role="status"></div>
+        <aside class="panel" id="m-panel" aria-label="Node details" hidden></aside>
       </div>
-      <aside class="panel" id="m-panel" aria-label="Node details" hidden></aside>
-      <div class="help" id="m-helpbox" hidden><div class="help-card"><b>Shortcuts</b>
-        <dl><dt>Scroll / pinch</dt><dd>zoom (two-finger drag pans)</dd><dt>Drag</dt><dd>pan</dd><dt>Click</dt><dd>node details</dd><dt>Double-click · Enter</dt><dd>open a stacked node's inner view</dd>
-        <dt>Esc · Backspace</dt><dd>close panel, then up one level</dd><dt>+ − 0 1</dt><dd>zoom in, out, fit, 100%</dd><dt>← ↑ → ↓</dt><dd>pan</dd><dt>/</dt><dd>find a node</dd><dt>O</dt><dd>views outline</dd><dt>F</dt><dd>animate flow on/off</dd><dt>?</dt><dd>this help</dd></dl>
-        <button class="pbtn" data-close>Got it</button></div></div>`;
+      <div class="hpop" id="m-helpbox" role="dialog" aria-label="Keys" hidden><b>Keys</b>
+        <dl><dt>/ or ${modK}</dt><dd>search nodes and views</dd><dt>Scroll · pinch</dt><dd>zoom (two-finger drag pans)</dd><dt>Click</dt><dd>details below the map</dd><dt>Double-click · Enter</dt><dd>open a stacked node ⤢</dd>
+        <dt>Esc · Backspace</dt><dd>close, then up one level</dd><dt>+ − 0 1</dt><dd>zoom in, out, fit, 100%</dd><dt>← ↑ → ↓</dt><dd>pan</dd><dt>[ ]</dt><dd>previous / next details tab</dd><dt>i</dt><dd>about this view</dd><dt>O</dt><dd>views list</dd><dt>F</dt><dd>flow on/off</dd></dl></div>
+      <div class="scrim" id="m-pal" hidden><div class="pal" role="dialog" aria-label="Search">
+        <div class="in"><span aria-hidden="true">⌕</span><input id="m-q" type="text" autocomplete="off" spellcheck="false" placeholder="Search nodes and views" aria-label="Search nodes and views" aria-controls="m-res"><span class="kbd">esc</span></div>
+        <div class="res" id="m-res" role="listbox"></div>
+        <div class="pft"><span>↑↓ move</span><span>↵ open</span><span>esc close</span></div></div></div>`;
     const $ = id => document.getElementById(id);
     const stage = $('m-stage'), panel = $('m-panel');
     let cam = null, geo = null, svg = null, cur = null, sel = null, stack = [], busy = false;
+    let tab = 'what'; try { tab = localStorage.getItem('visual-tab') || 'what'; } catch (_) {}
     const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches || window.__instant;
     const sleep = ms => new Promise(r => setTimeout(r, reduce() ? 0 : ms));
-    const toast = (t, ms = 1800) => { const el = $('m-toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('on'), ms); };
+    const status = (t, ms = 1800) => { const el = $('m-hint'); el.textContent = t; el.classList.add('msg'); clearTimeout(status.t); status.t = setTimeout(() => { el.innerHTML = HINT; el.classList.remove('msg'); }, ms); };
 
-    function buildView(vid, override) {
-      const g = buildGeo(vid, override), v = V[vid];
-      const markup = svgOf(g, { title: v.title, subject: subjectOf(v), childCount: nid => { const c = childOf(nid); return c && c !== vid ? (V[c].nodeIds || []).length : 0; } });
-      return { g, markup };
+    /* ---------- reading order: every view runs left → right ----------
+       The trigger sits at the far left; each next step or callee goes one column to the right, branches
+       stack inside a column, state (board, config, repo) sits at the end of its column. A view whose
+       focus node starts three or more things is a hub: its callees go into phase lanes, and one comb of
+       lines feeds them — a single trunk, one split per lane, one short branch per callee with its label
+       just left of the callee. A line that closes a loop is the only one allowed to run right to left. */
+    const HUB_PHASES = [
+      ['Prepare', /\b(grill|ask|interview|plan|spec|scope|shape|sharpen|ladder|docs?\b|reads?\b|design|picks?|init|triage|on-ramp|vocabular|idea|requires|climbs)/i],
+      ['Build', /\b(build|implement|routes?|test|tdd|writes?|fix|diagnos|resolv|fetch|runs?\b|prototype|split|code|finds?|drafts?|bridges?|wires?)/i],
+      ['Check', /\b(review|verif|proves?|audit|critique|judge|coverage|polish|humaniz|hunts?|checks?|grades?)/i],
+      ['Hand off', /\b(pr\b|moves? card|files?\b|board|merges?|gate|closes?|bounces?|ships?|posts?|parks?|ticks|updates|backlog)/i],
+    ];
+    const latestPhase = texts => { for (const t of texts) { let best = null; HUB_PHASES.forEach((p, i) => { if (p[1].test(String(t || ''))) best = i; }); if (best != null) return best; } return null; };
+    const isState = id => (N[id] || {}).kind === 'board';
+    function loopsOf(v) { // edges that close a cycle, found depth-first in run order from the roots
+      const ids = (v.nodeIds || []).filter(i => N[i]), edges = viewEdges(v), back = new Set(), st = {};
+      const dfs = u => { st[u] = 1; edges.forEach((e, k) => { if (e.from !== u || e.from === e.to) return; if (st[e.to] === 1) back.add(k); else if (!st[e.to]) dfs(e.to); }); st[u] = 2; };
+      [...ids.filter(i => !edges.some(e => e.to === i && e.from !== i)), ...ids].forEach(i => { if (!st[i]) dfs(i); });
+      if (v.render === 'sequence') { // run order: a step back to a part an earlier step already reached loops back (state may be written again later)
+        const first = {}; edges.forEach((e, k) => { if (first[e.from] == null && !edges.some((x, j) => j < k && x.to === e.from)) first[e.from] = -1; if (first[e.to] == null) first[e.to] = k; });
+        edges.forEach((e, k) => { if (first[e.to] < k && !isState(e.to) && e.from !== e.to) back.add(k); });
+      }
+      return { edges, back, keys: new Set(edges.filter((e, k) => back.has(k)).map(e => e.from + '>' + e.to)) };
+    }
+    function deriveLanes(v, hub) { // sequence views: lanes named by workflow phase, in run order
+      if (v.lanes === false) return null;
+      const ids = (v.nodeIds || []).filter(i => N[i]), edges = viewEdges(v);
+      if (Array.isArray(v.lanes)) {
+        const lanes = v.lanes.map(l => ({ title: l.title || l.label || '', ids: (l.nodeIds || []).filter(i => ids.includes(i) && i !== hub) })).filter(l => l.ids.length);
+        return lanes.length ? { lanes, explicit: true } : null;
+      }
+      if (v.render !== 'sequence' || edges.length < 4) return null;
+      const lanes = [], laneOf = {}, pending = [];
+      let curP = -1, named = 0, filed = 0;
+      const file = (id, p) => {
+        filed++; if (p != null) named++;
+        if (p == null) { if (!lanes.length) { pending.push(id); return; } lanes[lanes.length - 1].ids.push(id); laneOf[id] = lanes.length - 1; return; }
+        if (p > curP) { curP = p; lanes.push({ title: PHASES[p][0], ids: [] }); }
+        lanes[lanes.length - 1].ids.push(id); laneOf[id] = lanes.length - 1;
+      };
+      edges.forEach(e => [e.from, e.to].forEach(id => {
+        if (id === hub || laneOf[id] != null || pending.includes(id)) return;
+        const n = N[id];
+        file(id, phaseOf([n.label, id === e.to ? e.label : '', n.sublabel || n.sub]));
+      }));
+      if (lanes.length < 3 || lanes.length > 6 || named < filed * 0.6) return null; // lanes only when most parts name their phase
+      lanes[0].ids.unshift(...pending);
+      ids.forEach(i => { if (i !== hub && laneOf[i] == null && !pending.includes(i)) lanes[lanes.length - 1].ids.push(i); });
+      return { lanes };
+    }
+    function hubPlan(v, hub, lp) {
+      const ids = (v.nodeIds || []).filter(i => N[i] && i !== hub), seq = v.render === 'sequence';
+      const fwd = lp.edges.filter((e, k) => !lp.back.has(k) && e.from !== e.to);
+      const callees = []; lp.edges.forEach(e => { if (e.from === hub && e.to !== hub && !callees.includes(e.to)) callees.push(e.to); });
+      const laneOf = {}; let titles = [], boxed = true;
+      const dl = deriveLanes(v, hub);
+      if (dl) { titles = dl.lanes.map(l => l.title); dl.lanes.forEach((l, i) => l.ids.forEach(id => { laneOf[id] = i; })); }
+      else if (seq) { // run order, three to a column
+        boxed = false;
+        const stepOf = id => lp.edges.findIndex(e => e.from === hub && e.to === id) + 1;
+        callees.forEach((id, k) => { laneOf[id] = Math.floor(k / 3); });
+        for (let i = 0; i * 3 < callees.length; i++) { const grp = callees.slice(i * 3, i * 3 + 3).map(stepOf); titles.push(grp.length > 1 ? `Steps ${grp[0]}–${grp[grp.length - 1]}` : `Step ${grp[0]}`); }
+      } else { // by the kind of work the line names; unnamed ones follow the previous callee
+        let prev = 1;
+        lp.edges.forEach(e => { if (e.from !== hub || laneOf[e.to] != null) return; const p = isState(e.to) ? 3 : latestPhase([condTag(e.label) ? 'routes' : e.label, N[e.to].label]); laneOf[e.to] = p == null ? prev : p; prev = laneOf[e.to]; });
+        titles = HUB_PHASES.map(p => p[0]);
+      }
+      const raise = () => { for (let it = 0; it <= ids.length; it++) fwd.forEach(e => { if (e.from === hub || laneOf[e.from] == null) return; if (laneOf[e.to] == null || laneOf[e.to] < laneOf[e.from]) laneOf[e.to] = laneOf[e.from]; }); };
+      raise();
+      ids.forEach(i => { if (laneOf[i] == null) { const t = fwd.filter(e => e.from === i && laneOf[e.to] != null).map(e => laneOf[e.to]); laneOf[i] = t.length ? Math.min(...t) : 0; } });
+      if (!dl && !seq) { const last = Math.max(...ids.map(i => laneOf[i])); ids.forEach(i => { if (isState(i)) laneOf[i] = Math.max(laneOf[i], last); }); raise(); }
+      const used = [...new Set(ids.map(i => laneOf[i]))].sort((a, b) => a - b);
+      // branches: hub → callee is drawn unless the callee already has another line coming in
+      const branch = new Set(callees.filter(c => !isState(c) && !lp.edges.some(e => e.to === c && e.from !== hub)));
+      const sub = {}; ids.forEach(i => { sub[i] = 0; });
+      for (let it = 0; it <= ids.length; it++) fwd.forEach(e => { if (e.from === hub || e.to === hub) return; if (laneOf[e.from] === laneOf[e.to] && sub[e.to] < sub[e.from] + 1) sub[e.to] = Math.min(3, sub[e.from] + 1); });
+      const seen = id => { const k = lp.edges.findIndex(e => e.to === id); return k < 0 ? 999 + lp.edges.findIndex(e => e.from === id) : k; };
+      const lanes = used.map(u => {
+        const mine = ids.filter(i => laneOf[i] === u), nCols = Math.max(...mine.map(i => sub[i])) + 1;
+        const cols = Array.from({ length: nCols }, (_, j) => mine.filter(i => sub[i] === j)
+          .sort((a, b) => (branch.has(b) - branch.has(a)) || (isState(a) - isState(b)) || (seen(a) - seen(b))));
+        return { title: titles[u] || `Lane ${u + 1}`, ids: mine, cols };
+      });
+      return { lanes, branch, boxed: boxed && lanes.length > 1 };
+    }
+    const planCache = {};
+    function planOf(vid) {
+      if (vid in planCache) return planCache[vid];
+      const v = V[vid], ids = (v.nodeIds || []).filter(i => N[i]), lp = loopsOf(v);
+      const outs = id => lp.edges.filter(e => e.from === id && e.to !== id).length;
+      let hub = subjectOf(v); if (hub && !ids.includes(hub)) hub = null;
+      const sources = ids.filter(i => outs(i) && !lp.edges.some(e => e.to === i && e.from !== i));
+      if (!hub && lp.edges.length && outs(lp.edges[0].from) >= 3 && sources.length === 1 && /^(public|lane|verb|external)$/.test(N[lp.edges[0].from]?.kind || '')) hub = lp.edges[0].from; // one trigger only; an overview with several stays a flow
+      if (hub && outs(hub) < 3) hub = null;
+      const steps = {}; if (v.render === 'sequence') lp.edges.forEach((e, i) => { (steps[e.to] ||= []).push(i + 1); });
+      const flow = { flow: true, backKeys: lp.keys, steps, hub: null };
+      if (!hub || v.containers || v.mainSteps || v.render === 'process') return (planCache[vid] = flow);
+      planCache[vid] = { ...hubPlan(v, hub, lp), hub, backKeys: lp.keys, steps };
+      // a hub plan that cannot route cleanly gives way to the plain left-to-right flow, if that does better
+      const bad = g => routeAudit(g, '').length + ((g.stats.cross || 0) + (g.stats.fallback || 0)) * 5;
+      let hb = bad(buildGeo(vid));
+      if (hb) { // try other orders inside each lane column before giving up on the hub layout
+        const P0 = planCache[vid]; let evals = 0;
+        for (let pass = 0; pass < 2 && hb && evals < 80; pass++) P0.lanes.forEach(L => L.cols.forEach(col => {
+          for (let a = 0; a < col.length && hb && evals < 80; a++) for (let b = a + 1; b < col.length && hb && evals < 80; b++) {
+            if (P0.branch.has(col[a]) !== P0.branch.has(col[b])) continue;
+            [col[a], col[b]] = [col[b], col[a]]; evals++;
+            const nb = bad(buildGeo(vid)); if (nb < hb) hb = nb; else [col[a], col[b]] = [col[b], col[a]];
+          }
+        }));
+      }
+      if (hb) { const keep = planCache[vid]; planCache[vid] = flow; const fb = bad(buildGeo(vid)); if (fb >= hb) planCache[vid] = keep; }
+      return planCache[vid];
+    }
+    /* plain views: longest-path columns from the roots, state at the bottom of its column */
+    function flowPos(vid) {
+      const v = V[vid], ids = (v.nodeIds || []).filter(i => N[i]), lp = loopsOf(v);
+      const fwd = lp.edges.filter((e, k) => !lp.back.has(k) && e.from !== e.to);
+      const rank = {}; ids.forEach(i => { rank[i] = 0; });
+      for (let it = 0; it <= ids.length; it++) fwd.forEach(e => { if (rank[e.to] < rank[e.from] + 1) rank[e.to] = rank[e.from] + 1; });
+      const seen = id => { const k = lp.edges.findIndex(e => e.to === id || e.from === id); return k < 0 ? 999 : k; };
+      const sink = i => isState(i) && !fwd.some(e => e.from === i); // state that leads nowhere sits along the bottom
+      const cols = {}; ids.forEach(i => (cols[rank[i]] ||= []).push(i));
+      const pos = {};
+      const height = Math.max(1, ...Object.values(cols).map(c => c.filter(i => !sink(i)).length));
+      Object.entries(cols).forEach(([c, list]) => {
+        const main = list.filter(i => !sink(i)).sort((a, b) => seen(a) - seen(b)), st = list.filter(sink).sort((a, b) => seen(a) - seen(b));
+        main.forEach((i, r) => { pos[i] = [+c, r]; });
+        st.forEach((i, r) => { pos[i] = [+c, height + r]; }); // state along the bottom, never above the flow
+      });
+      return pos;
+    }
+
+    function buildView(vid) {
+      const g = buildGeo(vid), v = V[vid];
+      return { g, markup: svgOf(g, { title: v.title, subject: subjectOf(v) }) };
     }
     const layoutCache = {};
+    const kidCount = (nid, vid) => { const c = childOf(nid, vid); return c && c !== vid ? (V[c].nodeIds || []).length : 0; };
+    const wireKind = e => { const t = N[e.to] || {}, f = N[e.from] || {}, l = String(e.label || '');
+      if (f.kind === 'hook') return 'guard';
+      if (t.kind === 'board' || f.kind === 'board' || /\b(reads?|writes? config|saves?|records?|appends?)\b/i.test(l)) return 'state';
+      if (t.kind === 'hook' || /\b(trigger|fires|suggests?|offers?|requires|wires)/i.test(l)) return 'triggers';
+      if (/\b(feeds?|hands? off|routes?|passes|returns|bounces|then)\b/i.test(l)) return 'feeds';
+      return 'calls'; };
+    function prepEdges(vid, edges, backKeys) {
+      const par = {}; // parallel edges between one pair read as one edge listing every relation
+      const merged = edges.filter(e => { const k = e.from + '>' + e.to, m = par[k]; if (!m) { par[k] = e; e.all = [e]; return true; } m.all.push(e); return false; })
+        .map(e => e.all.length < 2 ? e : { ...e, label: (e.label || '') + ' +' + (e.all.length - 1), when: e.all.map(x => (x.step != null ? x.step + '. ' : '') + (x.label || '')).join('\n') });
+      const out = merged.map(e => ({ ...e, wk: wireKind(e), back: backKeys && backKeys.has(e.from + '>' + e.to) }));
+      const pair = {}; // A→B plus B→A reads as one two-way edge
+      return out.filter(e => { const r = pair[e.to + '>' + e.from]; if (r) { r.both = true; r.back = false; if (e.label && e.label !== r.label) r.label = (r.label ? r.label + ' / ' : '') + e.label; if (e.when) r.when = [r.when, e.when].filter(Boolean).join(' · '); return false; } pair[e.from + '>' + e.to] = e; return true; });
+    }
+    const condTag = l => { const m = /^(?:routes|on-ramp:?)\s+(\S+)$/i.exec(String(l || '').trim()); return m ? m[1] : null; }; // "routes bug" → a "bug" tag
     function buildGeo(vid, override, repair = true) {
       const v = V[vid], ids = (v.nodeIds || []).filter(i => N[i]);
       const edges = viewEdges(v).map(e => ({ ...e }));
-      const pos = override || v.layout || (layoutCache[vid] ||= autoLayout(ids, edges, subjectOf(v)));
-      const seq = v.render === 'sequence';
-      if (seq) edges.forEach((e, i) => { e.step = i + 1; });
-      const par = {}; // parallel edges between one pair read as one edge listing every relation
-      const merged = edges.filter(e => { const k = e.from + '>' + e.to, m = par[k]; if (!m) { par[k] = e; e.all = [e]; return true; } m.all.push(e); return false; })
-        .map(e => e.all.length < 2 ? e : { ...e, label: (e.step != null ? '' : '') + (e.label || '') + ' +' + (e.all.length - 1), when: e.all.map(x => (x.step != null ? x.step + '. ' : '') + (x.label || '')).join('\n') });
-      const dg = { nodeH: 70, nodes: ids.map(i => ({ ...N[i], sub: N[i].sub || N[i].sublabel, col: (N[i].col != null && v.layout == null && !pos[i]) ? N[i].col : (pos[i] || [0, 0])[0], row: (pos[i] || [0, 0])[1] })),
-        edges: merged.map(e => ({ ...e, style: e.style || (N[e.from] && N[e.from].kind === 'hook' ? 'security' : /async|dispatch|spawn/i.test(e.label || '') ? 'async' : '') })) };
-      const pair = {}; // A→B plus B→A reads as one two-way edge
-      dg.edges = dg.edges.filter(e => { const r = pair[e.to + '>' + e.from]; if (r) { r.both = true; if (e.label && e.label !== r.label) r.label = (r.label ? r.label + ' / ' : '') + e.label; if (e.when) r.when = [r.when, e.when].filter(Boolean).join(' · '); return false; } pair[e.from + '>' + e.to] = e; return true; });
+      if (v.render === 'sequence') edges.forEach((e, i) => { e.step = i + 1; });
+      const P = planCache[vid] || { flow: true, backKeys: loopsOf(v).keys, steps: {} };
+      if (!override && P.hub) return hubGeo(vid, P, edges, repair);
+      const pos = override || v.layout || (layoutCache[vid] ||= flowPos(vid));
+      const mainSteps = v.mainSteps || v.render === 'process';
+      const stepIds = v.stepIds || ids;
+      const dg = { nodeH: mainSteps ? 82 : 64, mainSteps, containers: v.containers, nodes: ids.map(i => { const n = nodeIn(i, vid), step = mainSteps && stepIds.includes(i); return { ...n, sub: n.sub || n.sublabel, emphasis: !!step || !!n.emphasis, step: step ? stepIds.indexOf(i) + 1 : null, verbs: step ? [] : n.verbs, kids: kidCount(i, vid), col: (pos[i] || [0, 0])[0], row: (pos[i] || [0, 0])[1] }; }),
+        edges: prepEdges(vid, edges, P.backKeys) };
       dg.repair = repair;
       return layoutGraph(dg, true);
+    }
+    function hubGeo(vid, P, edges, repair) {
+      const NH = 64, CG = 108, RG = 44, pitch = NH + RG, hub = P.hub;
+      const all = P.lanes.flatMap(l => l.ids).concat(hub);
+      const widths = Object.fromEntries(all.map(i => [i, mapNodeW(nodeIn(i, vid))]));
+      const nodeW = widths[hub];
+      const stepTxt = id => { const s = (P.steps || {})[id] || []; return s.length > 2 ? s[0] + '+' : s.join('·'); };
+      const nodesOut = [{ ...nodeIn(hub, vid), sub: nodeIn(hub, vid).sub || nodeIn(hub, vid).sublabel, kids: kidCount(hub, vid), ax: 0, ay: 0, w: nodeW, h: NH }];
+      const lanes = [], blocks = [], spine = [];
+      let x = nodeW + CG, maxRows = 1;
+      const rowAt = {};
+      P.lanes.forEach((L, li) => {
+        const x0 = x; spine[li] = x0 - CG + 28;
+        const SUBG = 54; // columns inside a lane carry no branch labels, so they sit closer
+        L.cols.forEach((col, j) => {
+          const colW = Math.max(...col.map(id => widths[id]));
+          const taken = new Set();
+          col.forEach((id, r) => { // a follow-on part lines up with the part that leads to it
+            let row = r;
+            if (j > 0) { const src = edges.find(e => e.to === id && rowAt[e.from] != null && P.lanes[li].ids.includes(e.from)); row = src ? rowAt[src.from] : r; while (taken.has(row)) row++; }
+            taken.add(row); rowAt[id] = row; maxRows = Math.max(maxRows, row + 1);
+            nodesOut.push({ ...nodeIn(id, vid), sub: nodeIn(id, vid).sub || nodeIn(id, vid).sublabel, kids: kidCount(id, vid), ax: x, ay: row * pitch, w: widths[id], h: NH, lane: li, step: stepTxt(id) });
+          });
+          x += colW + (j < L.cols.length - 1 ? SUBG : CG);
+        });
+        const right = x - CG + 16;
+        const lx = P.boxed ? x0 - CG + 40 : x0 - 12, lw = P.boxed ? right - lx : right - 4 - lx;
+        lanes.push({ title: L.title, ids: L.ids, x: lx, y: -62, w: lw, h: 0, gap: 24, bare: !P.boxed });
+        const hx = P.boxed ? lx : x0 - 12;
+        blocks.push({ x: hx + 12, y: -52, w: Math.min(lw - 24, 34 + textW(L.title, 11) * .95 + 8 + textW('00 parts', 11)), h: 22, title: L.title });
+        if (P.boxed && li < P.lanes.length - 1) blocks.push({ x: lx + lw + 4, y: -48, w: 16, h: 18, title: L.title + ' → next' });
+      });
+      lanes.forEach(l => { l.h = maxRows * pitch - RG + 30 + 62; });
+      // the comb: trunk from the hub, a spine per lane, a branch into each callee with its label at the end
+      const yh = NH / 2, yt = -24, hubR = nodeW, byIdLocal = Object.fromEntries(nodesOut.map(n => [n.id, n]));
+      const comb = [], others = [];
+      const prepared = prepEdges(vid, edges.filter(e => e.from !== hub || P.branch.has(e.to)), P.backKeys);
+      prepared.forEach(e => {
+        if (e.from !== hub) return others.push(e);
+        const c = byIdLocal[e.to]; if (!c) return;
+        const li = c.lane, xs = spine[li], yc = c.ay + NH / 2;
+        let pts = li === 0 ? [[hubR, yh], [xs, yh], [xs, yc], [c.ax, yc]] : [[hubR, yh], [spine[0], yh], [spine[0], yt], [xs, yt], [xs, yc], [c.ax, yc]];
+        pts = pts.filter((p, k) => !k || p[0] !== pts[k - 1][0] || p[1] !== pts[k - 1][1]);
+        pts = pts.filter((p, k) => k === 0 || k === pts.length - 1 || !((pts[k - 1][0] === p[0] && p[0] === pts[k + 1][0]) || (pts[k - 1][1] === p[1] && p[1] === pts[k + 1][1])));
+        const tag = condTag(e.label), avail = c.ax - 26 - (xs + 10);
+        const text = avail >= 44 ? fit(tag || e.label || '', 10.5, Math.max(30, avail - 20) / .92) : '';
+        const w = Math.min(avail, textW(text, 10.5) * .92 + 18);
+        e.fixed = pts; e.lbl = text ? { x: c.ax - 26 - w, y: yc - 10, w, h: 20, text, step: null, tag: !!tag } : null;
+        comb.push(e);
+      });
+      return layoutGraph({ nodeH: NH, abs: true, nodes: nodesOut, edges: [...comb, ...others], lanes, blocks, laneGap: 24, repair, hub }, true);
     }
     /* crossing-minimising local search over rows and sides; `visual.py render` bakes the result into the page */
     function scoreGeo(g) {
       const bad = routeAudit(g, '').length, len = g.edges.reduce((a, e) => a + e.pts.slice(1).reduce((s, p, i) => s + Math.abs(p[0] - e.pts[i][0]) + Math.abs(p[1] - e.pts[i][1]), 0), 0);
       const bends = g.edges.reduce((a, e) => a + e.pts.length, 0), drop = g.edges.filter(e => e.label && !e.lbl).length;
-      return bad * 1000 + ((g.stats.cross || 0) + (g.stats.fallback || 0)) * 150 + drop * 40 + len / 40 + bends * 3 + g.bounds.w * g.bounds.h / 4e5;
+      return bad * 1000 + ((g.stats.cross || 0) + (g.stats.fallback || 0)) * 150 + drop * 40 + len / 15 + bends * 12 + g.bounds.w * g.bounds.h / 4e5;
     }
     function optimize(vid, budget = 160) {
       budget = Math.max(budget, Math.min(400, 20 * (V[vid].nodeIds || []).length));
       const t0 = performance.now(); let wall = 4000; // per-view time box, extended while problems remain
       const v = V[vid], ids = (v.nodeIds || []).filter(i => N[i]);
-      let pos = JSON.parse(JSON.stringify(autoLayout(ids, viewEdges(v), subjectOf(v))));
+      let pos = JSON.parse(JSON.stringify(flowPos(vid)));
       let best = scoreGeo(buildGeo(vid, pos, false)), evals = 1;
       const hub = subjectOf(v), hubCol = hub && pos[hub] ? pos[hub][0] : null;
       const tryPos = cand => { evals++; const s = scoreGeo(buildGeo(vid, cand, false)); if (s < best - 0.5) { best = s; pos = cand; return true; } return false; };
@@ -1453,16 +1982,23 @@
           if (evals >= budget * (best >= 1000 ? 2.5 : 1) || performance.now() - t0 > (best >= 1000 ? 12000 : wall)) break;
           const [ca, ra] = pos[a];
           const moves = [];
-          ids.forEach(b => { if (b !== a && Math.abs(pos[b][0] - ca) <= 1 && b !== hub) moves.push(['swap', b]); });
+          // columns are the reading order, so only the order inside a column may change
+          const band = i => isState(i) && !viewEdges(v).some(e => e.from === i);
+          const stateFloor = () => Math.max(-1, ...ids.filter(i => !band(i)).map(i => pos[i][1]));
+          ids.forEach(b => { if (b !== a && pos[b][0] === ca && band(a) === band(b)) moves.push(['swap', b]); });
           moves.push(['row', -1], ['row', 1]);
-          if (a !== hub) moves.push(['col', -1], ['col', 1]);
-          if (hubCol != null && a !== hub && ca !== hubCol) moves.push(['mirror']);
           for (const [kind, arg] of moves) {
             if (evals >= budget) break;
             const c = JSON.parse(JSON.stringify(pos));
             if (kind === 'swap') { if (a === hub) continue; const t2 = c[a]; c[a] = c[arg]; c[arg] = t2; }
             else if (kind === 'col') { const nc = ca + arg; let r = ra; while (ids.some(b => c[b][0] === nc && c[b][1] === r)) r++; c[a] = [nc, r]; }
-            else if (kind === 'row') { const r = ra + arg; if (r < 0 || ids.some(b => c[b][0] === ca && c[b][1] === r)) continue; c[a][1] = r; }
+            else if (kind === 'row') {
+              let r = ra + arg;
+              if (band(a) && r <= stateFloor()) r = stateFloor() + 1;
+              while (ids.some(b => c[b][0] === ca && c[b][1] === r)) r += arg > 0 ? 1 : -1;
+              if (r < 0 || (band(a) && r <= stateFloor())) continue;
+              c[a][1] = r;
+            }
             else { const nc = 2 * hubCol - ca; const occ = ids.find(b => c[b][0] === nc && c[b][1] === ra); if (occ) c[occ][0] = ca; c[a][0] = nc; }
             if (Math.min(...ids.map(i => c[i][0])) < 0) { const m = Math.min(...ids.map(i => c[i][0])); ids.forEach(i => { c[i][0] -= m; }); }
             if (tryPos(c)) { improved = true; break; }
@@ -1473,13 +2009,23 @@
     }
 
     function mount(vid) {
-      const { g, markup } = buildView(vid);
-      stage.querySelectorAll('svg.map-svg').forEach(s => s.remove());
-      stage.insertAdjacentHTML('afterbegin', markup);
-      svg = stage.querySelector('svg'); svg.classList.add('map-svg'); geo = g; cur = vid;
-      if (!cam) cam = new Camera(stage, svg, { wheel: 'zoom', maxFit: 1.15, max: 4, onChange: onCam });
-      cam.setSvg(svg, g.bounds);
-      renderChrome(); buildMini(); sel = null; panel.hidden = true; stage.classList.remove('focusing');
+      cur = vid; planOf(vid);
+      stage.querySelectorAll('svg.map-svg, .empty-view').forEach(s => s.remove());
+      const v = V[vid], empty = !(v.nodeIds || []).some(i => N[i]);
+      if (empty) { // a view with nothing in it gets a friendly card, not a blank canvas
+        geo = { nodes: [], edges: [], groups: [], lanes: [], byId: {}, stats: {}, bounds: { x: 0, y: 0, w: 400, h: 300 } };
+        stage.insertAdjacentHTML('afterbegin', '<svg class="map-svg" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg"></svg>');
+        const p = v.parent;
+        stage.insertAdjacentHTML('beforeend', `<div class="empty-view"><div class="ico">◌</div><h4>Nothing here yet</h4><p>This view has no nodes. Add them to the map model and run /visual again.</p>${p ? `<button class="btn" data-v="${esc(p)}">← Back to ${esc(shortT(V[p].title || p))}</button>` : ''}</div>`);
+      } else {
+        const { g, markup } = buildView(vid);
+        stage.insertAdjacentHTML('afterbegin', markup); geo = g;
+      }
+      svg = stage.querySelector('svg'); svg.classList.add('map-svg');
+      if (!cam) cam = new Camera(stage, svg, { wheel: 'zoom', maxFit: 1.15, max: 4, mapDepth: 0.3, onChange: onCam, inset: () => { const top = Math.max(58, 26 + $('m-vpill').offsetHeight); if (innerWidth <= 820) return { t: top, r: 12, b: 12, l: 12 }; const lg = $('m-legend'), on = lg && !lg.hidden; // the legend box sits bottom-left: keep the map above it or beside it
+        return [{ t: top, r: 20, b: 40 + (on ? lg.offsetHeight + 8 : 0), l: 20 }, { t: top, r: 20, b: 40, l: 20 + (on ? lg.offsetWidth + 8 : 0) }]; } });
+      cam.setSvg(svg, geo.bounds);
+      renderChrome(); buildMini(); sel = null; hidePanel(); stage.classList.remove('focusing');
     }
 
     function onCam(c) {
@@ -1497,45 +2043,91 @@
     const mini = {};
     function buildMini() {
       const b = geo.bounds, el = $('m-mini');
+      const ln = (geo.lanes || []).map(l => `<rect x="${l.x}" y="${l.y}" width="${l.w}" height="${l.h}" rx="14" fill="none" stroke="var(--border-2)" stroke-width="${Math.max(2, b.w / 300)}"/>`).join('');
       const r = geo.nodes.map(n => `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="8" fill="var(--${KIND[n.k][0]})" opacity="${n.k === 'm-public' ? .95 : .55}"/>`).join('');
       const l = geo.edges.map(e => `<polyline points="${e.pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="var(--arrow)" stroke-width="${Math.max(2, b.w / 260)}" opacity=".6"/>`).join('');
-      el.innerHTML = `<svg viewBox="${b.x} ${b.y} ${b.w} ${b.h}" preserveAspectRatio="xMidYMid meet">${l}${r}<rect class="vp" rx="${b.w / 80}"/></svg>`;
+      el.innerHTML = `<svg viewBox="${b.x} ${b.y} ${b.w} ${b.h}" preserveAspectRatio="xMidYMid meet">${ln}${l}${r}<rect class="vp" rx="${b.w / 80}"/></svg>`;
       mini.svg = el.firstChild; mini.vp = el.querySelector('.vp');
       mini.vp.setAttribute('stroke-width', Math.max(2, b.w / 160));
       cam && onCam(cam);
     }
     (() => {
       const el = $('m-mini'); let down = false;
-      const go = (e, anim) => { const p = mini.svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const w = p.matrixTransform(mini.svg.getScreenCTM().inverse()); cam.touched = true; anim ? cam.animate({ cx: w.x, cy: w.y }, 240) : cam.set({ cx: w.x, cy: w.y }); };
-      el.addEventListener('pointerdown', e => { down = true; el.setPointerCapture(e.pointerId); go(e, true); e.stopPropagation(); });
-      el.addEventListener('pointermove', e => { if (down) go(e, false); });
+      const go2 = (e, anim) => { const p = mini.svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const w = p.matrixTransform(mini.svg.getScreenCTM().inverse()); cam.touched = true; anim ? cam.animate({ cx: w.x, cy: w.y }, 240) : cam.set({ cx: w.x, cy: w.y }); };
+      el.addEventListener('pointerdown', e => { down = true; el.setPointerCapture(e.pointerId); go2(e, true); e.stopPropagation(); });
+      el.addEventListener('pointermove', e => { if (down) go2(e, false); });
       el.addEventListener('pointerup', () => { down = false; });
     })();
 
-    /* chrome: breadcrumbs, view card, legend, outline */
+    /* chrome: breadcrumbs, view pill, legend, column browser */
     function renderChrome() {
       const v = V[cur];
       $('m-crumbs').innerHTML = stack.map((id, i) => i === stack.length - 1
         ? `<span class="crumb cur" aria-current="page">${esc(V[id].title || id)}</span>`
-        : `<button class="crumb" data-v="${esc(id)}">${esc(V[id].title || id)}</button><span class="crumb-sep">›</span>`).join('');
-      const nE = geo.edges.length, parent = stack.length > 1 ? stack[stack.length - 2] : v.parent;
-      $('m-vcard').innerHTML = `${parent ? `<button class="back" data-v="${esc(parent)}">← ${esc(V[parent].title || parent)}</button>` : ''}
-        <div class="vt">${esc(v.title || v.id)}</div>${v.caption || v.description ? `<div class="vc">${inline(v.caption || v.description)}</div>` : ''}
-        ${v.render === 'sequence' ? `<details class="vseq"><summary>Run order · ${viewEdges(v).length} steps</summary><ol>${viewEdges(v).map(e => `<li><b>${esc((N[e.from] || {}).label || e.from)}</b> → <b>${esc((N[e.to] || {}).label || e.to)}</b>${e.label ? ': ' + esc(e.label) : ''}</li>`).join('')}</ol></details>` : ''}
-        <div class="vm">${geo.nodes.length} nodes · ${nE} edges${views.length > 1 ? ` · level ${chain(cur).length} of ${Math.max(...views.map(x => chain(x.id).length))}` : ''}</div>`;
+        : `<button class="crumb" data-v="${esc(id)}">${esc(shortT(V[id].title || id))}</button><span class="crumb-sep">›</span>`).join('');
+      const parent = stack.length > 1 ? stack[stack.length - 2] : v.parent;
       $('m-up').disabled = !parent;
-      const used = [...new Set(geo.nodes.map(n => n.k))];
-      const order = ['m-public', 'm-lane', 'm-ext', 'm-verb', 'm-board', 'm-hook', 'm-script'];
-      $('m-legend').innerHTML = order.filter(k => used.includes(k)).map(k => `<span class="lg lg-${k}" title="${esc(KIND[k][1] + ' — ' + KIND[k][2])}"><i style="border-color:var(--${KIND[k][0]});background:var(--${KIND[k][0]}-f)"></i><b>${KIND[k][1]}</b> ${KIND[k][2]}</span>`).join('')
-        + `${geo.nodes.some(n => childOf(n.id) && childOf(n.id) !== cur) ? '<span class="lg-stack"><i></i><b>Stacked</b> double-click to look inside</span>' : ''}`
-        + `${geo.nodes.some(n => n.author) ? '<span class="lg-av"><i></i><b>Avatar</b> who wrote the skill</span>' : ''}`;
-      const tree = (pid, depth) => views.filter(x => (x.parent || null) === pid).map(x => `<button class="tv${x.id === cur ? ' on' : ''}${stack.includes(x.id) && x.id !== cur ? ' path' : ''}" data-v="${esc(x.id)}" style="--d:${depth}">
-          <span class="tv-t">${esc(x.title || x.id)}</span><span class="tv-n">${(x.nodeIds || []).length}</span></button>${tree(x.id, depth + 1)}`).join('');
-      $('m-tree').innerHTML = `<div class="tree-h">Views <span>${views.length}</span></div>` + tree(null, 0);
+      renderPill(parent); renderLegend(); renderTree();
       document.title = `${v.title || v.id} · ${D.title || 'map'}`;
     }
+    function renderPill(parent) {
+      const v = V[cur], mainSteps = v.mainSteps || v.render === 'process', seq = v.render === 'sequence', ve = viewEdges(v), L = planCache[cur] && planCache[cur].hub ? planCache[cur] : null;
+      const depth = Math.max(...views.map(x => chain(x.id).length));
+      $('m-vpill').innerHTML = `<button class="pill" id="m-pillbtn" aria-expanded="false" aria-controls="m-vpop" title="About this view (i)"><b>${esc(shortT(v.title || v.id))}</b><span class="n">${mainSteps ? (v.stepIds || v.nodeIds || []).length + ' steps' : seq ? ve.length + ' steps' : geo.nodes.length + ' nodes'}</span><span class="kbd">i</span></button>
+        ${mainSteps && (v.note || v.caption) ? `<p class="view-note">${inline(v.note || v.caption)}</p>` : ''}
+        <div class="vpop" id="m-vpop" hidden>${parent ? `<button class="back" data-v="${esc(parent)}">← ${esc(shortT(V[parent].title || parent))}</button>` : ''}
+          <h4>${esc(v.title || v.id)}</h4>${v.caption || v.description ? `<p>${inline(v.caption || v.description)}</p>` : ''}
+          ${L ? `<div class="vlanes">${L.lanes.map((l, i) => `${i ? '<i>→</i>' : ''}<span><em>${i + 1}</em>${esc(l.title)} <small>${l.ids.length}</small></span>`).join('')}</div>` : ''}
+          ${seq ? `<ol>${ve.map(e => `<li title="${esc((N[e.from] || {}).label || e.from)} → ${esc((N[e.to] || {}).label || e.to)}">${esc(e.label || (N[e.to] || {}).label || e.to)}</li>`).join('')}</ol>` : ''}
+          <div class="vm">${geo.nodes.length} nodes · ${geo.edges.length} wires${views.length > 1 ? ` · level ${chain(cur).length} of ${depth}` : ''}</div></div>`;
+    }
+    const togglePill = force => { const b = $('m-pillbtn'), p = $('m-vpop'); if (!b) return; const on = force != null ? force : p.hidden; p.hidden = !on; b.setAttribute('aria-expanded', on); };
+    let legendFolded = false; try { legendFolded = localStorage.getItem('visual-legend') === '0'; } catch (_) {}
+    function renderLegend() {
+      const used = [...new Set(geo.nodes.map(n => n.k))];
+      const order = ['m-public', 'm-step', 'm-lane', 'm-ext', 'm-verb', 'm-board', 'm-hook', 'm-script'];
+      const shape = k => k === 'm-verb' ? 'p' : k === 'm-ext' ? 'd' : k === 'm-hook' ? 'h' : '';
+      const items = order.filter(k => used.includes(k)).map(k => `<span class="lgi" title="${esc(KIND[k][1] + ' — ' + KIND[k][2])}"><i class="${shape(k)}" style="border-color:var(--${KIND[k][0]});background:var(--${KIND[k][0]}-f)${k === 'm-hook' ? `;background:var(--${KIND[k][0]})` : ''}"></i><b>${KIND[k][1]}</b><span>${KIND[k][2]}</span></span>`)
+        .concat(geo.nodes.some(n => n.kids) ? ['<span class="lgi"><i class="s"></i><b>⤢ Stacked</b><span>double-click to open</span></span>'] : [])
+        .concat(geo.nodes.some(n => n.step) ? ['<span class="lgi"><i class="num">1</i><b>Step</b><span>run order</span></span>'] : [])
+        .concat(geo.nodes.some(n => n.tag) ? ['<span class="lgi"><i class="tag"></i><b>@author</b><span>who wrote it</span></span>'] : [])
+        .concat(WIRES.filter(w => geo.edges.some(e => e.wk === w[0])).map(w => `<span class="lgi"><i class="w" style="border-color:var(--w-${w[0]})"></i><b>${w[1]}</b><span>${w[2]}</span></span>`))
+        .concat(geo.edges.some(e => e.back) ? ['<span class="lgi"><i class="w dash" style="border-color:var(--w-calls)"></i><b>loops back</b><span>the one line that runs right to left</span></span>'] : []);
+      const el = $('m-legend');
+      el.hidden = !items.length;
+      el.classList.toggle('folded', legendFolded);
+      el.innerHTML = `<div class="t"><span>LEGEND</span><button type="button" id="m-lfold" aria-label="${legendFolded ? 'Show' : 'Hide'} legend" aria-expanded="${!legendFolded}">${legendFolded ? '+' : '–'}</button></div>${items.join('')}`;
+    }
+    function renderTree() { // Readable columns; a declared order may include shortcuts to descendants.
+      const ch = chain(cur);
+      const roots = views.filter(x => !x.parent), cols = roots.length > 1 ? [{ head: 'Map', items: roots, on: ch[0] }] : [];
+      ch.forEach((id, i) => { const order = V[id].browserOrder || [], k = [...new Set([...order, ...kidsOf(id).map(v => v.id)])].map(id => V[id]).filter(Boolean); if (k.length) cols.push({ head: shortT(V[id].title || id), items: k, on: ch[i + 1] }); });
+      document.body.style.setProperty('--browser-width', Math.min(448, Math.max(1, cols.length) * 224) + 'px');
+      $('m-tree').innerHTML = `<div class="miller">${cols.map(c => `<div class="mcol"><div class="mch" title="${esc(c.head)}">${esc(c.head)}</div>${c.items.map(x => { const n = kidsOf(x.id).length;
+        return `<button class="mit${x.id === cur ? ' on' : x.id === c.on ? ' path' : ''}" data-v="${esc(x.id)}" title="${esc(x.title || x.id)}"${x.id === cur ? ' aria-current="page"' : ''}><span>${esc(shortT(x.title || x.id))}</span><em>${(x.nodeIds || []).length}${n ? ' ›' : ''}</em></button>`; }).join('')}</div>`).join('')}</div>`;
+      const m = $('m-tree').firstChild, last = m.lastElementChild; m.style.scrollBehavior = 'auto'; m.scrollLeft = last ? Math.max(0, last.offsetLeft + last.offsetWidth - m.clientWidth) : 0; m.style.scrollBehavior = '';
+    }
+    const setTree = on => { document.body.classList.toggle('tree-open', on); $('m-outline').setAttribute('aria-expanded', on); };
 
-    /* selection + passport panel */
+    // Pull concise points from captured prose; retain wording and keep the full point in its tooltip.
+    function detailBullets(body) {
+      const normalized = String(body || '').replace(/^\s*(?:[-*]|\d+[.)])\s+/gm, '').replace(/\n+/g, ' ').trim();
+      let parts = normalized.split(/(?<=[.!?])\s+(?=[A-Z`/])|;\s+|\s+[·|]\s+/).filter(Boolean);
+      while (parts.length < 2 || parts.some(p => p.length > 160) && parts.length < 4) {
+        const index = parts.reduce((best, p, i) => p.length > (parts[best] || '').length ? i : best, 0), value = parts[index];
+        if (!value || value.length < 8) break;
+        const separators = [...value.matchAll(/:\s+|,\s+|\s+(?=then\b|with\b|before\b|after\b|once\b|to\b|and\b|or\b|during\b|by\b|whose\b|outside\b|on\b|for\b|as\b|whenever\b|into\b|in\b|from\b|when\b|includes\b|typed\b)/g)].map(m => m.index + m[0].length);
+        const safe = i => (value.slice(0, i).match(/`/g) || []).length % 2 === 0;
+        const cuts = separators.filter(i => i >= 6 && i < value.length - 4 && safe(i));
+        if (!cuts.length && parts.length < 2) cuts.push(...[...value.matchAll(/\s+/g)].map(m => m.index).filter(i => i >= 6 && i < value.length - 4 && safe(i)));
+        const cut = cuts.sort((a, b) => Math.abs(a - value.length / 2) - Math.abs(b - value.length / 2))[0];
+        if (!cut) break;
+        parts.splice(index, 1, value.slice(0, cut).replace(/[,;:]\s*$/, '').trim(), value.slice(cut).trim());
+      }
+      if (parts.length > 4) parts = [...parts.slice(0, 3), parts.slice(3).join(' ')];
+      return parts;
+    }
+    /* selection + details strip */
     function select(nid, opts = {}) {
       if (!geo.byId[nid]) return;
       sel = nid;
@@ -1544,62 +2136,67 @@
       svg.querySelectorAll('.node').forEach(g => { const id = g.dataset.id; g.classList.toggle('sel', id === nid); g.classList.toggle('nb', ups.has(id) || downs.has(id)); });
       svg.querySelectorAll('.edge-g').forEach(g => g.classList.toggle('hot', g.dataset.from === nid || g.dataset.to === nid));
       svg.querySelectorAll('.e-lab').forEach(g => { const e = geo.edges[g.dataset.i]; g.classList.toggle('hot', e.from === nid || e.to === nid); });
+      svg.querySelectorAll('.n-port').forEach(p => p.classList.toggle('hot', p.dataset.edges.split(',').some(i => geo.edges[i].from === nid || geo.edges[i].to === nid)));
       stage.classList.add('focusing');
       renderPanel(nid);
       const n = geo.byId[nid];
-      if (opts.reveal !== false) cam.reveal({ x: n.x, y: n.y, w: n.w, h: n.h });
+      if (opts.reveal !== false) requestAnimationFrame(() => cam.reveal({ x: n.x, y: n.y, w: n.w, h: n.h }));
       setHash(true);
     }
+    function hidePanel() { panel.hidden = true; }
     function deselect() {
-      sel = null; stage.classList.remove('focusing'); panel.hidden = true; stage.classList.remove('with-panel');
+      sel = null; stage.classList.remove('focusing'); hidePanel();
       svg.querySelectorAll('.sel,.nb,.hot').forEach(g => g.classList.remove('sel', 'nb', 'hot'));
       setHash(true);
     }
     function relRows(list, dir) {
       if (!list.length) return `<div class="rel-none">${dir === 'up' ? 'Nothing calls this here' : 'Calls nothing here'}</div>`;
-      return list.map(({ e, id, inView }) => { const o = N[id] || { label: id, kind: '' }, k = kindOf(o.kind, true);
-        return `<button class="rel" data-n="${esc(id)}" title="${inView ? 'Select' : 'Find in another view'}"><i style="background:var(--${KIND[k][0]})"></i><span class="rel-l">${esc(o.label)}</span>
-          <span class="rel-e">${e.step != null ? esc(e.step) + ' · ' : ''}${esc(e.label || '')}${inView ? '' : ' ↗'}</span>${e.when ? `<span class="rel-w">${esc(e.when)}</span>` : ''}</button>`; }).join('');
+      return '<ul class="relation-list">' + list.map(({ e, id, inView }) => { const o = N[id] || { label: id, kind: '' }, k = kindOf(o.kind, true);
+        return `<li><button class="rel" data-n="${esc(id)}" title="${esc((e.when ? e.when + ' — ' : '') + (inView ? 'Select' : 'Find in another view'))}"><i style="background:var(--${KIND[k][0]})"></i><span class="rel-l">${esc(o.label)}</span>
+          <span class="rel-e">${e.step != null ? esc(e.step) + ' · ' : ''}${esc(e.label || '')}${inView ? '' : ' ↗'}</span></button></li>`; }).join('') + '</ul>';
     }
-    function authorLine(n) {
-      const one = login => { const A = (D.authors || {})[login] || {};
-        return `<a class="author" href="${esc(A.url || 'https://github.com/' + login)}" target="_blank" rel="noopener">${A.avatar ? `<img src="${A.avatar}" alt="">` : `<i>${esc(login.slice(0, 2).toUpperCase())}</i>`}<span>${esc(A.name || login)} <b>@${esc(login)}</b></span></a>`; };
-      const by = n.author ? `<div class="authors"><span class="by">by</span>${one(n.author)}${n.origin ? `<span class="origin">${esc(n.origin)}</span>` : ''}</div>` : (n.external ? `<div class="authors"><span class="by">by</span><span class="origin">author unknown${n.origin ? ' · ' + esc(n.origin) : ''}</span></div>` : '');
-      const cr = (n.credits || []).length ? `<div class="authors"><span class="by">credits</span>${n.credits.map(one).join('')}</div>` : '';
-      return by + cr;
-    }
+    const authorChip = login => { const A = (D.authors || {})[login] || {};
+      return `<a class="author" href="${esc(A.url || 'https://github.com/' + login)}" target="_blank" rel="noopener">${A.avatar ? `<img src="${A.avatar}" alt="">` : `<i>${esc(login.slice(0, 2).toUpperCase())}</i>`}<span>${esc(A.name || login)} <b>@${esc(login)}</b></span></a>`; };
     function renderPanel(nid) {
-      const n = N[nid] || geo.byId[nid], k = kindOf(n.kind, true), c = `var(--${KIND[k][0]})`, pub = k === 'm-public';
+      const n = nodeIn(nid), k = kindOf(n.kind, true), c = `var(--${KIND[k][0]})`, pub = k === 'm-public', ext = k === 'm-ext';
       const inView = new Set(geo.nodes.map(x => x.id)), seen = new Set();
       const collect = dir => {
         const out = [];
         const add = (e, id, iv) => { const key = dir + id + (e.label || ''); if (seen.has(key)) return; seen.add(key); out.push({ e, id, inView: iv }); };
         geo.edges.forEach(e => { if (dir === 'up' && e.to === nid) add(e, e.from, true); if (dir === 'down' && e.from === nid) add(e, e.to, true); });
+        viewEdges(V[cur]).forEach((e, i) => { const e2 = V[cur].render === 'sequence' ? { ...e, step: i + 1 } : e; if (dir === 'up' && e.to === nid) add(e2, e.from, true); if (dir === 'down' && e.from === nid) add(e2, e.to, true); });
         (D.edges || []).forEach(e => { if (dir === 'up' && e.to === nid) add(e, e.from, inView.has(e.from)); if (dir === 'down' && e.from === nid) add(e, e.to, inView.has(e.to)); });
         return out;
       };
-      const ups = collect('up'), downs = collect('down');
+      const ups = collect('up'), downs = collect('down'), srcs = srcList(n);
       const child = childOf(nid), canOpen = child && child !== cur;
       const vIn = viewsWith(nid).filter(v => v.id !== cur);
-      const sec = (t, body) => body ? `<section class="ps"><h4>${t}</h4><div class="prose">${md(body)}</div></section>` : '';
+      const by = n.author ? `<span>·</span>${authorChip(n.author)}` : ext ? '<span class="origin">· author unknown</span>' : '';
+      const tabs = [['what', 'What'], ['when', 'When'], ['how', 'How'], ['links', 'Links', ups.length + downs.length]];
+      if (!tabs.some(t => t[0] === tab)) tab = 'what';
+      const text = (h4, body, key) => body ? `<h4>${h4}</h4><ul class="detail-bullets">${detailBullets(body).map(b => `<li title="${esc(b)}">${inline(b)}</li>`).join('')}</ul>` : `<h4>${h4}</h4><div class="pnone">Not written yet — add <code>${key}</code> to this node in the map model.</div>`;
+      const verbs = (n.verbs || []).length ? `<div class="pverbs">${n.verbs.map(v => { const vid = N[nid + ':' + v] ? nid + ':' + v : null; return `<${vid ? `button data-n="${esc(vid)}"` : 'span'} class="pverb" style="--c:${c}">${esc(v)}</${vid ? 'button' : 'span'}>`; }).join('')}</div>` : '';
+      const srcHtml = srcs.length ? '<ul class="source-list">' + srcs.map(s => `<li class="src">${srcHref(s) ? `<a href="${esc(srcHref(s))}" title="Open ${esc(sb ? srcLabel(s) : base + s)}"${sb ? ' target="_blank" rel="noopener"' : ''}>${esc(srcLabel(s))}</a>` : `<span>${esc(s)}</span>`}<button class="ibtn sm" data-copy="${esc(sb ? srcLabel(s) : base + s)}" title="Copy path" aria-label="Copy path">⧉</button></li>`).join('') + '</ul>' : '<div class="rel-none">No source listed</div>';
+      const bodies = {
+        what: text('What it does', n.what, 'what') + verbs,
+        when: text('When it triggers', n.when, 'when'),
+        how: text('How it works', n.how, 'how'),
+        links: `<div class="links"><div><h4>Upstream <span>${ups.length}</span></h4>${relRows(ups, 'up')}</div><div><h4>Downstream <span>${downs.length}</span></h4>${relRows(downs, 'down')}</div>
+          <div><h4>Source <span>${srcs.length}</span></h4>${srcHtml}${vIn.length ? `<h4 style="margin-top:10px">Also in <span>${vIn.length}</span></h4><ul class="pviews">${vIn.map(v => `<li><button class="pview" data-v="${esc(v.id)}" data-sel="${esc(nid)}">${esc(shortT(v.title || v.id))}</button></li>`).join('')}</ul>` : ''}</div></div>`,
+      };
       panel.innerHTML = `<div class="ph" style="--c:${c}">
-          <div class="ph-top"><span class="kchip" style="color:${c}"><svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[k]}</svg>${esc(KIND[k][1])}</span>
-            <span class="vis ${pub ? 'pub' : k === 'm-ext' ? 'ext' : 'priv'}">${pub ? 'PUBLIC' : k === 'm-ext' ? 'EXTERNAL' : 'INTERNAL'}</span><button class="ibtn x" data-close title="Close (Esc)" aria-label="Close">×</button></div>
-          <h3>${esc(n.label || nid)}</h3><div class="pid">${esc(nid)}</div>
-          ${authorLine(n)}
-          ${(n.verbs || []).length ? `<div class="pverbs">${n.verbs.map(v => { const vid = N[nid + ':' + v] ? nid + ':' + v : null; return `<${vid ? `button data-n="${esc(vid)}"` : 'span'} class="pverb" style="--c:${c}">${esc(v)}</${vid ? 'button' : 'span'}>`; }).join('')}</div>` : ''}
-          ${canOpen ? `<button class="open-btn" data-open="${esc(child)}" style="--c:${c}">⤢ Open “${esc(V[child].title || child)}” <span>${(V[child].nodeIds || []).length} nodes · Enter</span></button>` : ''}
+          <span class="big" style="background:${c}" aria-hidden="true"><svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[k]}</svg></span>
+          <div class="pt"><h3>${esc(n.label || nid)}</h3><small><span>${esc(KIND[k][1])}</span><span class="vis ${pub ? 'pub' : ext ? 'ext' : ''}">${pub ? 'PUBLIC' : ext ? 'EXTERNAL' : 'INTERNAL'}</span>${by}${n.origin ? `<span class="origin">${esc(n.origin)}</span>` : ''}</small></div>
+          <div class="acts">${canOpen ? `<button class="obtn" data-open="${esc(child)}" style="--c:${c}">⤢ Open ${esc(shortT(V[child].title || child))} <span>${(V[child].nodeIds || []).length} nodes · Enter</span></button>` : ''}<button class="ibtn x" data-close title="Close (Esc)" aria-label="Close details">×</button></div>
         </div>
-        <div class="pb">
-          ${sec('What it does', n.what)}${sec('When it triggers', n.when)}${sec('How it works', n.how)}
-          ${!n.what && !n.when && !n.how ? '<div class="rel-none">No description yet — enrich <code>what</code>, <code>when</code>, <code>how</code> in the map model.</div>' : ''}
-          ${srcList(n).length ? `<section class="ps"><h4>Source</h4>${srcList(n).map(s => `<div class="src">${srcHref(s) ? `<a href="${esc(srcHref(s))}" title="Open ${esc(sb ? srcLabel(s) : base + s)}"${sb ? ' target="_blank" rel="noopener"' : ''}>${esc(srcLabel(s))}</a>` : `<span>${esc(s)}</span>`}<button class="ibtn sm" data-copy="${esc(sb ? srcLabel(s) : base + s)}" title="Copy path">⧉</button></div>`).join('')}</section>` : ''}
-          <section class="ps"><h4>Upstream <span>${ups.length}</span></h4>${relRows(ups, 'up')}</section>
-          <section class="ps"><h4>Downstream <span>${downs.length}</span></h4>${relRows(downs, 'down')}</section>
-          ${vIn.length ? `<section class="ps"><h4>Also appears in</h4><div class="pviews">${vIn.map(v => `<button class="pview" data-v="${esc(v.id)}" data-sel="${esc(nid)}">${esc(v.title || v.id)}</button>`).join('')}</div></section>` : ''}
-        </div>`;
-      panel.hidden = false; stage.classList.add('with-panel');
+        <div class="ptabs" role="tablist" aria-label="Details">${tabs.map(t => `<button class="ptab" role="tab" id="pt-${t[0]}" data-tab="${t[0]}" aria-selected="${t[0] === tab}" aria-controls="m-pbody">${t[1]}${t[2] != null ? `<em>${t[2]}</em>` : ''}</button>`).join('')}
+          <span class="pnav"><button class="ibtn sm" data-step="-1" title="Previous ([)" aria-label="Previous tab">‹</button><button class="ibtn sm" data-step="1" title="Next (])" aria-label="Next tab">›</button></span></div>
+        <div class="pbody" id="m-pbody" role="tabpanel" aria-labelledby="pt-${tab}">${bodies[tab]}</div>`;
+      panel.hidden = false;
+      panel.querySelectorAll('.clamp').forEach(el => { if (el.scrollHeight > el.clientHeight + 2) el.insertAdjacentHTML('afterend', '<button class="morebtn" data-more>Show all</button>'); });
     }
+    const TABS = ['what', 'when', 'how', 'links'];
+    const setTab = t => { tab = t; try { localStorage.setItem('visual-tab', t); } catch (_) {} if (sel) renderPanel(sel); };
 
     /* navigation */
     function setHash(replace) {
@@ -1612,7 +2209,7 @@
     async function go(vid, how = {}) {
       if (!V[vid] || busy) return;
       if (vid === cur) { if (how.select) select(how.select); return; }
-      busy = true;
+      busy = true; togglePill(false);
       const prev = cur, via = how.via;
       let mode = 'jump';
       if (prev && chain(vid).includes(prev) || how.via) mode = 'in';
@@ -1626,7 +2223,7 @@
         stage.classList.add('fading'); await sleep(130);
       }
       mount(vid);
-      const fitS = cam.fitState();
+      const fitS = startView();
       if (prev && !reduce()) {
         if (mode === 'in') cam.set({ ...fitS, k: fitS.k * 0.55 });
         else if (mode === 'out') { const back = geo.nodes.find(n => childOf(n.id) === prev); cam.set(back ? cam.zoomTo({ x: back.x, y: back.y, w: back.w, h: back.h }, 1.1) : { ...fitS, k: fitS.k * 1.6 }); }
@@ -1640,8 +2237,15 @@
       setHash(how.replace);
       busy = false;
     }
-    const open = nid => { const c = childOf(nid); if (c && c !== cur) go(c, { via: nid }); else toast('No inner view for this node'); };
-    const up = () => { const p = stack.length > 1 ? stack[stack.length - 2] : V[cur].parent; if (p) go(p); else toast('Already at the top'); };
+    /* where the camera starts: fit on a desk; on a phone a readable zoom from the top-left corner */
+    function startView() {
+      const f = cam.fitState();
+      if (innerWidth > 820 || f.k >= 0.6) return f;
+      const [W, H] = cam.size(), k = 0.6, b = geo.bounds;
+      return { k, cx: b.x + (W / 2 - 12) / k, cy: b.y + (H / 2 - 56) / k };
+    }
+    const open = nid => { const c = childOf(nid); if (c && c !== cur) go(c, { via: nid }); else status('No inner view for this node'); };
+    const up = () => { const p = stack.length > 1 ? stack[stack.length - 2] : V[cur].parent; if (p) go(p); else status('Already at the top'); };
     function flash(nid) { const g = svg.querySelector(`.node[data-id="${CSS.escape(nid)}"]`); if (!g) return; g.classList.add('flash'); setTimeout(() => g.classList.remove('flash'), 1400); }
     const findNode = nid => { if (geo.byId[nid]) return select(nid); const vs = viewsWith(nid); const v = vs.find(x => chain(x.id).includes(cur)) || vs[0]; if (v) go(v.id, { select: nid }); };
 
@@ -1649,8 +2253,10 @@
     stage.addEventListener('click', e => {
       const g = e.target.closest('.node');
       if (g) return select(g.dataset.id);
-      if (e.target.closest('.vcard .back')) return go(e.target.closest('.back').dataset.v);
-      if (!e.target.closest('.ctl, .minimap, .vcard, .legend')) deselect();
+      if (e.target.closest('#m-pillbtn')) return togglePill();
+      if (e.target.closest('#m-lfold')) { legendFolded = !legendFolded; try { localStorage.setItem('visual-legend', legendFolded ? '0' : '1'); } catch (_) {} renderLegend(); if (!cam.touched) cam.set(startView()); return; }
+      const bv = e.target.closest('.vpop [data-v], .empty-view [data-v]'); if (bv) return go(bv.dataset.v);
+      if (!e.target.closest('.ctl, .minimap, .vpill, .m-legend, .hint')) { togglePill(false); deselect(); }
     });
     stage.addEventListener('dblclick', e => { const g = e.target.closest('.node'); if (g) { e.preventDefault(); open(g.dataset.id); } });
     stage.addEventListener('keydown', e => { const g = e.target.closest && e.target.closest('.node'); if (!g) return; if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); sel === g.dataset.id ? open(g.dataset.id) : select(g.dataset.id); } });
@@ -1658,65 +2264,109 @@
     stage.addEventListener('pointerout', e => { if (e.target.closest('.node')) svg.querySelectorAll('.edge-g.hov').forEach(x => x.classList.remove('hov')); });
     $('m-ctl').addEventListener('click', e => { const z = e.target.closest('button')?.dataset.z; if (!z) return;
       if (z === 'in') cam.zoomAt(1.4, null, null, true); else if (z === 'out') cam.zoomAt(1 / 1.4, null, null, true); else if (z === 'fit') cam.fit(); else if (z === 'one') cam.actual(); else if (z === 'up') up(); else if (z === 'flow') setFlow(!stage.classList.contains('flowing')); });
-    function setFlow(on) { stage.classList.toggle('flowing', on); $('m-flow').classList.toggle('on', on); try { localStorage.setItem('visual-flow', on ? '1' : '0'); } catch (_) {} }
+    function setFlow(on) { stage.classList.toggle('flowing', on); $('m-flow').classList.toggle('on', on); $('m-flow').setAttribute('aria-pressed', on); try { localStorage.setItem('visual-flow', on ? '1' : '0'); } catch (_) {} }
     { let f = null; try { f = localStorage.getItem('visual-flow'); } catch (_) {} setFlow(f ? f === '1' : !matchMedia('(prefers-reduced-motion: reduce)').matches); }
+    const closeHelp = () => { $('m-helpbox').hidden = true; $('m-help').setAttribute('aria-expanded', 'false'); };
+    const closeExport = () => { $('m-export-pop').hidden = true; $('m-export').setAttribute('aria-expanded', 'false'); };
+    panel.addEventListener('click', e => {
+      const t = e.target;
+      const tb = t.closest('[data-tab]'); if (tb) return setTab(tb.dataset.tab);
+      const st = t.closest('[data-step]'); if (st) return setTab(TABS[(TABS.indexOf(tab) + +st.dataset.step + TABS.length) % TABS.length]);
+      const mb = t.closest('[data-more]'); if (mb) { mb.previousElementSibling.classList.add('open'); mb.remove(); }
+    });
     document.addEventListener('click', e => {
       const t = e.target;
-      if (t.closest('[data-close]')) { if (t.closest('#m-helpbox')) $('m-helpbox').hidden = true; else deselect(); return; }
+      if (t.closest('[data-close]')) return deselect();
       const ob = t.closest('[data-open]'); if (ob) return go(ob.dataset.open, { via: sel });
       const pv = t.closest('.pview'); if (pv) return go(pv.dataset.v, { select: pv.dataset.sel });
       const rn = t.closest('#m-panel [data-n]'); if (rn) return findNode(rn.dataset.n);
-      const cv = t.closest('#m-crumbs [data-v], #m-tree [data-v]'); if (cv) return go(cv.dataset.v);
-      const cp = t.closest('[data-copy]'); if (cp) { navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy).then(() => toast('Path copied'), () => toast(cp.dataset.copy)); return; }
-      if (!t.closest('.menu')) $('m-export-pop').hidden = true;
-      if (!t.closest('.finder')) $('m-finds').classList.remove('on');
+      const cv = t.closest('#m-crumbs [data-v], #m-tree [data-v]'); if (cv) { if (innerWidth <= 820) setTree(false); return go(cv.dataset.v); }
+      const cp = t.closest('[data-copy]'); if (cp) { navigator.clipboard && navigator.clipboard.writeText(cp.dataset.copy).then(() => status('Path copied'), () => status(cp.dataset.copy)); return; }
+      if (!t.closest('.menu')) closeExport();
+      if (!t.closest('#m-helpbox, #m-help')) closeHelp();
     });
-    $('m-outline').addEventListener('click', () => document.body.classList.toggle('tree-open'));
-    if (innerWidth > 1180 && views.length > 1) document.body.classList.add('tree-open');
-    $('m-help').addEventListener('click', () => { $('m-helpbox').hidden = !$('m-helpbox').hidden; });
+    $('m-outline').addEventListener('click', () => setTree(!document.body.classList.contains('tree-open')));
+    if (innerWidth > 1180 && views.length > 1) setTree(true);
+    $('m-help').addEventListener('click', () => { const on = $('m-helpbox').hidden; $('m-helpbox').hidden = !on; $('m-help').setAttribute('aria-expanded', on); });
     $('m-theme').addEventListener('click', toggleTheme);
-    $('m-export').addEventListener('click', () => { $('m-export-pop').hidden = !$('m-export-pop').hidden; });
-    $('m-export-pop').addEventListener('click', e => { const x = e.target.closest('[data-x]')?.dataset.x; if (!x) return; $('m-export-pop').hidden = true; exportView(x); });
+    $('m-export').addEventListener('click', () => { const on = $('m-export-pop').hidden; $('m-export-pop').hidden = !on; $('m-export').setAttribute('aria-expanded', on); });
+    $('m-export-pop').addEventListener('click', e => { const x = e.target.closest('[data-x]')?.dataset.x; if (!x) return; closeExport(); exportView(x); });
 
-    /* finder */
-    const idx = nodes.map(n => ({ n, hay: [n.label, n.id, (n.verbs || []).join(' '), n.what, n.kind, n.author, ((D.authors || {})[n.author] || {}).name, n.origin].join(' ').toLowerCase() }));
+    /* ⌘K command box: nodes and views, Enter jumps */
+    const nodeIdx = nodes.map(n => ({ n, hay: [n.label, n.id, (n.verbs || []).join(' '), n.what, n.kind, n.author, ((D.authors || {})[n.author] || {}).name, n.origin].join(' ').toLowerCase() }));
+    const viewIdx = views.map(v => ({ v, hay: [v.title, v.id, v.caption].join(' ').toLowerCase() }));
+    const pal = $('m-pal'), q = $('m-q'), res = $('m-res');
     let hits = [], hi = 0;
-    const finder = $('m-find'), finds = $('m-finds');
-    const drawFinds = () => { finds.innerHTML = hits.length ? hits.map((x, i) => { const k = kindOf(x.n.kind, true), vs = viewsWith(x.n.id);
-        return `<button class="fh${i === hi ? ' on' : ''}" data-i="${i}" role="option"><i style="background:var(--${KIND[k][0]})"></i><span class="fh-l">${esc(x.n.label)}</span><span class="fh-v">${esc(vs.map(v => v.title || v.id).slice(0, 2).join(' · '))}</span></button>`; }).join('') : '<div class="fh-none">No match</div>';
-      finds.classList.add('on'); };
-    finder.addEventListener('input', () => { const q = finder.value.trim().toLowerCase(); if (!q) { finds.classList.remove('on'); return; }
-      hits = idx.filter(x => q.split(/\s+/).every(w => x.hay.includes(w))).sort((a, b) => (a.n.label.toLowerCase().startsWith(q) ? 0 : 1) - (b.n.label.toLowerCase().startsWith(q) ? 0 : 1)).slice(0, 9); hi = 0; drawFinds(); });
-    finder.addEventListener('keydown', e => {
-      if (e.key === 'ArrowDown') { hi = Math.min(hits.length - 1, hi + 1); drawFinds(); e.preventDefault(); }
-      else if (e.key === 'ArrowUp') { hi = Math.max(0, hi - 1); drawFinds(); e.preventDefault(); }
-      else if (e.key === 'Enter' && hits[hi]) { pick(hits[hi].n.id); }
-      else if (e.key === 'Escape') { finder.value = ''; finds.classList.remove('on'); finder.blur(); }
+    const mark = (s, words) => { let out = esc(s); words.filter(w => w.length > 1).forEach(w => { out = out.replace(new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig'), '<mark>$1</mark>'); }); return out; };
+    const lev = (a, b) => { const d = Array.from({ length: b.length + 1 }, (_, i) => i); for (let i = 1; i <= a.length; i++) { let p = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++) { const t = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, p + (a[i - 1] === b[j - 1] ? 0 : 1)); p = t; } } return d[b.length]; };
+    function drawHits() {
+      const qs = q.value.trim().toLowerCase(), words = qs.split(/\s+/).filter(Boolean);
+      if (!qs) { // empty query: the views you can jump to, starting from where you are
+        hits = [...kidsOf(cur), ...views.filter(v => v.id !== cur && !kidsOf(cur).includes(v))].slice(0, 8).map(v => ({ t: 'v', v }));
+      } else {
+        const starts = s => String(s || '').toLowerCase().startsWith(qs) ? 0 : 1;
+        const ns = nodeIdx.filter(x => words.every(w => x.hay.includes(w))).sort((a, b) => starts(a.n.label) - starts(b.n.label) || (geo.byId[b.n.id] ? 1 : 0) - (geo.byId[a.n.id] ? 1 : 0)).slice(0, 7).map(x => ({ t: 'n', n: x.n }));
+        const vs = viewIdx.filter(x => words.every(w => x.hay.includes(w))).slice(0, 5).map(x => ({ t: 'v', v: x.v }));
+        hits = [...ns, ...vs];
+      }
+      hi = Math.min(hi, Math.max(0, hits.length - 1));
+      if (!hits.length) {
+        const near = nodes.map(n => [n, lev(qs, String(n.label).toLowerCase().replace(/^\//, '').slice(0, qs.length + 2))]).sort((a, b) => a[1] - b[1])[0];
+        res.innerHTML = `<div class="none"><div aria-hidden="true">⌕</div><h4>Nothing called “${esc(q.value.trim())}”</h4>${near && near[1] <= Math.max(2, qs.length / 3) ? `Did you mean <button data-fill="${esc(near[0].label)}">${esc(near[0].label)}</button>?` : 'Try a skill, verb, script or view name.'}</div>`;
+        return;
+      }
+      let html = '', last = '';
+      hits.forEach((h, i) => {
+        const grp = !qs ? 'Views' : h.t === 'n' ? 'Nodes' : 'Views';
+        if (grp !== last) { html += `<div class="gt">${grp}</div>`; last = grp; }
+        if (h.t === 'n') { const k = kindOf(h.n.kind, true), vs = viewsWith(h.n.id), here = geo.byId[h.n.id];
+          html += `<button class="fr${i === hi ? ' on' : ''}" role="option" aria-selected="${i === hi}" data-i="${i}"><i style="background:var(--${KIND[k][0]})"></i><b>${mark(h.n.label, words)}</b><span>${esc(KIND[k][1])} · ${here ? 'this view' : esc(vs.map(v => shortT(v.title || v.id)).slice(0, 2).join(', ') || 'no view')}</span></button>`; }
+        else html += `<button class="fr${i === hi ? ' on' : ''}" role="option" aria-selected="${i === hi}" data-i="${i}"><i style="background:var(--accent)"></i><b>${mark(h.v.title || h.v.id, words)}</b><span>${(h.v.nodeIds || []).length} nodes${h.v.id === cur ? ' · here' : ''}</span></button>`;
+      });
+      res.innerHTML = html;
+      const on = res.querySelector('.fr.on'); on && on.scrollIntoView({ block: 'nearest' });
+    }
+    const openPal = () => { closeHelp(); closeExport(); pal.hidden = false; q.value = ''; hi = 0; drawHits(); q.focus(); };
+    const closePal = () => { pal.hidden = true; q.blur(); };
+    const pickHit = h => { if (!h) return; closePal(); if (h.t === 'n') findNode(h.n.id); else go(h.v.id); };
+    q.addEventListener('input', () => { hi = 0; drawHits(); });
+    q.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') { hi = Math.min(hits.length - 1, hi + 1); drawHits(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { hi = Math.max(0, hi - 1); drawHits(); e.preventDefault(); }
+      else if (e.key === 'Enter') { pickHit(hits[hi]); e.preventDefault(); }
+      else if (e.key === 'Escape') { closePal(); e.preventDefault(); }
       e.stopPropagation();
     });
-    finds.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) pick(hits[+b.dataset.i].n.id); });
-    const pick = nid => { finds.classList.remove('on'); finder.value = ''; finder.blur(); findNode(nid); };
+    res.addEventListener('click', e => { const f = e.target.closest('[data-fill]'); if (f) { q.value = f.dataset.fill; hi = 0; drawHits(); q.focus(); return; } const b = e.target.closest('[data-i]'); if (b) pickHit(hits[+b.dataset.i]); });
+    res.addEventListener('pointermove', e => { const b = e.target.closest('[data-i]'); if (b && +b.dataset.i !== hi) { hi = +b.dataset.i; res.querySelectorAll('.fr').forEach(x => { const on = +x.dataset.i === hi; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); }); } });
+    pal.addEventListener('click', e => { if (e.target === pal) closePal(); });
+    $('m-find').addEventListener('click', openPal);
 
     /* keyboard */
     document.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); return pal.hidden ? openPal() : closePal(); }
       if ((e.target.matches && e.target.matches('input, textarea')) || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key;
       if (k === '+' || k === '=') cam.zoomAt(1.4, null, null, true);
       else if (k === '-' || k === '_') cam.zoomAt(1 / 1.4, null, null, true);
       else if (k === '0') cam.fit();
       else if (k === '1') cam.actual();
-      else if (k === 'Escape' || k === 'Backspace') { if (!$('m-helpbox').hidden) $('m-helpbox').hidden = true; else if (sel) deselect(); else up(); }
+      else if (k === 'Escape' || k === 'Backspace') { if (!$('m-helpbox').hidden) closeHelp(); else if (!$('m-export-pop').hidden) closeExport(); else if ($('m-vpop') && !$('m-vpop').hidden) togglePill(false); else if (sel) deselect(); else up(); }
       else if (k === 'Enter' && sel) open(sel);
-      else if (k === '/') { finder.focus(); }
-      else if (k === '?') $('m-helpbox').hidden = !$('m-helpbox').hidden;
-      else if (k === 'o' || k === 'O') document.body.classList.toggle('tree-open');
+      else if (k === '/') openPal();
+      else if (k === '?') $('m-help').click();
+      else if (k === 'i' || k === 'I') togglePill();
+      else if ((k === '[' || k === ']') && sel) setTab(TABS[(TABS.indexOf(tab) + (k === ']' ? 1 : -1) + TABS.length) % TABS.length]);
+      else if (k === 'o' || k === 'O') setTree(!document.body.classList.contains('tree-open'));
       else if (k === 'f' || k === 'F') setFlow(!stage.classList.contains('flowing'));
       else if (k.startsWith('Arrow')) { const d = 80, m = { ArrowLeft: [d, 0], ArrowRight: [-d, 0], ArrowUp: [0, d], ArrowDown: [0, -d] }[k]; cam.pan(m[0], m[1], true); }
       else return;
       e.preventDefault();
     });
     addEventListener('popstate', () => { const p = new URLSearchParams(location.hash.slice(1)); const v = p.get('view') || rootId; if (v !== cur) go(v, { replace: true, select: p.get('node') || undefined }); else if (p.get('node')) select(p.get('node')); else if (sel) deselect(); });
-    let rz; addEventListener('resize', () => { cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (!cam.touched) cam.fit(false); else cam.apply(); }); });
+    // the stage changes size when the details strip opens or the window resizes: keep the zoom, refit only an untouched view
+    let rz;
+    new ResizeObserver(() => { if (!cam) return; cancelAnimationFrame(rz); rz = requestAnimationFrame(() => { if (!cam.touched) cam.set(startView()); else cam.apply(); if (sel && geo.byId[sel]) { const n = geo.byId[sel]; cam.reveal({ x: n.x, y: n.y, w: n.w, h: n.h }); } }); }).observe(stage);
 
     /* export: resolve CSS variables into attributes so the file stands alone */
     function standalone(scale) {
@@ -1727,43 +2377,48 @@
       clone.querySelectorAll('title').forEach(t => t.remove());
       clone.setAttribute('viewBox', `${b.x} ${b.y} ${b.w} ${b.h}`); clone.setAttribute('width', b.w * scale); clone.setAttribute('height', b.h * scale);
       const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      Object.entries({ x: b.x, y: b.y, width: b.w, height: b.h, fill: getComputedStyle(document.body).backgroundColor }).forEach(([k2, v]) => bg.setAttribute(k2, v));
+      Object.entries({ x: b.x, y: b.y, width: b.w, height: b.h, fill: getComputedStyle(stage).backgroundColor }).forEach(([k2, v]) => bg.setAttribute(k2, v));
       clone.insertBefore(bg, clone.firstChild.nextSibling);
       return new XMLSerializer().serializeToString(clone);
     }
     function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
     function exportView(x) {
-      const base = (D.slug || D.title || 'map').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + cur.replace(/[^a-z0-9]+/gi, '-');
-      if (x === 'svg') download(base + '.svg', new Blob([standalone(1)], { type: 'image/svg+xml' }));
+      const stem = (D.slug || D.title || 'map').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + cur.replace(/[^a-z0-9]+/gi, '-');
+      if (x === 'svg') download(stem + '.svg', new Blob([standalone(1)], { type: 'image/svg+xml' }));
       else if (x === 'png') {
         const img = new Image(), s = standalone(2), b = geo.bounds;
-        img.onload = () => { const c = document.createElement('canvas'); c.width = b.w * 2; c.height = b.h * 2; c.getContext('2d').drawImage(img, 0, 0); c.toBlob(bl => download(base + '.png', bl)); };
+        img.onload = () => { const c = document.createElement('canvas'); c.width = b.w * 2; c.height = b.h * 2; c.getContext('2d').drawImage(img, 0, 0); c.toBlob(bl => download(stem + '.png', bl)); };
         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
-      } else if (x === 'link') { navigator.clipboard && navigator.clipboard.writeText(location.href).then(() => toast('Link copied'), () => toast(location.href)); }
-      else if (x === 'json') { const { meta, kind, ...model } = D; download(base.split('-' + cur)[0] + '.json', new Blob([JSON.stringify(model, null, 2)], { type: 'application/json' })); }
-      if (x !== 'link') toast('Exported ' + x.toUpperCase());
+      } else if (x === 'link') { navigator.clipboard && navigator.clipboard.writeText(location.href).then(() => status('Link copied'), () => status(location.href)); }
+      else if (x === 'json') { const { meta, kind, ...model } = D; download(stem.split('-' + cur)[0] + '.json', new Blob([JSON.stringify(model, null, 2)], { type: 'application/json' })); }
+      if (x !== 'link') status('Exported ' + x.toUpperCase());
     }
 
-    /* boot */
-    const p0 = new URLSearchParams(location.hash.slice(1));
-    const v0 = V[p0.get('view')] ? p0.get('view') : rootId;
-    stack = chain(v0); mount(v0); cam.fit(false); cam.touched = false;
-    const n0 = p0.get('node') || (Q.get('shot') && v0 !== rootId ? subjectOf(V[v0]) || (V[v0].nodeIds || [])[0] : null);
-    if (n0 && geo.byId[n0]) select(n0, { reveal: false });
-    setHash(true);
-    if (!Q.get('shot') && !Q.get('check')) { try { if (!localStorage.getItem('visual-map-seen')) { toast('Scroll to zoom · drag to pan · double-click a stacked node to open it · ? for keys', 5200); localStorage.setItem('visual-map-seen', '1'); } } catch (_) {} }
+    /* boot: ghost nodes show until the first view is laid out */
+    const boot = () => {
+      const p0 = new URLSearchParams(location.hash.slice(1));
+      const v0 = V[p0.get('view')] ? p0.get('view') : rootId;
+      stack = chain(v0); mount(v0); cam.set(startView()); cam.touched = false;
+      $('m-ghosts').remove();
+      const n0 = p0.get('node') || (Q.get('shot') && v0 !== rootId ? subjectOf(V[v0]) || (V[v0].nodeIds || [])[0] : null);
+      if (n0 && geo.byId[n0]) select(n0, { reveal: false });
+      setHash(true);
+    };
+    if (window.__instant) boot(); else requestAnimationFrame(() => setTimeout(boot, 16));
 
     window.__mapAudit = () => {
       const out = [], host = document.createElement('div');
       host.style.cssText = 'position:absolute;left:-99999px;top:0;width:2000px;height:2000px;visibility:hidden';
       document.body.appendChild(host);
-      const routes = {}, layouts = {};
-      if (Q.get('optimize')) views.forEach(v => { if (!v.layout) { const r = optimize(v.id); layouts[v.id] = r.pos; layoutCache[v.id] = r.pos; } });
-      views.forEach(v => { const { g, markup } = buildView(v.id); host.innerHTML = markup; out.push(...auditSvg(host.firstChild, g, 'view ' + v.id)); Object.entries(g.stats || {}).forEach(([k, n]) => { routes[k] = (routes[k] || 0) + n; });
+      const routes = {}, layouts = {}, laneReport = {};
+      views.forEach(v => { const L = planOf(v.id); if (L.hub) laneReport[v.id] = L.lanes.map(l => l.title); });
+      if (Q.get('optimize')) views.forEach(v => { if (!v.layout && !planOf(v.id).hub) { const r = optimize(v.id); layouts[v.id] = r.pos; layoutCache[v.id] = r.pos; } });
+      views.forEach(v => { if (!(v.nodeIds || []).some(i => N[i])) return; const { g, markup } = buildView(v.id); host.innerHTML = markup; out.push(...auditSvg(host.firstChild, g, 'view ' + v.id)); Object.entries(g.stats || {}).forEach(([k, n]) => { routes[k] = (routes[k] || 0) + n; });
         g.edges.filter(e => e.how === 'fallback').forEach(e => (routes.fallbackEdges ||= []).push(`${v.id}: ${e.from}(${e.fs})→${e.to}(${e.ts})`)); });
       host.remove();
       const deep = views.filter(v => v.parent).sort((a, b) => chain(b.id).length - chain(a.id).length || (b.nodeIds || []).length - (a.nodeIds || []).length)[0];
-      return { overlaps: out, routes, layouts, checked: views.length + ' views', childView: deep ? deep.id : null };
+      const laneView = laneReport['super-build'] ? 'super-build' : Object.keys(laneReport)[0] || null;
+      return { overlaps: out, routes, layouts, lanes: laneReport, checked: views.length + ' views', childView: deep ? deep.id : null, laneView };
     };
   }
 

@@ -159,7 +159,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    └─ OLDER SUPER-BOARD (the result says `upgraded: true`): same rule, no question. Header
       `1 of 8 · 🔍 Checks — found super-board v<from>; upgrading to v<pack>.` and the list:
           ⏺ Upgraded for you (backup: .claude/super-board/backup/<ts>/)
-            ✓ skills updated; added super-collect, visual, ui-refine-loop
+            ✓ skills updated; added super-collect, visual, git-sync, ui-refine-loop
             ✓ removed old folders: super-refine, cleanup-wt, arch-loop
             ✓ scripts, board engine and safety guards updated
             ✓ config moved to the new keys (merge rule, migrations, sources)
