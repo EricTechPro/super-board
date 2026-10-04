@@ -343,7 +343,9 @@ def link_sources(data: dict, repo: Path, src_root: Path, base: str) -> int:
         return base + quote(rel) + anchor, 1
 
     n = 0
-    for node in data.get("nodes", []):
+    all_nodes = [*data.get("nodes", []), *(n for v in data.get("views", []) for n in v.get("nodes", [])),
+                 *(n for v in data.get("views", []) for n in v.get("nodeOverrides", {}).values())]
+    for node in all_nodes:
         src = node.get("source")
         if isinstance(src, list):
             pairs = [one(s) for s in src]
@@ -404,7 +406,8 @@ def load_map(path: Path) -> dict:
 
 
 def embed_avatars(d: dict) -> int:
-    """Fetch each author's GitHub avatar once (cached) and inline it, so the page works offline."""
+    """Fetch each author's GitHub avatar once (cached, 96 px for the 26 px name-tag headshot on 2x screens)
+    and inline it, so the page works offline."""
     import base64
     import urllib.request
     cache = Path.home() / ".cache" / "visual" / "avatars"
@@ -413,10 +416,10 @@ def embed_avatars(d: dict) -> int:
     for login, a in (d.get("authors") or {}).items():
         if not isinstance(a, dict) or str(a.get("avatar", "")).startswith("data:"):
             continue
-        f = cache / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', login)}.png"
+        f = cache / f"{re.sub(r'[^A-Za-z0-9_.-]', '_', login)}@96.png"
         if not f.exists() or f.stat().st_size < 100:
             try:
-                req = urllib.request.Request(f"https://github.com/{login}.png?size=64", headers={"User-Agent": "visual.py"})
+                req = urllib.request.Request(f"https://github.com/{login}.png?size=96", headers={"User-Agent": "visual.py"})
                 with urllib.request.urlopen(req, timeout=10) as r:
                     f.write_bytes(r.read())
             except Exception:
@@ -430,17 +433,55 @@ def embed_avatars(d: dict) -> int:
 
 def validate_map(d: dict) -> list[str]:
     """Hard errors only: dangling ids would render as holes."""
-    ids = {n.get("id") for n in d.get("nodes", [])}
+    all_nodes = [*d.get("nodes", []), *(n for v in d.get("views", []) for n in v.get("nodes", []))]
+    ids = {n.get("id") for n in all_nodes}
     vids = {v.get("id") for v in d.get("views", [])}
     out = []
+    seen = set()
+    for n in all_nodes:
+        nid = n.get("id")
+        if not nid or nid in seen:
+            out.append(f"missing or duplicate node id {nid!r}")
+        seen.add(nid)
+        if n.get("opensView") and n["opensView"] not in vids:
+            out.append(f"node {nid!r}: opens unknown view {n['opensView']!r}")
     if not d.get("views"):
         out.append("no views")
     for v in d.get("views", []):
         if v.get("parent") and v["parent"] not in vids and v["parent"] not in ids:
             out.append(f"view {v.get('id')!r}: parent {v['parent']!r} is not a view")
+        for nid, override in v.get("nodeOverrides", {}).items():
+            if nid not in ids:
+                out.append(f"view {v.get('id')!r}: overrides unknown node {nid!r}")
+            if override.get("opensView") and override["opensView"] not in vids:
+                out.append(f"view {v.get('id')!r}: override opens unknown view {override['opensView']!r}")
         for i in v.get("nodeIds", []):
             if i not in ids:
                 out.append(f"view {v.get('id')!r}: unknown node {i!r}")
+        members = set(v.get("nodeIds", []))
+        for i in v.get("stepIds", []):
+            if i not in members:
+                out.append(f"view {v.get('id')!r}: main step {i!r} is not in nodeIds")
+        for i in v.get("browserOrder", []):
+            if i not in vids:
+                out.append(f"view {v.get('id')!r}: browser opens unknown view {i!r}")
+        families = {f.get("id"): f for f in v.get("containers", [])}
+        if None in families or len(families) != len(v.get("containers", [])):
+            out.append(f"view {v.get('id')!r}: missing or duplicate container id")
+        for fid, family in families.items():
+            for i in family.get("nodeIds", []):
+                if i not in members:
+                    out.append(f"view {v.get('id')!r}: container {fid!r} includes non-visible node {i!r}")
+            trail, cursor = set(), fid
+            while cursor:
+                if cursor in trail:
+                    out.append(f"view {v.get('id')!r}: cyclic container {fid!r}")
+                    break
+                trail.add(cursor)
+                if cursor not in families:
+                    out.append(f"view {v.get('id')!r}: container {fid!r} has unknown parent {cursor!r}")
+                    break
+                cursor = families[cursor].get("parent")
         for e in v.get("edges", []) or []:
             if isinstance(e, dict) and (e.get("from") not in ids or e.get("to") not in ids):
                 out.append(f"view {v.get('id')!r}: edge {e.get('from')}->{e.get('to')} has an unknown end")
@@ -760,6 +801,8 @@ def run_check(page: Path, shots: Path | None, is_map: bool) -> dict:
     plan = [("light", "theme=light"), ("dark", "theme=dark")]
     if is_map and report.get("childView"):
         plan.append(("drill-dark", f"theme=dark&view={report['childView']}"))
+    if is_map and report.get("laneView"):
+        plan.append(("lanes-light", f"theme=light&view={report['laneView']}"))
     for name, frag in plan:
         png = shots / f"{name}.png"
         if png.exists():
@@ -769,12 +812,14 @@ def run_check(page: Path, shots: Path | None, is_map: bool) -> dict:
         if png.exists():
             taken.append(str(png))
     ov = report.get("overlaps", [])
+    lane = lambda o: 'lane "' in o or 'lanes "' in o
     out = {"screenshots": taken, "overlaps": ov,
-           "counts": {"crossings": sum(" cross" in o for o in ov), "sharedLines": sum("share a line" in o for o in ov),
+           "counts": {"crossings": sum(" cross" in o and not lane(o) for o in ov), "sharedLines": sum("share a line" in o for o in ov),
                       "labelOnLine": sum(" lies on edge " in o for o in ov),
-                      "labelOnNode": sum(("covers node" in o) or ("overlaps node" in o) for o in ov),
-                      "other": sum(not any(k in o for k in (" cross", "share a line", " lies on edge ", "covers node", "overlaps node")) for o in ov)},
-           "routes": report.get("routes"),
+                      "labelOnNode": sum(not lane(o) and (("covers node" in o) or ("overlaps node" in o)) for o in ov),
+                      "lanes": sum(lane(o) for o in ov),
+                      "other": sum(not lane(o) and not any(k in o for k in (" cross", "share a line", " lies on edge ", "covers node", "overlaps node")) for o in ov)},
+           "routes": report.get("routes"), "lanes": report.get("lanes"),
            "checked": report.get("checked"), "errors": report.get("errors", [])}
     if "error" in report:
         out["errors"].append(report["error"])
