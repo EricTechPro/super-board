@@ -36,6 +36,8 @@ option, and puts back any card status the option rewrite cleared. Before any wri
 all cards and conversion intent in .claude/super-board/migrations/ (under --root, the config project root, or cwd).
 Re-run the same command from the same root to recover an interrupted upgrade. Keep the
 board idle during migration: GitHub has no atomic compare-and-swap for field rewrites.
+Before the first option rewrite it also saves the original card statuses to
+.claude/super-board/backup/board-<number>-<ts>.json for manual recovery.
 No card is deleted. Detected concurrent edits are preserved or halt recovery.
 
 Exit: 0 ok · 1 check found red items · 2 a gh call failed · 64 usage · 66 pack not found.
@@ -777,7 +779,7 @@ def prepare_migration(binding, url, qa_all, prune_empty):
     result = {'url': url, 'added_columns': [c for c in COLUMNS if c.lower() not in names],
               'labels_created': [], 'labels_mapped': 0, 'qa_labelled': 0,
               'skipped_moved': 0, 'skipped_removed': 'skipped' in names, 'restored': 0,
-              'preserved_edits': [], 'removed_items': []}
+              'preserved_edits': [], 'removed_items': [], 'status_backup': None}
     for item in items:
         item['want'] = 'Done' if (item['status'] or '').lower() == 'skipped' else item['status']
         result['skipped_moved'] += int(item['want'] != item['status'])
@@ -864,6 +866,12 @@ def resume_migration(saved, path):
             if signature(now) != signature(saved['items']):
                 raise RuntimeError('Board cards changed before the Status rewrite; preserving edits and stopping')
             if rewrite:
+                if not saved['result'].get('status_backup'):
+                    # Keep the original manual backup alongside the resumable recovery record.
+                    directory = os.path.join(os.path.dirname(os.path.dirname(path)), 'backup')
+                    backup = os.path.join(directory, f"board-{saved['binding']['number']}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.json")
+                    durable_json(backup, {item['id']: item['status'] for item in saved['items']})
+                    saved['result']['status_backup'] = backup
                 saved['options_started'] = True; checkpoint()
                 try:
                     gql(UPDATE_M, {'id': fid, 'opts': saved['desired']})
