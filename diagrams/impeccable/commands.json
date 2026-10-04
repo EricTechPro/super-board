@@ -1,646 +1,674 @@
 {
- "schema_version": 1,
- "diagram_type": "architecture",
- "meta": {
-  "title": "impeccable v4.0.4 \u00b7 slash commands and how they connect",
-  "output": "commands.html",
-  "quality_profile": "showcase",
-  "locale": "en",
-  "legend": {
-   "mode": "all",
-   "entries": {
-    "cloud": {
-     "label": "context / setup"
-    },
-    "messagebus": {
-     "label": "plan / build"
-    },
-    "security": {
-     "label": "diagnose (report only)"
-    },
-    "backend": {
-     "label": "fix / refine"
-    },
-    "frontend": {
-     "label": "style / enhance"
-    },
-    "external": {
-     "label": "finish"
-    },
-    "database": {
-     "label": "system / iterate"
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "impeccable \u00b7 left-to-right order of use",
+    "output": "commands.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "legend": {
+      "mode": "all",
+      "entries": {
+        "cloud": {
+          "label": "context / setup"
+        },
+        "messagebus": {
+          "label": "plan / build"
+        },
+        "security": {
+          "label": "diagnose (report only)"
+        },
+        "backend": {
+          "label": "fix / refine"
+        },
+        "frontend": {
+          "label": "style / enhance"
+        },
+        "external": {
+          "label": "finish"
+        },
+        "database": {
+          "label": "utilities"
+        }
+      }
     }
-   }
-  }
- },
- "components": [
-  {
-   "id": "menu",
-   "type": "cloud",
-   "label": "/impeccable",
-   "sublabel": "what next?",
-   "pos": [
-    40,
-    60
-   ],
-   "size": [
-    128,
-    54
-   ]
   },
-  {
-   "id": "init",
-   "type": "cloud",
-   "label": "init",
-   "sublabel": "no PRODUCT.md",
-   "pos": [
-    236,
-    60
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "document",
-   "type": "cloud",
-   "label": "document",
-   "sublabel": "no DESIGN.md",
-   "pos": [
-    432,
-    60
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "shape",
-   "type": "messagebus",
-   "label": "shape",
-   "sublabel": "plan first",
-   "pos": [
-    40,
-    200
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "craft",
-   "type": "messagebus",
-   "label": "craft",
-   "sublabel": "build new",
-   "pos": [
-    236,
-    200
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "critique",
-   "type": "security",
-   "label": "critique",
-   "sublabel": "UX review",
-   "pos": [
-    628,
-    200
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "audit",
-   "type": "security",
-   "label": "audit",
-   "sublabel": "tech check",
-   "pos": [
-    824,
-    200
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "harden",
-   "type": "backend",
-   "label": "harden",
-   "sublabel": "edge cases",
-   "pos": [
-    40,
-    340
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "clarify",
-   "type": "backend",
-   "label": "clarify",
-   "sublabel": "confusing copy",
-   "pos": [
-    236,
-    340
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "adapt",
-   "type": "backend",
-   "label": "adapt",
-   "sublabel": "other screens",
-   "pos": [
-    432,
-    340
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "optimize",
-   "type": "backend",
-   "label": "optimize",
-   "sublabel": "feels slow",
-   "pos": [
-    628,
-    340
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "onboard",
-   "type": "backend",
-   "label": "onboard",
-   "sublabel": "first run",
-   "pos": [
-    824,
-    340
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "distill",
-   "type": "backend",
-   "label": "distill",
-   "sublabel": "too cluttered",
-   "pos": [
-    1020,
-    340
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "layout",
-   "type": "frontend",
-   "label": "layout",
-   "sublabel": "spacing off",
-   "pos": [
-    40,
-    480
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "typeset",
-   "type": "frontend",
-   "label": "typeset",
-   "sublabel": "type off",
-   "pos": [
-    236,
-    480
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "colorize",
-   "type": "frontend",
-   "label": "colorize",
-   "sublabel": "too gray",
-   "pos": [
-    432,
-    480
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "bolder",
-   "type": "frontend",
-   "label": "bolder",
-   "sublabel": "too bland",
-   "pos": [
-    824,
-    480
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "quieter",
-   "type": "frontend",
-   "label": "quieter",
-   "sublabel": "too loud",
-   "pos": [
-    628,
-    480
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "animate",
-   "type": "frontend",
-   "label": "animate",
-   "sublabel": "needs motion",
-   "pos": [
-    824,
-    620
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "delight",
-   "type": "frontend",
-   "label": "delight",
-   "sublabel": "needs charm",
-   "pos": [
-    1020,
-    620
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "overdrive",
-   "type": "frontend",
-   "label": "overdrive",
-   "sublabel": "wow factor",
-   "pos": [
-    628,
-    620
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "polish",
-   "type": "external",
-   "label": "polish",
-   "sublabel": "before ship",
-   "pos": [
-    1216,
-    480
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "extract",
-   "type": "database",
-   "label": "extract",
-   "sublabel": "repeated UI",
-   "pos": [
-    1020,
-    200
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "live",
-   "type": "database",
-   "label": "live",
-   "sublabel": "try variants",
-   "pos": [
-    1216,
-    200
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "hooks",
-   "type": "cloud",
-   "label": "hooks",
-   "sublabel": "auto-detect",
-   "pos": [
-    1020,
-    60
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "doctor",
-   "type": "cloud",
-   "label": "doctor",
-   "sublabel": "stale files",
-   "pos": [
-    824,
-    60
-   ],
-   "size": [
-    128,
-    54
-   ]
-  },
-  {
-   "id": "pin",
-   "type": "cloud",
-   "label": "pin / unpin",
-   "sublabel": "shortcut",
-   "pos": [
-    1216,
-    60
-   ],
-   "size": [
-    128,
-    54
-   ]
-  }
- ],
- "boundaries": [
-  {
-   "kind": "region",
-   "label": "Context",
-   "wraps": [
-    "menu",
-    "init",
-    "document"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "Plan & build",
-   "wraps": [
-    "shape",
-    "craft"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "Diagnose",
-   "wraps": [
-    "critique",
-    "audit"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "Fix \u00b7 then polish",
-   "wraps": [
-    "harden",
-    "clarify",
-    "adapt",
-    "optimize",
-    "onboard",
-    "distill"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "Style \u00b7 then polish",
-   "wraps": [
-    "layout",
-    "typeset",
-    "colorize",
-    "bolder",
-    "quieter"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "Motion",
-   "wraps": [
-    "animate",
-    "delight",
-    "overdrive"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "Finish",
-   "wraps": [
-    "polish"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "System",
-   "wraps": [
-    "extract",
-    "live"
-   ]
-  },
-  {
-   "kind": "region",
-   "label": "Maintenance",
-   "wraps": [
-    "hooks",
-    "doctor",
-    "pin"
-   ]
-  }
- ],
- "connections": [
-  {
-   "id": "e0",
-   "from": "shape",
-   "to": "init",
-   "label": "requires",
-   "variant": "emphasis"
-  },
-  {
-   "id": "e1",
-   "from": "craft",
-   "to": "init",
-   "label": "requires",
-   "variant": "emphasis"
-  },
-  {
-   "id": "e2",
-   "from": "document",
-   "to": "init",
-   "label": "requires",
-   "variant": "emphasis"
-  },
-  {
-   "id": "e3",
-   "from": "shape",
-   "to": "craft",
-   "label": "feeds"
-  },
-  {
-   "id": "e4",
-   "from": "craft",
-   "to": "document",
-   "label": "calls"
-  },
-  {
-   "id": "e5",
-   "from": "delight",
-   "to": "animate",
-   "label": "calls"
-  },
-  {
-   "id": "e6",
-   "from": "init",
-   "to": "live",
-   "label": "feeds"
-  },
-  {
-   "id": "e7",
-   "from": "critique",
-   "to": "polish",
-   "label": "feeds"
-  },
-  {
-   "id": "e8",
-   "from": "menu",
-   "to": "init",
-   "label": "suggests",
-   "variant": "dashed"
-  },
-  {
-   "id": "e9",
-   "from": "menu",
-   "to": "critique",
-   "label": "suggests",
-   "variant": "dashed"
-  },
-  {
-   "id": "e10",
-   "from": "audit",
-   "to": "harden",
-   "label": "suggests",
-   "variant": "dashed"
-  },
-  {
-   "id": "e11",
-   "from": "audit",
-   "to": "optimize",
-   "label": "suggests",
-   "variant": "dashed"
-  },
-  {
-   "id": "e12",
-   "from": "layout",
-   "to": "craft",
-   "label": "escalates",
-   "variant": "dashed"
-  },
-  {
-   "id": "e13",
-   "from": "polish",
-   "to": "bolder",
-   "label": "suggests",
-   "variant": "dashed"
-  },
-  {
-   "id": "e14",
-   "from": "live",
-   "to": "polish",
-   "label": "calls"
-  },
-  {
-   "id": "e15",
-   "from": "doctor",
-   "to": "document",
-   "label": "feeds",
-   "variant": "dashed"
-  },
-  {
-   "id": "p_distill",
-   "from": "distill",
-   "to": "polish",
-   "label": "then",
-   "variant": "dashed"
-  },
-  {
-   "id": "p_bolder",
-   "from": "bolder",
-   "to": "polish",
-   "label": "then",
-   "variant": "dashed"
-  },
-  {
-   "id": "p_delight",
-   "from": "delight",
-   "to": "polish",
-   "label": "then",
-   "variant": "dashed"
-  }
- ],
- "cards": [
-  {
-   "dot": "violet",
-   "title": "Best practice",
-   "items": [
-    "init once \u2192 shape / build \u2192 critique + audit \u2192 fix & style commands \u2192 polish last",
-    "Click any command for what it does and what to pair it with"
-   ]
-  },
-  {
-   "dot": "rose",
-   "title": "Edges",
-   "items": [
-    "read FROM, label, TO \u00b7 bold = requires \u00b7 dashed = suggests / then",
-    "Group label \"then polish\" = every command in it hands off to polish"
-   ]
-  }
- ]
+  "components": [
+    {
+      "id": "stage_ctx",
+      "type": "cloud",
+      "label": "Setup",
+      "sublabel": "establish context",
+      "pos": [
+        40,
+        72
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "init",
+      "type": "cloud",
+      "label": "init",
+      "sublabel": "no PRODUCT.md",
+      "pos": [
+        40,
+        172
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "document",
+      "type": "cloud",
+      "label": "document",
+      "sublabel": "no DESIGN.md",
+      "pos": [
+        40,
+        252
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "extract",
+      "type": "cloud",
+      "label": "extract",
+      "sublabel": "repeated UI",
+      "pos": [
+        40,
+        332
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "menu",
+      "type": "cloud",
+      "label": "/impeccable",
+      "sublabel": "what next?",
+      "pos": [
+        40,
+        412
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "stage_plan",
+      "type": "messagebus",
+      "label": "Plan / build",
+      "sublabel": "plan, then build",
+      "pos": [
+        246,
+        72
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "shape",
+      "type": "messagebus",
+      "label": "shape",
+      "sublabel": "plan first",
+      "pos": [
+        246,
+        172
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "craft",
+      "type": "messagebus",
+      "label": "craft",
+      "sublabel": "build new",
+      "pos": [
+        246,
+        252
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "stage_diag",
+      "type": "security",
+      "label": "Diagnose",
+      "sublabel": "review + report",
+      "pos": [
+        452,
+        72
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "critique",
+      "type": "security",
+      "label": "critique",
+      "sublabel": "UX review",
+      "pos": [
+        452,
+        172
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "audit",
+      "type": "security",
+      "label": "audit",
+      "sublabel": "tech check",
+      "pos": [
+        452,
+        252
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "stage_fix",
+      "type": "backend",
+      "label": "Fix",
+      "sublabel": "choose as needed",
+      "pos": [
+        658,
+        72
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "harden",
+      "type": "backend",
+      "label": "harden",
+      "sublabel": "edge cases",
+      "pos": [
+        658,
+        172
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "clarify",
+      "type": "backend",
+      "label": "clarify",
+      "sublabel": "confusing copy",
+      "pos": [
+        658,
+        252
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "adapt",
+      "type": "backend",
+      "label": "adapt",
+      "sublabel": "other screens",
+      "pos": [
+        658,
+        332
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "optimize",
+      "type": "backend",
+      "label": "optimize",
+      "sublabel": "feels slow",
+      "pos": [
+        658,
+        412
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "onboard",
+      "type": "backend",
+      "label": "onboard",
+      "sublabel": "first run",
+      "pos": [
+        658,
+        492
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "distill",
+      "type": "backend",
+      "label": "distill",
+      "sublabel": "too cluttered",
+      "pos": [
+        658,
+        572
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "stage_style",
+      "type": "frontend",
+      "label": "Style",
+      "sublabel": "choose as needed",
+      "pos": [
+        864,
+        72
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "layout",
+      "type": "frontend",
+      "label": "layout",
+      "sublabel": "spacing off",
+      "pos": [
+        864,
+        172
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "typeset",
+      "type": "frontend",
+      "label": "typeset",
+      "sublabel": "type off",
+      "pos": [
+        864,
+        252
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "colorize",
+      "type": "frontend",
+      "label": "colorize",
+      "sublabel": "too gray",
+      "pos": [
+        864,
+        332
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "bolder",
+      "type": "frontend",
+      "label": "bolder",
+      "sublabel": "too bland",
+      "pos": [
+        864,
+        412
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "quieter",
+      "type": "frontend",
+      "label": "quieter",
+      "sublabel": "too loud",
+      "pos": [
+        864,
+        492
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "stage_motion",
+      "type": "frontend",
+      "label": "Motion",
+      "sublabel": "choose as needed",
+      "pos": [
+        1070,
+        72
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "animate",
+      "type": "frontend",
+      "label": "animate",
+      "sublabel": "needs motion",
+      "pos": [
+        1070,
+        172
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "delight",
+      "type": "frontend",
+      "label": "delight",
+      "sublabel": "needs charm",
+      "pos": [
+        1070,
+        252
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "overdrive",
+      "type": "frontend",
+      "label": "overdrive",
+      "sublabel": "wow factor",
+      "pos": [
+        1070,
+        332
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "stage_fin",
+      "type": "external",
+      "label": "Polish",
+      "sublabel": "always last",
+      "pos": [
+        1276,
+        72
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "polish",
+      "type": "external",
+      "label": "polish",
+      "sublabel": "before ship",
+      "pos": [
+        1276,
+        172
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "hooks",
+      "type": "database",
+      "label": "hooks",
+      "sublabel": "auto-detect",
+      "pos": [
+        40,
+        744
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "doctor",
+      "type": "database",
+      "label": "doctor",
+      "sublabel": "stale files",
+      "pos": [
+        246,
+        744
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "pin",
+      "type": "database",
+      "label": "pin / unpin",
+      "sublabel": "shortcut",
+      "pos": [
+        452,
+        744
+      ],
+      "size": [
+        136,
+        54
+      ]
+    },
+    {
+      "id": "live",
+      "type": "database",
+      "label": "live",
+      "sublabel": "try variants",
+      "pos": [
+        658,
+        744
+      ],
+      "size": [
+        136,
+        54
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Setup",
+      "wraps": [
+        "stage_ctx",
+        "init",
+        "document",
+        "extract",
+        "menu"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Plan & build",
+      "wraps": [
+        "stage_plan",
+        "shape",
+        "craft"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Diagnose",
+      "wraps": [
+        "stage_diag",
+        "critique",
+        "audit"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Fix \u00b7 choose as needed",
+      "wraps": [
+        "stage_fix",
+        "harden",
+        "clarify",
+        "adapt",
+        "optimize",
+        "onboard",
+        "distill"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Style \u00b7 choose as needed",
+      "wraps": [
+        "stage_style",
+        "layout",
+        "typeset",
+        "colorize",
+        "bolder",
+        "quieter"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Motion \u00b7 choose as needed",
+      "wraps": [
+        "stage_motion",
+        "animate",
+        "delight",
+        "overdrive"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Polish last",
+      "wraps": [
+        "stage_fin",
+        "polish"
+      ],
+      "pad": 16
+    },
+    {
+      "kind": "region",
+      "label": "Utilities \u00b7 independent of the main flow",
+      "wraps": [
+        "hooks",
+        "doctor",
+        "pin",
+        "live"
+      ],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {
+      "id": "order_plan",
+      "from": "stage_ctx",
+      "to": "stage_plan",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "order_diag",
+      "from": "stage_plan",
+      "to": "stage_diag",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "order_fix",
+      "from": "stage_diag",
+      "to": "stage_fix",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "order_style",
+      "from": "stage_fix",
+      "to": "stage_style",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "order_motion",
+      "from": "stage_style",
+      "to": "stage_motion",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    },
+    {
+      "id": "order_fin",
+      "from": "stage_motion",
+      "to": "stage_fin",
+      "fromSide": "right",
+      "toSide": "left",
+      "route": "straight"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Read left to right",
+      "items": [
+        "Setup \u2192 plan / build \u2192 diagnose \u2192 choose fixes and styling \u2192 polish last",
+        "Fix, Style and Motion are optional groups; choose only what the findings need."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Command details",
+      "items": [
+        "Click a command for its definition and Use with. Group arrows show order, not prerequisites.",
+        "Hooks, doctor, pin and live stay in a separate utility lane."
+      ]
+    }
+  ]
 }

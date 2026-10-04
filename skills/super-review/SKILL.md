@@ -353,8 +353,10 @@ two complete builds. In order, no shortcuts:
      human-only step. Card → **Blocked** with the 🙋 template
      (`block-template.md` → "🙋 Needs you"), the gate's `needs-you:` commands copied
      verbatim into `To unblock`, label `needs-you`, `blocked-by: -`. After the human
-     comments `done` (or labels `needs-you:done`), the next wave moves it back to Review
-     and you re-run the gate; it re-verifies and merges.
+     comments `done` after the current pinned request, the next wave verifies their
+     permission and the head, then moves it to Review. Re-run the gate; labels do not
+     authorize it. For exits 7 and 8, copy `approval-request:` into the canonical
+     issue block and link it from the PR (no duplicate request); see block-template.md.
    - The rule in one line: the robot migrates the databases it was allowed to test its
      work; live databases, money, auth and destructive schema changes wait for a person.
 3. **Confirm the merge landed** — never trust the merge command's exit code:

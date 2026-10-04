@@ -148,4 +148,9 @@ echo "$OUT" | jq -e '[.resume[].number] == [20]' >/dev/null \
 echo "$OUT" | jq -e '[.sweep[].number, .cards[].number] | (index(20) == null and index(21) == null)' >/dev/null \
   || fail "🙋 cards must not be swept to Ready or dispatched"
 
-echo "PASS: test-wave-plan.sh (18 scenarios)"
+# 19 — a moved head while Blocked goes to request refresh, never approved resume.
+OUT19=$("$PLAN" --config <(echo "$NOCAP") --items "$ITEMS" --deps <(jq '.["21"].approvalRefresh=true | .["21"].approvalWhy="PR head changed"' "$DEPS"))
+echo "$OUT19" | jq -e '[.refreshApproval[].number] == [21]' >/dev/null || fail "stale approval must get a fresh request"
+echo "$OUT19" | jq -e '[.resume[].number, .cards[].number, .sweep[].number] | index(21) == null' >/dev/null || fail "refresh is not permission to merge or build"
+
+echo "PASS: test-wave-plan.sh (19 scenarios)"

@@ -453,16 +453,18 @@ on the base branch**.
           category and evidence; `To unblock` = "[ ] review PR #<P> and merge it
           yourself" OR "[ ] comment `done` to approve — the next wave merges it";
           label `needs-you`, `blocked-by: -`. A human merge moves the card to Done the
-          usual way; a `done` brings it back through `resume`, and the gate skips the
-          policy check once the PR carries `needs-you:done`.
+          usual way; a `done` brings it back through `resume`, and the gate clears the
+          policy hold only with a verified trusted approval of the current request.
      8 → 🙋 needs you. Stdout carries one `needs-you: <command>` line per human step
           (migration for an env outside `migrations.allowed_envs`, an allowed migrate
           command that failed, a `needs-you:` line in the PR body,
           `migrations.human_steps`). Card Review → **Blocked** with the 🙋 template
           (block-template.md → "🙋 Needs you"), the commands copied verbatim into
           `To unblock`, label `needs-you` on issue and PR, `blocked-by: -`. When the
-          human comments `done` (or labels `needs-you:done`), the wave planner's
-          `resume` list brings it back to Review and this gate re-runs.
+          human comments `done` after the current pinned request, the wave planner
+          verifies their permission and the head before resuming Review. For exits
+          7 and 8, copy the gate's `approval-request:` line into the canonical issue
+          block; link it from the PR without duplicating the request.
    → do NOT leave a card in Review on exit 2, 3, 5, 7 or 8. A card left in Review is
      re-picked next tick and re-reviewed forever, which is the re-dispatch waste
      tracked in issue #10. Exits 4 and 6 are the exceptions: 4 simply queued, and
@@ -653,7 +655,7 @@ usual template — and, per §4, a `blocked-by:` line.
 
 ### The wave-start sweep
 
-Before planning any wave, `super-board-wave-plan.sh` reports four lists the orchestrator must act on
+Before planning any wave, `super-board-wave-plan.sh` reports five lists the orchestrator must act on
 **before** launching:
 
 - **`sweep`** — `Blocked` cards whose blockers have all closed. Move each to `Ready` and comment
@@ -662,12 +664,17 @@ Before planning any wave, `super-board-wave-plan.sh` reports four lists the orch
   so a wave stopped mid-build leaves them there forever. Remove any leftover build worktree, keep
   the branch, move the card to `Ready`, and comment naming the branch. The legacy dispatcher does
   the same once at start (`reclaim_stranded_building`).
-- **`resume`** — 🙋 `Blocked` cards (merge gate exit 7 or 8) whose human step is confirmed: the `needs-you:done` label, or a
-  comment after the 🙋 block that reads just `done`. Move each to **Review** (not Ready — the code
-  was already reviewed), add `needs-you:done` to its PR, and comment `↩️ back to Review — human step
-  confirmed; the merge gate re-verifies and merges. Next: Reviewer.` The Reviewer re-runs the gate,
-  which re-checks the head and the build, re-runs the allowed migrations and merges, or sends it
-  straight back to Blocked if a command still fails.
+- **`resume`** — 🙋 `Blocked` cards whose newest pinned request has a later `done`
+  from a human with verified write, maintain or admin permission, for the current
+  PR head. Move each to **Review**; `needs-you:done` may be kept as a display label
+  only. Do not create or copy approval evidence. The Reviewer re-runs the gate,
+  which independently checks the request, current policy/steps and head, verifies
+  the build, and runs allowed migrations. New code or a newer request needs fresh
+  human approval; a label or old bare comment cannot bypass that hold.
+- **`refreshApproval`** — a PR head changed while its card was still `Blocked`.
+  Move it to **Review** and remove stale `needs-you:done` display labels. The Reviewer
+  reviews the new code and lets the gate produce a new pinned request, then returns
+  it to **Blocked** for a fresh human reply. This is not an approved resume.
 - **`flag`** — cards whose `## Blocked by` section could not be parsed. Leave them where they are
   and comment asking for the line to be fixed, quoting the `why`. Never guess: a card treated as
   free on an unreadable line gets built against a base that does not have what it needs.

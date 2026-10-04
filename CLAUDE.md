@@ -1,7 +1,7 @@
 # super-board — agent-facing notes
 
-This repo ships seven skills under `skills/`: four you type (`super-board`, `super-collect`,
-`ui-refine-loop`, `visual`) and three the board runs (the lane workers `super-build`, `super-qa`,
+This repo ships eight skills under `skills/`: five you type (`super-board`, `super-collect`,
+`ui-refine-loop`, `visual`, `git-sync`) and three the board runs (the lane workers `super-build`, `super-qa`,
 `super-review`). Architecture findings come from `/super-collect architecture`.
 Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill. README skill tables are generated
 by `scripts/super-board-readme-sync.py` from SKILL.md frontmatter and `skills/families.json`.
@@ -43,7 +43,7 @@ See `skills/super-board/references/rate-limit-etiquette.md` for the full discipl
 
 ```
 .claude/
-├── skills/<all seven>/...
+├── skills/<all eight>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/super-board-wave.js, ui-refine-loop.js
 └── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings, setup), super-qa-file-bug.sh, super-review-file-refactor.sh

@@ -84,13 +84,16 @@ Repeat until a done condition or halt gate fires:
    cut off mid-lane. The legacy `claude-p` dispatcher does not run this guard.
 2. **Plan the wave** —
    `bash .claude/bin/super-board-wave-plan.sh --config <config-path>` →
-   The planner returns `cards`, `sweep`, `resume`, `flag` and `stranded`. **Act on
-   `sweep`, `resume`, `flag` and `stranded` BEFORE launching** (run.md → "The wave-start
+   The planner returns `cards`, `sweep`, `resume`, `refreshApproval`, `flag` and `stranded`. **Act on
+   `sweep`, `resume`, `refreshApproval`, `flag` and `stranded` BEFORE launching** (run.md → "The wave-start
    sweep"): move every swept card to `Ready` with a comment naming what cleared
-   it, move every `resume` card (🙋 needs you, human said done) to `Review` and
-   label its PR `needs-you:done`, comment on every flagged card asking for its
+   it, move every `resume` card (verified human approval of the current pinned
+   request) to `Review`; `needs-you:done` is display-only. Move `refreshApproval`
+   cards to `Review` solely to review the changed head and post a fresh human request;
+   clear their stale `needs-you:done` display labels. They have no approval to merge.
+   Comment on flagged cards asking for their
    `## Blocked by` line to be fixed, and return every stranded Building card to
-   `Ready` (below). Swept, resumed and stranded cards are NOT in this pass's
+   `Ready` (below). Swept, resumed, approval-refresh and stranded cards are NOT in this pass's
    `cards`; they join the next wave.
 
    **Stranded Building cards.** A card in Building with no assignee between

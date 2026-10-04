@@ -1,7 +1,7 @@
 {
   "name": "super-board",
-  "version": "3.0.3",
-  "description": "Autonomous GitHub Project board runner. Primary skills: super-board, super-build, super-qa, super-review, super-collect. Secondary skills: visual, ui-refine-loop. Installed as a plugin it ships the skills only; run /super-board onboard to add the guard hooks, .claude/bin scripts and workflows (get.sh / install.sh install all of it in one go).",
+  "version": "3.0.5",
+  "description": "Autonomous GitHub Project board runner. Primary skills: super-board, super-build, super-qa, super-review, super-collect. Secondary skills: visual, git-sync, ui-refine-loop. Installed as a plugin it ships the skills only; run /super-board onboard to add the guard hooks, .claude/bin scripts and workflows (get.sh / install.sh install all of it in one go).",
   "author": {
     "name": "Eric Tech"
   },

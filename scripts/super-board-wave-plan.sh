@@ -67,6 +67,7 @@
 #   { "cards": [ {"number":10,"status":"Review","title":"…","lane":"review","labels":[]} ],
 #     "sweep": [ {"number":37,"title":"…","clearedBy":[32]} ],
 #     "resume": [ {"number":51,"title":"…"} ],
+#     "refreshApproval": [ {"number":52,"title":"…","why":"PR head changed after review"} ],
 #     "flag":  [ {"number":82,"title":"…","why":"…"} ],
 #     "stranded": [ {"number":44,"title":"…"} ] }
 set -euo pipefail
@@ -166,14 +167,18 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
                | { number, title,
                    clearedBy: (dep(.number) | .blockers) } ],
 
-      # 🙋 Blocked cards whose human step is confirmed done (needs-you:done
-      # label, or a "done" comment after the 🙋 block). The orchestrator moves
-      # them to Review and labels the PR needs-you:done; the Reviewer re-runs
-      # the merge gate, which re-verifies and merges.
+      # Verified current-head human approval from the dependency helper. The
+      # Reviewer independently rechecks it; labels are only UI state.
       resume: [ $all[]
                 | select(.status == "Blocked")
                 | select(dep(.number) != null and (dep(.number).needsYouDone // false))
                 | { number, title } ],
+
+      # Changed code while Blocked needs a new review/request, never approval.
+      refreshApproval: [ $all[]
+                         | select(.status == "Blocked")
+                         | select(dep(.number).approvalRefresh // false)
+                         | { number, title, why: dep(.number).approvalWhy } ],
 
       # Cards the graph could not read. Left where they are, reported so the
       # orchestrator can ask for the line to be fixed.

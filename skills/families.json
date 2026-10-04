@@ -1,11 +1,12 @@
 {
   "you_type": {
-    "title": "You type — 4 skills",
+    "title": "You type — 5 skills",
     "skills": {
       "super-board": "Orchestrator: plans waves, runs Build → QA → Review, merges when green.",
       "super-collect": "Finds problems (Sentry, PostHog, issues, PRs, architecture) and files verified Backlog cards.",
       "ui-refine-loop": "Critique → refine loop that polishes one page or component.",
-      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams."
+      "visual": "One HTML page: branch recap, plan, or codebase map with diagrams.",
+      "git-sync": "Commit per logical change, merge-pull, push without force, report."
     }
   },
   "board_runs": {
