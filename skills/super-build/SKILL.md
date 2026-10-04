@@ -113,6 +113,10 @@ The dispatcher (this skill's `scripts/super-build-dispatch.sh`) handles:
 
 Poll BashOutput on each in-flight shell. As each finishes:
 
+After creating either a complete or partial PR below, follow
+[PR author notes](../super-board/references/pr-author-notes.md) before reporting the
+handoff complete. Add file summaries and critical inline notes on the PR, not in source.
+
 **On dispatcher exit 0 (success):**
 - `git -C .claude/worktrees/issue-N push -u origin loop/issue-N`
 - `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/super-board/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution
@@ -226,7 +230,7 @@ Follow spec `.claude/skills/super-board/references/run.md` → Builder (first pa
 4. Implement smallest safe change covering ACs — under the PR size cap (section below).
 5. Commit + push (always).
 6. Open **draft PR** with the PR description template from `run.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution.
-7. Post the `[builder] [report]` PR comment + the short issue comment with the PR URL (writing-standard.md § 4).
+7. Follow [PR author notes](../super-board/references/pr-author-notes.md), then post the `[builder] [report]` PR comment + the short issue comment with the PR URL (writing-standard.md § 4).
 8. Move card Ready/Building → QA.
 
 ### Keep each PR small (every ticket)
@@ -251,7 +255,7 @@ Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
    ```
 3. Address any new failure feedback from Tester's latest ❌ comment.
 4. Commit + push to same branch. Verify ALL `[builder]` threads are resolved before exit.
-5. Rewrite your PR body blocks (`super-board-pr-body.sh`), post `[builder] [report]` PR + issue comments. Move card Ready/Building → QA.
+5. Refresh [PR author notes](../super-board/references/pr-author-notes.md), rewrite your PR body blocks (`super-board-pr-body.sh`), post `[builder] [report]` PR + issue comments. Move card Ready/Building → QA.
 
 ### Docs before outside-tool code (every ticket)
 Before writing code, decide whether the ticket touches any of:

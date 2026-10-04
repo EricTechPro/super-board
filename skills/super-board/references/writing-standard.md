@@ -15,7 +15,8 @@ Every template in this pack points here. Change the format here first, then the 
   commit sha. NEVER link to them, NEVER upload to a public image host.
 - NEVER write a "Not verified" section or a "Next" section in a PR body. An unchecked AC
   with its one-line reason replaces both.
-- NEVER list changed files in a comment. GitHub already shows them.
+- DON'T repeat a changed-file list in status comments. Explain each file in its own PR
+  review comment, using "Author notes" below.
 - DON'T restate the ticket. DON'T narrate ("I have successfully…").
 
 ## 1 · Commit
@@ -272,6 +273,31 @@ The filers (`super-qa-file-bug.sh`, `super-collect-file.sh`, `super-review-file-
 refuse a body that misses a required section.
 
 ## 4 · Comment
+
+### Author notes on a PR
+
+On every PR opened by this pack, add a native **file-level review comment** for each changed
+file. Use the same three labels, one short sentence each, in plain English:
+
+```markdown
+<!-- super-board:author-note v1 key=file-summary -->
+**Purpose:** This file checks whether a code change may be merged.
+**What changed:** It asks for fresh approval if the AI edits the code after approval.
+**Why it matters:** Your earlier approval cannot allow code you have not reviewed.
+```
+
+Add a few **inline review comments** at important changed sections using the same labels.
+Explain a safety check, a hard-to-see choice, or a changed behavior; skip obvious lines.
+Use a stable key for each inline topic, such as `key=fresh-approval`, instead of
+`key=file-summary`. The key and path identify the note on later runs.
+
+These notes live on the pull request, never as comments inserted into source files. They
+explain the author's work; they are not reviewer findings, approval, or proof a test passed.
+They use the three-label format instead of the lane-status format below. Do not copy the
+PR description into every note. See [PR author notes](pr-author-notes.md) for when to post,
+how to use GitHub's file and line comments, and how to refresh notes without duplicates.
+
+### Lane status and findings
 
 ```
 [<role>] [<label>] <status-emoji> <status> · <round or short context>

@@ -312,6 +312,10 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    steps, screenshot), Solution (plain bullets), Acceptance criteria with proof
    lines, Iteration history, Risk (🟢/🟡/🔴 — subjective signals are never 🟢).
    Forensics excerpts go in the proof lines, not as file lists.
+   After opening the PR and after each later push, follow
+   `.claude/skills/super-board/references/pr-author-notes.md`: one file-level review
+   comment per changed file and a few critical inline notes, with Purpose, What changed,
+   and Why it matters. Confirm them before handing the PR to review.
 
 5. **Run reviewer skills against the PR (parallel where possible):**
    ```bash

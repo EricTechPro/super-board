@@ -33,7 +33,8 @@ Board: Backlog · Ready · Building · QA · Review · Blocked · Done. Labels r
 | PR body | blocks: status · Problem · Solution · AC + proof · history · Before\|After · Risk — `super-board-pr-body.sh` |
 | Ticket | Problem · Context · Fix · AC · Risk · Blocked by → `docs/agents/issue-tracker.md` |
 | Comment | `[role] [label] status` · Did · ✅ Done · ❌ Not done · Next · ≤ 8 lines |
+| PR author notes | file + critical inline review comments: Purpose · What changed · Why it matters → `pr-author-notes.md` |
 
 - NEVER chain steps with arrows. One step per line, lettered under Where.
 - NEVER link screenshots. Embed a raw URL pinned to a sha.
-- DON'T list files in comments. DON'T write "Not verified" or "Next" in a PR body.
+- DON'T repeat file lists in status comments. DON'T write "Not verified" or "Next" in a PR body.

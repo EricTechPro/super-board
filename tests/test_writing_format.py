@@ -163,13 +163,22 @@ def test_comment_header_regex():
 
 
 def test_comment_examples_follow_the_header():
-    """Every comment sample in the standard and run.md starts with a valid header, ≤ 8 prose lines."""
+    """Lane comments have headers; author notes use three labels without a routing prefix."""
     machine = re.compile(r"^(Local tests|gh-quota-on-exit|blocked-by|root-cause-hash):|^\||^$|^<!--")
     run_md = (REF / "run.md").read_text(encoding="utf-8")
     checked = 0
+    author_notes = 0
     for text in (STANDARD, run_md):
         for block in fenced(text):
             lines = block.splitlines()
+            if lines and lines[0].startswith("<!-- super-board:author-note "):
+                assert lines[0].endswith(" -->"), "author-note marker must stay hidden"
+                labels = re.findall(r"^\*\*(.+?):\*\* \S", block, flags=re.M)
+                assert labels == ["Purpose", "What changed", "Why it matters"], labels
+                assert len(lines) == 4, "author-note example must stay short"
+                assert not any(COMMENT_HEADER.match(line) for line in lines), "author notes must not route as findings"
+                author_notes += 1
+                continue
             lines = [l for l in lines if not l.startswith("<!-- super-review:report")]
             if not lines or not re.match(r"^\[[a-z<]", lines[0]) or lines[0].startswith("[<"):
                 continue
@@ -178,6 +187,7 @@ def test_comment_examples_follow_the_header():
             assert len(prose) <= 8, f"comment over 8 lines: {lines[0]}"
             checked += 1
     assert checked >= 6, f"expected comment samples, checked {checked}"
+    assert author_notes == 1, "expected one shared author-note example"
 
 
 def test_block_template_uses_the_header():

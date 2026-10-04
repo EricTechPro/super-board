@@ -297,7 +297,11 @@ When invoked by super-board (env `SUPER_BOARD_RUN=1` or invocation contains "sup
 See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the sub-steps:
 
 1. Worktree from current state of `issue-<N>-<slug>`.
-2. **Gate 1 — thread scan.** If ANY unresolved PR thread:
+2. **Gate 1 — thread scan.** Read threads and replies. [PR author notes](../super-board/references/pr-author-notes.md)
+   alone are explanations, not findings or approval. Human questions or change requests
+   in those threads still follow the normal review/blocking flow; the marker exempts no
+   replies. Never auto-resolve them or bypass GitHub's conversation-resolution requirements.
+   If ANY unresolved finding:
    - `[builder]` open → comment, move card Review → Ready.
    - `[qa]` open → comment, move card Review → QA.
    - Both open → bounce to whichever is older.
