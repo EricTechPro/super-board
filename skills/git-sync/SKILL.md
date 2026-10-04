@@ -36,7 +36,7 @@ skip a hook (`--no-verify`).
 **Commit format.** The host wins.
 
 1. The host's `AGENTS.md`, `CLAUDE.md` or `CONTRIBUTING.md` defines a commit format: follow it
-   (BookZero, for example, uses `#N: type: description`).
+   (for example `#N: type: description`).
 2. Otherwise use section "1 · Commit" of the super-board writing standard
    (`.claude/skills/super-board/references/writing-standard.md`): emoji, `[type]`, scope,
    subject, 1–4 bullets, `Closes #N` when the commit finishes a ticket.
