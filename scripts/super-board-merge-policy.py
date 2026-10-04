@@ -17,7 +17,8 @@ Stdout, one JSON object:
       "done":       false }
 
 `human` non-empty → the gate exits 7 (a human merges). `needs_you` non-empty →
-exit 8 unless `done` (the PR carries the `needs-you:done` label). Exit 2 on
+exit 8 unless the gate verifies a head-bound approval. `done` stays false for
+compatibility: labels never supply authority. Exit 2 on
 unreadable metadata, so the gate fails safe to "human".
 
 Rules, from references/config-schema.json → merge_policy / migrations:
@@ -68,7 +69,6 @@ DEFAULT_MIGRATION_GLOBS = [
     "**/migrations/*.sql", "db/migrate/**", "alembic/versions/**",
 ]
 DEFAULT_ALLOWED_ENVS = ["test", "staging"]
-DONE_LABEL = "needs-you:done"
 DEFAULT_AUTO_MAX_LINES = 400
 DEFAULT_SIZE_EXCLUDE = [
     # lockfiles
@@ -193,7 +193,7 @@ def main() -> int:
             needs.append(m.group(1).strip("`"))
 
     print(json.dumps({"human": human, "migrations": mig_files, "run": run,
-                      "needs_you": needs, "done": DONE_LABEL in labels}))
+                      "needs_you": needs, "done": False}))
     return 0
 
 

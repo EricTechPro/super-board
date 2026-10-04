@@ -81,14 +81,14 @@
 #      review" — or merge_policy.default "human"). Stdout lists each
 #      `human-gate: <category> — <evidence>`. Nothing ran, nothing merged; the
 #      card → Blocked with the 🙋 template: the human reviews and merges it, or
-#      comments "done" (label needs-you:done) to approve — the next wave re-runs
+#      comments "done" after its pinned request to approve — the next wave re-runs
 #      the gate, which then skips the policy check and merges.
 #   8  🙋 needs you — the PR has migrations for a database the robot may not
 #      touch (merge_policy → migrations.allowed_envs), an allowed migrate command
 #      failed, or a human-only step is declared (`needs-you:` line in the PR body,
 #      or migrations.human_steps). Stdout lists the exact commands as
 #      `needs-you: <command>` lines. Card → Blocked with the 🙋 template; once the
-#      PR carries the `needs-you:done` label the next wave re-runs the gate and it
+#      current request has verified trusted-human approval, the gate re-runs and
 #      merges.
 #
 # MERGE POLICY AND MIGRATIONS (config, all optional — defaults shown in
@@ -218,14 +218,27 @@ PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$M
   echo "human-gate: policy — could not classify the PR (unreadable metadata)"
   say "merge policy could not be evaluated — a human merges this one"; exit 7; }
 
+# The label is display-only. A request posted before `done` pins the exact head
+# and policy/commands. Re-read trusted approval evidence; never mint it here.
+APPROVED=false
+approval_check() {
+  APPROVAL=$(python3 "$HERE/super-board-approval.py" --repo "$REPO" --pr "$PR" \
+    --head "$HEAD_SHA" --plan "$PLAN") || APPROVAL='{"approved":false}'
+  APPROVED=$(echo "$APPROVAL" | jq -r '.approved // false')
+}
+approval_request() {
+  python3 "$HERE/super-board-approval.py" --request --repo "$REPO" --pr "$PR" \
+    --head "$HEAD_SHA" --plan "$PLAN"
+}
 HUMAN=$(echo "$PLAN" | jq -r '.human[] | "human-gate: \(.category) — \(.why)"')
-if [ -n "$HUMAN" ] && [ "$(echo "$PLAN" | jq -r '.done')" = "true" ]; then
-  say "needs-you:done is on the PR — a human approved the policy gate ($(echo "$PLAN" | jq -r '[.human[].category] | join(", ")'))"
-  HUMAN=""
+if [ -n "$HUMAN" ] || [ "$(echo "$PLAN" | jq '.needs_you | length')" -gt 0 ]; then
+  approval_check
 fi
-if [ -n "$HUMAN" ]; then
+if [ -n "$HUMAN" ] && [ "$APPROVED" != true ]; then
   echo "$HUMAN"
-  say "merge policy: a human merges this PR"; exit 7
+  echo "$PLAN" | jq -r '.needs_you[] | "needs-you: " + .'
+  approval_request
+  say "merge policy: waiting for a trusted human to approve this exact head"; exit 7
 fi
 
 git -C "$REPO_PATH" fetch origin "$HEAD_REF" "$BASE" --quiet
@@ -275,12 +288,29 @@ if [ "$(echo "$PLAN" | jq '.migrations | length')" -gt 0 ]; then
   done < <(echo "$PLAN" | jq -r '.run[] | [.env, .cmd] | @tsv')
 fi
 if [ "${#NEEDS[@]}" -gt 0 ]; then
-  if [ "$(echo "$PLAN" | jq -r '.done')" = "true" ] && [ "$(echo "$PLAN" | jq '.needs_you | length')" -eq "${#NEEDS[@]}" ]; then
-    say "needs-you:done is on the PR — the human steps are confirmed; merging"
+  if [ "$APPROVED" = true ] && [ "$(echo "$PLAN" | jq '.needs_you | length')" -eq "${#NEEDS[@]}" ]; then
+    say "a trusted human confirmed the current head and human steps"
   else
     for n in "${NEEDS[@]}"; do echo "needs-you: $n"; done
+    approval_request
     say "🙋 needs you before this merges — card → Blocked with the commands above"
     exit 8
+  fi
+fi
+
+# An approval can be superseded while verification/migrations run. Re-read just
+# before merging; GitHub independently pins the code with --match-head-commit.
+if [ "$APPROVED" = true ]; then
+  # Code remains pinned; body-declared human steps and config can change without
+  # a commit. Reclassify them too instead of reusing the old approval scope.
+  gh pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,body > "$META" 2>/dev/null || echo '{}' > "$META"
+  PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
+    say "human approval scope could not be refreshed"; exit 7; }
+  approval_check
+  if [ "$APPROVED" != true ]; then
+    approval_request
+    say "human approval changed during verification; keep the card Blocked"
+    if [ -n "$HUMAN" ]; then exit 7; else exit 8; fi
   fi
 fi
 
