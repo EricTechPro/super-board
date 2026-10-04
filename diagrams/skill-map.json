@@ -100,6 +100,20 @@
    ]
   },
   {
+   "id": "git-sync",
+   "label": "/git-sync",
+   "kind": "public",
+   "what": "Commits the working tree as one commit per logical change, merge-pulls, pushes the current branch without force, and reports what it did.",
+   "when": "Eric runs /git-sync or says \"sync\", \"commit and push\" or \"pull and push\", usually at the end of a piece of work.",
+   "how": "Stages each group by path (never `git add -A`), refuses secrets, writes the host's commit format or the writing standard, gates `supabase/` changes on a migration file and advisors, then `git pull --no-rebase` and `git push`. The default or a protected branch needs a yes.",
+   "source": [
+    "_skills/vendor/super-board/skills/git-sync/SKILL.md"
+   ],
+   "sublabel": "commit · pull · push",
+   "opensView": "git-sync",
+   "author": "EricTechPro"
+  },
+  {
    "id": "sb-onboard",
    "label": "/super-board onboard",
    "kind": "public",
@@ -749,7 +763,7 @@
    "label": "resolving-merge-conflicts",
    "kind": "external",
    "what": "Resolves an in-progress merge or rebase conflict by reading each side's intent, then runs the project's checks.",
-   "when": "Reached by super-build on a live conflict, e.g. when the merge gate exits 2 or 5 and the card returns to the Builder.",
+   "when": "Reached by super-build on a live conflict, e.g. when the merge gate exits 2 or 5 and the card returns to the Builder, and by /git-sync when its pull conflicts.",
    "how": "Finds primary sources per hunk, preserves both intents where possible, never aborts; the Builder's finish line is green verification, not an empty conflict list.",
    "source": [
     ".agents/skills/resolving-merge-conflicts/SKILL.md"
@@ -1582,6 +1596,13 @@
    "when": "recap mode, or any mode reading the repo"
   },
   {
+   "id": "r-gitsync-base",
+   "from": "git-sync",
+   "to": "base-branch",
+   "label": "pulls, pushes",
+   "when": "every run; a push to the default or a protected branch waits for a yes"
+  },
+  {
    "id": "r-refine-config",
    "from": "ui-refine-loop",
    "to": "sb-config",
@@ -2331,6 +2352,27 @@
    "when": "recap mode collects files, +/- and hunks from git"
   },
   {
+   "id": "gs-base",
+   "from": "git-sync",
+   "to": "base-branch",
+   "label": "merge-pulls, pushes",
+   "when": "`git pull --no-rebase`, then `git push`; never force"
+  },
+  {
+   "id": "gs-conflict",
+   "from": "git-sync",
+   "to": "resolving-merge-conflicts",
+   "label": "resolves conflict",
+   "when": "the pull conflicts and the skill is installed; otherwise hunk by hunk"
+  },
+  {
+   "id": "gs-push",
+   "from": "git-sync",
+   "to": "guard-protected-push",
+   "label": "push checked by",
+   "when": "the opt-in push guard is installed"
+  },
+  {
    "id": "h-wt",
    "from": "claude-settings",
    "to": "guard-worktree-path",
@@ -2875,12 +2917,13 @@
    "id": "root",
    "parent": null,
    "title": "super-board pack",
-   "caption": "Four public skills, three board lanes, the board state they share, the installer and the guard hooks. Click a node to drill in.",
+   "caption": "Five public skills, three board lanes, the board state they share, the installer and the guard hooks. Click a node to drill in.",
    "nodeIds": [
     "super-board",
     "super-collect",
     "ui-refine-loop",
     "visual",
+    "git-sync",
     "super-build",
     "super-qa",
     "super-review",
@@ -2905,6 +2948,7 @@
     "r-review-hooks",
     "r-refine-base",
     "r-visual-base",
+    "r-gitsync-base",
     "r-refine-config",
     "r-install-hooks"
    ]
@@ -3290,6 +3334,23 @@
    "edges": [
     "vi-py",
     "vi-py-base"
+   ]
+  },
+  {
+   "id": "git-sync",
+   "parent": "root",
+   "title": "/git-sync · commit, pull, push",
+   "caption": "Standalone; no lane runs it. Merges, never rebases, and never force-pushes.",
+   "nodeIds": [
+    "git-sync",
+    "base-branch",
+    "resolving-merge-conflicts",
+    "guard-protected-push"
+   ],
+   "edges": [
+    "gs-base",
+    "gs-conflict",
+    "gs-push"
    ]
   },
   {
