@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Owner acceptance: nested skill families and usable column navigation in Chrome."""
-import html
 import copy
 import json
-import re
 import shutil
 import subprocess
 import sys
@@ -34,16 +32,20 @@ for field, value, message in (
     invalid["views"][0][field] = value
     assert any(message in error for error in visual.validate_map(invalid)), (field, value)
 probe = r"""
-<style>* { transition-duration: 0s !important; }</style>
-<script>
 (async () => {
   const failures = [], facts = {};
   const check = (ok, message) => { if (!ok) failures.push(message); };
   const $ = s => document.querySelector(s), all = s => [...document.querySelectorAll(s)];
+  const diagnostic = () => {
+    const el = $('.mit[data-v="super-board"]'), r = el?.getBoundingClientRect();
+    return {hash:location.hash,ghosts:!!$('#m-ghosts'),fonts:document.fonts.status,columns:all('.mcol').length,
+      rect:r?.toJSON(),scroll:$('.miller')?.scrollLeft,viewport:[innerWidth,innerHeight],
+      target:r && document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.outerHTML.slice(0,300)};
+  };
   const waitFor = async (ready, name) => {
     const deadline = performance.now() + 6000;
     while (!ready()) {
-      if (performance.now() >= deadline) throw Error('Timed out waiting for ' + name + ': ' + JSON.stringify({hash:location.hash,ghosts:!!$('#m-ghosts'),fonts:document.fonts.status,columns:all('.mcol').length}));
+      if (performance.now() >= deadline) throw Error('Timed out waiting for ' + name + ': ' + JSON.stringify(diagnostic()));
       await new Promise(r => setTimeout(r, 20));
     }
   };
@@ -80,9 +82,13 @@ probe = r"""
       const miller = $('.miller');
       check(getComputedStyle(miller).overflowX === 'auto', 'column browser scrolls horizontally');
       const button = column.querySelector('[data-v="super-board"]');
-      // renderTree initially reveals the last column. Virtual timers cannot wait for
-      // the inherited smooth scroll's compositor animation; reveal this row synchronously.
+      // renderTree initially reveals the last column. Reveal this row synchronously,
+      // then wait for the physical hit target, including the sidebar's initial layout.
       button.scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'});
+      await waitFor(() => {
+        const r = button.getBoundingClientRect();
+        return document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('button') === button;
+      }, 'physical board row');
       const r = button.getBoundingClientRect();
       const target = document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
       check(target && target.closest('button') === button, 'board row is physically clickable');
@@ -109,18 +115,17 @@ probe = r"""
     check(facts.mainSteps.length === 6, 'loop preserves its six main steps');
     check($('#m-pillbtn .n').textContent === '6 steps', 'view counts primary steps separately from nested tools');
   } catch (e) { failures.push(e.stack || String(e)); }
-  const pre=document.createElement('pre'); pre.id='family-report'; pre.textContent=JSON.stringify({failures,facts}); document.body.appendChild(pre);
-})();
-</script>
+  return {failures,facts};
+})()
 """
 
-# Virtual time does not advance animation frames reliably. CDP clicks and real elapsed time
-# exercise the production resize/animation path instead of screenshot mode's instant path.
+# Virtual time advances timers before scrolling/layout is painted. Use CDP real time
+# for physical family hits and the normal-motion production resize/animation path.
 motion_probe = r"""
 import {spawn} from 'node:child_process';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-const [binary,url]=process.argv.slice(1), delay=ms=>new Promise(r=>setTimeout(r,ms));
+const [binary,url,familyProbe]=process.argv.slice(1), delay=ms=>new Promise(r=>setTimeout(r,ms));
 const profile=await mkdtemp(tmpdir()+'/visual-navigation-');
 // Test normal motion explicitly: macOS CI can default to reduced motion.
 const browser=spawn(binary,['--headless','--disable-gpu','--force-prefers-no-reduced-motion','--remote-debugging-port=0','--no-first-run','--no-default-browser-check','--user-data-dir='+profile,'about:blank'],{stdio:'ignore'});
@@ -138,12 +143,19 @@ try {
   const cdp=(method,params={})=>new Promise((resolve,reject)=>{const id=++next;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
   const evaluate=async expression=>{const r=await cdp('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
   await cdp('Page.enable'); await cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
-  const waitFor=async (expression,name)=>{const end=Date.now()+10000;while(!await evaluate(expression)){if(Date.now()>end)throw Error('Timed out waiting for '+name+': '+JSON.stringify(await evaluate('({hash:location.hash,ghosts:!!document.querySelector("#m-ghosts"),fonts:document.fonts.status,columns:document.querySelectorAll(".mcol").length})')));await delay(20);}};
+  const diagnostic=()=>evaluate(`(()=>{const el=document.querySelector('.mit[data-v="super-board"]'),r=el?.getBoundingClientRect();return {hash:location.hash,ghosts:!!document.querySelector("#m-ghosts"),fonts:document.fonts.status,columns:document.querySelectorAll(".mcol").length,rect:r?.toJSON(),scroll:document.querySelector('.miller')?.scrollLeft,viewport:[innerWidth,innerHeight],target:r && document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.outerHTML.slice(0,300)};})()`);
+  const waitFor=async (expression,name)=>{const end=performance.now()+10000;while(!await evaluate(expression)){if(performance.now()>end)throw Error('Timed out waiting for '+name+': '+JSON.stringify(await diagnostic()));await delay(20);}};
+  await cdp('Page.navigate',{url:url+'#shot=1'});
+  await waitFor('window.__instant && !!document.querySelector(".mcol") && !document.querySelector("#m-ghosts")','family initial column browser');
+  const family=await evaluate(familyProbe);
+  failures.push(...family.failures); Object.assign(facts,family.facts);
   await cdp('Page.navigate',{url});
-  await waitFor('!!document.querySelector(".mcol") && !document.querySelector("#m-ghosts")','initial column browser');
+  await waitFor('!window.__instant && !!document.querySelector(".mcol") && !document.querySelector("#m-ghosts")','initial column browser');
   await waitFor('document.fonts.status === "loaded"','fonts');
   await evaluate('document.fonts.ready.then(()=>true)');
   check(await evaluate('!window.__instant && !matchMedia("(prefers-reduced-motion: reduce)").matches'),'normal motion is enabled without screenshot flags');
+  const sidebarReady='Math.abs(document.querySelector("#m-tree").getBoundingClientRect().width-Math.min(parseFloat(document.body.style.getPropertyValue("--browser-width")),innerWidth*.38))<1';
+  await waitFor(sidebarReady,'initial sidebar width');
   facts.beforeWidth=await evaluate('document.querySelector("#m-tree").getBoundingClientRect().width');
   const click=async id=>{
     await evaluate(`document.querySelector('.mit[data-v="${id}"]').scrollIntoView({behavior:'instant',block:'nearest',inline:'nearest'})`);
@@ -152,6 +164,7 @@ try {
     await cdp('Input.dispatchMouseEvent',{type:'mousePressed',...p,button:'left',clickCount:1});
     await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',...p,button:'left',clickCount:1});
     await waitFor(`new URLSearchParams(location.hash.slice(1)).get('view')==='${id}' && !!document.querySelector('.mit[data-v="${id}"][aria-current="page"]')`,'completed '+id+' navigation');
+    await waitFor(sidebarReady,'completed '+id+' sidebar width');
   };
   await click('super-board');
   facts.boardView=await evaluate('new URLSearchParams(location.hash.slice(1)).get("view")');
@@ -170,21 +183,14 @@ console.log(JSON.stringify({failures,facts}));
 with tempfile.TemporaryDirectory() as directory:
     page = Path(directory) / "fixture.html"
     visual.write_page(page, model)
-    page.write_text(page.read_text().replace("</body>", probe + "</body>"))
-    dom = visual.chrome(binary, "--virtual-time-budget=8000", "--window-size=1440,1000", "--dump-dom",
-                        page.as_uri() + "#shot=1", done=lambda s: 'id="family-report"' in s)
-    match = re.search(r'<pre id="family-report"[^>]*>(.*?)</pre>', dom, re.S)
-    assert match, "family probe did not finish"
-    report = json.loads(html.unescape(match[1]))
-    assert not report["failures"], report
-    visual.write_page(page, model)
     node = shutil.which("node")
     if node and subprocess.run([node, "-e", "process.exit(typeof WebSocket === 'function' ? 0 : 1)"], capture_output=True).returncode == 0:
-        result = subprocess.run([node, "--input-type=module", "-e", motion_probe, binary, page.as_uri()],
-                                capture_output=True, text=True, timeout=25)
+        result = subprocess.run([node, "--input-type=module", "-e", motion_probe, binary, page.as_uri(), probe],
+                                capture_output=True, text=True, timeout=45)
         assert result.returncode == 0, result.stderr
         report = json.loads(result.stdout)
         assert not report["failures"], report
     else:
-        print("SKIP: normal-motion navigation probe (needs Node with built-in WebSocket)")
+        print("SKIP: test_visual_families.py (needs Node with built-in WebSocket)")
+        sys.exit(0)
 print("PASS: test_visual_families.py (nested boxes, physical clicks, readable rows, animated navigation)")
