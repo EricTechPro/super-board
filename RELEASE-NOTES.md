@@ -1,5 +1,22 @@
 # Release notes
 
+## v3.0.5 — 2026-10-03
+
+Migrating a board no longer leaves its cards with no status.
+
+- 🐛 **Every option rewrite is undone.** Rewriting the Status options gives every option a
+  new id and clears the Status of every card. `board-migrate --prune-empty` rewrote them
+  without restoring, so a live board's cards all fell to "No status". The restore now runs
+  after any rewrite, whatever triggered it.
+- 💾 **Snapshot on disk first.** Before the first rewrite, every card's status is saved to
+  `.claude/super-board/backup/board-<number>-<ts>.json` (path in `status_backup`), so a run
+  that dies mid-way can still be put back.
+- 🔎 **Snapshot that cannot be empty by accident.** When `gh project item-list` surfaces no
+  `status` key on any card, statuses are read over GraphQL instead; item reads now go past
+  500 cards.
+- 🧪 **Regressions.** Offline scenarios cover prune-empty on a board in use, the GraphQL
+  fallback, and a dry run that writes nothing.
+
 ## v3.0.4 — 2026-10-03
 
 The skill map reads from left to right, with nested skill families and clearer drill-down

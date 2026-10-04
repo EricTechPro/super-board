@@ -33,6 +33,9 @@ Status options (--prune-empty also drops unused extras such as a new board's Tod
 creates the three labels, maps old type labels, labels every card `qa`
 on a board that was "qa-only" (--qa-all), moves Skipped cards to Done, removes the Skipped
 option, and puts back any card status the option rewrite cleared. Cards are never lost.
+Before the first option rewrite it saves every card's status to
+.claude/super-board/backup/board-<number>-<ts>.json, so a run that dies mid-way can still
+be put back by hand.
 
 Exit: 0 ok · 1 check found red items · 2 a gh call failed · 64 usage · 66 pack not found.
 Stdlib only.
@@ -537,10 +540,44 @@ def item_labels(it):
     return {(x.get("name") if isinstance(x, dict) else str(x)).lower() for x in raw}
 
 
-def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=False):
-    """Bring one GitHub Project to the v3 shape. Never removes a card."""
+ITEM_STATUS_Q = ("query($id:ID!,$after:String){node(id:$id){... on ProjectV2{items(first:100,after:$after){"
+                 "pageInfo{hasNextPage endCursor} nodes{id fieldValueByName(name:\"Status\"){"
+                 "... on ProjectV2ItemFieldSingleSelectValue{name}}}}}}}")
+
+
+def board_items(owner, number, pid):
+    """Every card and its Status, as {item_id: status-or-None} beside the raw items.
+
+    `gh project item-list` names the Status column by its lowercased field name
+    (`status`) and leaves the key out on a card with no status. When no card carries
+    the key at all, it is read again over GraphQL (fieldValueByName "Status") rather
+    than trusted: a snapshot of all-None would make the restore a silent no-op."""
+    items = gh_json("project", "item-list", str(number), "--owner", owner, "--format", "json",
+                    "--limit", "5000").get("items", [])
+    if items and not any("status" in it for it in items):
+        statuses, after = {}, None
+        while True:
+            page = gql(ITEM_STATUS_Q, {"id": pid, "after": after})["data"]["node"]["items"]
+            for n in page["nodes"]:
+                statuses[n["id"]] = (n.get("fieldValueByName") or {}).get("name")
+            if not page["pageInfo"]["hasNextPage"]:
+                break
+            after = page["pageInfo"]["endCursor"]
+        for it in items:
+            if statuses.get(it["id"]):
+                it["status"] = statuses[it["id"]]
+    return items, {it["id"]: it.get("status") for it in items}
+
+
+def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=False, root=None):
+    """Bring one GitHub Project to the v3 shape. Never removes a card.
+
+    updateProjectV2Field with singleSelectOptions replaces the whole option list: every
+    option gets a new id and GitHub clears the Status of EVERY card on the board. So every
+    rewrite is preceded by a snapshot on disk and followed by a restore, whatever path
+    triggered it (added columns, --prune-empty, Skipped removal)."""
     res = {"added_columns": [], "labels_created": [], "labels_mapped": 0, "qa_labelled": 0,
-           "skipped_moved": 0, "skipped_removed": False, "restored": 0}
+           "skipped_moved": 0, "skipped_removed": False, "restored": 0, "status_backup": None}
     proj = gh_json("project", "view", str(number), "--owner", owner, "--format", "json")
     pid, res["url"] = proj.get("id"), proj.get("url")
     field = status_field(owner, number)
@@ -548,8 +585,7 @@ def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=Fals
         raise RuntimeError("project has no Status field")
     fid = field["id"]
     opts = gql(OPTIONS_Q, {"id": fid})["data"]["node"]["options"]
-    items = gh_json("project", "item-list", str(number), "--owner", owner, "--format", "json", "--limit", "500").get("items", [])
-    snapshot = {it["id"]: it.get("status") for it in items}
+    items, snapshot = board_items(owner, number, pid)
 
     names_low = {o["name"].lower(): o for o in opts}
     in_use = {it.get("status") for it in items}
@@ -572,9 +608,23 @@ def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=Fals
         return out_
 
     has_skipped = "skipped" in names_low
+    rewrote = False
+
+    def rewrite(keep_skipped):
+        nonlocal rewrote
+        if not rewrote:
+            # On disk before the first rewrite: a crash after it still leaves a way back.
+            bdir = os.path.join(root or os.getcwd(), ".claude", "super-board", "backup")
+            os.makedirs(bdir, exist_ok=True)
+            path = os.path.join(bdir, f"board-{number}-{dt.datetime.now().strftime('%Y%m%d-%H%M%S')}.json")
+            write_json(path, snapshot)
+            res["status_backup"] = path
+        rewrote = True
+        got = gql(UPDATE_M, {"id": fid, "opts": option_inputs(keep_skipped)})
+        return got["data"]["updateProjectV2Field"]["projectV2Field"]["options"]
+
     if (res["added_columns"] or prune_empty) and not dry:
-        opts_now = gql(UPDATE_M, {"id": fid, "opts": option_inputs(keep_skipped=True)})
-        opts_now = opts_now["data"]["updateProjectV2Field"]["projectV2Field"]["options"]
+        opts_now = rewrite(keep_skipped=True)
     else:
         opts_now = opts
     ids = {o["name"].lower(): o["id"] for o in opts_now}
@@ -615,18 +665,17 @@ def board_migrate(owner, number, repo, qa_all=False, dry=False, prune_empty=Fals
                 snapshot[it["id"]] = "Done"
                 res["skipped_moved"] += 1
         if not dry:
-            opts_now = gql(UPDATE_M, {"id": fid, "opts": option_inputs(keep_skipped=False)})
-            opts_now = opts_now["data"]["updateProjectV2Field"]["projectV2Field"]["options"]
+            opts_now = rewrite(keep_skipped=False)
             ids = {o["name"].lower(): o["id"] for o in opts_now}
         res["skipped_removed"] = True
 
-    # Rewriting options can clear a card's status. Put every one back.
-    if not dry and (res["added_columns"] or has_skipped):
-        now = gh_json("project", "item-list", str(number), "--owner", owner, "--format", "json", "--limit", "500").get("items", [])
-        for it in now:
-            want = snapshot.get(it["id"])
-            if want and it.get("status") != want and want.lower() in ids:
-                set_status(it["id"], want)
+    # Rewriting options clears card statuses. After ANY rewrite, put every one back.
+    if rewrote and not dry:
+        _, now = board_items(owner, number, pid)
+        for item_id, have in now.items():
+            want = snapshot.get(item_id)
+            if want and have != want and want.lower() in ids:
+                set_status(item_id, want)
                 res["restored"] += 1
     return res
 
@@ -690,7 +739,7 @@ def main(argv):
             if not (owner and number and repo):
                 return 64
             qa_all = "--qa-all" in rest or bool(cfg.get("_qa_all"))
-            res = board_migrate(owner, int(number), repo, qa_all, dry, "--prune-empty" in rest)
+            res = board_migrate(owner, int(number), repo, qa_all, dry, "--prune-empty" in rest, root)
             if cfg_path and cfg.pop("_qa_all", None) is not None and not dry:
                 write_json(cfg_path, cfg)
             return out(res)
