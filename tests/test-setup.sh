@@ -118,6 +118,16 @@ a = sys.argv[1:]
 st = json.load(open(os.environ["GH_STATE"]))
 open(os.environ["GH_LOG"], "a").write(" ".join(a) + "\n")
 def save(): json.dump(st, open(os.environ["GH_STATE"], "w"))
+def page(rows, cursor=None):
+    start = int(cursor or 0); end = start + 100
+    return {"nodes": rows[start:end], "totalCount": len(rows),
+            "pageInfo": {"hasNextPage": end < len(rows), "endCursor": str(end)}}
+def node(it):
+    status = None if it.get("status") is None else {"name": it["status"], "optionId": next(o["id"] for o in st["options"]["2"] if o["name"] == it["status"])}
+    n = it["content"]["number"]
+    return {"id": it["id"], "updatedAt": it.get("updatedAt", "t0"), "type": "ISSUE", "status": status,
+            "content": {"__typename": "Issue", "id": "ISS"+str(n), "number": n, "repository": {"nameWithOwner": "eric/books"},
+                        "labels": page([{"name": n} for n in it.get("labels", [])])}}
 if a[:2] == ["project", "list"]:
     print(json.dumps({"projects": st["projects"]}))
 elif a[:2] == ["project", "field-list"]:
@@ -127,34 +137,55 @@ elif a[:2] == ["project", "field-list"]:
 elif a[:2] == ["project", "view"]:
     print(json.dumps({"id": "P" + a[2], "url": "https://github.com/users/eric/projects/" + a[2]}))
 elif a[:2] == ["project", "item-list"]:
-    print(json.dumps({"items": st["items"]}))
+    items = st["items"]
+    if st.get("hide_status"):  # a gh that does not surface the Status column
+        items = [{k: v for k, v in it.items() if k != "status"} for it in items]
+    else:  # like gh: no key on a card with no status
+        items = [{k: v for k, v in it.items() if not (k == "status" and v is None)} for it in items]
+    print(json.dumps({"items": items}))
 elif a[:2] == ["project", "item-edit"]:
     item, opt = a[a.index("--id") + 1], a[a.index("--single-select-option-id") + 1]
     name = next(o["name"] for o in st["options"]["2"] if o["id"] == opt)
     for it in st["items"]:
-        if it["id"] == item: it["status"] = name
+        if it["id"] == item: it["status"], it["updatedAt"] = name, it.get("updatedAt", "t0") + "w"
     save()
 elif a[:2] == ["api", "graphql"]:
     body = json.loads(sys.stdin.read())
     if body["query"].startswith("query"):
-        print(json.dumps({"data": {"node": {"options": st["options"]["2"]}}}))
+        query, v = body["query"], body["variables"]
+        if "items(first:" in query:
+            value = {"items": page([node(it) for it in st["items"]], v.get("after"))}
+        elif "... on ProjectV2Item{" in query:
+            value = node(next(it for it in st["items"] if it["id"] == v["id"]))
+        elif "... on Issue{" in query:
+            it = next(it for it in st["items"] if "ISS"+str(it["content"]["number"]) == v["id"])
+            value = {"labels": page([{"name": n} for n in it.get("labels", [])], v.get("after"))}
+        else:
+            value = {"options": st["options"]["2"]}
+        print(json.dumps({"data": {"node": value}}))
     else:
         st["gen"] = st.get("gen", 0) + 1
         new = [{"id": f"o{st['gen']}-{i}", "name": o["name"], "color": o["color"], "description": o["description"]}
                for i, o in enumerate(body["variables"]["opts"])]
         st["options"]["2"] = new
         names = {o["name"] for o in new}
-        # Like the real API can: rewriting options clears statuses (here: every card in "Ready").
+        # Rewriting options can clear every card status; early scenarios only clear Ready.
         for it in st["items"]:
-            if it.get("status") == "Ready" or it.get("status") not in names: it["status"] = None
+            if st.get("wipe_all") or it.get("status") == "Ready" or it.get("status") not in names: it["status"] = None
         save()
         print(json.dumps({"data": {"updateProjectV2Field": {"projectV2Field": {"options": [{"id": o["id"], "name": o["name"]} for o in new]}}}}))
+elif a[0] == "api" and a[1].startswith("repos/"):
+    print(json.dumps([[{"name": n} for n in st["labels"]]]))
 elif a[:2] == ["label", "list"]:
     print(json.dumps([{"name": n} for n in st["labels"]]))
 elif a[:2] == ["label", "create"]:
     st["labels"].append(a[2]); save()
 elif a[:2] == ["issue", "edit"]:
-    pass
+    it = next(it for it in st["items"] if str(it["content"]["number"]) == a[2])
+    labels = set(it.get("labels", []))
+    if "--add-label" in a: labels.update(a[a.index("--add-label")+1].split(","))
+    if "--remove-label" in a: labels.difference_update(a[a.index("--remove-label")+1].split(","))
+    it["labels"] = sorted(labels); save()
 else:
     sys.exit(f"unexpected gh call: {a}")
 PY
@@ -196,7 +227,7 @@ JSON
 : > "$GH_LOG"
 CFG="$WORK/books.json"
 echo '{"project":{"owner":"eric","number":2},"repo":{"remote":"https://github.com/eric/books.git"},"_qa_all":true}' > "$CFG"
-OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --config "$CFG")
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --root "$WORK/board8" --config "$CFG")
 echo "$OUT" | q '.added_columns == ["Backlog","Building"] and .labels_created == ["qa","feature"]' || fail "columns/labels wrong: $OUT"
 echo "$OUT" | q '.labels_mapped == 1 and .qa_labelled == 1 and .skipped_moved == 1 and .skipped_removed == true' \
   || fail "mapping / qa-all / Skipped counts wrong: $OUT"
@@ -207,6 +238,8 @@ q '[.options["2"][].name] == ["Backlog","Ready","Building","QA","Review","Blocke
 q '[.items[] | {(.id): .status}] | add == {"I1":"Done","I2":"Ready","I3":"Ready","I4":"Review"}' "$GH_STATE" \
   || fail "every card must keep its column (Skipped → Done): $(jq -c .items "$GH_STATE")"
 echo "$OUT" | q '.restored >= 2' || fail "cleared statuses must be restored: $OUT"
+q '. == {"I1":"Skipped","I2":"Ready","I3":"Ready","I4":"Review"}' "$(echo "$OUT" | jq -r .status_backup)" \
+  || fail "the pre-rewrite snapshot is saved to disk: $OUT"
 q 'has("_qa_all") | not' "$CFG" || fail "the qa-all marker is dropped once applied"
 
 # 9 — a brand-new board: --prune-empty swaps GitHub's default Todo / In Progress for the seven.
@@ -215,9 +248,57 @@ cat > "$GH_STATE" <<'JSON'
  "options":{"2":[{"id":"t","name":"Todo","color":"GRAY","description":""},{"id":"p","name":"In Progress","color":"YELLOW","description":""},
                  {"id":"d","name":"Done","color":"GREEN","description":""}]},"items":[]}
 JSON
-OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --owner eric --number 2 --repo eric/books --prune-empty)
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --root "$WORK/board9" --owner eric --number 2 --repo eric/books --prune-empty)
 q '[.options["2"][].name] == ["Backlog","Ready","Building","QA","Review","Blocked","Done"]' "$GH_STATE" \
   || fail "a new board should end with exactly the seven: $(jq -c '.options["2"]' "$GH_STATE")"
 echo "$OUT" | q '.labels_created == []' || fail "existing labels are not created again: $OUT"
 
-echo "PASS: test-setup.sh (10 scenarios)"
+# 10 — --prune-empty on a live board that already has the seven: the option rewrite wipes
+#      EVERY card's status (as GitHub does), and the restore must still run — it used to
+#      run only for added columns or Skipped, so 114 cards fell to "No status".
+cat > "$GH_STATE" <<'JSON'
+{"projects":[],"labels":["qa","bug","feature"],"wipe_all":true,
+ "options":{"2":[{"id":"k","name":"Backlog","color":"GRAY","description":""},{"id":"r","name":"Ready","color":"BLUE","description":""},
+                 {"id":"u","name":"Building","color":"YELLOW","description":""},{"id":"q","name":"QA","color":"ORANGE","description":""},
+                 {"id":"v","name":"Review","color":"PURPLE","description":""},{"id":"b","name":"Blocked","color":"RED","description":""},
+                 {"id":"d","name":"Done","color":"GREEN","description":""},{"id":"t","name":"Todo","color":"GRAY","description":""}]},
+ "items":[{"id":"I1","status":"Done","content":{"type":"Issue","number":1}},
+          {"id":"I2","status":"Building","content":{"type":"Issue","number":2}},
+          {"id":"I3","status":"Review","content":{"type":"Issue","number":3}},
+          {"id":"I4","status":null,"content":{"type":"Issue","number":4}}]}
+JSON
+: > "$GH_LOG"
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --owner eric --number 2 --repo eric/books --prune-empty --root "$WORK")
+q '[.options["2"][].name] == ["Backlog","Ready","Building","QA","Review","Blocked","Done"]' "$GH_STATE" \
+  || fail "the unused Todo should be pruned: $(jq -c '.options["2"]' "$GH_STATE")"
+q '[.items[] | {(.id): .status}] | add == {"I1":"Done","I2":"Building","I3":"Review","I4":null}' "$GH_STATE" \
+  || fail "prune-empty must put every wiped status back: $(jq -c .items "$GH_STATE")"
+echo "$OUT" | q '.restored == 3' || fail "three cards should be restored: $OUT"
+BK=$(echo "$OUT" | jq -r .status_backup)
+case "$BK" in "$WORK/.claude/super-board/backup/board-2-"*.json) ;; *) fail "backup path wrong: $BK" ;; esac
+q '. == {"I1":"Done","I2":"Building","I3":"Review","I4":null}' "$BK" || fail "backup must hold the pre-rewrite statuses: $(cat "$BK")"
+
+# 11 — a gh that does not surface `status`: the snapshot falls back to GraphQL
+#      fieldValueByName("Status"), so the restore still has something to restore.
+jq '.items = [{"id":"I1","status":"Done","content":{"type":"Issue","number":1}},{"id":"I2","status":"Building","content":{"type":"Issue","number":2}}] | .hide_status = true
+    | .options["2"] += [{"id":"t","name":"Todo","color":"GRAY","description":""}]' "$GH_STATE" > "$WORK/s" && mv "$WORK/s" "$GH_STATE"
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --owner eric --number 2 --repo eric/books --prune-empty --root "$WORK")
+q '[.items[] | {(.id): .status}] | add == {"I1":"Done","I2":"Building"}' "$GH_STATE" \
+  || fail "statuses read over GraphQL must be restored: $(jq -c .items "$GH_STATE") $OUT"
+echo "$OUT" | q '.restored == 2' || fail "two cards restored via the GraphQL snapshot: $OUT"
+
+# 12 — --dry-run writes nothing: no option rewrite, no card move, no label, no backup file.
+jq '.items = [{"id":"I1","status":"Skipped","content":{"type":"Issue","number":1}},
+              {"id":"I2","status":"Ready","labels":["build"],"content":{"type":"Issue","number":2}}]
+    | .hide_status = false | .labels = [] | del(.gen)
+    | .options["2"] = [{"id":"r","name":"Ready","color":"BLUE","description":""},{"id":"s","name":"Skipped","color":"GRAY","description":""}]' \
+  "$GH_STATE" > "$WORK/s" && mv "$WORK/s" "$GH_STATE"
+cp "$GH_STATE" "$WORK/before.json"; : > "$GH_LOG"; rm -rf "$WORK/dry"; mkdir -p "$WORK/dry"
+OUT=$(PATH="$WORK/bin:$PATH" python3 "$SETUP" board-migrate --owner eric --number 2 --repo eric/books --prune-empty --qa-all --dry-run --root "$WORK/dry")
+cmp -s "$GH_STATE" "$WORK/before.json" || fail "dry-run changed board state: $(cat "$GH_STATE")"
+! grep -Eq '^(project item-edit|label create|issue edit)' "$GH_LOG" || fail "dry-run made a write: $(cat "$GH_LOG")"
+[ "$(grep -c '^api graphql' "$GH_LOG")" = 2 ] || fail "dry-run should only read options and the complete card snapshot over GraphQL: $(cat "$GH_LOG")"
+[ ! -e "$WORK/dry/.claude" ] || fail "dry-run must not write a backup file"
+echo "$OUT" | q '.status_backup == null and .restored == 0 and .added_columns != []' || fail "dry-run report wrong: $OUT"
+
+echo "PASS: test-setup.sh (12 scenarios)"

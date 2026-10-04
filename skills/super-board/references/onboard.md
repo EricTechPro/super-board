@@ -159,7 +159,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    └─ OLDER SUPER-BOARD (the result says `upgraded: true`): same rule, no question. Header
       `1 of 8 · 🔍 Checks — found super-board v<from>; upgrading to v<pack>.` and the list:
           ⏺ Upgraded for you (backup: .claude/super-board/backup/<ts>/)
-            ✓ skills updated; added super-collect, visual, ui-refine-loop
+            ✓ skills updated; added super-collect, visual, git-sync, ui-refine-loop
             ✓ removed old folders: super-refine, cleanup-wt, arch-loop
             ✓ scripts, board engine and safety guards updated
             ✓ config moved to the new keys (merge rule, migrations, sources)
@@ -171,7 +171,12 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       <config>` — run it here when `gh auth status` already has the project scope, else in
       step 3 (it then prints them there). It adds missing columns, creates qa · bug · feature,
       maps old labels, labels every card `qa` on a board that was "qa-only", moves Skipped
-      cards to Done, removes Skipped and restores any status the change cleared.
+      cards to Done, removes Skipped and restores any status the change cleared. Keep the board
+      idle during this operation. The helper saves every card/status and label conversion plan
+      in `.claude/super-board/migrations/` before writing to GitHub. A failed upgrade is not a
+      completed setup: keep the recovery file and re-run the same command from the same project
+      root (or with the same `--root`). It resumes the saved plan and verifies remote results;
+      it never takes a new snapshot over a partially upgraded board. No extra setup question.
 
 2. 🔑 GITHUB
    ├─ Bash(gh auth status). Signed in with project scopes → `✓ GitHub connected.` and on.
@@ -315,7 +320,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    "session", bot_identity}, worker_backend "workflow". No `variant`.
    │    ├─ .claude/super-board/active ← <slug>
    │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
-   │    │    backup/, inflight/, upgrade.json (all under .claude/super-board/)
+   │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)
    │    ├─ settings.json: super-board-settings.py allow … ; protect main →
    │    │    super-board-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
    │    ├─ AGENTS.md / CLAUDE.md: super-board-agents-md.py backup, then write --src <staged>
@@ -404,7 +409,7 @@ answers are kept and it resumes at <step>".
 | 2 | Repo create refused | `📦 GitHub refused to create the repo (org admin required, or the free-repo quota). Pick an existing repo, or create one in the web UI, then re-run.` |
 | 3 | Org project denied | `🔑 You can't create projects under <org>. Ask an org admin, or use your account: gh project create --owner @me.` |
 | 3 | Board read-only | `🔑 That board is read-only for your account. Get write access, or pick another.` |
-| 3 | board-migrate exits 2 | Show its `error` in one line; the board is left as it was (no card moved). |
+| 3 | board-migrate exits 2 | Show its `error` and recovery-file path. Some changes may already be applied. Keep the board stopped and the recovery file; fix the access/read/write failure, then re-run the same command from the same project root. A concurrent-edit conflict needs review of the saved original/desired state; never delete the record to bypass it. |
 | 4 | `git push origin main:staging` rejected | `🌿 Couldn't create staging (<reason>). Create it on GitHub, or pick main.` |
 | 5 | `coverage` exits 1 | Not an error: fix the mapping, re-run `coverage`, then show the result. |
 | 5 | Two managed blocks / dangling marker | `✋ AGENTS.md has <n> super-board markers. Leave one begin/end pair (or none) and re-run.` |
@@ -412,6 +417,22 @@ answers are kept and it resumes at <step>".
 | 8 | File not writable | `🛑 Can't write <path> — check permissions.` Answers kept; re-run resumes at Review. |
 
 ---
+
+### Upgrade recovery limits
+
+The recovery file is durable before any GitHub write, records verified progress, and is retained
+on failure. Full cursor pagination covers boards beyond 500 cards; missing/partial pages block
+writes. A lost mutation response is checked against GitHub before an operation can repeat.
+Completed records retain the latest snapshot until a later, fully snapshotted migration replaces
+them. The local OS lock releases automatically on a crash; run upgrades from one project root.
+
+New nonempty task statuses and edits after a verified restore are preserved. Changed options,
+labels, or conflicting unfinished restores halt for review. Deleted cards are never recreated.
+GitHub cannot atomically compare a read with a field rewrite: edits made in that narrow interval,
+or an intentional clear before the first post-rewrite observation, cannot always be distinguished
+from the rewrite clearing a status. **Keep workers and people from editing this board during its
+upgrade.** This is resumable recovery, not a promise of an atomic rollback. Do not hand-edit or
+remove a pending recovery record; use its saved state to reconcile a conflict before retrying.
 
 ## Worker self-check (mandatory before the 🎉 screen)
 

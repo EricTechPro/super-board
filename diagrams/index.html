@@ -14,14 +14,16 @@
 :root{
   --bg:#ffffff; --soft:#f6f8fa; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0;
   --accent:#0969da; --pri:#1f883d; --pri-fg:#ffffff;
+  --lane-gray:#8c959f; --lane-blue:#0969da; --lane-orange:#bc4c00; --lane-purple:#8250df;
+  --lane-teal:#087e8b; --lane-green:#1f883d; --lane-red:#cf222e; --lane-mix:9%;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;color-scheme:dark}
+  :root:not([data-theme="light"]){--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;--lane-gray:#9198a1;--lane-blue:#4493f8;--lane-orange:#f0883e;--lane-purple:#a371f7;--lane-teal:#39c5cf;--lane-green:#3fb950;--lane-red:#f85149;--lane-mix:14%;color-scheme:dark}
 }
-:root[data-theme="dark"]{--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;color-scheme:dark}
+:root[data-theme="dark"]{--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;--lane-gray:#9198a1;--lane-blue:#4493f8;--lane-orange:#f0883e;--lane-purple:#a371f7;--lane-teal:#39c5cf;--lane-green:#3fb950;--lane-red:#f85149;--lane-mix:14%;color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans)}
@@ -80,9 +82,13 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
 
 /* how: one card, still */
 .board{display:grid;grid-template-columns:repeat(7,minmax(118px,1fr));gap:8px;overflow-x:auto;padding-bottom:4px}
-.bcol{background:var(--soft);border:1px solid var(--border);border-radius:8px;padding:8px;min-height:200px}
-.bcol>b{font-size:12.5px;display:block}
-.bcol>.who{display:block;font:11px var(--mono);color:var(--accent);margin-bottom:8px}
+.board:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+.bcol{background:var(--soft);border:1px solid var(--border);border-top:3px solid var(--lane);border-radius:8px;padding:8px;min-height:200px}
+.bcol.backlog{--lane:var(--lane-gray)}.bcol.ready{--lane:var(--lane-blue)}.bcol.building{--lane:var(--lane-orange)}
+.bcol.qa{--lane:var(--lane-purple)}.bcol.review{--lane:var(--lane-teal)}.bcol.done{--lane:var(--lane-green)}.bcol.blocked{--lane:var(--lane-red)}
+.bhead{margin:-8px -8px 8px;padding:8px;border-radius:5px 5px 0 0;background:color-mix(in srgb,var(--lane) var(--lane-mix),var(--soft))}
+.bhead>b{font-size:12.5px;display:block;white-space:nowrap}
+.bhead>.who{display:block;font:11px var(--mono);color:var(--accent)}
 .card{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;margin-bottom:6px;position:relative}
 .card.dim{color:var(--muted)}
 .card.ghost{border-style:dashed;opacity:.7}
@@ -175,7 +181,7 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
   <svg class="mark" viewBox="0 0 96 96" role="img" aria-label="super-board kanban logo"><rect x="4" y="4" width="88" height="88" rx="20" fill="#0d1117" stroke="#3d444d" stroke-width="2"/><rect x="14" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="38" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="62" y="16" width="20" height="64" rx="5" fill="#fff" fill-opacity=".08"/><rect x="17" y="20" width="14" height="10" rx="2.5" fill="#d97757"/><rect x="17" y="33" width="14" height="10" rx="2.5" fill="#d97757" fill-opacity=".55"/><rect x="17" y="46" width="14" height="10" rx="2.5" fill="#d97757" fill-opacity=".3"/><rect x="41" y="20" width="14" height="10" rx="2.5" fill="#58a6ff"/><rect x="41" y="33" width="14" height="10" rx="2.5" fill="#58a6ff" fill-opacity=".55"/><rect x="65" y="20" width="14" height="10" rx="2.5" fill="#3fb950"/><rect x="65" y="33" width="14" height="10" rx="2.5" fill="#3fb950"/><rect x="65" y="46" width="14" height="10" rx="2.5" fill="#3fb950"/><path d="M66 70.5 l4 4 l8 -9" fill="none" stroke="#3fb950" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   <h1 class="big">super-board</h1>
   <p class="pitch">Add tasks, walk away, get merged PRs with proof.</p>
-  <p class="sub">An autonomous GitHub Project board for Claude Code. 7 skills (4 you type, 3 the board runs) · 8 commands · 6 guard hooks.</p>
+  <p class="sub">An autonomous GitHub Project board for Claude Code. 8 skills (5 you type, 3 the board runs) · 9 commands · 6 guard hooks.</p>
   <div class="cmd"><code>curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash</code></div>
   <div class="ctas" style="justify-content:center">
     <a class="btn pri" href="#map">See the skill map</a>
@@ -187,21 +193,21 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
 <section class="sec" id="map"><div class="in">
   <h2>The skill map</h2>
   <p class="lead">Every skill, lane and guard, and how they connect. Click a node to drill in.</p>
-  <div class="mapbox"><iframe src="skill-map/" title="super-board skill map" loading="lazy"></iframe></div>
-  <p class="small"><a href="skill-map/">Open full screen ↗</a></p>
+  <div class="mapbox"><iframe src="skill-map/#view=root" title="super-board skill map" loading="lazy"></iframe></div>
+  <p class="small"><a href="skill-map/#view=root">Open full screen ↗</a></p>
 </div></section>
 
 <section class="sec" id="how"><div class="in">
   <h2>Watch one card</h2>
   <p class="lead">#812 goes from Ready to merged on its own. The board is the only state: stop any time, and <code>run</code> picks up from each card's column.</p>
-  <div class="board" role="img" aria-label="Card #812 moves from Ready through Building, QA and Review to Done">
-    <div class="bcol"><b>Backlog</b><span class="who">you · collect</span><div class="card dim">Dark mode toggle</div><div class="card dim">CSV export</div></div>
-    <div class="bcol"><b>Ready</b><span class="who">you</span><div class="card ghost">#812 Receipt size error<span class="sn">1</span></div><div class="card dim">Retry failed sync</div></div>
-    <div class="bcol"><b>Building</b><span class="who">super-build</span><div class="card ghost">#812 draft PR<span class="sn">2</span></div></div>
-    <div class="bcol"><b>QA</b><span class="who">super-qa</span><div class="card ghost">#812 48/48 tests<span class="sn">3</span></div></div>
-    <div class="bcol"><b>Review</b><span class="who">super-review</span><div class="card ghost">#812 review passed<span class="sn">4</span></div></div>
-    <div class="bcol"><b>Blocked</b><span class="who">you 🙋</span></div>
-    <div class="bcol"><b>Done</b><span class="who">merged</span><div class="card live">#812 Receipt size error<span class="ev">✓ PR merged · 3 screenshots</span></div><div class="card dim">Fix login redirect</div></div>
+  <div class="board" role="img" tabindex="0" aria-label="Card #812 moves from Ready through Building, QA and Review to Done. Scroll horizontally to see all seven columns.">
+    <div class="bcol backlog"><div class="bhead"><b>📥 Backlog</b><span class="who">you · collect</span></div><div class="card dim">Dark mode toggle</div><div class="card dim">CSV export</div></div>
+    <div class="bcol ready"><div class="bhead"><b>✅ Ready</b><span class="who">you</span></div><div class="card ghost">#812 Receipt size error<span class="sn">1</span></div><div class="card dim">Retry failed sync</div></div>
+    <div class="bcol building"><div class="bhead"><b>🔨 Building</b><span class="who">super-build</span></div><div class="card ghost">#812 draft PR<span class="sn">2</span></div></div>
+    <div class="bcol qa"><div class="bhead"><b>🔍 QA</b><span class="who">super-qa</span></div><div class="card ghost">#812 48/48 tests<span class="sn">3</span></div></div>
+    <div class="bcol review"><div class="bhead"><b>🧐 Review</b><span class="who">super-review</span></div><div class="card ghost">#812 review passed<span class="sn">4</span></div></div>
+    <div class="bcol done"><div class="bhead"><b>🎉 Done</b><span class="who">merged</span></div><div class="card live">#812 Receipt size error<span class="ev">✓ PR merged · 3 screenshots</span></div><div class="card dim">Fix login redirect</div></div>
+    <div class="bcol blocked"><div class="bhead"><b>🙋 Blocked</b><span class="who">you 🙋</span></div></div>
   </div>
   <ol class="steps">
     <li><b>1</b> You drag it to Ready</li>
@@ -215,7 +221,7 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
   <h2>Explore</h2>
   <p class="lead">Interactive pages that show how super-board works.</p>
   <div class="pgrid">
-    <a class="pcard" href="skill-map/"><img src="assets/skill-map.png" alt="" loading="lazy"><div class="b"><h3>Skill map</h3><p>Every skill, lane and hook. Click to drill in.</p><span class="go">Open →</span></div></a>
+    <a class="pcard" href="skill-map/#view=root"><img src="assets/skill-map.png" alt="" loading="lazy"><div class="b"><h3>Skill map</h3><p>Every skill, lane and hook. Click to drill in.</p><span class="go">Open →</span></div></a>
     <a class="pcard" href="onboarding/"><img src="assets/onboarding.png" alt="" loading="lazy"><div class="b"><h3>Setup simulator</h3><p>The install line and the 8 <code>onboard</code> steps, as your terminal shows them.</p><span class="go">Open →</span></div></a>
     <a class="pcard" href="impeccable/"><img src="assets/impeccable.png" alt="" loading="lazy"><div class="b"><h3>Impeccable map</h3><p>27 design commands behind /ui-refine-loop.</p><span class="go">Open →</span></div></a>
     <a class="pcard" href="writing-standard/"><img src="assets/writing-standard.png" alt="" loading="lazy"><div class="b"><h3>Writing standard</h3><p>How commits, tickets, PRs and comments are written.</p><span class="go">Open →</span></div></a>
@@ -223,14 +229,15 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
 </div></section>
 
 <section class="sec" id="skills"><div class="in">
-  <h2>7 skills</h2>
-  <p class="lead">4 you type in Claude Code. 3 the board runs for each card.</p>
-  <div class="grp"><h3>You type</h3><span>4 skills</span></div>
+  <h2>8 skills</h2>
+  <p class="lead">5 you type in Claude Code. 3 the board runs for each card.</p>
+  <div class="grp"><h3>You type</h3><span>5 skills</span></div>
   <div class="sgrid">
     <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/super-board/README.md"><span class="nm">/super-board</span><p>Runs the board: Build → QA → Review, merges when green.</p><code>/super-board run my-app</code></a>
     <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/super-collect/README.md"><span class="nm">/super-collect</span><p>Finds problems in Sentry, PostHog, issues and PRs. Files verified cards.</p><code>/super-collect sentry</code></a>
     <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/ui-refine-loop/README.md"><span class="nm">/ui-refine-loop</span><p>Critique → refine rounds on one page or component.</p><code>/ui-refine-loop /settings</code></a>
     <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/visual/README.md"><span class="nm">/visual</span><p>One HTML page: branch recap, plan, or codebase map.</p><code>/visual recap</code></a>
+    <a class="scard" href="https://github.com/EricTechPro/super-board/blob/main/skills/git-sync/README.md"><span class="nm">/git-sync</span><p>Commits per logical change, merge-pulls, pushes without force.</p><code>/git-sync</code></a>
   </div>
   <div class="grp"><h3>The board runs</h3><span>3 lanes</span></div>
   <div class="sgrid three">

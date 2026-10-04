@@ -36,7 +36,7 @@ bash -n "$GET" || fail "get.sh has a syntax error"
 # 1 — default install into --target: pack lands, hooks wired, helper skills called.
 T="$WORK/t1"; mkdir -p "$T"; : > "$NPX_LOG"
 out=$(bash "$GET" --target "$T" 2>&1) || fail "default install exited non-zero: $out"
-for s in super-board super-build super-qa super-review super-collect visual ui-refine-loop; do
+for s in super-board super-build super-qa super-review super-collect visual git-sync ui-refine-loop; do
   [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "skill $s not installed"
 done
 [ -x "$T/.claude/bin/super-board-run.sh" ] || fail "dispatcher script not installed"

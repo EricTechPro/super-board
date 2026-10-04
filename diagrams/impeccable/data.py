@@ -1,15 +1,14 @@
 # impeccable v4.0.4 (EricOS .agents/skills/impeccable) — command data, sourced from SKILL.md + reference/*.md
 # group: (id, region label, archify node type, legend label)
 GROUPS = [
- ("ctx",   "Context",     "cloud",      "context / setup"),
+ ("ctx",   "Setup",     "cloud",      "context / setup"),
  ("plan",  "Plan & build",        "messagebus", "plan / build"),
  ("diag",  "Diagnose",            "security",   "diagnose (report only)"),
- ("fix",   "Fix · then polish",        "backend",    "fix / refine"),
- ("style", "Style · then polish",               "frontend",   "style / enhance"),
- ("motion","Motion",        "frontend",   None),
- ("fin",   "Finish",              "external",   "finish"),
- ("sys",   "System",    "database",   "system / iterate"),
- ("util",  "Maintenance",         "cloud",      None),
+ ("fix",   "Fix · choose as needed",        "backend",    "fix / refine"),
+ ("style", "Style · choose as needed",               "frontend",   "style / enhance"),
+ ("motion","Motion · choose as needed",        "frontend",   None),
+ ("fin",   "Polish last",              "external",   "finish"),
+  ("util",  "Utilities · use independently", "database", "utilities"),
 ]
 
 # id, label, group, trigger (node sublabel), steps, inputs, output, requires, feeds-into, source
@@ -80,10 +79,10 @@ C = [
  ("polish","polish","fin","before shipping",
   ["Establish the system (DESIGN.md, tokens)","Gather evidence + latest critique snapshot","Triage functional vs cosmetic","Polish the whole path","Verify every state + clean diff"],
   "DESIGN.md, critique snapshot, quality bar","Shippable path + clean source diff","—","bolder / redesign (if concept is wrong)","polish.md"),
- ("extract","extract","sys","drift · 3+ repeats",
+ ("extract","extract","ctx","drift · 3+ repeats",
   ["Discover the design system (ask if none)","Identify patterns used 3+ times","Plan extraction","Extract & enrich components/tokens","Migrate all uses","Document"],
   "codebase repeats","Shared tokens + components, migrated uses","—","— (no command link in source)","extract.md"),
- ("live","live","sys","dev server running",
+ ("live","live","util","dev server running",
   ["Boot live.mjs (+ live-setup on first run)","Open the app URL","Background poll loop","On generate: load verb ref, 3 variants via HMR","Accept / discard → write source","Exit cleanup"],
   "running dev server, PRODUCT.md, DESIGN.md","Chosen variant written to source","init (configures live, optional)","— (calls 11 verb references)","live.md"),
  ("hooks","hooks","util","detector on edits",
@@ -97,26 +96,17 @@ C = [
   "command name","Standalone /<command> shortcut","—","—","SKILL.md"),
 ]
 
-# edges: from, to, label, variant   (read as: FROM — label → TO)
-E = [
- ("shape","init","requires","emphasis"),
- ("craft","init","requires","emphasis"),
- ("document","init","requires","emphasis"),
- ("shape","craft","feeds",None),
- ("craft","document","calls",None),
- ("delight","animate","calls",None),
- ("init","live","feeds",None),
- ("critique","polish","feeds",None),
- ("menu","init","suggests","dashed"),
- ("menu","critique","suggests","dashed"),
- ("audit","harden","suggests","dashed"),
- ("audit","optimize","suggests","dashed"),
- ("layout","craft","escalates","dashed"),
- ("polish","bolder","suggests","dashed"),
- ("live","polish","calls",None),
- ("doctor","document","feeds","dashed"),
+# Map arrows show order of use; clicked definitions retain detailed pairings.
+STAGES = [
+ ("ctx", "Setup", "establish context", ["init", "document", "extract", "menu"]),
+ ("plan", "Plan / build", "plan, then build", ["shape", "craft"]),
+ ("diag", "Diagnose", "review + report", ["critique", "audit"]),
+ ("fix", "Fix", "choose as needed", ["harden", "clarify", "adapt", "optimize", "onboard", "distill"]),
+ ("style", "Style", "choose as needed", ["layout", "typeset", "colorize", "bolder", "quieter"]),
+ ("motion", "Motion", "choose as needed", ["animate", "delight", "overdrive"]),
+ ("fin", "Polish", "always last", ["polish"]),
 ]
-POLISH_HANDOFF = ["harden","clarify","adapt","optimize","onboard","distill","layout","typeset","colorize","bolder","quieter","animate","delight"]
+UTILITIES = ["hooks", "doctor", "pin", "live"]
 
 # ---- v3 additions ----
 # short trigger (one phrase, canvas sublabel)
@@ -180,7 +170,7 @@ PAIR = {
 "delight":"Calls animate for motion. Hand off to polish.",
 "overdrive":"Use on its own when the brief asks for wow; verify in the browser.",
 "polish":"Always last, after diagnose + fixes. If the concept is wrong it suggests bolder or a redesign.",
-"extract":"Standalone: no other command links to it. Run when repeated UI drifts apart.",
+"extract":"During setup on an existing codebase, or whenever repeated UI drifts apart. Run independently when needed.",
 "live":"Needs a dev server; init sets it up. Uses the style commands' rules for its variants.",
 "hooks":"Leave on while building; it catches mechanical defects as you edit.",
 "doctor":"When context looks stale; it hands real gaps to init or document.",

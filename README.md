@@ -6,10 +6,10 @@
 
 <p><strong>Add tasks, walk away, get merged PRs with proof.</strong></p>
 
-<p>7 skills (4 you type, 3 the board runs) · 8 commands · 6 guard hooks</p>
+<p>8 skills (5 you type, 3 the board runs) · 9 commands · 6 guard hooks</p>
 
 <p>
-<img alt="Version" src="https://img.shields.io/badge/version-3.0.3-1f883d?style=flat-square">
+<img alt="Version" src="https://img.shields.io/badge/version-3.0.5-1f883d?style=flat-square">
 <img alt="Host" src="https://img.shields.io/badge/Claude%20Code-skills-d97757?style=flat-square">
 <img alt="License" src="https://img.shields.io/badge/license-MIT-0969da?style=flat-square">
 </p>
@@ -39,7 +39,7 @@ Or as a Claude Code plugin:
 ```
 
 > [!NOTE]
-> The plugin ships the skills only. Run `/super-board:super-board onboard` and its 🔍 Checks step adds the guard hooks, scripts and workflows. Needs Claude Code, `gh`, `jq`, bash 3.2+ and Python 3; the installer checks.
+> The plugin ships the skills only. Run `/super-board:super-board onboard` and its 🔍 Checks step adds the guard hooks, scripts and workflows. Needs Claude Code, `gh`, `jq`, bash 3.2+ and Python 3.9+; the installer checks.
 
 ## Quick start
 
@@ -73,10 +73,10 @@ Each card runs Build → QA → Review, and the merge gate merges it when the ev
 
 ## Skills
 
-**7 skills (4 you type, 3 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable and humanizer.
+**8 skills (5 you type, 3 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable and humanizer.
 
 <!-- skills:start -->
-**You type — 4 skills**
+**You type — 5 skills**
 
 | Skill | What it does |
 |---|---|
@@ -84,6 +84,7 @@ Each card runs Build → QA → Review, and the merge gate merges it when the ev
 | [`/super-collect`](skills/super-collect/README.md) | Finds problems (Sentry, PostHog, issues, PRs, architecture) and files verified Backlog cards. |
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
+| [`/git-sync`](skills/git-sync/README.md) | Commit per logical change, merge-pull, push without force, report. |
 
 **The board runs — 3 lanes**
 
@@ -107,6 +108,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /super-collect [source]       # file problems to Backlog
 /ui-refine-loop <route>       # polish one page
 /visual [recap|plan|path]     # one HTML page
+/git-sync                     # commit, pull, push
 ```
 
 Flags: `run --low|--high` · `super-collect --since 30d`
