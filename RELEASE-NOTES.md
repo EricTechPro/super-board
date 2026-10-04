@@ -1,5 +1,16 @@
 # Release notes
 
+## v3.1.1 — 2026-10-04
+
+`/super-board run` inside a Codex session runs on Codex instead of failing.
+
+- ✨ **A Codex host means `--codex`.** With no Workflow tool, or when the new
+  `scripts/super-board-host.sh` prints `codex`, a plain `run` takes the Codex ladder; `--low`,
+  `--high` and `--codex=<model>` still apply. The check reads `CODEX_THREAD_ID` /
+  `CODEX_SESSION_ID`, which codex-cli 0.160.0 sets in every shell it runs.
+- 📝 **How Codex finds the skill.** Codex has no `/super-board` command: it reads skills from
+  `.agents/skills/` and is invoked as `$super-board run`.
+
 ## v3.1.0 — 2026-10-04
 
 The board spends about a twentieth of the GitHub budget it did, can run every lane on Codex,

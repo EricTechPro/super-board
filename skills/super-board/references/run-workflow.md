@@ -20,6 +20,11 @@ Ready takes its tier's medium cell. `--codex=<model>`, else optional `codex.mode
 pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
 
+**Inside Codex, plain `run` is `--codex`.** Your tool list has no Workflow tool, or
+`bash .claude/bin/super-board-host.sh` prints `codex` → run as `--codex` (tier flags and
+`--codex=<model>` still apply); it counts as explicit `--codex`, Review included.
+Say so once, in the first wave report: `🔁 codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
+
 After the same plan and claim steps, launch this command as a background task:
 `bash .claude/bin/super-board-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
 The helper starts one `super-board-codex-lane.sh` per card/lane, cards in parallel,
@@ -126,7 +131,7 @@ Repeat until a done condition or halt gate fires:
    quota: `gh api repos/<o>/<r>/issues/<n>/comments -f body=…` for a comment,
    `gh api -X DELETE repos/<o>/<r>/issues/<n>/assignees -f 'assignees[]=<bot>'`
    to release a claim. Board moves have no REST route; they wait for the reset.
-   **Usage guard** (Claude waves only; skip for explicit `--codex`) — `bash .claude/bin/super-board-usage.sh check --config <config-path>`
+   **Usage guard** (Claude waves only; skip for `--codex`, explicit or host-switched) — `bash .claude/bin/super-board-usage.sh check --config <config-path>`
    (Claude 5-hour and weekly plan usage; threshold `usage_pause_pct`, default 95):
    - exit 0 → launch.
    - exit 10 with `usage_fallback: "codex"` → Build/QA may use
@@ -208,7 +213,8 @@ Repeat until a done condition or halt gate fires:
    bot_identity is unset — accepted single-orchestrator risk: without it
    there is no cross-session claim at all, so never run two orchestrators
    (or /loop re-entries) against the same board without bot_identity.
-4. **Launch** — With explicit `--codex`, use "Codex runs" above; otherwise Workflow tool with
+4. **Launch** — With `--codex`, or no Workflow tool, or the host check printing `codex`, use
+   "Codex runs" above; otherwise Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
    `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` straight from the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
@@ -287,6 +293,7 @@ don't stall on prompts:
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
     "Bash(bash .claude/bin/super-board-codex-lane.sh:*)",
     "Bash(bash .claude/bin/super-board-codex-wave.sh:*)",
+    "Bash(bash .claude/bin/super-board-host.sh:*)",
     "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
 
