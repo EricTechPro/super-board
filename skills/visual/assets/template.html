@@ -194,6 +194,22 @@
   .flowing svg .flowline { opacity: .9; animation: flowdash 2.4s linear infinite; }
   .flowing svg .edge { opacity: .8; }
   @keyframes flowdash { to { stroke-dashoffset: -160; } }
+  /* intake badges and the view tour: a ticket dot rides the loop while flow is on */
+  svg .intake-chip { fill: #fff; stroke: var(--border-2); stroke-width: 1.2; }
+  svg .intake-tx { fill: var(--muted); font: 600 10.5px var(--sans); }
+  svg .intake-chip.dashed { fill: var(--panel); stroke: var(--w-feeds); stroke-dasharray: 3 3; }
+  svg .intake-mark { fill: #1b1f23; font: 700 13px var(--sans); }
+  svg .intake-chip.dashed + .intake-mark { fill: var(--w-feeds); }
+  svg .tour, svg .tour-glow { display: none; pointer-events: none; }
+  .flowing svg .tour, .flowing svg .tour-glow { display: inline; }
+  svg .tour-glow { fill: none; stroke-width: 7; stroke-linecap: round; filter: blur(2.5px); }
+  svg .tour-dot { fill: var(--w-feeds); stroke: var(--bg-2); stroke-width: 1.5; filter: drop-shadow(0 0 6px var(--w-feeds)); }
+  svg .tour-packet { fill: var(--w-feeds); }
+  .flowing svg .node.tour-stop { transform-box: fill-box; transform-origin: center; animation: tour-pulse 8s ease-in-out infinite; }
+  @keyframes tour-pulse { 0%, 9%, 100% { transform: none; filter: none; } 4% { transform: scale(1.04); filter: drop-shadow(0 0 10px color-mix(in srgb, var(--w-feeds) 60%, transparent)); } }
+  .flowing svg .edge-g.back .edge { animation: march 1.1s linear infinite; }
+  @keyframes march { to { stroke-dashoffset: -22; } }
+  @media (prefers-reduced-motion: reduce) { svg .tour, svg .tour-glow { display: none !important; } .flowing svg .node.tour-stop, .flowing svg .edge-g.back .edge { animation: none; } }
   @media (prefers-reduced-motion: reduce) { .flowing svg .flowline { animation: none; opacity: 0; } .flowing svg .edge { opacity: 1; } }
   .ctl button.on { color: var(--cyan); background: var(--cyan-f); }
   svg .flow { stroke-dasharray: 6 6; animation: flow 1.2s linear infinite; }
@@ -766,6 +782,29 @@
       }
     });
     const tagRects = nodes.filter(n => n.tag).map(n => ({ x: n.tag.x - 2, y: n.tag.y - 2, w: n.tag.w + 4, h: n.tag.h + 6 }));
+    // Family frames enclose ordinary cards, so clicks, ports and focus keep their existing owners.
+    // Children contribute their entire frame to their parent's bounds, rather than just their cards.
+    const familyDefs = dg.containers || [], familyCache = {};
+    const frameOf = (f, trail = new Set()) => {
+      if (familyCache[f.id]) return familyCache[f.id];
+      if (trail.has(f.id)) return null;
+      const next = new Set([...trail, f.id]);
+      const children = familyDefs.filter(c => c.parent === f.id).map(c => frameOf(c, next)).filter(Boolean);
+      const members = (f.nodeIds || []).map(id => byId[id]).filter(Boolean);
+      const rects = [...members.map(n => ({x:n.x - 8,y:n.y - 14,w:n.w + 16,h:n.h + 22 + (n.tag ? 14 : 0)})), ...children];
+      if (!rects.length) return null;
+      const p = 12, x = Math.min(...rects.map(r => r.x)) - p, y = Math.min(...rects.map(r => r.y)) - p - 24;
+      return familyCache[f.id] = {...f, x, y, w:Math.max(...rects.map(r => r.x+r.w)) + p - x, h:Math.max(...rects.map(r => r.y+r.h)) + p - y};
+    };
+    const families = familyDefs.map(f => frameOf(f)).filter(Boolean);
+    // intake sources: brand badges stacked left of the node they feed, each with its own short feeds line
+    const intake = map ? (dg.intake || []).filter(b => byId[b.to]).map((b, i, all) => {
+      const n = byId[b.to], mine = all.filter(o => o.to === b.to), k = mine.indexOf(b), off = k - (mine.length - 1) / 2;
+      const cx = n.x - 72, cy = n.y + n.h / 2 + off * 34, py = n.y + n.h / 2 + off * Math.min(16, (n.h - 20) / Math.max(1, mine.length - 1));
+      const ex = n.x - 38 + Math.abs(off) * 6; // nested elbows: an outer badge turns nearer the card, so lines never cross
+      return { ...b, cx, cy, r: 14, pts: simplify([[cx + 15, cy], [ex, cy], [ex, py], [n.x, py]]) };
+    }) : [];
+    intake.forEach(b => tagRects.push({ x: b.cx - b.r - 4, y: b.cy - b.r - 4, w: 2 * b.r + 8, h: 2 * b.r + 8 }));
     /* ---- routing: one orthogonal route per edge, no shared trunks ----
        Ported in approach from archify's router (MIT): renderers/shared/route-quality.mjs
        shortestOrthogonalGridRoute + renderers/architecture/routing.mjs. Each edge gets its own
@@ -776,8 +815,18 @@
        route exists; earlier labels are obstacles, so later routes keep clear of them. */
     const edges = (dg.edges || []).filter(e => byId[e.from] && byId[e.to] && e.from !== e.to).map(e => ({ ...e, s: byId[e.from], t: byId[e.to] }));
     // fixed edges arrive with their route already drawn (the hub comb); the router works around them
+    // a loop back out of a family runs under the frames: out the source's right side, down past every
+    // frame and card it would cut through, left along the bottom, and up into the target's bottom
+    const inFam = n => families.filter(f => n.x >= f.x && n.x + n.w <= f.x + f.w && n.y >= f.y && n.y + n.h <= f.y + f.h);
+    edges.filter(e => map && e.back && !e.fixed && (inFam(e.s).length || inFam(e.t).length)).forEach((e, k) => {
+      const { s, t } = e, sy = s.y + s.h / 2;
+      const xr = Math.max(s.x + s.w + 22, ...inFam(s).map(f => f.x + f.w + 14)) + k * 10;
+      const tx = t.tag ? Math.max(t.x + 12, (t.x + t.tag.x - 2) / 2) : t.x + t.w / 2, ty = t.y + t.h + (t.kids ? 8 : 0);
+      const span = nodes.filter(n => n.x < xr && n.x + n.w > tx), yb = Math.max(...[...inFam(s), ...inFam(t)].map(f => f.y + f.h), ...span.map(n => n.y + n.h + (n.tag ? 22 : 8))) + 24 + k * 10;
+      e.fixed = [[s.x + s.w, sy], [xr, sy], [xr, yb], [tx, yb], [tx, ty]]; e.under = true;
+    });
     const free = edges.filter(e => !e.fixed);
-    edges.filter(e => e.fixed).forEach(e => { e.pts = e.fixed; e.p1 = e.pts[0]; e.p2 = e.pts[e.pts.length - 1]; e.fs = 'R'; e.ts = 'L'; e.stubs = []; e.how = 'comb'; });
+    edges.filter(e => e.fixed).forEach(e => { e.pts = e.fixed; e.p1 = e.pts[0]; e.p2 = e.pts[e.pts.length - 1]; e.fs = 'R'; e.ts = e.under ? 'B' : 'L'; e.stubs = []; e.how = e.under ? 'under' : 'comb'; });
     const sides = {};
     const pushSide = (n, side, e, other) => ((sides[n.id + '|' + side] ||= []).push({ e, other, n }));
     free.forEach(e => {
@@ -924,7 +973,7 @@
     const placed = [];
     function placeLabel(e) {
       if (!e.label && e.step == null) return;
-      const full = map ? fit(e.label || '', 10.5, 170) : fit((e.step != null ? e.step + ' · ' : '') + (e.label || ''), 10, 150);
+      const full = map ? fit(e.label || '', 10.5, e.under ? 320 : 170) : fit((e.step != null ? e.step + ' · ' : '') + (e.label || ''), 10, 150);
       const tries = [full]; if (e.step != null && e.label && !dg.abs) tries.push(map ? '' : String(e.step));
       const segs = segsOf(e.pts).map((s, i) => ({ a: s[0], b: s[1], i, l: Math.hypot(s[1][0] - s[0][0], s[1][1] - s[0][1]), h: s[0][1] === s[1][1] }));
       const order = [...segs].sort((p, q) => (q.h - p.h) * 40 + (q.l - p.l));
@@ -955,7 +1004,7 @@
     const runRouting = order => {
       routed.length = 0; reserved.length = 0; placed.length = 0; stats = {};
       (dg.blocks || []).forEach(b => { reserved.push(b); placed.push(b); }); // lane headers and arrows stay clear
-      edges.filter(e => e.fixed).forEach(e => { routed.push(e); if (e.lbl) { placed.push(e.lbl); reserved.push({ x: e.lbl.x - 3, y: e.lbl.y - 3, w: e.lbl.w + 6, h: e.lbl.h + 6 }); } stats.comb = (stats.comb || 0) + 1; });
+      edges.filter(e => e.fixed).forEach(e => { routed.push(e); if (e.under) { placeLabel(e); stats.under = (stats.under || 0) + 1; return; } if (e.lbl) { placed.push(e.lbl); reserved.push({ x: e.lbl.x - 3, y: e.lbl.y - 3, w: e.lbl.w + 6, h: e.lbl.h + 6 }); } stats.comb = (stats.comb || 0) + 1; });
       order.forEach(e => {
         let how = 'grid'; e.lbl = null; e.pts = gridRoute(e, false, 320) || gridRoute(e, false, 0);
         if (!e.pts) { how = 'cross'; e.pts = gridRoute(e, true, 0); } if (!e.pts) { how = 'fallback'; e.pts = fallback(e); }
@@ -1014,25 +1063,11 @@
       return { ...g, k: kindOf(g.kind || 'external'), x: Math.min(...ms.map(n => n.x)) - P, y: Math.min(...ms.map(n => n.y)) - P - 16,
         x2: Math.max(...ms.map(n => n.x + n.w)) + P, y2: Math.max(...ms.map(n => n.y + n.h)) + P };
     }).filter(Boolean);
-    // Family frames enclose ordinary cards, so clicks, ports and focus keep their existing owners.
-    // Children contribute their entire frame to their parent's bounds, rather than just their cards.
-    const familyDefs = dg.containers || [], familyCache = {};
-    const frameOf = (f, trail = new Set()) => {
-      if (familyCache[f.id]) return familyCache[f.id];
-      if (trail.has(f.id)) return null;
-      const next = new Set([...trail, f.id]);
-      const children = familyDefs.filter(c => c.parent === f.id).map(c => frameOf(c, next)).filter(Boolean);
-      const members = (f.nodeIds || []).map(id => byId[id]).filter(Boolean);
-      const rects = [...members.map(n => ({x:n.x - 8,y:n.y - 14,w:n.w + 16,h:n.h + 22 + (n.tag ? 14 : 0)})), ...children];
-      if (!rects.length) return null;
-      const p = 12, x = Math.min(...rects.map(r => r.x)) - p, y = Math.min(...rects.map(r => r.y)) - p - 24;
-      return familyCache[f.id] = {...f, x, y, w:Math.max(...rects.map(r => r.x+r.w)) + p - x, h:Math.max(...rects.map(r => r.y+r.h)) + p - y};
-    };
-    const families = familyDefs.map(f => frameOf(f)).filter(Boolean);
     const xs = [...families.flatMap(f => [f.x,f.x+f.w]), ...(dg.lanes || []).flatMap(l => [l.x, l.x + l.w]), ...nodes.flatMap(n => [n.x - 14, n.x + n.w + 8]), ...groups.flatMap(g => [g.x, g.x2]), ...edges.flatMap(e => e.pts.map(p => p[0])), ...placed.flatMap(p => [p.x, p.x + p.w])];
     const ys = [...families.flatMap(f => [f.y,f.y+f.h]), ...(dg.lanes || []).flatMap(l => [l.y, l.y + l.h]), ...nodes.flatMap(n => [n.y - 14, n.y + n.h + (n.tag ? 18 : 8)]), ...groups.flatMap(g => [g.y, g.y2]), ...edges.flatMap(e => e.pts.map(p => p[1])), ...placed.flatMap(p => [p.y, p.y + p.h])];
+    intake.forEach(b => { xs.push(b.cx - b.r - 8 - textW(b.label || '', 10.5), b.cx + b.r); ys.push(b.cy - b.r, b.cy + b.r); });
     const M = 36, minX = Math.min(...xs) - M, minY = Math.min(...ys) - M;
-    return { stats, nodes, edges, groups, families, byId, map, hub: dg.hub || null, lanes: dg.lanes || [], blocks: dg.blocks || [], bounds: { x: minX, y: minY, w: Math.max(...xs) - minX + M, h: Math.max(...ys) - minY + M } };
+    return { stats, nodes, edges, groups, families, intake, tour: dg.tour || null, byId, map, hub: dg.hub || null, lanes: dg.lanes || [], blocks: dg.blocks || [], bounds: { x: minX, y: minY, w: Math.max(...xs) - minX + M, h: Math.max(...ys) - minY + M } };
   }
 
   let svgSeq = 0;
@@ -1068,9 +1103,34 @@
       s += `<g class="grp"><rect x="${g.x}" y="${g.y}" width="${g.x2 - g.x}" height="${g.y2 - g.y}" rx="12" fill="${fill(g.k)}" fill-opacity=".35" stroke="${col(g.k)}" stroke-opacity=".55" stroke-dasharray="6 4"/>
         <text x="${g.x + 12}" y="${g.y + 16}" class="g-label" fill="${col(g.k)}">${esc(fit(g.label, 10, g.x2 - g.x - 24))}</text></g>`;
     });
+    // tour (map): one ticket dot rides the view's loop; each stop pulses and each wire glows as it passes
+    const TOUR = 8, f2 = v => +Math.min(1, Math.max(0, v)).toFixed(4), tour = map && (geo.tour || []).length > 1 ? (() => {
+      const pts = [], legs = {}, at = {}, ends = [];
+      for (let i = 0; i + 1 < geo.tour.length; i++) {
+        const a = geo.tour[i], b = geo.tour[i + 1], k = edges.findIndex(e => (e.from === a && e.to === b) || (e.both && e.from === b && e.to === a));
+        if (k < 0) return null;
+        const p = edges[k].from === a ? edges[k].pts : [...edges[k].pts].reverse();
+        if (pts.length) pts.push([pts[pts.length - 1][0], p[0][1]]); // through the card to the next port
+        const from = pts.length; pts.push(...p); ends.push([k, from, pts.length - 1, b]);
+      }
+      const P = pts.filter((p, i) => !i || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]), L = [0];
+      pts.slice(1).forEach((p, i) => L.push(L[i] + Math.abs(p[0] - pts[i][0]) + Math.abs(p[1] - pts[i][1])));
+      const tot = L[L.length - 1] || 1; at[geo.tour[0]] = 0;
+      ends.forEach(([k, a, b, to]) => { legs[k] = [L[a] / tot, L[b] / tot]; if (!(to in at)) at[to] = L[b] / tot; });
+      return { d: roundPath(P), legs, at };
+    })() : null;
+    const tourAnim = (vals, times) => `<animate attributeName="opacity" values="${vals}" keyTimes="${times.map(f2).join(';')}" dur="${TOUR}s" repeatCount="indefinite"/>`;
     s += '<g class="edges">';
+    (geo.intake || []).forEach(b => {
+      s += `<g class="intake"><title>${esc(b.label)} feeds ${esc((geo.byId[b.to] || {}).label || b.to)}</title><path d="${roundPath(b.pts)}" class="edge" stroke="var(--w-feeds)" marker-end="url(#${id}-feeds)"/>
+        <circle cx="${b.cx}" cy="${b.cy}" r="${b.r}" class="intake-chip${b.dashed ? ' dashed' : ''}"/>${b.logo ? `<image href="${esc(b.logo)}" x="${b.cx - 9}" y="${b.cy - 9}" width="18" height="18"/>` : b.mark ? `<text x="${b.cx}" y="${b.cy + 4.5}" text-anchor="middle" class="intake-mark">${esc(b.mark)}</text>` : ''}
+        <text x="${b.cx - b.r - 7}" y="${b.cy + 3.5}" text-anchor="end" class="intake-tx">${esc(b.label)}</text>
+        ${tour ? `<circle r="3.2" class="tour tour-packet" opacity="0"><animateMotion path="${roundPath(b.pts)}" keyPoints="0;0;1" keyTimes="0;.86;1" calcMode="linear" dur="${TOUR}s" repeatCount="indefinite"/>${tourAnim('0;0;.8;.8;0', [0, .86, .88, .99, 1])}</circle>` : ''}</g>`;
+    });
     edges.forEach((e, i) => {
       const st = estyle(e), d = roundPath(e.pts);
+      if (tour && tour.legs[i]) { const [a, b] = tour.legs[i];
+        s += `<path d="${d}" class="tour-glow" stroke="${st.c}" opacity="0">${tourAnim('0;0;.55;.55;0;0', [0, a, Math.min(a + .01, b), b, b + .03, 1])}</path>`; }
       s += `<g class="edge-g${st.cls || ''}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-i="${i}"><path d="${d}" class="halo"/><path d="${d}" class="hitline"/>
         <path d="${d}" class="edge${st.flow ? ' flow' : ''}" stroke="${st.c}" ${st.dash && !st.flow ? `stroke-dasharray="${st.dash}"` : ''} ${st.op ? `opacity="${st.op}"` : ''} marker-end="url(#${id}-${st.m})" ${e.both ? `marker-start="url(#${id}-${st.m})"` : ''}/>
         <path d="${d}" class="flowline" stroke="${st.c}"/>
@@ -1089,7 +1149,7 @@
       const labelPx = n.emphasis ? 15 : 13;
       const lpx = textW(n.label, labelPx) > n.w - 30 ? Math.max(11, (n.w - 30) / (String(n.label).length * 0.6)) : labelPx;
       const ly = n.y + n.h / 2 + (sub || verbs ? -3 : 4);
-      s += `<g class="node${pub ? ' pub' : ''}${priv ? ' priv' : ''}${kids ? ' has-child' : ''}${subject ? ' subject' : ''}${n.emphasis ? ' main-step' : ''}" data-id="${esc(n.id)}" tabindex="${map ? 0 : -1}" role="${map ? 'button' : 'img'}" aria-label="${esc(n.label)}${kids ? ' (opens inner view)' : ''}">
+      s += `<g class="node${pub ? ' pub' : ''}${priv ? ' priv' : ''}${kids ? ' has-child' : ''}${subject ? ' subject' : ''}${n.emphasis ? ' main-step' : ''}${tour && n.id in tour.at ? ' tour-stop' : ''}"${tour && n.id in tour.at ? ` style="animation-delay:${(tour.at[n.id] * TOUR - .32).toFixed(2)}s"` : ''} data-id="${esc(n.id)}" tabindex="${map ? 0 : -1}" role="${map ? 'button' : 'img'}" aria-label="${esc(n.label)}${kids ? ' (opens inner view)' : ''}">
         <title>${esc(n.label)}${subTxt ? ' · ' + esc(subTxt) : ''}${n.note ? '\n' + esc(n.note) : ''}${kids ? '\nDouble-click to open' : ''}</title>`;
       if (kids) s += `<rect x="${n.x + 8}" y="${n.y + 8}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-stack" stroke="${c}"/><rect x="${n.x + 4}" y="${n.y + 4}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-stack" stroke="${c}"/>`;
       if (pub) s += `<rect x="${n.x - 4}" y="${n.y - 4}" width="${n.w + 8}" height="${n.h + 8}" rx="14" class="n-ring" stroke="${c}"/>`;
@@ -1142,6 +1202,7 @@
       }
       s += `</g>`;
     });
+    if (tour) s += `<g class="tour" aria-hidden="true"><circle r="5.5" class="tour-dot"><animateMotion path="${tour.d}" dur="${TOUR}s" repeatCount="indefinite"/></circle></g>`;
     s += '</g><g class="labels depth-read">';
     edges.forEach((e, i) => {
       if (!e.lbl) return;
@@ -1882,6 +1943,7 @@
     const layoutCache = {};
     const kidCount = (nid, vid) => { const c = childOf(nid, vid); return c && c !== vid ? (V[c].nodeIds || []).length : 0; };
     const wireKind = e => { const t = N[e.to] || {}, f = N[e.from] || {}, l = String(e.label || '');
+      if (WIRES.some(w => w[0] === e.kind)) return e.kind; // an edge may name its wire kind
       if (f.kind === 'hook') return 'guard';
       if (t.kind === 'board' || f.kind === 'board' || /\b(reads?|writes? config|saves?|records?|appends?)\b/i.test(l)) return 'state';
       if (t.kind === 'hook' || /\b(trigger|fires|suggests?|offers?|requires|wires)/i.test(l)) return 'triggers';
@@ -1907,7 +1969,7 @@
       const stepIds = v.stepIds || ids;
       const dg = { nodeH: mainSteps ? 82 : 64, mainSteps, containers: v.containers, nodes: ids.map(i => { const n = nodeIn(i, vid), step = mainSteps && stepIds.includes(i); return { ...n, sub: n.sub || n.sublabel, emphasis: !!step || !!n.emphasis, step: step ? stepIds.indexOf(i) + 1 : null, verbs: step ? [] : n.verbs, kids: kidCount(i, vid), col: (pos[i] || [0, 0])[0], row: (pos[i] || [0, 0])[1] }; }),
         edges: prepEdges(vid, edges, P.backKeys) };
-      dg.repair = repair;
+      dg.repair = repair; dg.intake = v.intake; dg.tour = v.tour;
       return layoutGraph(dg, true);
     }
     function hubGeo(vid, P, edges, repair) {

@@ -402,7 +402,21 @@ def load_map(path: Path) -> dict:
                          capture_output=True, text=True).stdout.strip()
     data["_root"] = top or str(path.resolve().parent)
     data.setdefault("source", portable_path(path.resolve(), Path(data["_root"])))
+    embed_logos(data, path.resolve().parent)
     return data
+
+
+def embed_logos(d: dict, base: Path) -> int:
+    """Inline each view's intake `logo` (an SVG path relative to the map file), so the page works offline."""
+    import base64
+    n = 0
+    for v in d.get("views", []):
+        for src in v.get("intake", []):
+            logo = src.get("logo")
+            if logo and not str(logo).startswith("data:") and (base / logo).is_file():
+                src["logo"] = "data:image/svg+xml;base64," + base64.b64encode((base / logo).read_bytes()).decode()
+                n += 1
+    return n
 
 
 def embed_avatars(d: dict) -> int:
@@ -482,6 +496,12 @@ def validate_map(d: dict) -> list[str]:
                     out.append(f"view {v.get('id')!r}: container {fid!r} has unknown parent {cursor!r}")
                     break
                 cursor = families[cursor].get("parent")
+        for src in v.get("intake", []):
+            if src.get("to") not in members:
+                out.append(f"view {v.get('id')!r}: intake {src.get('label')!r} feeds non-visible node {src.get('to')!r}")
+        for i in v.get("tour", []):
+            if i not in members:
+                out.append(f"view {v.get('id')!r}: tour stop {i!r} is not in nodeIds")
         for e in v.get("edges", []) or []:
             if isinstance(e, dict) and (e.get("from") not in ids or e.get("to") not in ids):
                 out.append(f"view {v.get('id')!r}: edge {e.get('from')}->{e.get('to')} has an unknown end")

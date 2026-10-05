@@ -2940,7 +2940,39 @@
           "label": "Ready cards"
         },
         "r-build-qa",
-        "r-qa-review"
+        "r-qa-review",
+        {
+          "from": "super-review",
+          "to": "super-collect",
+          "label": "review done → collect the next tickets",
+          "kind": "feeds",
+          "when": "the board drains; /super-collect files the next verified tickets into Backlog"
+        }
+      ],
+      "intake": [
+        {
+          "label": "Sentry",
+          "logo": "assets/logos/sentry.svg",
+          "to": "super-collect"
+        },
+        {
+          "label": "PostHog",
+          "logo": "assets/logos/posthog.svg",
+          "to": "super-collect"
+        },
+        {
+          "label": "GitHub",
+          "logo": "assets/logos/github.svg",
+          "to": "super-collect"
+        }
+      ],
+      "tour": [
+        "super-collect",
+        "super-board",
+        "super-build",
+        "super-qa",
+        "super-review",
+        "super-collect"
       ],
       "lanes": false,
       "layout": {
@@ -3438,9 +3470,8 @@
       "id": "super-collect",
       "parent": "root",
       "title": "/super-collect · fetch, verify, file",
-      "caption": "Fetch → fresh verifier → confirm → Backlog. Five built-in sources plus custom ones; collection never moves a card to Ready.",
+      "caption": "Fetch sources → verify → confirm → file to Backlog. Five built-in sources plus custom ones; collecting never moves a card to Ready.",
       "nodeIds": [
-        "super-collect",
         "collect-fetch",
         "collect-verify",
         "collect-confirm",
@@ -3448,30 +3479,25 @@
       ],
       "edges": [
         {
-          "from": "super-collect",
-          "to": "collect-fetch",
-          "label": ""
-        },
-        {
           "from": "collect-fetch",
           "to": "collect-verify",
-          "label": ""
+          "label": "candidates"
         },
         {
           "from": "collect-verify",
           "to": "collect-confirm",
-          "label": ""
+          "label": "real ones"
         },
         {
           "from": "collect-confirm",
           "to": "collect-submit",
-          "label": ""
+          "label": "on yes"
         }
       ],
       "nodes": [
         {
           "id": "collect-fetch",
-          "label": "Fetch enabled sources",
+          "label": "Fetch sources",
           "kind": "step",
           "what": "Fetch the enabled built-in sources. Include any custom sources added in onboard.",
           "when": "When /super-collect runs for the project. Use the requested window or the default 14 days.",
@@ -3480,11 +3506,11 @@
             "_skills/vendor/super-board/skills/super-collect/SKILL.md"
           ],
           "opensView": "collect-sources",
-          "sublabel": "Default window: 14 days"
+          "sublabel": "Last 14 days by default"
         },
         {
           "id": "collect-verify",
-          "label": "Verify each candidate",
+          "label": "Verify",
           "kind": "step",
           "what": "Check whether each candidate is real and still happening. Reject fixed or duplicate problems.",
           "when": "After source adapters return candidates. Use one fresh verifier for each candidate.",
@@ -3493,11 +3519,11 @@
             "_skills/vendor/super-board/skills/super-collect/SKILL.md"
           ],
           "opensView": "collect-verify",
-          "sublabel": "Unclear → needs-triage"
+          "sublabel": "One fresh check each"
         },
         {
           "id": "collect-confirm",
-          "label": "Confirm the plan",
+          "label": "Confirm",
           "kind": "step",
           "what": "Show the proposed filing plan. Keep collection dry-run by default.",
           "when": "After verification produces the candidate results. Before writing tickets to the board.",
@@ -3506,11 +3532,11 @@
             "_skills/vendor/super-board/skills/super-collect/SKILL.md"
           ],
           "opensView": "collect-confirm",
-          "sublabel": "Dry-run by default"
+          "sublabel": "Dry run until you say yes"
         },
         {
           "id": "collect-submit",
-          "label": "File verified tickets",
+          "label": "File to Backlog",
           "kind": "step",
           "what": "File verified problems into Backlog. Apply fingerprints and duplicate checks.",
           "when": "After confirmation or an authorized --yes run. File candidates marked file or needs-triage.",
@@ -3519,42 +3545,63 @@
             "_skills/vendor/super-board/skills/super-collect/scripts/super-collect-file.sh"
           ],
           "opensView": "collect-submit",
-          "sublabel": "Backlog · then lint"
+          "sublabel": "Then lint"
         }
       ],
       "mainSteps": true,
       "render": "process",
       "lanes": false,
       "layout": {
-        "super-collect": [
+        "collect-fetch": [
           0,
           0
         ],
-        "collect-fetch": [
+        "collect-verify": [
           1,
           0
         ],
-        "collect-verify": [
+        "collect-confirm": [
           2,
           0
         ],
-        "collect-confirm": [
-          3,
-          0
-        ],
         "collect-submit": [
-          4,
+          3,
           0
         ]
       },
-      "nodeOverrides": {
-        "super-collect": {
-          "label": "Collect problems",
-          "verbs": [],
-          "sublabel": "Choose sources + window",
-          "opensView": "collect-sources"
+      "intake": [
+        {
+          "label": "Sentry",
+          "logo": "assets/logos/sentry.svg",
+          "to": "collect-fetch"
+        },
+        {
+          "label": "PostHog",
+          "logo": "assets/logos/posthog.svg",
+          "to": "collect-fetch"
+        },
+        {
+          "label": "GitHub issues",
+          "logo": "assets/logos/github.svg",
+          "to": "collect-fetch"
+        },
+        {
+          "label": "Merged PRs",
+          "logo": "assets/logos/github.svg",
+          "to": "collect-fetch"
+        },
+        {
+          "label": "Architecture",
+          "mark": "◇",
+          "to": "collect-fetch"
+        },
+        {
+          "label": "custom",
+          "mark": "+",
+          "dashed": true,
+          "to": "collect-fetch"
         }
-      }
+      ]
     },
     {
       "id": "ui-refine-loop",
