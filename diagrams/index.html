@@ -15,15 +15,15 @@
   --bg:#ffffff; --soft:#f6f8fa; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0;
   --accent:#0969da; --pri:#1f883d; --pri-fg:#ffffff;
   --lane-gray:#8c959f; --lane-blue:#0969da; --lane-orange:#bc4c00; --lane-purple:#8250df;
-  --lane-teal:#087e8b; --lane-green:#1f883d; --lane-red:#cf222e; --lane-mix:9%;
+  --lane-teal:#087e8b; --lane-green:#1f883d; --lane-red:#cf222e; --lane-mix:9%; --warn:#9a6700;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans",Helvetica,Arial,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   color-scheme:light;
 }
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;--lane-gray:#9198a1;--lane-blue:#4493f8;--lane-orange:#f0883e;--lane-purple:#a371f7;--lane-teal:#39c5cf;--lane-green:#3fb950;--lane-red:#f85149;--lane-mix:14%;color-scheme:dark}
+  :root:not([data-theme="light"]){--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;--lane-gray:#9198a1;--lane-blue:#4493f8;--lane-orange:#f0883e;--lane-purple:#a371f7;--lane-teal:#39c5cf;--lane-green:#3fb950;--lane-red:#f85149;--lane-mix:14%;--warn:#d29922;color-scheme:dark}
 }
-:root[data-theme="dark"]{--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;--lane-gray:#9198a1;--lane-blue:#4493f8;--lane-orange:#f0883e;--lane-purple:#a371f7;--lane-teal:#39c5cf;--lane-green:#3fb950;--lane-red:#f85149;--lane-mix:14%;color-scheme:dark}
+:root[data-theme="dark"]{--bg:#0d1117;--soft:#151b23;--fg:#f0f6fc;--muted:#9198a1;--border:#3d444d;--accent:#4493f8;--pri:#238636;--lane-gray:#9198a1;--lane-blue:#4493f8;--lane-orange:#f0883e;--lane-purple:#a371f7;--lane-teal:#39c5cf;--lane-green:#3fb950;--lane-red:#f85149;--lane-mix:14%;--warn:#d29922;color-scheme:dark}
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 html,body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans)}
@@ -95,6 +95,19 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
 .card.live{border:2px solid var(--pri)}
 .card .sn{position:absolute;top:-8px;right:-6px;background:var(--pri);color:var(--pri-fg);border-radius:999px;font-size:10px;font-weight:700;padding:0 6px}
 .card .ev{display:block;font:11px var(--mono);color:var(--pri);margin-top:3px}
+.board{position:relative}
+/* how: animated story (JS adds .anim; reduced motion keeps the still board) */
+.board.anim{grid-template-columns:repeat(7,minmax(132px,1fr))}
+.board.anim .bcol{min-height:var(--colmin,200px);transition:min-height .3s}
+.board.anim .card.tk{will-change:transform}
+.board.anim .card.fly{z-index:3}
+.board.anim .card .id{font:600 11px var(--mono);color:var(--muted)}
+.board.anim .card .ev{color:var(--muted);width:fit-content;max-width:100%}
+.board.anim .card .ev.ok{color:var(--pri)}
+.board.anim .card .ev.bad,.board.anim .card .ev.warn{padding:0 6px;border-radius:8px;font-weight:600}
+.board.anim .card .ev.bad{color:var(--lane-red);background:color-mix(in srgb,var(--lane-red) 13%,transparent)}
+.board.anim .card .ev.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 15%,transparent)}
+.board.anim .card.merged{border-color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri)}
 .steps{display:flex;flex-wrap:wrap;gap:8px 20px;margin:16px 0 0;padding:0;list-style:none;color:var(--muted);font-size:14px}
 .steps b{color:var(--fg)}
 
@@ -198,7 +211,7 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
 </div></section>
 
 <section class="sec" id="how"><div class="in">
-  <h2>Watch one card</h2>
+  <h2>Watch the board</h2>
   <p class="lead">#812 goes from Ready to merged on its own. The board is the only state: stop any time, and <code>run</code> picks up from each card's column.</p>
   <div class="board" role="img" tabindex="0" aria-label="Card #812 moves from Ready through Building, QA and Review to Done. Scroll horizontally to see all seven columns.">
     <div class="bcol backlog"><div class="bhead"><b>📥 Backlog</b><span class="who">you · collect</span></div><div class="card dim">Dark mode toggle</div><div class="card dim">CSV export</div></div>
@@ -304,6 +317,176 @@ h2{font:650 28px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 6px}
     if(e.target.closest('#burger')){var o=nav.classList.toggle('open');document.getElementById('burger').setAttribute('aria-expanded',o?'true':'false');return;}
     if(e.target.closest('#links a')){nav.classList.remove('open');document.getElementById('burger').setAttribute('aria-expanded','false');}
   });
+})();
+</script>
+<script>
+/* "Watch the board": five cards play a fixed story, Ready to Done, with send-backs. Reduced motion keeps the still board. */
+(function(){
+  var board=document.querySelector('#how .board'), lead=document.querySelector('#how .lead');
+  if(!board||!lead||!window.IntersectionObserver||!Element.prototype.animate||!Element.prototype.getAnimations) return;
+  var mq=matchMedia('(prefers-reduced-motion: reduce)');
+  var orig={board:board.innerHTML,label:board.getAttribute('aria-label'),lead:lead.innerHTML};
+  var ORDER=['backlog','ready','building','qa','review','done','blocked'];
+  var T={A:['#812','Receipt size error'],B:['#815','Retry failed sync'],C:['#818','Fix login redirect'],D:['#821','Dark mode toggle'],E:['#824','CSV export']};
+  /* [ms, card, column or '', status, status style, flight] ; flight: '' glide, 'bad' red arc, 'warn' amber arc */
+  var S=[
+    [0,'A','building','building…'],
+    [900,'A','','draft PR'],
+    [1600,'A','qa','running tests'],
+    [2000,'B','building','building…'],
+    [2800,'A','','48/48 tests','ok'],
+    [3100,'B','','draft PR'],
+    [3700,'A','review','reviewing'],
+    [4100,'B','qa','running tests'],
+    [4600,'C','building','building…'],
+    [5300,'B','','✗ tests failed','bad'],
+    [5700,'A','','review passed','ok'],
+    [6400,'B','building','sent back','bad','bad'],
+    [7200,'A','done','✓ PR merged','ok'],
+    [7600,'C','','draft PR'],
+    [8200,'C','qa','running tests'],
+    [8600,'D','building','building…'],
+    [9200,'B','','fixing tests'],
+    [9600,'C','','31/31 tests','ok'],
+    [10200,'D','blocked','needs you 🙋','warn','warn'],
+    [11000,'C','review','reviewing'],
+    [11400,'B','','draft PR'],
+    [12000,'B','qa','running tests'],
+    [12500,'C','','changes requested','warn'],
+    [13300,'C','building','changes requested','warn','warn'],
+    [13800,'E','building','building…'],
+    [14400,'B','','48/48 tests','ok'],
+    [15000,'B','review','reviewing'],
+    [15500,'C','','fixing review'],
+    [16000,'E','','draft PR'],
+    [16700,'D','ready','unblocked','','warn'],
+    [17400,'B','','review passed','ok'],
+    [18000,'B','done','✓ PR merged','ok'],
+    [18400,'E','qa','running tests'],
+    [18900,'C','','draft PR'],
+    [19500,'D','building','building…'],
+    [19900,'C','qa','running tests'],
+    [20500,'E','','22/22 tests','ok'],
+    [21000,'E','review','reviewing'],
+    [21400,'C','','31/31 tests','ok'],
+    [21900,'D','','draft PR'],
+    [22400,'C','review','reviewing'],
+    [22900,'E','','review passed','ok'],
+    [23500,'E','done','✓ PR merged','ok'],
+    [23900,'D','qa','running tests'],
+    [24500,'C','','review passed','ok'],
+    [25100,'C','done','✓ PR merged','ok'],
+    [25500,'D','','17/17 tests','ok'],
+    [26100,'D','review','reviewing'],
+    [26900,'D','','review passed','ok'],
+    [27500,'D','done','✓ PR merged','ok'],
+    [30000,'*fade'],
+    [30500,'*reset']
+  ];
+  var LOOP_GAP=1000;
+  var cols, cards, timer=0, idx=0, running=false, visible=false, lastUser=0, io=null, on=false;
+
+  function tok(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+  function setEv(c,text,st,fade){
+    var e=c.querySelector('.ev'); e.textContent=text; e.className='ev'+(st?' '+st:'');
+    if(fade) e.animate([{opacity:0},{opacity:1}],{duration:280,easing:'ease-out'});
+  }
+  function place0(){
+    Object.keys(cards).forEach(function(k){var c=cards[k]; c.className='card tk'; setEv(c,'ready',''); cols.ready.appendChild(c);});
+  }
+  function measure(){
+    var m=cols.ready.cloneNode(true);
+    [].forEach.call(m.querySelectorAll('.card'),function(k){k.remove();});
+    Object.keys(cards).forEach(function(k){var c=cards[k].cloneNode(true); c.className='card tk'; var e=c.querySelector('.ev'); e.textContent='review passed'; e.className='ev'; m.appendChild(c);});
+    m.style.cssText='position:absolute;left:0;top:0;visibility:hidden;min-height:0;width:'+cols.ready.offsetWidth+'px';
+    board.appendChild(m); var h=m.offsetHeight; m.remove();
+    board.style.setProperty('--colmin',(h+20)+'px'); /* +1 line: one card at a time can wrap its tag */
+  }
+  function follow(col){
+    if(board.scrollWidth<=board.clientWidth+2||Date.now()-lastUser<5000) return;
+    var x=col.offsetLeft-(board.clientWidth-col.offsetWidth)/2;
+    board.scrollTo({left:Math.max(0,x),behavior:'smooth'});
+  }
+  function flash(col,color,delay){
+    col.animate([{boxShadow:'0 0 0 0 transparent'},{boxShadow:'0 0 0 2px '+color+', 0 0 22px '+color,offset:.3},{boxShadow:'0 0 0 0 transparent'}],{duration:1100,delay:delay,easing:'ease-out'});
+  }
+  function move(c,to,text,st,kind){
+    var all=[].slice.call(board.querySelectorAll('.card.tk'));
+    var first=all.map(function(el){return el.getBoundingClientRect();});
+    var from=ORDER.indexOf(c.parentNode.classList[1]), dest=ORDER.indexOf(to);
+    setEv(c,text,st,true); cols[to].appendChild(c);
+    if(to==='done') c.classList.add('merged');
+    all.forEach(function(el){el.getAnimations().forEach(function(a){if(a.id==='fly')a.cancel();});});
+    all.forEach(function(el,i){
+      var l=el.getBoundingClientRect(), dx=first[i].left-l.left, dy=first[i].top-l.top;
+      if(Math.abs(dx)<.5&&Math.abs(dy)<.5) return;
+      var a;
+      if(el===c){
+        var arc=kind||dest<from, glow=kind==='bad'?tok('--lane-red'):kind?tok('--warn'):'', N=12, fr=[];
+        var lift=glow?'0 0 0 2px '+glow+', 0 0 18px '+glow:'0 10px 24px rgba(0,0,0,.22)';
+        for(var j=0;j<=N;j++){
+          var t=j/N, y=dy*(1-t)-(arc?46*Math.sin(Math.PI*t):0), s=1+.05*Math.sin(Math.PI*t);
+          fr.push({transform:'translate('+(dx*(1-t)).toFixed(1)+'px,'+y.toFixed(1)+'px) scale('+s.toFixed(3)+')',boxShadow:(j===0||j===N)?'0 0 0 0 transparent':lift});
+        }
+        var dur=arc?1050:780;
+        a=el.animate(fr,{duration:dur,easing:'cubic-bezier(.45,0,.25,1)'});
+        if(glow) flash(cols[to],glow,dur*.75);
+        else if(to==='done') flash(cols[to],tok('--pri'),dur*.75);
+      } else {
+        a=el.animate([{transform:'translate('+dx+'px,'+dy+'px)'},{transform:'none'}],{duration:420,easing:'cubic-bezier(.3,.7,.2,1)'});
+      }
+      a.id='fly'; el.classList.add('fly');
+      a.onfinish=a.oncancel=function(){if(!el.getAnimations().some(function(b){return b.id==='fly'&&b!==a&&b.playState==='running';})) el.classList.remove('fly');};
+    });
+    follow(cols[to]);
+  }
+  function run(s){
+    if(s[1]==='*fade'){
+      Object.keys(cards).forEach(function(k,i){cards[k].animate([{opacity:1},{opacity:0,transform:'translateY(6px)'}],{duration:420,delay:i*50,easing:'ease-in',fill:'forwards'}).id='fade';});
+      return;
+    }
+    if(s[1]==='*reset'){
+      Object.keys(cards).forEach(function(k){cards[k].getAnimations().forEach(function(a){a.cancel();});});
+      place0();
+      if(board.scrollLeft&&Date.now()-lastUser>=5000) board.scrollTo({left:0,behavior:'smooth'});
+      Object.keys(cards).forEach(function(k,i){cards[k].animate([{opacity:0,transform:'translateY(-8px)'},{opacity:1,transform:'none'}],{duration:380,delay:120+i*90,easing:'ease-out',fill:'backwards'});});
+      return;
+    }
+    var c=cards[s[1]];
+    if(s[2]) move(c,s[2],s[3],s[4]||'',s[5]||''); else setEv(c,s[3],s[4]||'',true);
+  }
+  function tick(){
+    timer=0; if(!running) return;
+    var s=S[idx]; run(s); idx=(idx+1)%S.length;
+    timer=setTimeout(tick, idx?S[idx][0]-s[0]:LOOP_GAP);
+  }
+  function update(){
+    var go=on&&visible&&!document.hidden;
+    if(go&&!running){running=true; timer=setTimeout(tick,idx===0?700:350);}
+    else if(!go&&running){running=false; clearTimeout(timer); timer=0;}
+  }
+  function setup(){
+    if(on) return; on=true; idx=0;
+    board.innerHTML=orig.board; board.classList.add('anim');
+    cols={}; [].forEach.call(board.querySelectorAll('.bcol'),function(c){cols[c.classList[1]]=c; [].forEach.call(c.querySelectorAll('.card'),function(k){k.remove();});});
+    cols.backlog.insertAdjacentHTML('beforeend','<div class="card dim">Bulk delete</div><div class="card dim">Email digest</div>');
+    cards={}; Object.keys(T).forEach(function(k){var el=document.createElement('div'); el.innerHTML='<span class="id">'+T[k][0]+'</span> '+T[k][1]+'<span class="ev"></span>'; cards[k]=el;});
+    place0(); measure();
+    board.setAttribute('aria-label','Five cards start in Ready and move through Building, QA and Review to Done. QA sends one back to Building, Review sends one back, and one waits in Blocked until you unblock it. Scroll horizontally to see all seven columns.');
+    lead.innerHTML='Five cards go from Ready to merged on their own. QA or Review can send one back to Building, and a stuck card waits in Blocked for you. The board is the only state: stop any time, and <code>run</code> picks up from each card\'s column.';
+    io=new IntersectionObserver(function(es){visible=es[es.length-1].isIntersecting; update();},{threshold:.2});
+    io.observe(board);
+  }
+  function teardown(){
+    if(!on) return; on=false; update(); if(io) io.disconnect();
+    board.classList.remove('anim'); board.style.removeProperty('--colmin');
+    board.innerHTML=orig.board; board.setAttribute('aria-label',orig.label); lead.innerHTML=orig.lead;
+  }
+  ['pointerdown','wheel','touchstart','keydown'].forEach(function(ev){board.addEventListener(ev,function(){lastUser=Date.now();},{passive:true});});
+  document.addEventListener('visibilitychange',update);
+  var rz=0; addEventListener('resize',function(){clearTimeout(rz); rz=setTimeout(function(){if(on) measure();},150);});
+  if(!mq.matches) setup();
+  if(mq.addEventListener) mq.addEventListener('change',function(e){if(e.matches) teardown(); else setup();});
 })();
 </script>
 </body>
