@@ -67,9 +67,8 @@ Add cards to `Ready`. The board drains on its own.
 
 ## How it works
 
-<p align="center"><a href="https://erictechpro.github.io/super-board/skill-map/#view=super-board-run"><img src="docs/assets/how-it-works.png" alt="What /super-board run does: open it in the live skill map" width="100%"></a></p>
-
-Each card runs Build → QA → Review, and the merge gate merges it when the evidence holds. The board is the only state: stop any time, and `run` picks up from each card's column. Safety controls, configuration and limits: [how it works](docs/super-board/README.md).
+<p align="center"><a href="https://youtu.be/aggJvNZxfKA"><img src="https://i.ytimg.com/vi/aggJvNZxfKA/maxresdefault.jpg" alt="Watch I Built a Self-Improving Software Factory by Eric Tech on YouTube" width="100%"></a></p>
+<p align="center"><a href="https://youtu.be/aggJvNZxfKA"><strong>▶ Watch on YouTube: I Built a Self-Improving Software Factory</strong></a></p>
 
 ## Skills
 
