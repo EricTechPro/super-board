@@ -106,7 +106,8 @@ def grade(card):
     if card.get('complexity') in ['low', 'medium', 'high']:
         return card['complexity'], False
     prompt = (f"Read GitHub issue #{card['number']} (\"{card.get('title', '')}\") - body and all comments - with "
-              f".claude/bin/super-board-github-read.py --kind issue -- gh issue view {card['number']} --json title,body,comments. "
+              f".claude/bin/super-board-github-read.py --kind issue -- issue view {card['number']} --json number,title,body and "
+              f"--kind comments -- api repos/{{owner}}/{{repo}}/issues/{card['number']}/comments --paginate --slurp. "
               'Grade complexity (low|medium|high) by the scope of change required. Read only: change no file, '
               'label, comment or board state. Exit 79 from the read helper means stop and return nothing.\n')
     with tempfile.TemporaryDirectory(prefix='super-board-codex-grade-') as temporary:

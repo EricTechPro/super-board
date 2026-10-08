@@ -107,6 +107,8 @@
 # and migrations run after verification, inside the lock, right before the
 # merge. `--dry-run` reports both and runs neither.
 set -euo pipefail
+# Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
+export SB_GITHUB_READ_STRICT=1
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 GITHUB_READ="$HERE/super-board-github-read.py"
 

@@ -40,7 +40,19 @@ if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
 }
 
 let halted = false
-const READ_FAILURE = `Required GitHub reads use .claude/bin/super-board-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
+// Valid form per --kind, from validate() in scripts/super-board-github-read.py (#32).
+const READ_SHAPES = [
+  `Read shapes (helper: .claude/bin/super-board-github-read.py --kind <kind> -- <gh args>):`,
+  `- issue title+body: --kind issue -- issue view <N> --json number,title,body`,
+  `- issue comments: --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp (zero comments = [[]])`,
+  `- other JSON, incl. maybe-empty lists: --kind json -- <gh args> (no --jq that prints a plain string)`,
+  `- PR branch+head: --kind head -- pr view <N> --json headRefName,headRefOid --jq '"\\(.headRefName) \\(.headRefOid)"'`,
+  `- PR body+head: --kind body -- pr view <N> --json body,headRefOid`,
+  `- PR metadata: --kind metadata -- pr view <N> --json files,labels,body,additions,deletions,changedFiles`,
+  `- issue state: --kind state -- issue view <N> --json state --jq .state`,
+  `A read whose output misses its shape exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
+].join('\n')
+const READ_FAILURE = READ_SHAPES + '\n' + `Required GitHub reads use .claude/bin/super-board-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
 
 const CLASSIFY_SCHEMA = {
   type: 'object',
@@ -271,7 +283,7 @@ const results = await pipeline(
     const labels = labelsOf(card)
     const typed = ['qa', 'bug', 'feature'].find((l) => labels.includes(l))
     const cls = await agent(
-      READ_FAILURE + '\n' + `Read GitHub issue #${card.number} ("${card.title}") — body and all comments — using gh issue view. ` +
+      READ_FAILURE + '\n' + `Read GitHub issue #${card.number} ("${card.title}") — body (--kind issue) and all comments (--kind comments) — with the read shapes above. ` +
       `Classify it: kind (feature|bug|qa) and complexity (low|medium|high) judged by the scope of change required. ` +
       (typed
         ? `Its label says "${typed}": return kind "${typed}" — the label routes the card, you never override it.`
