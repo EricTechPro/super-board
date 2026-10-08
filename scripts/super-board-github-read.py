@@ -5,7 +5,10 @@ A logical read gets three total attempts. Success resets its own sequence; other
 reads cannot reset it. Permanent query/auth errors stop on the first attempt.
 The halt file is shared through the main checkout, including linked worktrees.
 Only an explicit new run clears it with --resume after preserving the old reason.
-Mutations never enter this retry helper.
+Mutations never enter this retry helper. For the agent-facing kinds in FORMS, a
+payload that fails its shape on every attempt is the caller's malformed read, not
+an outage: that call exits 64 with the valid form and the run keeps going. Scripts
+whose commands are fixed set SB_GITHUB_READ_STRICT=1 to keep halting on it.
 """
 from __future__ import annotations
 
@@ -23,6 +26,22 @@ HALTED = 79
 
 class ReadHalted(Exception):
     pass
+
+
+class GitHubErrors(ValueError):
+    """GitHub's own error payload: an outage, never the caller's shape."""
+
+
+# Valid read per --kind, quoted back when a payload fails its shape.
+FORMS = {
+    'issue': 'issue view <N> --json number,title,body',
+    'comments': 'api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp',
+    'json': '<gh args> (JSON output; no --jq that prints a plain string)',
+    'head': 'pr view <N> --json headRefName,headRefOid --jq \'"\\(.headRefName) \\(.headRefOid)"\'',
+    'body': 'pr view <N> --json body,headRefOid',
+    'metadata': 'pr view <N> --json files,labels,body,additions,deletions,changedFiles',
+    'state': 'issue view <N> --json state --jq .state',
+}
 
 
 def halt_path():
@@ -99,7 +118,8 @@ def require(condition, why):
 
 def no_errors(value):
     pages = value if isinstance(value, list) else [value]
-    require(not any(isinstance(p, dict) and p.get('errors') for p in pages), 'GraphQL returned errors with incomplete data')
+    if any(isinstance(p, dict) and p.get('errors') for p in pages):
+        raise GitHubErrors('GraphQL returned errors with incomplete data')
 
 
 def validate(text, kind, meta=None):
@@ -254,6 +274,7 @@ def read(args, kind='json', meta=None, recovering=False):
         check_halt()
     operation = {'args': args, 'kind': kind, 'meta': meta}
     last = 'GitHub read failed'
+    shape_only = True  # every attempt reached GitHub and got a payload of the wrong shape
     delay = float(os.environ.get('SB_GITHUB_RETRY_DELAY', '1'))
     for attempt in range(1, 4):
         if not recovering:
@@ -272,6 +293,7 @@ def read(args, kind='json', meta=None, recovering=False):
             if permanent_error(diagnostic):
                 halt('GitHub rejected a required read (query, authentication, or permission error); fix it before restarting', attempt, operation)
             if result.returncode:
+                shape_only = False
                 status = re.search(r'HTTP [0-9]{3}', result.stderr)
                 last = 'GitHub required read failed' + (f' ({status[0]})' if status else '')
             else:
@@ -282,11 +304,15 @@ def read(args, kind='json', meta=None, recovering=False):
                     return result.stdout, value
                 except (ValueError, KeyError, TypeError, AttributeError, IndexError) as error:
                     last = f'GitHub required read returned incomplete evidence: {error}'
+                    shape_only = shape_only and not isinstance(error, GitHubErrors)
         except (OSError, subprocess.SubprocessError):
+            shape_only = False
             last = 'GitHub required read timed out or could not start'
         if attempt < 3:
             print(f'[github-read] {last}; retry {attempt + 1}/3', file=sys.stderr)
             time.sleep(max(0, delay) * attempt)
+    if shape_only and kind in FORMS and not os.environ.get('SB_GITHUB_READ_STRICT'):
+        raise ValueError(f'{last}; this call failed, the run continues. Valid form: --kind {kind} -- {FORMS[kind]}')
     halt(f'{last}; stopped after 3 failed attempts', 3, operation)
 
 

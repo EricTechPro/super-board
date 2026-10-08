@@ -37,6 +37,8 @@
 #       79 reads halted (super-board-github-read.py) · 3 issue not on this board /
 #       Status option missing.
 set -euo pipefail
+# Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
+export SB_GITHUB_READ_STRICT=1
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CONFIG="${SB_CONFIG:-}"; OWNER="${BUILD_LOOP_OWNER:-}"; NUMBER="${BUILD_LOOP_PROJECT:-}"; REPO=""

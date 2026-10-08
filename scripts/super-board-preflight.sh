@@ -45,6 +45,8 @@
 # Exit 0 ok · 64 usage · 79 required GitHub evidence unavailable (pause the run;
 # a blind pre-flight never says proceed).
 set -euo pipefail
+# Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
+export SB_GITHUB_READ_STRICT=1
 
 REPO=""; ISSUES=""; INFLIGHT=""; FILES=""; THRESHOLD="0.6"
 while [ $# -gt 0 ]; do
