@@ -1,0 +1,218 @@
+<title>pstack map</title>
+<style>
+:root{--bg:#f4f5f7;--fg:#0f172a;--muted:#5b6b82;--card:#fff;--line:#e2e8f0;--hov:#f1f5f9;%%LT%%--hl:#fde047;--hlfg:#1c1917;--ok:#047857;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1020;--fg:#e2e8f0;--muted:#94a3b8;--card:#111827;--line:#1f2937;--hov:#182033;%%DK%%--hl:#854d0e;--hlfg:#fef3c7;--ok:#34d399;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1020;--fg:#e2e8f0;--muted:#94a3b8;--card:#111827;--line:#1f2937;--hov:#182033;%%DK%%--hl:#854d0e;--hlfg:#fef3c7;--ok:#34d399;color-scheme:dark}
+*{box-sizing:border-box}
+html{background:var(--bg);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 -apple-system,"Segoe UI",Inter,system-ui,sans-serif}
+code,.mono,.step i{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:inherit}
+main{max-width:1440px;margin:0 auto;padding:max(20px,env(safe-area-inset-top,0px)) 16px 40px;overflow-x:clip}
+%%CATCSS%%
+header{display:flex;gap:12px;justify-content:space-between;align-items:flex-start}
+h1{font-size:24px;line-height:1.2;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 4px;max-width:90ch}
+.links{font-size:12.5px;display:flex;flex-wrap:wrap;gap:0 14px;margin:0}.links a{display:inline-flex;align-items:center;min-height:40px}
+.tt{flex:none;min-width:40px;min-height:40px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);font:inherit;cursor:pointer;padding:0 12px}
+h2{font-size:16px;margin:16px 0 8px}h2 small{font-weight:400;color:var(--muted);font-size:12.5px;margin-left:6px}
+.flow{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+@media (max-width:900px){.flow{grid-template-columns:repeat(2,1fr)}}
+.step{display:flex;align-items:center;gap:10px;min-height:52px;padding:6px 12px;background:var(--card);color:var(--fg);border:1px solid var(--line);border-left:4px solid var(--fg);border-radius:8px;text-align:left;font:inherit;cursor:pointer}
+.step i{font-style:normal;font-size:22px;font-weight:700}.step b{font-size:13px;display:block}.step small{display:block;color:var(--muted);font-size:11.5px}
+.step[aria-pressed=true]{background:var(--fg);color:var(--bg)}.step[aria-pressed=true] small{color:inherit;opacity:.8}
+.bar{margin:12px 0 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input[type=search]{flex:1 1 220px;min-height:44px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);padding:0 12px;font:16px/1 inherit;font-family:inherit}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card)}
+.seg button{min-height:42px;padding:0 12px;border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}.seg button[aria-pressed=true]{background:var(--fg);color:var(--bg)}
+.count{font-size:12.5px;color:var(--muted)}
+.hero{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:16px 16px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+#map{display:block;width:100%;height:auto}
+@media (max-width:900px){#map{min-width:1466px}}
+.hero.exp #map,.hero:fullscreen #map{min-width:min(1466px,100%)}
+@media (max-width:900px){.hero.exp #map,.hero:fullscreen #map{min-width:1466px}}
+.hd{cursor:pointer;outline:none}.hd>rect:not(.tagbg){fill:transparent;stroke:none}.hdl{stroke:var(--c);stroke-width:2;stroke-linecap:round}
+.hd:hover>rect:not(.tagbg),.hd:focus-visible>rect:not(.tagbg),.hd.sel>rect:not(.tagbg){fill:color-mix(in srgb,var(--c) 14%,transparent)}
+.nd rect.tagbg,.hd rect.tagbg,.nd rect.bg{fill:var(--c);stroke:none}.tagt{fill:var(--card);font:700 8.5px/1 ui-monospace,Menlo,monospace;letter-spacing:.08em}
+.chev{fill:var(--c);font:700 16px sans-serif}
+.bt{fill:var(--card);font:700 8.5px ui-monospace,Menlo,monospace}
+.fan{stroke:var(--k-router);stroke-width:1.6;stroke-dasharray:5 4;fill:none}.ahr{fill:var(--k-router)}
+.nd.rt0>rect:not(.tagbg):not(.bg){fill:color-mix(in srgb,var(--c) 14%,var(--card));stroke-width:2.2}.rn{font-size:12px}.rb{fill:var(--fg)}
+.l-diag{--l:var(--k-indigo)}.l-calls{--l:var(--k-cyan)}.l-picks{--l:var(--k-router)}.l-grp{--l:var(--k-teal)}
+.stack{display:inline-flex;flex-direction:column;gap:3px}
+.dimg{display:block;max-width:100%;height:auto;border-radius:8px;border:1px solid var(--line);background:#0b1020}
+.cr{font-size:11.5px;color:var(--muted);margin-top:4px}.cr a{color:var(--c)}
+.rowx{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 6px}
+.note2{margin:0;padding:8px 10px;border:1px dashed var(--c);border-radius:8px;background:color-mix(in srgb,var(--c) 8%,transparent)}
+.ic-cur{color:var(--fg)}
+.seg button.ib{display:flex;align-items:center;justify-content:center;min-width:48px;padding:0 12px}.seg button.ib svg{width:20px;height:20px;display:block}
+.tb{display:flex;gap:8px;align-items:center;margin:0 0 8px}.tb input[type=search]{flex:1 1 auto;min-width:0;min-height:40px;font-size:16px}.tb .seg button{min-height:38px}.tb .fsb{margin-left:auto}.tb{flex-wrap:wrap}@media (max-width:700px){.tb input[type=search]{flex:1 1 100%}}
+.fsb{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--fg);font:inherit;font-size:13px;cursor:pointer}.fsb svg{width:16px;height:16px}
+.hero.exp,.hero:fullscreen{position:fixed;inset:0;z-index:1000;border-radius:0;overflow:auto;background-color:var(--card);padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.hero.exp .scroll,.hero:fullscreen .scroll{overflow:visible}
+html.lock,html.lock body{overflow:hidden}
+.lgi{display:inline-flex;align-items:center;gap:4px}.lgi svg{width:13px;height:13px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:10px 2px 0}
+.reg{fill:color-mix(in srgb,var(--c) 7%,transparent);stroke:var(--c);stroke-width:1.2;stroke-dasharray:5 4}.reg.sub{stroke-width:1;stroke-dasharray:2 3;fill:color-mix(in srgb,var(--c) 4%,transparent)}
+.rt{fill:var(--c);font:700 12.5px -apple-system,"Segoe UI",Inter,sans-serif}.rt.gt{font-size:12px}
+.bl{fill:var(--muted);font:9.5px -apple-system,"Segoe UI",Inter,sans-serif}
+.arr{stroke:var(--muted);stroke-width:1.6;fill:none}.ahp{fill:var(--muted)}
+.nd{cursor:pointer;outline:none}.nd rect{fill:var(--card);stroke:var(--c);stroke-width:1.6}
+.nd.dash rect{stroke-dasharray:5 3}.nd.dot rect{stroke-width:2.4;stroke-dasharray:1.5 3;stroke-linecap:round}
+.nd:hover rect,.nd:focus-visible rect{fill:color-mix(in srgb,var(--c) 16%,var(--card));stroke-width:2.6}
+.nd.sel rect{fill:color-mix(in srgb,var(--c) 22%,var(--card));stroke-width:3}
+.nn{fill:var(--fg);font:600 10.5px ui-monospace,Menlo,monospace}.pn{font-size:9.5px}.hwt{font:600 11.5px -apple-system,"Segoe UI",sans-serif}
+.nt{fill:var(--muted);font:9.5px -apple-system,'Segoe UI',Inter,sans-serif}
+.nd,.rg{transition:opacity .15s}.dim{opacity:.17}
+#pop{width:min(760px,calc(100vw - 32px));max-width:none;max-height:88vh;max-height:88dvh;overflow:auto;background:var(--card);color:var(--fg);border:0;border-left:6px solid var(--c);border-radius:16px;box-shadow:0 30px 90px rgba(0,0,0,.5),0 4px 14px rgba(0,0,0,.25);padding:24px 28px 22px;font-size:15px;line-height:1.55;overscroll-behavior:contain}
+#pop::backdrop{background:rgba(2,6,23,.62);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#pop .x{position:sticky;top:0;float:right;min-width:44px;min-height:44px;margin:-10px -12px 0 8px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--fg);font-size:22px;line-height:1;cursor:pointer;z-index:2}
+html:has(dialog[open]){overflow:hidden}
+#pop h3{margin:0 0 6px;font:700 21px ui-monospace,Menlo,monospace;overflow-wrap:anywhere}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;font-size:11.5px}
+.tag{padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--muted)}.tag.k{color:var(--c);font-weight:600;border-color:var(--c)}
+#pop h4{margin:14px 0 6px;width:fit-content;padding:2px 9px;border-radius:6px;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--l);background:color-mix(in srgb,var(--l) 15%,transparent);border:1px solid color-mix(in srgb,var(--l) 40%,transparent)}
+.l-when{--l:var(--k-amber)}.l-is{--l:var(--k-blue)}.l-how{--l:var(--k-green)}.l-bts{--l:var(--k-violet)}.l-get{--l:var(--k-teal)}.l-use{--l:var(--k-orange)}.l-next{--l:var(--k-pink)}
+#pop b{font-weight:700}
+mark{background:linear-gradient(transparent 8%,var(--hl) 8% 94%,transparent 94%);color:var(--hlfg);padding:0 3px;border-radius:3px;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.fl{display:flex;flex-wrap:wrap;align-items:center;gap:5px 4px;margin:0 0 8px;padding:7px 8px;background:var(--hov);border-radius:8px}
+.pill{font-size:12px;line-height:1.3;padding:3px 9px;border:1px solid var(--line);background:var(--card);border-radius:12px}
+.pill code{background:none;padding:0;font-size:11.5px}
+.pill.cmd{font-family:ui-monospace,Menlo,monospace;font-weight:700;color:var(--c);border-color:var(--c)}
+.ar{color:var(--muted);font-size:13px;padding:0 1px}
+.cg{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center}
+.fl .chip{min-height:30px;padding:0 10px;background:var(--card);border-color:var(--c);color:var(--c)}
+@media (max-width:700px){.fl .chip{min-height:40px}}
+#pop p{margin:0}#pop ul,#pop ol{margin:0;padding-left:20px}#pop li{margin:2px 0}
+#pop code{font-size:13px;background:var(--hov);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.hl{display:flex;flex-wrap:wrap;gap:6px}
+.chip{min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:20px;background:var(--hov);color:var(--fg);font:12px ui-monospace,Menlo,monospace;cursor:pointer}
+.src{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;margin-top:12px;padding-top:8px;border-top:1px solid var(--line);font-size:12.5px}
+.src a{display:inline-flex;align-items:center;min-height:40px;color:var(--c)}
+.b-both{color:var(--ok)}.b-claude{color:var(--k-blue)}.b-cursor{color:var(--k-orange)}.badge{font-weight:600;padding:2px 8px;border:1px solid var(--line);border-radius:10px;font-size:11.5px}
+@media (max-width:700px){#pop{width:100vw;height:100vh;height:100dvh;max-height:100dvh;margin:0;border-radius:0;border-left:0;border-top:6px solid var(--c);padding:max(16px,env(safe-area-inset-top,0px)) 16px max(20px,env(safe-area-inset-bottom,0px))}}
+.ex{border:1px dashed var(--c);border-radius:10px;background:color-mix(in srgb,var(--c) 7%,transparent);padding:10px 12px}
+.exr{display:grid;grid-template-columns:96px 1fr;gap:8px;margin:4px 0;align-items:baseline}.exr>b{font-size:12px;color:var(--muted);font-weight:700}
+@media (max-width:700px){.exr{grid-template-columns:1fr;gap:2px;margin:8px 0}}
+.exr code{display:block;white-space:pre-wrap;padding:6px 8px}
+.exn{font-size:11.5px;color:var(--muted);margin:6px 0 0!important}
+.l-ex{--l:var(--k-lime)}
+
+footer{margin-top:20px;color:var(--muted);font-size:12.5px}footer a{display:inline-block;padding:8px 0}
+:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+</style>
+<main>
+<header><div>
+<h1>pstack map</h1>
+<p class="sub">Skill stack for AI coding agents, by Lauren Tan (<a href="https://x.com/poteto/status/2094457600259842065" target="_blank" rel="noopener">@poteto</a>) and Cursor. The Claude Code port is by michael-denyer.</p>
+<p class="links"><a href="https://github.com/cursor/plugins/tree/main/pstack" target="_blank" rel="noopener">Cursor plugin</a><a href="https://github.com/michael-denyer/pstack-claude" target="_blank" rel="noopener">Claude port</a><a href="https://flaviocopes.com/pstack/" target="_blank" rel="noopener">Flavio Copes</a><a href="https://x.com/poteto/status/2094457600259842065" target="_blank" rel="noopener">poteto on X</a></p>
+</div><button class="tt" id="tt" type="button" aria-label="Toggle theme">Theme</button></header>
+
+<div class="hero" id="hero"><div class="tb"><input type="search" id="q" placeholder="Search" aria-label="Search skills"><div class="seg" role="group" aria-label="Show skills for"><button type="button" class="ib" data-src="all" aria-pressed="true" aria-label="All" title="All"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg></button><button type="button" class="ib" data-src="claude" aria-pressed="false" aria-label="Claude Code" title="Claude Code"><svg viewBox="0 0 24 24" aria-hidden="true"><g stroke="#d97757" stroke-width="3.2" stroke-linecap="round"><path d="M12 2.5v19M2.5 12h19M5.3 5.3l13.4 13.4M18.7 5.3L5.3 18.7"/></g></svg></button><button type="button" class="ib" data-src="cursor" aria-pressed="false" aria-label="Cursor" title="Cursor"><svg viewBox="0 0 24 24" aria-hidden="true" style="color:var(--fg)"><path d="M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 12L3.8 7.2M12 12l8.2-4.8M12 12v9.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M12 12l4.2-2.4v4.8z" fill="currentColor"/></svg></button></div><button type="button" class="fsb" id="fsb" aria-label="Full screen"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" id="fsi"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg><span id="fst">Full screen</span></button></div><div class="scroll" id="sc">%%SVG%%</div>
+<div class="legend"><span class="lgi"><svg viewBox="0 0 24 24" aria-hidden="true"><g stroke="#d97757" stroke-width="3.2" stroke-linecap="round"><path d="M12 2.5v19M2.5 12h19M5.3 5.3l13.4 13.4M18.7 5.3L5.3 18.7"/></g></svg> = Claude Code</span><span class="lgi"><svg viewBox="0 0 24 24" aria-hidden="true" style="color:var(--fg)"><path d="M12 2.2l8.5 4.9v9.8L12 21.8l-8.5-4.9V7.1z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 12L3.8 7.2M12 12l8.2-4.8M12 12v9.5" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M12 12l4.2-2.4v4.8z" fill="currentColor"/></svg> = Cursor</span><span>dashed = Claude Code only</span><span>dotted = Cursor only</span></div>
+<dialog id="pop" aria-label="Details"><button type="button" class="x" aria-label="Close">×</button><div id="popb"></div></dialog></div>
+
+<h2>Best-practice order</h2>
+<div class="flow">%%ORDER%%</div>
+
+<footer>Sources: %%FLINKS%%</footer>
+</main>
+<script>
+(function(){
+var DATA=%%DATA%%;var S=DATA.skills;
+var $=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var nodes=$('.nd,.hd'),heroEl=document.getElementById('hero'),dlg=document.getElementById('pop'),pb=document.getElementById('popb'),sc=document.getElementById('sc');
+var st={q:'',src:'all'},cur=null,lastFocus=null;
+function txt(s){return((s.name||'')+' '+(s.command||'')+' '+(s.trigger||'')+' '+(s.whatItIs||'')+' '+(s.summary||'')).toLowerCase()}
+function apply(){
+ nodes.forEach(function(g){var s=S[g.dataset.id];if(!s)return;
+  var m=(st.src==='all'||s.source==='both'||s.source===st.src)&&(!st.q||txt(s).indexOf(st.q)>=0);
+  g.classList.toggle('dim',!m)});
+ $('.rg').forEach(function(r){var c=r.dataset.cat,any=c==='router'||nodes.some(function(g){var s=S[g.dataset.id];return s&&s.category===c&&!g.classList.contains('dim')});r.classList.toggle('dim',!any)})}
+document.getElementById('q').addEventListener('input',function(e){st.q=e.target.value.trim().toLowerCase();apply()});
+$('.seg button').forEach(function(b){b.addEventListener('click',function(){st.src=b.dataset.src;$('.seg button').forEach(function(x){x.setAttribute('aria-pressed',String(x===b))});apply()})});
+/* rendering */
+function h(t,c,x){var e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e}
+function sec(l,k){pb.appendChild(h('h4','l-'+k,l))}
+function md(el,s){String(s).split(/(\*\*.+?\*\*|==.+?==|`.+?`)/).forEach(function(p){if(!p)return;
+ if(p.slice(0,2)==='**')el.appendChild(h('b',null,p.slice(2,-2)));else if(p.slice(0,2)==='==')el.appendChild(h('mark',null,p.slice(2,-2)));else if(p[0]==='`')el.appendChild(h('code',null,p.slice(1,-1)));else el.appendChild(document.createTextNode(p))})}
+function para(s){var p=h('p');md(p,s);pb.appendChild(p)}
+function list(a,o){var u=h(o?'ol':'ul');a.forEach(function(x){var li=h('li');md(li,x);u.appendChild(li)});pb.appendChild(u)}
+function link(u,l){var a=h('a',null,l);a.href=u;a.target='_blank';a.rel='noopener';return a}
+function chipBtn(id){var c=h('button','chip',S[id]?S[id].name:id);c.type='button';c.dataset.go=id;return c}
+function flow(f){var d=h('div','fl');f.forEach(function(tk,i){if(i)d.appendChild(h('span','ar','→'));
+ if(Array.isArray(tk)){var g=h('span','cg');tk.forEach(function(x){g.appendChild(chipBtn(x.slice(1)))});d.appendChild(g)}
+ else if(tk&&tk.stack){var sk=h('span','stack');tk.stack.forEach(function(x){var p=h('span','pill');md(p,x);sk.appendChild(p)});d.appendChild(sk)}
+ else if(tk[0]==='@'){d.appendChild(chipBtn(tk.slice(1)))}
+ else{var p=h('span','pill'+(i===0&&tk[0]==='/'?' cmd':''));md(p,tk);d.appendChild(p)}});pb.appendChild(d)}
+function example(ex,note){sec('Example','ex');var b=h('div','ex');
+ [['You type',ex[0],1],['What happens',ex[1]],['You get',ex[2]]].forEach(function(r){var row=h('div','exr');row.appendChild(h('b',null,r[0]));if(r[2]){var c=h('code',null,r[1]);row.appendChild(c)}else{var s=h('span');md(s,r[1]);row.appendChild(s)}b.appendChild(row)});
+ b.appendChild(h('p','exn',note));pb.appendChild(b)}
+function render(id){
+ var s=S[id],gi=id.indexOf('grp:')===0?DATA.groupsInfo[id.slice(4)]:null;pb.textContent='';
+ var cat=gi?id.slice(4):(s?s.category:'principles');if(id==='poteto-mode')cat='router';dlg.className='c-'+cat;
+ if(id==='__how'){pb.appendChild(h('h3',null,'How principles work'));var t=h('div','tags');t.appendChild(h('span','tag k','24 principles'));pb.appendChild(t);
+  sec('How they work','how');list(DATA.how);sec('When each group applies','when');var u=h('ul');Object.keys(DATA.groups).forEach(function(k){var g2=DATA.groups[k],li=h('li');li.appendChild(h('b',null,g2.name+': '));li.appendChild(document.createTextNode(g2.howItWorks));u.appendChild(li)});pb.appendChild(u)}
+ else if(gi){pb.appendChild(h('h3',null,gi.name));
+  sec('What it is for','grp');para(gi.blurb);var n2=h('p','note2');md(n2,"**Not a command, it's a group.** Pick a skill inside it.");n2.style.marginTop='8px';pb.appendChild(n2);
+  sec('Pick by symptom','how');gi.items.forEach(function(it){var r=h('div','rowx');r.appendChild(h('span','pill',it[0].charAt(0).toUpperCase()+it[0].slice(1)));r.appendChild(h('span','ar','→'));r.appendChild(chipBtn(it[1]));pb.appendChild(r)});
+  sec('Example','ex');var eb=h('div','ex'),r1=h('div','exr'),r2=h('div','exr');r1.appendChild(h('b',null,'You say'));r1.appendChild(h('span',null,'“'+gi.ex[0]+'”'));r2.appendChild(h('b',null,'Use'));var sp=h('span');sp.appendChild(chipBtn(gi.ex[1]));r2.appendChild(sp);eb.appendChild(r1);eb.appendChild(r2);eb.appendChild(h('p','exn','Example'));pb.appendChild(eb);
+  sec('Does poteto-mode route here?','picks');para(gi.routes)}
+ else{
+  pb.appendChild(h('h3',null,s.name));var t2=h('div','tags');
+  if(s.kind==='skill'){t2.appendChild(h('span','tag k',s.command));if(s.trigger)t2.appendChild(h('span','tag',s.trigger))}else t2.appendChild(h('span','tag k','principle'));
+  t2.appendChild(h('span','tag',s.kind==='skill'?DATA.cats[s.category]:DATA.groups[s.principleGroup].name));pb.appendChild(t2);
+  if(id==='poteto-mode'){sec('Official diagram','diag');var im=h('img','dimg');im.src=DATA.img;im.alt='Official pstack overview: your request goes into poteto-mode, which chooses a playbook (plan, bugs, features, refactor), plans and delegates with architect, arena and swarm, then reviews and verifies with interrogate, tests and measurements, and returns verified work. Supporting skills how, why and unslop; project playbooks and setup-pstack sit underneath.';pb.appendChild(im);var cr=h('p','cr');cr.appendChild(document.createTextNode('Credit: '));cr.appendChild(link('https://github.com/michael-denyer/pstack-claude','pstack-claude README (michael-denyer)'));pb.appendChild(cr)}
+  sec(s.kind==='skill'?'When to use it':'When it applies','when');para(s.when);
+  sec('What it is','is');para(s.whatItIs);
+  if(s.kind==='skill'){
+   sec('How it works','how');list(s.steps,1);
+   if(s.ex)example(s.ex,s.ex[3]?'Example. Prompt taken from the official guide.':'Example. Written from the skill file.');
+   if(s.picks){sec('How it picks','picks');s.picks.forEach(flow)}
+   if(s.calls){sec('Calls these','calls');s.calls.forEach(flow)}
+   if(s.diag){sec('Diagram (from the official guide)','diag');s.diag.flows.forEach(flow);var c3=h('p','cr');c3.appendChild(document.createTextNode('source: '));c3.appendChild(link(s.diag.url,s.diag.src));pb.appendChild(c3)}
+   if(s.flows&&s.flows.length){sec('Behind the scenes','bts');s.flows.forEach(flow)}
+   sec('You get','get');para(s.output);
+   sec('Use it','use');var u2=h('ul'),a=h('li'),b=h('li');a.appendChild(h('b',null,'Claude Code: '));a.appendChild(document.createTextNode(s.claudeCode||''));
+   b.appendChild(h('b',null,'Codex: '));b.appendChild(document.createTextNode((s.codex||'').replace(/^Codex: /,'')));u2.appendChild(a);u2.appendChild(b);pb.appendChild(u2);
+   if(!s.calls&&s.handsOffTo&&s.handsOffTo.length){sec('Next','next');var hl=h('div','hl');s.handsOffTo.forEach(function(n){hl.appendChild(chipBtn(n))});pb.appendChild(hl)}
+  }else{sec('In practice','how');list(s.inPractice);sec('Use it','use');pb.appendChild(h('p',null,s.claudeCode||''))}
+  var sr=h('div','src');sr.appendChild(h('span','badge b-'+s.source,{both:'Claude Code + Cursor',claude:'Claude Code only',cursor:'Cursor only'}[s.source]));
+  if(s.source==='both'){sr.appendChild(link(s.url,'Cursor source'));if(s.claudeUrl)sr.appendChild(link(s.claudeUrl,'Claude port source'))}else sr.appendChild(link(s.url,'Source file'));
+  pb.appendChild(sr)}
+}
+function openDlg(id){
+ var g=nodes.filter(function(x){return x.dataset.id===id})[0];if(!g)return;
+ if(!dlg.open)lastFocus=g;
+ render(id);cur=id;nodes.forEach(function(x){x.classList.toggle('sel',x===g)});
+ if(!dlg.open){try{dlg.showModal()}catch(e){dlg.setAttribute('open','')}}
+ dlg.scrollTop=0;var x=dlg.querySelector('.x');if(x)x.focus({preventScroll:true})}
+function closeDlg(){if(dlg.open){try{dlg.close()}catch(e){dlg.removeAttribute('open')}}}
+dlg.addEventListener('close',function(){nodes.forEach(function(x){x.classList.remove('sel')});cur=null;if(lastFocus)try{lastFocus.focus({preventScroll:true})}catch(e){}});
+dlg.addEventListener('click',function(e){var c=e.target.closest&&e.target.closest('[data-go]');if(c){openDlg(c.dataset.go);return}
+ if(e.target.closest('.x')){closeDlg();return}
+ var r=dlg.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDlg()});
+nodes.forEach(function(g){g.addEventListener('click',function(e){e.stopPropagation();openDlg(g.dataset.id)});
+ g.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openDlg(g.dataset.id)}})});
+/* full screen */
+var fsb=document.getElementById('fsb'),fst=document.getElementById('fst'),root=document.documentElement,exp=false;
+function fsOn(){return document.fullscreenElement===heroEl}
+function sync2(){var on=exp||fsOn();fst.textContent=on?'Exit':'Full screen';fsb.setAttribute('aria-label',on?'Exit full screen':'Full screen')}
+function expand(on){exp=on;heroEl.classList.toggle('exp',on);root.classList.toggle('lock',on);sync2()}
+function exitAll(){if(fsOn()){try{document.exitFullscreen()}catch(e){}}if(exp)expand(false)}
+fsb.addEventListener('click',function(){
+ if(exp||fsOn()){exitAll();return}
+ var p;try{p=heroEl.requestFullscreen?heroEl.requestFullscreen():null}catch(x){p=null}
+ if(p&&p.then){p.then(sync2,function(){expand(true)})}else if(!p){expand(true)}});
+document.addEventListener('fullscreenchange',sync2);
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!dlg.open&&exp)expand(false)});
+/* theme */
+try{var t=localStorage.getItem('pstack-theme');if(t)root.setAttribute('data-theme',t)}catch(e){}
+document.getElementById('tt').addEventListener('click',function(){
+ var dark=root.getAttribute('data-theme')==='dark'||(!root.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);
+ var n=dark?'light':'dark';root.setAttribute('data-theme',n);try{localStorage.setItem('pstack-theme',n)}catch(x){}});
+apply();
+})();
+</script>

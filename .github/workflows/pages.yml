@@ -6,6 +6,7 @@ name: pages
 #   /skill-map/          diagrams/visual/skill-map.html
 #   /onboarding/         diagrams/onboarding/index.html (setup simulator)
 #   /impeccable/         diagrams/impeccable/index.html
+#   /pstack/             diagrams/pstack/index.html
 #   /writing-standard/   diagrams/writing-standard/reference.html (read-only reference)
 # Pick-a-design pages (choose, confirm, carousels, older simulator versions) stay out.
 # Only files in this repo are copied; no event input is interpolated.
@@ -32,12 +33,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: assemble site
         run: |
-          mkdir -p _site/assets _site/skill-map _site/onboarding _site/impeccable _site/writing-standard
+          mkdir -p _site/assets _site/skill-map _site/onboarding _site/impeccable _site/pstack _site/writing-standard
           cp diagrams/index.html _site/index.html
           cp diagrams/assets/*.png _site/assets/
           cp diagrams/visual/skill-map.html _site/skill-map/index.html
           cp diagrams/onboarding/index.html _site/onboarding/index.html
           cp diagrams/impeccable/index.html _site/impeccable/index.html
+          cp diagrams/pstack/index.html _site/pstack/index.html
           cp diagrams/writing-standard/reference.html _site/writing-standard/index.html
           touch _site/.nojekyll
           find _site -type f | sort

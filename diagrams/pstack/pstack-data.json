@@ -1,0 +1,2369 @@
+{
+ "meta": {
+  "name": "pstack",
+  "author": "Lauren Tan (@poteto)",
+  "port": "michael-denyer/pstack-claude (unofficial)",
+  "cursorPluginVersion": "0.15.17",
+  "claudePortVersion": "0.9.82",
+  "tagline": "if you want to go fast, go deep first. pstack helps you write less, but higher quality code. rigorous agent workflows you can parallelize with confidence.",
+  "counts": {
+   "cursorSkillDirs": 52,
+   "cursorNonPrincipleSkills": 28,
+   "principles": 24,
+   "playbooks": 23,
+   "claudeSkillDirs": 58,
+   "claudePublicSkills": 34,
+   "claudeOnlySkills": 8,
+   "cursorOnlySkills": 2,
+   "sharedSkills": 26,
+   "subagentsCursor": 2
+  },
+  "countDiscrepancies": "flavio post says 24 skills/23 principles/22 playbooks (+1 internal); repo README/dir listing show 28 skills, 24 principles, 23 playbook files; marketplace shows 52 skills (=28+24) and 2 subagents.",
+  "installCursor": "/add-plugin pstack  then  /setup-pstack  then new chat",
+  "installClaude": "/plugin marketplace add michael-denyer/pstack-claude  then  /plugin install pstack@pstack-claude  (commands are /pstack:<name>)"
+ },
+ "phases": [
+  {
+   "id": "setup",
+   "name": "Set up and route",
+   "blurb": "Install, pick models per role, then let poteto-mode route the task to a playbook. Guide chapters 1-2."
+  },
+  {
+   "id": "understand",
+   "name": "Understand",
+   "blurb": "Read-only: how it works now, why it is shaped that way, what you were doing. Guide chapter 3."
+  },
+  {
+   "id": "design",
+   "name": "Design",
+   "blurb": "Settle shape before code: caller-first sketch, competing attempts, parallel coverage, adversarial review. Guide chapter 4."
+  },
+  {
+   "id": "build",
+   "name": "Build and clean",
+   "blurb": "Build playbooks (bug fix, feature, refactor, perf), then strip slop and comments before review. Guide chapter 5."
+  },
+  {
+   "id": "verify",
+   "name": "Verify and review",
+   "blurb": "Prove behavior on the real artifact, vet numbers, attack the diff. Guide chapter 6."
+  },
+  {
+   "id": "ship",
+   "name": "Ship",
+   "blurb": "Open a focused PR, drive it to merge-ready, verify independently, land the verified run. Guide chapter 6 (plus Babysit/Shipping playbooks)."
+  },
+  {
+   "id": "overnight",
+   "name": "Run unattended",
+   "blurb": "Long autonomous work with a checkable finish condition and an auditable decision log. Guide chapter 7."
+  },
+  {
+   "id": "improve",
+   "name": "Make it yours",
+   "blurb": "Capture lessons, fix repeated mistakes, personalise the mode. Guide chapter 9."
+  },
+  {
+   "id": "principles",
+   "name": "Principles",
+   "blurb": "24 one-rule skills (core, architecture, verification, delegation, meta). Indexed inline by poteto-mode; used to steer by name. Guide chapter 8."
+  }
+ ],
+ "skills": [
+  {
+   "id": "poteto-mode",
+   "name": "poteto-mode",
+   "command": "/poteto-mode",
+   "phase": "setup",
+   "summary": "Router and default entry point. Reads the principles index, matches the task to one of 23 playbooks, copies its steps verbatim into a todo list, calls specialist skills, delegates to subagents by model role, and writes unslopped replies.",
+   "whenToUse": "Any non-trivial or rigorous task; type it at the start of work (Cursor: option+enter makes it a sticky custom mode).",
+   "handsOffTo": [
+    "how",
+    "why",
+    "architect",
+    "arena",
+    "swarm",
+    "interrogate",
+    "unslop",
+    "no-comments",
+    "technical-writing",
+    "benchmark-checklist",
+    "show-me-your-work",
+    "figure-it-out",
+    "create-verification-skill",
+    "deslop",
+    "babysit"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/poteto-mode",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/poteto-mode",
+   "isRouter": true,
+   "kind": "skill",
+   "category": "setup",
+   "trigger": "any real task",
+   "whatItIs": "The front door. It reads the rules, picks the right playbook for your task, and runs it with sub-agents and checks.",
+   "steps": [
+    "Reads the principles index and matches your task to one of 23 playbooks",
+    "Copies that playbook's steps into a to-do list, word for word",
+    "Calls specialist skills (how, architect, swarm, interrogate, unslop...) as the playbook says",
+    "Sends code work to sub-agents, each with a set model, and reviews every diff itself",
+    "Writes the final reply in plain short sentences and names which principles changed a decision"
+   ],
+   "behindTheScenes": [
+    "Playbooks live in skills/poteto-mode/playbooks/*.md; helper scripts (watch-pr, orch, check-plan, worktree-audit) live in skills/poteto-mode/scripts",
+    "Uses the poteto-agent sub-agent type for ad-hoc helpers",
+    "Claude port: a SessionStart hook injects a reminder to use it when a task touches several files, a design choice, or an unknown bug"
+   ],
+   "output": "The finished work plus a reply that says what changed, what was verified, and what is open.",
+   "claudeCode": "/pstack:poteto-mode (after /plugin install pstack@pstack-claude); or just say 'use poteto-mode to...'. A SessionStart hook reminds Claude to use it.",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: same skill; hook runs after you trust it via /hooks. Skills-only install: ask for poteto-mode by name or add a line to AGENTS.md."
+  },
+  {
+   "id": "setup-pstack",
+   "name": "setup-pstack",
+   "command": "/setup-pstack",
+   "phase": "setup",
+   "summary": "Detects available models, asks for a reasoning budget, writes a per-role model rule (Cursor: ~/.cursor/rules/pstack-models.mdc). Offers to generate a verification skill at the end.",
+   "whenToUse": "Once after install, and whenever you want to change models/effort per role. Claude Code: /pstack:setup-pstack; also toggles the routing hook.",
+   "handsOffTo": [
+    "create-verification-skill"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/setup-pstack",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/setup-pstack",
+   "kind": "skill",
+   "category": "setup",
+   "trigger": "first-time setup",
+   "whatItIs": "Picks which AI model pstack uses for each job (code, judgment, reviews) and how hard it thinks.",
+   "steps": [
+    "Lists the models your session can actually use",
+    "Loads your current choices, or the defaults",
+    "Asks for a budget (small, medium, large, unlimited) and fills in a model per role",
+    "Shows every role and lets you change any of them",
+    "Checks each model name is real, then writes the settings file",
+    "Offers to build a project verification skill if you have none"
+   ],
+   "behindTheScenes": [
+    "Writes ~/.cursor/rules/pstack-models.mdc in Cursor (always-applied rule); the Claude port writes a model sheet you add to CLAUDE.md with an @ line",
+    "Every other pstack skill reads these role lines before it spawns a sub-agent",
+    "Claude port also asks if the SessionStart routing hook stays on"
+   ],
+   "output": "A settings file that sets the model per role; applies to new sessions.",
+   "claudeCode": "/pstack:setup-pstack (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: setup-pstack has its own Codex sheet path; use your Codex model names (codex-tools.md)."
+  },
+  {
+   "id": "poteto-help",
+   "name": "poteto-help",
+   "command": "/poteto-help",
+   "phase": "setup",
+   "summary": "Guided help: finds out what you are trying to do, answers, hands you a prompt to send and links the skill/guide page. Does not start the work.",
+   "whenToUse": "New to pstack or unsure which skill, playbook or principle fits. Runs only when typed.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/poteto-help",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/poteto-help",
+   "kind": "skill",
+   "category": "setup",
+   "trigger": "how do I use this",
+   "whatItIs": "A guide that answers questions about pstack and hands you a prompt to send.",
+   "steps": [
+    "Works out what you need: set up, start a task, pick a skill, fix a bad run, or customize",
+    "Checks if your model settings file exists",
+    "Reads the right guide file before quoting it",
+    "Replies with the answer, a copy-ready prompt, and a link to the source file"
+   ],
+   "behindTheScenes": [
+    "Reads references/recipes.md and references/prompting.md plus the docs/guide pages",
+    "Does not start the work itself; you send the prompt"
+   ],
+   "output": "An answer, a prompt you can send, and a link.",
+   "claudeCode": "/pstack:poteto-help (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out."
+  },
+  {
+   "id": "figure-it-out",
+   "name": "figure-it-out",
+   "command": "/figure-it-out",
+   "phase": "setup",
+   "summary": "Designs a bespoke, auditable playbook when no bundled one fits (large migration, ambitious multi-part change, work reviewed after stepping away). Scales rigor, runs a hypothesis loop, logs decisions.",
+   "whenToUse": "No narrower playbook fits, or the work is large/cross-cutting or will be reviewed later.",
+   "handsOffTo": [
+    "architect",
+    "arena",
+    "show-me-your-work"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/figure-it-out",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/figure-it-out",
+   "kind": "skill",
+   "category": "setup",
+   "trigger": "no playbook fits",
+   "whatItIs": "Designs a custom playbook when your job is too big or odd for the standard ones.",
+   "steps": [
+    "Frame: writes the done-condition as something checkable, sizes the work, sets how strict to be",
+    "Design: splits work into small units, riskiest first, and builds the check before the work",
+    "Runs a loop per unit: hypothesis, smallest change, measure on the real thing, keep or revert",
+    "Logs every decision as it goes",
+    "Checks the whole result against the done-condition on the real product"
+   ],
+   "behindTheScenes": [
+    "Runs architect (which runs arena) for one-way-door design choices",
+    "Logs through show-me-your-work",
+    "Each worker gets its own worktree or branch"
+   ],
+   "output": "The playbook it designed, the decision trail path, what is verified, what is still open.",
+   "claudeCode": "/pstack:figure-it-out (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out."
+  },
+  {
+   "id": "how",
+   "name": "how",
+   "command": "/how",
+   "phase": "understand",
+   "summary": "Explains how a subsystem works now: concepts, runtime flow, files, sharp edges. Narrow question uses one explainer; large subsystems split into 2-4 explorers plus an explainer. Also placement/ownership questions.",
+   "whenToUse": "Before changing unfamiliar code; \"how does X work\", \"where should this live\".",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/how",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/how",
+   "kind": "skill",
+   "category": "understand",
+   "trigger": "how does it work",
+   "whatItIs": "Explains how a part of the code works, like onboarding a new senior engineer.",
+   "steps": [
+    "Decides if the question is simple (one file) or complex (a subsystem)",
+    "Simple: one explainer sub-agent reads the code and writes the answer",
+    "Complex: splits the question into 2-4 angles and runs one read-only explorer per angle at once",
+    "Then one explainer turns all the findings into the write-up",
+    "Shows it with light edits only"
+   ],
+   "behindTheScenes": [
+    "All sub-agents are read-only generalPurpose Task calls",
+    "Prompts come from references/explorer-prompt.md and explainer-prompt.md",
+    "Models come from the 'how explorer' and 'how explainer' lines in your settings"
+   ],
+   "output": "An explanation: Overview, Key Concepts, How It Works, Where Things Live, Gotchas.",
+   "claudeCode": "/pstack:how (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: explorers map to spawn_agent; turn on multi_agent in ~/.codex/config.toml or it runs as one pass."
+  },
+  {
+   "id": "why",
+   "name": "why",
+   "command": "/why",
+   "phase": "understand",
+   "summary": "Historical evidence for why code has its shape. Discovers MCPs at run time and queries seven evidence categories in parallel (source control, issues, docs, chat, infra observability, error tracking, analytics); separates fact from inference and reports empty searches.",
+   "whenToUse": "Design rationale, regressions, postmortems, data-backed thresholds.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/why",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/why",
+   "kind": "skill",
+   "category": "understand",
+   "trigger": "why built this way",
+   "whatItIs": "Finds the reasons behind code: who decided, what forced it, and what we only guess.",
+   "steps": [
+    "Pins down the code you mean and what you are asking",
+    "Builds an anchor: git blame, git log, PR numbers, and PR bodies via gh",
+    "Finds which tools are connected (git, tickets, docs, chat, monitoring, errors, analytics)",
+    "Runs one investigator per source at once; each owns one tool",
+    "One synthesizer merges the findings and keeps facts apart from guesses",
+    "Presents the cited result, with a Preserve/Change/Avoid/Risk list if you plan to change it"
+   ],
+   "behindTheScenes": [
+    "Investigators run in agent mode (not read-only) so they can use MCP tools",
+    "Prompts and rules: references/epistemics.md, investigator-prompt.md, synthesizer-prompt.md, sources/*.md",
+    "Missing sources are listed as gaps, not skipped quietly"
+   ],
+   "output": "A cited report: what we found, what we infer, competing ideas, what we don't know, confidence.",
+   "claudeCode": "/pstack:why (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: lists MCP servers from the tools Codex exposes; sub-agents map to spawn_agent."
+  },
+  {
+   "id": "teach",
+   "name": "teach",
+   "command": "/teach",
+   "phase": "understand",
+   "summary": "Runs how + why and weaves one plain explanation, built up diagram by diagram.",
+   "whenToUse": "You want to genuinely understand a change or subsystem, not just a summary.",
+   "handsOffTo": [
+    "how",
+    "why",
+    "unslop"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/teach",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/teach",
+   "kind": "skill",
+   "category": "understand",
+   "trigger": "explain it to me",
+   "whatItIs": "Explains a piece of work in plain words so you really understand it.",
+   "steps": [
+    "Picks the few things you should walk away knowing, from what you asked and what you already know",
+    "Runs how and why in parallel and blends the results",
+    "Starts with a plain definition, then ties it to your code",
+    "Builds diagrams one part at a time instead of one big picture",
+    "Stays a conversation: smallest full answer first, goes deeper when you ask"
+   ],
+   "behindTheScenes": [
+    "Calls the how and why skills for the real digging",
+    "Writes through unslop",
+    "Keeps why's hedging words as they are"
+   ],
+   "output": "A plain explanation, not a report about what it did.",
+   "claudeCode": "/pstack:teach (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: how+why in parallel map to spawn_agent; image generation uses the Codex equivalent."
+  },
+  {
+   "id": "recall",
+   "name": "recall",
+   "command": "/recall",
+   "phase": "understand",
+   "summary": "Rebuilds your recent context on a topic from your own chat transcripts, live git/PR state and the shared record; returns a tight current-state brief.",
+   "whenToUse": "Starting or resuming work after days away (\"catch me up\").",
+   "handsOffTo": [
+    "why"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/recall",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/recall",
+   "kind": "skill",
+   "category": "understand",
+   "trigger": "catch me up",
+   "whatItIs": "Rebuilds what you were working on from your chat history and the team record, then hands back a short brief.",
+   "steps": [
+    "Locks scope: time window (default last 7 days), topic, current workspace",
+    "Fans out cheap sub-agents over your past chat transcripts, grep topic first",
+    "Runs why's investigators on tickets, chat, docs and errors for the same topic",
+    "Checks every PR, branch and ticket it found with git and gh",
+    "Writes a brief: capsule, tagged threads, problems, one next move"
+   ],
+   "behindTheScenes": [
+    "Reads transcripts at ~/.cursor/projects/<slug>/agent-transcripts/",
+    "Never reads another project's transcripts unless asked",
+    "Raw transcripts stay in sub-agents; the main chat gets only findings"
+   ],
+   "output": "A short brief with status tags like [merged #N] or [open PR #N] and a next step.",
+   "claudeCode": "/pstack:recall (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: transcript paths in the source are Cursor's; Codex layout not covered in the sources (inference)."
+  },
+  {
+   "id": "ketchup",
+   "name": "ketchup",
+   "command": "/ketchup",
+   "phase": "understand",
+   "summary": "Catches you up on everything in this chat since your last message, in plain words, with an executive summary per action item.",
+   "whenToUse": "Returning to a long agent chat and needing to make the calls.",
+   "handsOffTo": [],
+   "source": "cursor",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/ketchup",
+   "kind": "skill",
+   "category": "catchup",
+   "trigger": "chat got long",
+   "whatItIs": "Catches you up on this chat since your last message, in plain words, and lists what only you can decide.",
+   "steps": [
+    "Finds your last real message (not notifications or sub-agent reports)",
+    "Collects your own work, sub-agent reports, and others' messages since then",
+    "Checks the live state of each PR, CI run, or agent",
+    "Opens with the count of action items, then what happened, most important first",
+    "Gives each action item a short summary: the decision, options, recommendation, what happens if you wait"
+   ],
+   "behindTheScenes": [
+    "Read-only turn",
+    "Uses the plain voice of /bro"
+   ],
+   "output": "A short catch-up plus action items.",
+   "claudeCode": "Not in the Claude Code port (Cursor repo only).",
+   "codex": "Not in the Claude or Codex ports (Cursor repo only per the repo listings)."
+  },
+  {
+   "id": "bro",
+   "name": "bro",
+   "command": "/bro",
+   "phase": "understand",
+   "summary": "Restates the last message in plain human language with no jargon.",
+   "whenToUse": "The answer is right but unreadable.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/bro",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/bro",
+   "kind": "skill",
+   "category": "catchup",
+   "trigger": "too much jargon",
+   "whatItIs": "Says the last message again in simple human words.",
+   "steps": [
+    "Takes the agent's last message",
+    "Drops the jargon",
+    "Restates it shorter and plainer"
+   ],
+   "behindTheScenes": [
+    "The whole skill is three sentences; no sub-agents, no files"
+   ],
+   "output": "A plain-language rewrite.",
+   "claudeCode": "/pstack:bro (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md, so it should load the same (inference)."
+  },
+  {
+   "id": "architect",
+   "name": "architect",
+   "command": "/architect",
+   "phase": "design",
+   "summary": "Five phases: ground (runs how, maybe why), sketch several shapes starting from caller usage, optional checkpoint (\"with checkpoint\"), implement against the sketch, scrap the sketch if repeated friction proves it wrong.",
+   "whenToUse": "Code that crosses a function boundary; before locking in types/signatures/module shape.",
+   "handsOffTo": [
+    "how",
+    "why",
+    "arena",
+    "interrogate"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/architect",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/architect",
+   "kind": "skill",
+   "category": "design",
+   "trigger": "before big code",
+   "whatItIs": "Sketches the types, function signatures and module layout first, then fills in code against that sketch.",
+   "steps": [
+    "Ground: runs how (and why if ownership changes) on the systems it touches",
+    "Sketch: runs arena with at least two structurally different designs",
+    "Screens each candidate against a design red-flags list and prefers the smaller interface",
+    "Agree: no pause by default; pauses only if you ask for a checkpoint",
+    "Implement: replaces 'not implemented' bodies; surprises are reported, not hidden",
+    "Scrap: if the same workaround keeps appearing, throws the sketch out and redesigns"
+   ],
+   "behindTheScenes": [
+    "Runners come from the 'architect runners' setting",
+    "Reads references/design-red-flags.md, runner-prompt.md, rationale-template.md",
+    "Writes the usage sketch first, then types; ships a rationale file next to it"
+   ],
+   "output": "A type/signature sketch (or module map) plus a rationale with the synthesis decision.",
+   "claudeCode": "/pstack:architect (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: the arena fan-out maps to spawn_agent."
+  },
+  {
+   "id": "arena",
+   "name": "arena",
+   "command": "/arena",
+   "phase": "design",
+   "summary": "Same brief to N models, each in its own worktree; private rubric, cross-model judge, coordinator reads all and picks a base and grafts the best parts from others.",
+   "whenToUse": "One attempt at a non-trivial artifact would lock in the wrong shape; design/code bakeoffs.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/arena",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/arena",
+   "kind": "skill",
+   "category": "design",
+   "trigger": "try several shapes",
+   "whatItIs": "Runs several agents on the same task, picks the best result, and borrows the good parts from the rest.",
+   "steps": [
+    "Frame: states the artifact, writes a 3-6 point rubric, picks runners, gives each its own folder or worktree",
+    "Fan out: all candidates start in one message, in the background",
+    "Cross-judge: one read-only judge on a different model family scores them",
+    "Pick: you read every candidate end to end and choose a base",
+    "Graft: port one or two strong ideas from each loser, by hand",
+    "Verify the final result like any other output"
+   ],
+   "behindTheScenes": [
+    "Runners and judge come from the 'arena runners' and 'arena cross-judge pool' settings",
+    "Candidates only see the task; the rubric is for the judge",
+    "Fewer than all candidates is fine; dropouts are noted"
+   ],
+   "output": "One merged result plus a note on the base, the grafts, and the verification.",
+   "claudeCode": "/pstack:arena (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: candidates and judge map to spawn_agent; use your own Codex models."
+  },
+  {
+   "id": "swarm",
+   "name": "swarm",
+   "command": "/swarm",
+   "phase": "design",
+   "summary": "Fans out N parallel workers across independent slices or declared race arms, drains them, returns one report (each worker PASS / ISSUES / BLOCKED with evidence).",
+   "whenToUse": "Coverage matrices, races, gauntlets, exploration partitions (vs arena = competing attempts at one thing).",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/swarm",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/swarm",
+   "kind": "skill",
+   "category": "fanout",
+   "trigger": "many things in parallel",
+   "whatItIs": "Runs many workers at once on slices, races, or comparisons, and returns one report.",
+   "steps": [
+    "Frame: states done-condition, shape (slices, race, or both), count, and worker model",
+    "Fan out: starts all workers in one message in the cloud, in the background",
+    "Each worker reports PASS, ISSUES, or BLOCKED with evidence",
+    "Aggregate: drops results missing required SHAs or method, retries once, then records a gap",
+    "Report: one table, one-line issues, gaps"
+   ],
+   "behindTheScenes": [
+    "Workers are generalPurpose with environment 'cloud' (local only if they need your machine)",
+    "Model from the 'swarm workers' setting",
+    "Writers get their own output folder or worktree"
+   ],
+   "output": "One table of results, evidenced issues, and any gaps.",
+   "claudeCode": "/pstack:swarm (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: each worker is a spawn_agent call; no separate background flag needed."
+  },
+  {
+   "id": "interrogate",
+   "name": "interrogate",
+   "command": "/interrogate",
+   "phase": "design",
+   "summary": "Multi-model adversarial review: same diff, intent and rules to several models; lead merges findings into act on / consider / noted / dismissed. Includes a strict code-quality lens. Never applies changes automatically.",
+   "whenToUse": "A diff is ready to attack; contested design before shipping. Claude port: three models.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/interrogate",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/interrogate",
+   "alsoPhase": "verify",
+   "kind": "skill",
+   "category": "fanout",
+   "trigger": "stress-test the diff",
+   "whatItIs": "Several different AI models try to tear your change apart; you get one judged verdict.",
+   "steps": [
+    "Scopes the diff or files (git diff main...HEAD on a branch)",
+    "Writes the intent in one paragraph; asks if unsure",
+    "Starts one read-only reviewer per model at the same time",
+    "Merges findings, noting which models raised each",
+    "Sorts them into Act on, Consider, Noted, Dismissed with reasons",
+    "Never applies changes itself"
+   ],
+   "behindTheScenes": [
+    "Prompt from references/reviewer-prompt.md, rubric.md, code-quality-review.md; lead role from lead-judgment.md",
+    "Reviewer list comes from the 'interrogate reviewers' setting",
+    "Issues two models found separately are the strongest signal"
+   ],
+   "output": "An intent, reviewers, four finding buckets, and an agreement map.",
+   "claudeCode": "/pstack:interrogate (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: dispatch fields map to spawn_agent; keep the panel model-diverse."
+  },
+  {
+   "id": "tdd",
+   "name": "tdd",
+   "command": "/tdd",
+   "phase": "build",
+   "summary": "Failing test first, then the fix.",
+   "whenToUse": "Only when asked, or the bug has an obvious cheap local test path.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/tdd",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/tdd",
+   "kind": "skill",
+   "category": "build",
+   "trigger": "fix a bug test-first",
+   "whatItIs": "Writes a failing test for a bug first, then fixes it. Skips the test when it would be a bad one.",
+   "steps": [
+    "Works out intended vs current behavior and the smallest reproduction",
+    "Picks the narrowest existing test style for that code",
+    "Writes the smallest failing test",
+    "Runs it to see it fail for the right reason",
+    "Makes the smallest fix, then reruns the test"
+   ],
+   "behindTheScenes": [
+    "No files besides the test and the fix",
+    "If a test is impractical it uses a script, browser run or log check instead",
+    "Final reply names the failing-before and passing-after evidence"
+   ],
+   "output": "A regression test plus before/after proof.",
+   "claudeCode": "/pstack:tdd (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "typescript-best-practices",
+   "name": "typescript-best-practices",
+   "command": "/typescript-best-practices",
+   "phase": "build",
+   "summary": "Grounds the type-system-discipline principle in TypeScript syntax; path-scoped to **/*.ts and **/*.tsx.",
+   "whenToUse": "Reading or editing .ts/.tsx.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/typescript-best-practices",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/typescript-best-practices",
+   "kind": "skill",
+   "category": "build",
+   "trigger": "editing .ts files",
+   "whatItIs": "A rule sheet for typed TypeScript: no casts, no loose types, check data at the edges.",
+   "steps": [
+    "Applies type-system-discipline first",
+    "Uses discriminated unions, branded types, unknown instead of any",
+    "Parses outside data once at the boundary",
+    "Uses exhaustive checks (never) so new cases break the build",
+    "Prefers real tests over mocks and structured logs over console.log"
+   ],
+   "behindTheScenes": [
+    "Has a paths filter for **/*.ts and **/*.tsx so it applies to those files",
+    "Examples are in references/patterns.md"
+   ],
+   "output": "TypeScript that follows the rule table.",
+   "claudeCode": "/pstack:typescript-best-practices (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: path-based auto-load is a Claude/Cursor frontmatter feature; Codex support not stated (inference)."
+  },
+  {
+   "id": "unslop",
+   "name": "unslop",
+   "command": "/unslop",
+   "phase": "build",
+   "summary": "Removes AI tells from any writing. Marked \"must always apply\" and used on every prose surface including poteto-mode replies.",
+   "whenToUse": "Any prose: replies, docs, PR text.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/unslop",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/unslop",
+   "kind": "skill",
+   "category": "write",
+   "trigger": "reads like AI",
+   "whatItIs": "Strips the usual AI-sounding habits from any writing.",
+   "steps": [
+    "Scans for numbered patterns: AI vocabulary, em dashes, filler, hedging, fake 'not just X but Y'",
+    "Rewrites each hit in plain words",
+    "Keeps the meaning and the tone",
+    "Prefers active voice and whole sentences"
+   ],
+   "behindTheScenes": [
+    "poteto-mode runs it on every reply; the description says it must always apply",
+    "Other skills cite its rule numbers (for example, rule 14 on colons)"
+   ],
+   "output": "The same text without AI tells.",
+   "claudeCode": "/pstack:unslop (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "technical-writing",
+   "name": "technical-writing",
+   "command": "/technical-writing",
+   "phase": "build",
+   "summary": "Layered doc standard: Diataxis structure, Google developer style, Simplified Technical English, Global English.",
+   "whenToUse": "Docs, RFCs, READMEs, PR descriptions, commit messages.",
+   "handsOffTo": [
+    "unslop"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/technical-writing",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/technical-writing",
+   "kind": "skill",
+   "category": "write",
+   "trigger": "docs and PR text",
+   "whatItIs": "A writing standard for docs, READMEs, RFCs, PR descriptions and commit messages.",
+   "steps": [
+    "Picks one mode first: tutorial, how-to, reference, or explanation",
+    "Writes direct sentences to the reader in present tense",
+    "Splits long instructions: one step per sentence",
+    "Removes anything that could be read two ways",
+    "Varies sentence length so it does not read machine-written"
+   ],
+   "behindTheScenes": [
+    "Layers four standards: Diataxis, Google developer style, Simplified Technical English, Global English",
+    "poteto-mode calls it for docs and PR descriptions"
+   ],
+   "output": "Docs that follow one clear mode.",
+   "claudeCode": "/pstack:technical-writing (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "no-comments",
+   "name": "no-comments",
+   "command": "/no-comments",
+   "phase": "build",
+   "summary": "Spawns the Comment Sicko subagent to strip comments, fixes accepted findings, offers to encode \"do not remove\" constraints as a type, runtime check, test or lint.",
+   "whenToUse": "Before review.",
+   "handsOffTo": [
+    "architect",
+    "how",
+    "why"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/no-comments",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/no-comments",
+   "agents": [
+    "comment-sicko"
+   ],
+   "kind": "skill",
+   "category": "cleanup",
+   "trigger": "before review",
+   "whatItIs": "Deletes needless code comments and fixes the code that needed them.",
+   "steps": [
+    "Takes your files or the diff against main",
+    "Spawns the Comment Sicko sub-agent to flag and delete comments",
+    "Checks its work and restores any deletion that was wrong",
+    "Fixes flagged code directly, or runs architect once if a new shape is needed",
+    "Offers a lint, type or test to replace 'do not remove' comments",
+    "Reports deletions, restores and open items"
+   ],
+   "behindTheScenes": [
+    "Uses the comment-sicko agent (agents/comment-sicko.md)",
+    "Comment Sicko only edits comments, never application code",
+    "Can call how/why on a suspicious comment"
+   ],
+   "output": "A cleaner diff plus a report.",
+   "claudeCode": "/pstack:no-comments (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: no comment-sicko agent type; spawn_agent reads the agent file first."
+  },
+  {
+   "id": "deslop",
+   "name": "deslop",
+   "command": "/deslop",
+   "phase": "build",
+   "summary": "Removes AI-generated code slop and cleans up style. In the Cursor original it lives in the separate cursor-team-kit plugin; bundled in the Claude port.",
+   "whenToUse": "Before commit.",
+   "handsOffTo": [],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/deslop",
+   "note": "Cursor original: ships in cursor-team-kit, not pstack. Claude port bundles it (imported from cursor-team-kit).",
+   "kind": "skill",
+   "category": "cleanup",
+   "trigger": "before commit",
+   "whatItIs": "Removes the leftovers AI code tends to add, on the current diff.",
+   "steps": [
+    "Checks the diff against main",
+    "Removes extra comments, odd try/catch, 'any' casts, deep nesting",
+    "Keeps behavior unchanged",
+    "Gives a 1-3 sentence summary"
+   ],
+   "behindTheScenes": [
+    "No scripts or sub-agents; it is a short checklist",
+    "poteto-mode runs it before commit (from the cursor-team-kit plugin in Cursor)"
+   ],
+   "output": "A leaner diff and a short summary.",
+   "claudeCode": "/pstack:deslop (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "create-verification-skill",
+   "name": "create-verification-skill",
+   "command": "/create-verification-skill",
+   "phase": "verify",
+   "summary": "Inspects the repo and writes a project-local verify-<app> skill (launch, health check, drive behavior, capture evidence, clean up) plus a feature map; runs it once before handing over. Poteto: \"critical infrastructure\".",
+   "whenToUse": "Project has no scripted way to prove app behavior.",
+   "handsOffTo": [
+    "maintain-verification-skill"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/create-verification-skill",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/create-verification-skill",
+   "kind": "skill",
+   "category": "prove",
+   "trigger": "no way to test the app",
+   "whatItIs": "Builds a project skill that lets future agents run your app like a user and capture proof.",
+   "steps": [
+    "Interviews the repo (not you) for surface, run command, drive method, evidence, isolation",
+    "Writes verify-<app>/SKILL.md with Launch, Doctor, Drive, Evidence, Cleanup, Helpers",
+    "Seeds a features/ folder with one file per user feature",
+    "Runs its own instructions once end to end",
+    "Points you to maintain-verification-skill"
+   ],
+   "behindTheScenes": [
+    "Writes .cursor/skills/verify-<app>/ in Cursor (the Codex note says a different project-skill location is used)",
+    "Cleanup never deletes the proof it captured"
+   ],
+   "output": "A tested project-local verify skill with a feature map.",
+   "claudeCode": "/pstack:create-verification-skill (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: write it to Codex's project-skill location."
+  },
+  {
+   "id": "maintain-verification-skill",
+   "name": "maintain-verification-skill",
+   "command": "/maintain-verification-skill",
+   "phase": "verify",
+   "summary": "Periodic pass: parallel source readers per feature, one live session driving every feature, at most one PR of proven corrections. Cannot hide a product bug by editing docs.",
+   "whenToUse": "Verify skill / feature map has drifted from the app (poteto suggests a daily routine).",
+   "handsOffTo": [
+    "create-verification-skill"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/maintain-verification-skill",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/maintain-verification-skill",
+   "kind": "skill",
+   "category": "prove",
+   "trigger": "verify skill is stale",
+   "whatItIs": "Checks a verify skill against the real app and fixes drift in one PR.",
+   "steps": [
+    "Finds the verify skill and tidies its feature index",
+    "Source wave: one read-only sub-agent per feature",
+    "Reconciles the findings and sweeps recent changes for missing features",
+    "Live pass: drives every feature in the real app",
+    "Triage: doc drift, harness gap, or product bug",
+    "Ships one PR, or reports clean/blocked"
+   ],
+   "behindTheScenes": [
+    "Only edits the verify skill's own folder, never product code"
+   ],
+   "output": "Outcome clean, changed (one PR) or blocked.",
+   "claudeCode": "/pstack:maintain-verification-skill (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: per-feature readers map to spawn_agent."
+  },
+  {
+   "id": "benchmark-checklist",
+   "name": "benchmark-checklist",
+   "command": "/benchmark-checklist",
+   "phase": "verify",
+   "summary": "Vets a measurement before you report it: limiter, tuning, limits, errors, repeatability, relevance, whether the work happened.",
+   "whenToUse": "After running a benchmark or measuring a speedup/regression.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/benchmark-checklist",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/benchmark-checklist",
+   "kind": "skill",
+   "category": "review",
+   "trigger": "number looks too good",
+   "whatItIs": "Checks a speed measurement before you trust or report it.",
+   "steps": [
+    "Writes down the claim you expect to make",
+    "Reads the measurement script; checks load with uptime and nproc",
+    "Asks 7 questions: why not double, was it tuned, past limits, errors, repeatable, matters end to end, did the work happen",
+    "Runs each side at least 5 times, alternating",
+    "Gives a verdict with the number, run count, range, and limiter"
+   ],
+   "behindTheScenes": [
+    "Used by the Perf issue and Hillclimb playbooks",
+    "Pairs with the explain-the-number principle"
+   ],
+   "output": "A verdict: faster, slower, no difference, or inconclusive.",
+   "claudeCode": "/pstack:benchmark-checklist (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out."
+  },
+  {
+   "id": "blast-radius",
+   "name": "blast-radius",
+   "command": "/blast-radius",
+   "phase": "verify",
+   "summary": "Finds what a small-looking change could break outside the diff and proves the one fact it is safe because of by running real code.",
+   "whenToUse": "Reviewing a small diff you do not trust; \"what could this break\".",
+   "handsOffTo": [
+    "how",
+    "why",
+    "arena"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/blast-radius",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/blast-radius",
+   "kind": "skill",
+   "category": "review",
+   "trigger": "what could this break",
+   "whatItIs": "Finds what a change could break elsewhere, then proves the one fact it's safe because of by running code.",
+   "steps": [
+    "Reads the diff and what changed, including what it doesn't spell out",
+    "Finds the one fact the change is safe because of",
+    "Looks where grep stops: library source, timing, wire formats, flags, other languages",
+    "Rates each risk with a real chance, a cost, and a file:line",
+    "Writes and runs a small script that proves the key fact",
+    "On a big change, runs an arena of models"
+   ],
+   "behindTheScenes": [
+    "Rates certainty on a 5-step ladder, from 'you said so' to 'reproduced in the app'",
+    "Uses why step 2 to pull PRs and commits"
+   ],
+   "output": "A write-up: what it does, the safety fact (proven or marked unproven), risks, cleared items, pre-merge test.",
+   "claudeCode": "/pstack:blast-radius (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out."
+  },
+  {
+   "id": "thermo-nuclear-code-quality-review",
+   "name": "thermo-nuclear-code-quality-review",
+   "command": "/thermo-nuclear-code-quality-review",
+   "phase": "verify",
+   "summary": "Extremely strict maintainability review: abstraction quality, giant files, spaghetti-condition growth. Imported from cursor-team-kit.",
+   "whenToUse": "Deep code-quality audit / especially harsh maintainability review.",
+   "handsOffTo": [
+    "swarm",
+    "why"
+   ],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/thermo-nuclear-code-quality-review",
+   "note": "Cursor original: cursor-team-kit plugin, not pstack.",
+   "kind": "skill",
+   "category": "review",
+   "trigger": "hard code review",
+   "whatItIs": "An extra-strict review of structure and maintainability that pushes for big simplifications.",
+   "steps": [
+    "Runs the baseline prompt on the branch's changes",
+    "Hunts for 'code judo': a restructure that deletes whole branches or layers",
+    "Flags files crossing 1000 lines, bolted-on conditionals, thin wrappers, casts",
+    "Suggests remedies like deleting a layer or using a typed model",
+    "Replies direct and demanding"
+   ],
+   "behindTheScenes": [
+    "Claude-port only skill",
+    "Pure review checklist; no scripts"
+   ],
+   "output": "A strict review with structural fixes.",
+   "claudeCode": "/pstack:thermo-nuclear-code-quality-review (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: in the Claude/Codex port; plain SKILL.md (inference)."
+  },
+  {
+   "id": "babysit",
+   "name": "babysit",
+   "command": "/babysit",
+   "phase": "ship",
+   "summary": "Watches an open PR, fixes failing CI and straightforward review comments, drives to mergeable. Claude port is an analog of Cursor built-in /babysit; inside poteto-mode the Babysit playbook supersedes it.",
+   "whenToUse": "After opening a PR, to shepherd it without re-prompting.",
+   "handsOffTo": [
+    "fix-ci",
+    "fix-merge-conflicts",
+    "get-pr-comments",
+    "interrogate"
+   ],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/babysit",
+   "note": "Cursor original: built-in /babysit + Babysit playbook (playbook exists in both).",
+   "kind": "skill",
+   "category": "pr",
+   "trigger": "PR won't go green",
+   "whatItIs": "Watches an open PR and fixes conflicts, CI failures and easy review comments until it can merge.",
+   "steps": [
+    "Reads PR state with gh pr view",
+    "Triages: conflicts, then CI failures, then review comments, then bot comments",
+    "Uses fix-merge-conflicts, fix-ci and get-pr-comments for each",
+    "Re-checks on a timer; stops when green and clean",
+    "Stops after three failed rounds and hands back",
+    "Reports fixes, deferred comments and status with SHAs"
+   ],
+   "behindTheScenes": [
+    "Uses gh and Claude Code's loop skill",
+    "Inside poteto-mode the Babysit playbook and watch-pr script take over",
+    "Never uses --no-verify and never edits tests just to pass"
+   ],
+   "output": "A merge-ready PR (or a report of what's blocking).",
+   "claudeCode": "/pstack:babysit (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: no loop skill; re-run on a cadence or use a scheduled task."
+  },
+  {
+   "id": "fix-ci",
+   "name": "fix-ci",
+   "command": "/fix-ci",
+   "phase": "ship",
+   "summary": "Finds failing PR checks, inspects logs/links, applies focused fixes, repeats until green. Imported from cursor-team-kit.",
+   "whenToUse": "Branch/PR CI is failing.",
+   "handsOffTo": [],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/fix-ci",
+   "kind": "skill",
+   "category": "pr",
+   "trigger": "CI is red",
+   "whatItIs": "Finds failing checks and fixes them one at a time.",
+   "steps": [
+    "Finds the PR and runs gh pr checks",
+    "Pulls the first real error from the failed job logs",
+    "Makes the smallest safe fix",
+    "Pushes, rechecks, repeats until green"
+   ],
+   "behindTheScenes": [
+    "Uses gh pr checks as the source of truth"
+   ],
+   "output": "Failing job, fixes in order, current CI status.",
+   "claudeCode": "/pstack:fix-ci (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "fix-merge-conflicts",
+   "name": "fix-merge-conflicts",
+   "command": "/fix-merge-conflicts",
+   "phase": "ship",
+   "summary": "Resolves merge conflicts non-interactively, validates build and tests, finalizes. Imported from cursor-team-kit.",
+   "whenToUse": "Merge conflicts on a branch/PR.",
+   "handsOffTo": [],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/fix-merge-conflicts",
+   "kind": "skill",
+   "category": "pr",
+   "trigger": "merge conflict",
+   "whatItIs": "Resolves conflicts without prompts and checks the build still works.",
+   "steps": [
+    "Lists conflicted files",
+    "Resolves each with the smallest correct edit",
+    "Regenerates lockfiles with the package manager",
+    "Runs compile, lint and tests",
+    "Stages files; does not push"
+   ],
+   "behindTheScenes": [
+    "No push or tag during resolution"
+   ],
+   "output": "Files resolved, key choices, build/test result.",
+   "claudeCode": "/pstack:fix-merge-conflicts (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "get-pr-comments",
+   "name": "get-pr-comments",
+   "command": "/get-pr-comments",
+   "phase": "ship",
+   "summary": "Fetches and summarizes review comments from the active PR. Imported from cursor-team-kit.",
+   "whenToUse": "Need the review state of the current PR.",
+   "handsOffTo": [],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/get-pr-comments",
+   "kind": "skill",
+   "category": "pr",
+   "trigger": "what did reviewers say",
+   "whatItIs": "Pulls review comments from your PR and sorts them into an action list.",
+   "steps": [
+    "Finds the PR for your branch",
+    "Fetches review and discussion comments",
+    "Groups by severity",
+    "Returns an action list"
+   ],
+   "behindTheScenes": [
+    "Read-only"
+   ],
+   "output": "Grouped summary, action list, open questions.",
+   "claudeCode": "/pstack:get-pr-comments (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "make-pr-easy-to-review",
+   "name": "make-pr-easy-to-review",
+   "command": "/make-pr-easy-to-review",
+   "phase": "ship",
+   "summary": "Cleans noisy history, improves PR description, adds reviewer guidance without changing behavior. Imported from cursor-team-kit.",
+   "whenToUse": "\"Make this easy to review\", tidy commits, annotate the diff.",
+   "handsOffTo": [],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/make-pr-easy-to-review",
+   "kind": "skill",
+   "category": "pr",
+   "trigger": "PR is hard to read",
+   "whatItIs": "Tidies a PR so reviewers see the point fast, without changing code behavior.",
+   "steps": [
+    "Reads commits, diff size, generated files and the description",
+    "Spots noisy commits or mixed changes",
+    "Proposes a plan before rewriting history",
+    "Applies it and checks the final code tree is identical",
+    "Adds a TL;DR and reviewer notes"
+   ],
+   "behindTheScenes": [
+    "Saves the original git tree hash and compares after a rewrite",
+    "Won't push if the tree changed"
+   ],
+   "output": "A cleaner PR with reviewer guidance.",
+   "claudeCode": "/pstack:make-pr-easy-to-review (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "what-did-i-get-done",
+   "name": "what-did-i-get-done",
+   "command": "/what-did-i-get-done",
+   "phase": "ship",
+   "summary": "Summarizes your authored commits over a chosen period into a concise update. Imported from cursor-team-kit.",
+   "whenToUse": "Status updates / standups.",
+   "handsOffTo": [],
+   "source": "claude",
+   "url": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/what-did-i-get-done",
+   "kind": "skill",
+   "category": "catchup",
+   "trigger": "status update",
+   "whatItIs": "Turns your recent commits into a short status update.",
+   "steps": [
+    "Turns 'yesterday' or 'last week' into real dates",
+    "Reads commits you authored in that range",
+    "Skips merge commits and uncommitted work",
+    "Writes a tight summary of what shipped, with the real date range"
+   ],
+   "behindTheScenes": [
+    "Uses git log by your git user email",
+    "Skips cosmetic changes; describes changes by what they do"
+   ],
+   "output": "One short summary and 2-5 bullets.",
+   "claudeCode": "/pstack:what-did-i-get-done (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: plain SKILL.md (inference)."
+  },
+  {
+   "id": "show-me-your-work",
+   "name": "show-me-your-work",
+   "command": "/show-me-your-work",
+   "phase": "overnight",
+   "summary": "Reviewable decision trail: a TSV with one row per decision (time, phase, decision, reason, evidence, result). Local by default; commit when reviewers need it.",
+   "whenToUse": "Long, autonomous, multi-phase or step-away work.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/show-me-your-work",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/show-me-your-work",
+   "kind": "skill",
+   "category": "prove",
+   "trigger": "long or unattended run",
+   "whatItIs": "Keeps a log of every decision so you can trust work you did not watch.",
+   "steps": [
+    "Starts a TSV log (ts, phase, decision, why, evidence, result)",
+    "Adds a row at each decision, unit finished, pivot or blocker",
+    "Never edits old rows; wrong calls get a new row",
+    "At the end, checks the log against the run's transcript",
+    "Spawns a different-model reviewer to flag weak evidence"
+   ],
+   "behindTheScenes": [
+    "Helper script: scripts/log.sh; template references/decision-log-template.tsv",
+    "Default location decisions.tsv or .audit/<task>.tsv, kept out of git unless a reviewer needs it"
+   ],
+   "output": "A decisions TSV and a review of it.",
+   "claudeCode": "/pstack:show-me-your-work (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: log.sh is shell; runs the same (inference)."
+  },
+  {
+   "id": "reflect",
+   "name": "reflect",
+   "command": "/reflect",
+   "phase": "improve",
+   "summary": "Spawns three parallel reviewers over the transcript (divergent, judgment, tooling) plus a synthesizer; sorts proposals into accepted/rejected/backlog; nothing changes until you approve.",
+   "whenToUse": "A long task landed and you want the recipe captured as a skill edit.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/reflect",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/reflect",
+   "kind": "skill",
+   "category": "improve",
+   "trigger": "session taught something",
+   "whatItIs": "Turns what went wrong or right in a chat into concrete edits to your skills.",
+   "steps": [
+    "Finds this chat's transcript",
+    "Starts three reviewers at once: judgment, tooling, divergent",
+    "One synthesizer sorts findings into Accepted, Rejected, Backlog",
+    "Moves anything a lint or script could enforce to Backlog",
+    "Waits for your approval before applying edits",
+    "Summarizes edits, new skills and backlog items"
+   ],
+   "behindTheScenes": [
+    "Prompts in references/*-reviewer.md and synthesizer.md",
+    "Never auto-applies skill edits"
+   ],
+   "output": "A list of approved skill edits.",
+   "claudeCode": "/pstack:reflect (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: reads Claude's transcript path, so pass a session digest instead."
+  },
+  {
+   "id": "correct",
+   "name": "correct",
+   "command": "/correct",
+   "phase": "improve",
+   "summary": "Mines history for repeated agent mistakes and makes each impossible at the highest level that works: architecture, then types, then lint (error names the fix), then test, docs last. Proves each check fails on a real past mistake.",
+   "whenToUse": "You keep correcting agents for the same mistakes.",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/correct",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/correct",
+   "kind": "skill",
+   "category": "improve",
+   "trigger": "same mistake again",
+   "whatItIs": "Finds mistakes agents keep repeating and makes each one impossible.",
+   "steps": [
+    "Reads commits, reverts, review comments and agent rules for repeated mistakes",
+    "Groups them into classes (a class counts after two repeats)",
+    "For each, tries architecture, then types, then a lint, then tests, docs last",
+    "Proves each new check fails on a real past mistake",
+    "Keeps a rule-to-enforcer table in the agent instructions file"
+   ],
+   "behindTheScenes": [
+    "Writes to CLAUDE.md or AGENTS.md rule table",
+    "Same command runs locally and in CI"
+   ],
+   "output": "Fixes per mistake class and a rule table.",
+   "claudeCode": "/pstack:correct (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: the instructions file is AGENTS.md."
+  },
+  {
+   "id": "automate-me",
+   "name": "automate-me",
+   "command": "/automate-me",
+   "phase": "improve",
+   "summary": "Mines recent transcripts and drafts your own <name>-mode skill that routes through pstack underneath.",
+   "whenToUse": "You want pstack in your own style.",
+   "handsOffTo": [
+    "unslop"
+   ],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/automate-me",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/automate-me",
+   "kind": "skill",
+   "category": "improve",
+   "trigger": "make it mine",
+   "whatItIs": "Builds a personal 'your-name-mode' skill from how you work.",
+   "steps": [
+    "Looks for an existing -mode skill",
+    "Mines recent chats in parallel slices for your habits",
+    "Asks a few multiple-choice questions",
+    "Clusters findings into sections",
+    "Drafts the skill, iterates on the prose, lands it in a PR"
+   ],
+   "behindTheScenes": [
+    "Uses create-skill and unslop",
+    "Needs patterns seen in 2+ slices before keeping them"
+   ],
+   "output": "A personal mode skill.",
+   "claudeCode": "/pstack:automate-me (after /plugin install pstack@pstack-claude)",
+   "codex": "Codex: ships a native port (codex plugin add pstack@pstack-claude); skills are the same SKILL.md files, ask for it by name (Codex shortcuts optional). Needs multi_agent for fan-out. Codex: skill authoring step maps to your platform's guidance."
+  },
+  {
+   "id": "make-bot-ui",
+   "name": "make-bot-ui",
+   "command": "/make-bot-ui",
+   "phase": "improve",
+   "summary": "Builds a page/dashboard whose buttons wake a Grok Bot over a webhook (sender-key handoff, optional Tailscale).",
+   "whenToUse": "Custom UI that triggers a Grok Bot. Cursor-only; not in Claude port.",
+   "handsOffTo": [],
+   "source": "cursor",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/make-bot-ui",
+   "phase_note": "peripheral",
+   "kind": "skill",
+   "category": "extras",
+   "trigger": "Cursor bot buttons",
+   "whatItIs": "Builds a small page whose buttons wake a Cursor bot through a webhook.",
+   "steps": [
+    "Creates a webhook routine",
+    "Has you copy the URL and sender key from the routine panel",
+    "Requests the key via a secret card",
+    "Hosts the page on your computer",
+    "Sends a test POST before saying it is live"
+   ],
+   "behindTheScenes": [
+    "Cursor-specific tools (update_state, SendToUser); key never goes in chat"
+   ],
+   "output": "A working button page.",
+   "claudeCode": "Not in the Claude Code port (Cursor repo only).",
+   "codex": "Not in the Claude or Codex ports (Cursor repo only)."
+  },
+  {
+   "id": "principle-laziness-protocol",
+   "name": "laziness-protocol",
+   "command": null,
+   "phase": "principles",
+   "summary": "Bias toward deletion and the smallest change that solves the problem.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-laziness-protocol",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-laziness-protocol",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "simple",
+   "whatItIs": "Aim for the most result with the least code.",
+   "inPractice": [
+    "Look for deletions before additions",
+    "Make the smallest diff that solves it",
+    "Question any plan to thread a new flag through many layers"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-laziness-protocol).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-foundational-thinking",
+   "name": "foundational-thinking",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply before writing logic: choosing core types and data structures, sequencing scaffold-vs-feature work, asking what concurrent actors share. Get the data structures right so downstream code becomes obvious.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-foundational-thinking",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-foundational-thinking",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "shape",
+   "whatItIs": "Get the data shapes and the base setup right before logic.",
+   "inPractice": [
+    "Define core types first",
+    "Do shared setup (CI, test infra, types) before features",
+    "Before sharing state between actors, ask what happens if another changes it"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-foundational-thinking).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-redesign-from-first-principles",
+   "name": "redesign-from-first-principles",
+   "command": null,
+   "phase": "principles",
+   "summary": "Redesign as if the requirement had been a foundational assumption from day one, instead of bolting it on.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-redesign-from-first-principles",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-redesign-from-first-principles",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "shape",
+   "whatItIs": "Add a new requirement as if it had been there from day one.",
+   "inPractice": [
+    "Read all affected files",
+    "Ask what you would build from scratch",
+    "Update every reference: types, docs, examples"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-redesign-from-first-principles).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-attack-the-premise",
+   "name": "attack-the-premise",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply when two or more fixes that share one premise have failed the same gate. Take a census of which actors hold the imbalance before the next fix, then question the premise instead of writing another fix that assumes it.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-attack-the-premise",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-attack-the-premise",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "shape",
+   "whatItIs": "When two fixes that share one assumption both fail, question the assumption.",
+   "inPractice": [
+    "Write the shared premise in one sentence",
+    "Count which actors hold the imbalance with a rerunnable script",
+    "Remove the asymmetry instead of compensating for it"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-attack-the-premise).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-subtract-before-you-add",
+   "name": "subtract-before-you-add",
+   "command": null,
+   "phase": "principles",
+   "summary": "Remove dead weight, redundant validators, and stub references first, then build on the simpler base.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-subtract-before-you-add",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-subtract-before-you-add",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "simple",
+   "whatItIs": "Remove complexity first, then build on the simpler base.",
+   "inPractice": [
+    "Delete dead code before adding",
+    "Design for what is used, not edge cases nobody hit",
+    "Drop references with no new content"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-subtract-before-you-add).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-minimize-reader-load",
+   "name": "minimize-reader-load",
+   "command": null,
+   "phase": "principles",
+   "summary": "Count layers between question and answer, and hidden state in the reader's head; collapse one-caller wrappers and shrink mutable scope.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-minimize-reader-load",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-minimize-reader-load",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "simple",
+   "whatItIs": "Judge code by how much a reader must trace and remember.",
+   "inPractice": [
+    "Inline one-caller wrappers",
+    "Shrink state scope (locals over fields over globals)",
+    "Test: can a newcomer answer 'where does X come from' in 30 seconds"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-minimize-reader-load).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-outcome-oriented-execution",
+   "name": "outcome-oriented-execution",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply during planned rewrites and migrations with explicit phase boundaries. Converge on the target architecture; don't preserve smooth intermediate states with throwaway compatibility code.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-outcome-oriented-execution",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-outcome-oriented-execution",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "simple",
+   "whatItIs": "Aim at the final target design, not smooth in-between states.",
+   "inPractice": [
+    "Break things on purpose only when planned, scoped and reversible",
+    "Skip throwaway compatibility code",
+    "Run full checks at the end of the plan"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-outcome-oriented-execution).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-experience-first",
+   "name": "experience-first",
+   "command": null,
+   "phase": "principles",
+   "summary": "Choose user delight over implementation convenience; ship fewer polished features over more rough ones.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-experience-first",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-experience-first",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "shape",
+   "whatItIs": "When ease of building clashes with user delight, pick delight.",
+   "inPractice": [
+    "Justify every feature and option",
+    "Ship fewer things, polished",
+    "The 'user' can be a colleague importing your library"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-experience-first).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-exhaust-the-design-space",
+   "name": "exhaust-the-design-space",
+   "command": null,
+   "phase": "principles",
+   "summary": "Build 2-3 competing prototypes and compare side by side before committing.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-exhaust-the-design-space",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-exhaust-the-design-space",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "shape",
+   "whatItIs": "With no precedent, build two or three real alternatives before choosing.",
+   "inPractice": [
+    "Make competing prototypes or sketches",
+    "Compare them side by side",
+    "Skip for mechanical work with one viable way"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-exhaust-the-design-space).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-build-the-lever",
+   "name": "build-the-lever",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply to any non-trivial work, not just bulk work: edits, migrations, analyses, checks. Build the tool that does it or proves it (codemod, script, generator, or a skill your subagents follow) instead of working by hand. The tool is the artifact a reviewer can rerun.",
+   "whenToUse": "Group: core. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-build-the-lever",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-build-the-lever",
+   "group": "core",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "agents",
+   "whatItIs": "For non-trivial work, build the script or tool that does or proves it.",
+   "inPractice": [
+    "Do one unit by hand, then write the tool and diff it against the hand version",
+    "Prefer a script over fan-out to many agents",
+    "If you cite this principle, the diff must contain the tool"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-build-the-lever).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-model-the-domain",
+   "name": "model-the-domain",
+   "command": null,
+   "phase": "principles",
+   "summary": "Encode the domain in a structure instead of scattered conditionals.",
+   "whenToUse": "Group: architecture. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-model-the-domain",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-model-the-domain",
+   "group": "architecture",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "structure",
+   "whatItIs": "Put the real rules into a data structure, not scattered if-statements.",
+   "inPractice": [
+    "Use a state machine, typed model, registry or reducer",
+    "Pick the structure when you write it, not in a later refactor",
+    "Organize modules by knowledge, not by execution order"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-model-the-domain).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-boundary-discipline",
+   "name": "boundary-discipline",
+   "command": null,
+   "phase": "principles",
+   "summary": "Concentrate guards at system boundaries (CLI, config, network, external APIs); trust internal types and keep business logic in pure functions.",
+   "whenToUse": "Group: architecture. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-boundary-discipline",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-boundary-discipline",
+   "group": "architecture",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "structure",
+   "whatItIs": "Validate at the edges, trust types inside.",
+   "inPractice": [
+    "Check args, config, APIs at the boundary",
+    "No re-validation inside the system",
+    "Keep business logic in pure functions, framework wiring thin"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-boundary-discipline).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-type-system-discipline",
+   "name": "type-system-discipline",
+   "command": null,
+   "phase": "principles",
+   "summary": "Make illegal states unrepresentable, brand semantic primitives, parse external data at boundaries, refuse to lie to the compiler, exhaust variants, derive from authoritative schemas.",
+   "whenToUse": "Group: architecture. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-type-system-discipline",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-type-system-discipline",
+   "group": "architecture",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "structure",
+   "whatItIs": "Make the compiler reject impossible states.",
+   "inPractice": [
+    "Use sum types, not bags of optional fields",
+    "Brand IDs and other semantic primitives",
+    "Parse outside data once; avoid casts"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-type-system-discipline).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-make-operations-idempotent",
+   "name": "make-operations-idempotent",
+   "command": null,
+   "phase": "principles",
+   "summary": "Converge to the same end state regardless of partial prior runs.",
+   "whenToUse": "Group: architecture. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-make-operations-idempotent",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-make-operations-idempotent",
+   "group": "architecture",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "structure",
+   "whatItIs": "Operations should reach the same end state however often or far they ran.",
+   "inPractice": [
+    "Ask: what if this runs twice, or crashed halfway",
+    "Scan and clean stale state on startup",
+    "Use self-healing locks"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-make-operations-idempotent).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-migrate-callers-then-delete-legacy-apis",
+   "name": "migrate-callers-then-delete-legacy-apis",
+   "command": null,
+   "phase": "principles",
+   "summary": "Migrate callers and delete the old API in the same wave instead of preserving compatibility layers.",
+   "whenToUse": "Group: architecture. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-migrate-callers-then-delete-legacy-apis",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-migrate-callers-then-delete-legacy-apis",
+   "group": "architecture",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "simple",
+   "whatItIs": "Move all callers to the new API and delete the old one in the same change.",
+   "inPractice": [
+    "Inventory callers and migrate them",
+    "Keep adapters only if time-boxed",
+    "Update tests to the new contract"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-migrate-callers-then-delete-legacy-apis).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-separate-before-serializing-shared-state",
+   "name": "separate-before-serializing-shared-state",
+   "command": null,
+   "phase": "principles",
+   "summary": "Eliminate the sharing first; serialize structurally only when one shared writer is a real invariant.",
+   "whenToUse": "Group: architecture. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-separate-before-serializing-shared-state",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-separate-before-serializing-shared-state",
+   "group": "architecture",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "structure",
+   "whatItIs": "Give each actor its own thing to write before reaching for locks.",
+   "inPractice": [
+    "List shared mutable state",
+    "Default: separate files, keys or branches",
+    "Lock only when one shared target is a real rule"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-separate-before-serializing-shared-state).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-prove-it-works",
+   "name": "prove-it-works",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply after completing a task, before declaring done. Verify against the real artifact (run the feature, read the actual value, inspect the diff), not a proxy, self-report, or 'it compiles.'.",
+   "whenToUse": "Group: verification. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-prove-it-works",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-prove-it-works",
+   "group": "verification",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "proof",
+   "whatItIs": "Check the real thing, not a proxy like 'it compiles'.",
+   "inPractice": [
+    "Read the actual value, not a derived one",
+    "If a check fails, doubt the check first",
+    "Prefer a rerunnable script as proof"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-prove-it-works).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-fix-root-causes",
+   "name": "fix-root-causes",
+   "command": null,
+   "phase": "principles",
+   "summary": "Trace each symptom to its root cause and fix it there; reproduce first, ask why until you reach it, resist nil-check guards that silence crashes.",
+   "whenToUse": "Group: verification. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-fix-root-causes",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-fix-root-causes",
+   "group": "verification",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "proof",
+   "whatItIs": "Trace the problem to its cause instead of patching the symptom.",
+   "inPractice": [
+    "Reproduce first",
+    "Keep asking why; don't add guards to silence a crash",
+    "Grep for the same pattern elsewhere"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-fix-root-causes).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-sequence-verifiable-units",
+   "name": "sequence-verifiable-units",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply to multi-step work (sweeps, migrations, runs of similar edits) and to how you stack commits and PRs. Break work into small units that each end in a verifiable state, check each before the next, and order delivery so the sequence proves itself to a reviewer.",
+   "whenToUse": "Group: verification. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-sequence-verifiable-units",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-sequence-verifiable-units",
+   "group": "verification",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "proof",
+   "whatItIs": "Work in small units that each end in a check.",
+   "inPractice": [
+    "Verify each unit before the next",
+    "Rebase onto clean trunk first",
+    "Stack commits so the story proves itself (failing test, then fix)"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-sequence-verifiable-units).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-test-behavior-not-implementation",
+   "name": "test-behavior-not-implementation",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply when you write, change, or keep a test. Call the code the way its users do and assert the result they observe against a literal expected value. If the test would still pass when every imported function returns undefined, rewrite the assertion or delete the test.",
+   "whenToUse": "Group: verification. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-test-behavior-not-implementation",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-test-behavior-not-implementation",
+   "group": "verification",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "proof",
+   "whatItIs": "A test calls the code like a user and checks the exact result.",
+   "inPractice": [
+    "Delete tests that pass if every function returns undefined",
+    "Assert literal expected values",
+    "For a mock, assert the payload it received"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-test-behavior-not-implementation).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-explain-the-number",
+   "name": "explain-the-number",
+   "command": null,
+   "phase": "principles",
+   "summary": "Apply before you trust, report, or act on a number you measured: a speedup, a regression, a throughput, a latency, or an eval result. Find what limits it, and rule out that it measured something other than the work you think.",
+   "whenToUse": "Group: verification. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-explain-the-number",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-explain-the-number",
+   "group": "verification",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "proof",
+   "whatItIs": "Before trusting a measured number, find what limits it.",
+   "inPractice": [
+    "Ask 'why not double?' with a profile",
+    "Rule out errors, cached or skipped work, untuned sides",
+    "Keep run count, spread and limiter with the number"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-explain-the-number).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-guard-the-context-window",
+   "name": "guard-the-context-window",
+   "command": null,
+   "phase": "principles",
+   "summary": "Route bulk to subagents; keep summaries in the main thread, not raw payloads.",
+   "whenToUse": "Group: delegation. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-guard-the-context-window",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-guard-the-context-window",
+   "group": "delegation",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "agents",
+   "whatItIs": "Context is limited, so spend it on what matters.",
+   "inPractice": [
+    "Send big outputs to sub-agents",
+    "Keep summaries in the main chat",
+    "Cap files per phase"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-guard-the-context-window).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-never-block-on-the-human",
+   "name": "never-block-on-the-human",
+   "command": null,
+   "phase": "principles",
+   "summary": "Proceed, present the result, let the human course-correct after the fact; reserve confirmation for irreversible actions.",
+   "whenToUse": "Group: delegation. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-never-block-on-the-human",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-never-block-on-the-human",
+   "group": "delegation",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "agents",
+   "whatItIs": "On reversible work, act and let the human correct later.",
+   "inPractice": [
+    "Proceed, then present",
+    "Ask only before irreversible actions",
+    "Product direction still comes from the human"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-never-block-on-the-human).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  },
+  {
+   "id": "principle-encode-lessons-in-structure",
+   "name": "encode-lessons-in-structure",
+   "command": null,
+   "phase": "principles",
+   "summary": "Encode the rule as a lint, metadata flag, runtime check, or script instead of more text.",
+   "whenToUse": "Group: meta. Not a command; steer by name (\"apply prove it works\").",
+   "handsOffTo": [],
+   "source": "both",
+   "url": "https://github.com/cursor/plugins/tree/main/pstack/skills/principle-encode-lessons-in-structure",
+   "claudeUrl": "https://github.com/michael-denyer/pstack-claude/tree/main/plugins/pstack/skills/principle-encode-lessons-in-structure",
+   "group": "meta",
+   "kind": "principle",
+   "category": "principles",
+   "principleGroup": "agents",
+   "whatItIs": "The second time you write the same instruction, turn it into a check.",
+   "inPractice": [
+    "Prefer a type, lint, metadata flag, runtime check or script",
+    "Pick the strongest mechanism available",
+    "Only judgment calls stay as text"
+   ],
+   "claudeCode": "Not a command: poteto-mode reads it automatically when its trigger fits (skills/principle-encode-lessons-in-structure).",
+   "codex": "Same plain SKILL.md; Codex port exposes it as a skill (principles are indexed by poteto-mode)."
+  }
+ ],
+ "playbooks": [
+  {
+   "id": "investigation",
+   "name": "investigation",
+   "summary": "a read-only question. how does x work, why was y built this way, are we sure.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/investigation.md",
+   "whatItIs": "Answer a read-only question with sources.",
+   "steps": [
+    "Run how (and why for motivation)",
+    "One-line throughput checkpoint: n/a",
+    "Write the how-shaped answer or a tradeoffs table",
+    "Run unslop on the reply"
+   ]
+  },
+  {
+   "id": "bug-fix",
+   "name": "bug fix",
+   "summary": "reproduce a defect, root-cause it, and fix with runtime evidence.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/bug-fix.md",
+   "whatItIs": "Reproduce, find the root cause, and fix it with runtime evidence.",
+   "steps": [
+    "Reproduce yourself on the real surface",
+    "Binary-search the cause using how and why",
+    "Plan the fix (architect if it crosses a function); delegate to a sub-agent",
+    "Verify on the same surface",
+    "Commit failing repro before the fix",
+    "Open a PR"
+   ]
+  },
+  {
+   "id": "perf-issue",
+   "name": "perf",
+   "summary": "trace a measured slowness and improve it against a baseline.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/perf-issue.md",
+   "whatItIs": "Trace a measured slowness and improve it against a baseline.",
+   "steps": [
+    "Capture and vet a baseline with benchmark-checklist",
+    "Ground with how; try the 'do less/later/cheaper' mantras in order",
+    "Plan, delegate and re-trace",
+    "Compare artifacts",
+    "Cite the number in the PR"
+   ]
+  },
+  {
+   "id": "hillclimb",
+   "name": "hillclimb",
+   "summary": "sustained, scientific improvement of one metric against a target, looping hypotheses with before/after measurement and one commit per accepted win.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/hillclimb.md",
+   "whatItIs": "Improve one metric step by step with a frozen harness and a decision log.",
+   "steps": [
+    "Ground the workload with how",
+    "Build and freeze the measurement harness",
+    "Open a decision log",
+    "Loop one hypothesis at a time; keep or revert",
+    "Push past plateaus; stop at target",
+    "Open a PR with the kept commits stacked"
+   ]
+  },
+  {
+   "id": "runtime-forensics",
+   "name": "runtime forensics",
+   "summary": "diagnose a live symptom (leak, idle-cpu spin, glitch) from instrumentation.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/runtime-forensics.md",
+   "whatItIs": "Diagnose a live runtime symptom (leak, idle CPU) from instrumentation.",
+   "steps": [
+    "Capture the live signal (profile, heap snapshot, trace)",
+    "Reduce to the smoking gun",
+    "Prove it by injecting instrumentation",
+    "Map back to source",
+    "Hand back a diagnosis, not a fix"
+   ]
+  },
+  {
+   "id": "trace-forensics",
+   "name": "trace forensics",
+   "summary": "diagnose a captured profiling artifact (cpuprofile, trace, spindump, heap snapshot).",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/trace-forensics.md",
+   "whatItIs": "Diagnose a captured profile or trace after the fact.",
+   "steps": [
+    "Identify the format and load it with the right tool",
+    "Dump it into sqlite",
+    "Narrow to the hot path or retainer chain",
+    "Attribute to source",
+    "Diff before/after if you have both",
+    "Hand back a cited diagnosis"
+   ]
+  },
+  {
+   "id": "feature",
+   "name": "feature",
+   "summary": "new or changed behavior, built from a named data shape.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/feature.md",
+   "whatItIs": "Build new behavior from a named data shape.",
+   "steps": [
+    "Run how, then architect",
+    "Write a four-point throughput checkpoint",
+    "Delegate code to a sub-agent",
+    "Verify on the real surface",
+    "Rebase into small ordered commits",
+    "interrogate if contested; open a PR"
+   ]
+  },
+  {
+   "id": "refactoring",
+   "name": "refactoring",
+   "summary": "a behavior-preserving change to structure or shape.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/refactoring.md",
+   "whatItIs": "Change structure without changing behavior.",
+   "steps": [
+    "Pin behavior with a characterization test",
+    "Name the missing structure and target shape",
+    "Subtract before adding",
+    "Move in small steps that keep the pin green",
+    "Prove behavior is unchanged",
+    "Keep it only if reader load dropped"
+   ]
+  },
+  {
+   "id": "prototype",
+   "name": "prototype",
+   "summary": "a throwaway sketch to make a design or behavioral decision cheaply, or to settle an empirical fork by observing it.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/prototype.md",
+   "whatItIs": "Build a throwaway sketch to decide something cheaply.",
+   "steps": [
+    "Scope the decision",
+    "Gather references if the space is open",
+    "Build in a scratch dir behind a variant switcher",
+    "Verify each variant on the real surface",
+    "Present tradeoffs and a recommendation"
+   ]
+  },
+  {
+   "id": "visual-parity",
+   "name": "visual parity",
+   "summary": "pixel-exact ui equivalence between two implementations.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/visual-parity.md",
+   "whatItIs": "Match two UIs pixel for pixel.",
+   "steps": [
+    "Capture baseline screenshots first",
+    "No harness or baseline tampering",
+    "Migrate one component at a time, one owner each",
+    "Image-diff each against its baseline",
+    "Open PRs per component"
+   ]
+  },
+  {
+   "id": "authoring-a-skill",
+   "name": "authoring a skill",
+   "summary": "writing or editing a SKILL.md.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/authoring-a-skill.md",
+   "whatItIs": "Write or edit a SKILL.md.",
+   "steps": [
+    "Use create-skill",
+    "Validate frontmatter and links",
+    "Add tests if structural",
+    "Open a PR"
+   ]
+  },
+  {
+   "id": "eval",
+   "name": "eval",
+   "summary": "test how a skill or prompt change affects agent behavior, blinded.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/eval.md",
+   "whatItIs": "Test how a skill or prompt change affects agent behavior.",
+   "steps": [
+    "Frame variant and rubric",
+    "Set up sanitized environments",
+    "Write one organic prompt",
+    "Run N candidates on different models",
+    "Run a blinded judge",
+    "Verify from transcripts, not self-report",
+    "Read every output yourself"
+   ]
+  },
+  {
+   "id": "babysit",
+   "name": "babysit",
+   "summary": "drive a pr or a stack to merge-ready: conflicts, review threads, ci.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/babysit.md",
+   "whatItIs": "Drive a PR or stack to merge-ready.",
+   "steps": [
+    "Declare a mode (drive, background, threads-only)",
+    "Work the lowest unmerged PR first",
+    "One babysitter per stack; never change stack topology",
+    "Order: conflicts, review threads, CI",
+    "Trust the forge's merge-ready verdict",
+    "Triage Bugbot skeptically; stop at the human's line"
+   ]
+  },
+  {
+   "id": "shipping",
+   "name": "shipping",
+   "summary": "independently verify a green stack, then land the contiguous verified run bottom-up through github by default or origin when available.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/shipping.md",
+   "whatItIs": "Land a green stack safely.",
+   "steps": [
+    "Verify each PR independently",
+    "Land only the contiguous verified run from the bottom",
+    "Check each verdict still matches the patch",
+    "Land one PR at a time",
+    "Recompute after each merge",
+    "Stop at the ceiling"
+   ]
+  },
+  {
+   "id": "autonomous-run",
+   "name": "autonomous run",
+   "summary": "drive a long task to completion without stopping.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/autonomous-run.md",
+   "whatItIs": "Drive a long task to a checkable finish.",
+   "steps": [
+    "State the exit condition",
+    "Pick a wake mechanism (watcher or heartbeat)",
+    "Make one small change per iteration and verify",
+    "Fix mid-run discoveries yourself",
+    "Log each iteration",
+    "Stop only when the predicate is met"
+   ]
+  },
+  {
+   "id": "orchestrate",
+   "name": "orchestrate",
+   "summary": "a standing project handed to one coordinator chat: multi-day, many stacked prs, fleets of subagents.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/orchestrate.md",
+   "whatItIs": "Coordinate a multi-day project with many sub-agents.",
+   "steps": [
+    "Frame with a countable done predicate",
+    "Install the runtime (orch init) and open the trail",
+    "Pilot one unit end to end",
+    "Scale with a rolling window of workers",
+    "Drain, land continuously, then close"
+   ]
+  },
+  {
+   "id": "autopilot-full",
+   "name": "autopilot-full",
+   "summary": "run independent prs to merged with one owner per pr and a root swarm verdict on each round, from the code-ready head on.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/autopilot-full.md",
+   "whatItIs": "Run a queue of independent PRs to merged.",
+   "steps": [
+    "Mark the operator's items",
+    "One owner per PR, in parallel",
+    "Swarm-verify each round before merge",
+    "Owner merges on a clean verdict",
+    "Stand down instantly on stop"
+   ]
+  },
+  {
+   "id": "autopilot-stack",
+   "name": "autopilot-stack",
+   "summary": "build and verify one linear base-branch stack for the operator to review and land.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/autopilot-stack.md",
+   "whatItIs": "Build a queue as one verified stack that the operator lands.",
+   "steps": [
+    "Run the owner loop",
+    "Audit hourly with /loop",
+    "Verify each round",
+    "Append clean PRs to one linear stack; never ship",
+    "Root alone changes topology",
+    "Deliver the chain"
+   ]
+  },
+  {
+   "id": "session-pickup",
+   "name": "session pickup",
+   "summary": "resume or take over a prior agent's in-flight work.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/session-pickup.md",
+   "whatItIs": "Resume a prior agent's unfinished work.",
+   "steps": [
+    "Locate the prior trail",
+    "Rebuild branch and state",
+    "Diff done vs pending",
+    "Route to the matching playbook",
+    "Verify inherited claims on the real artifact"
+   ]
+  },
+  {
+   "id": "pause-safely",
+   "name": "pause safely",
+   "summary": "suspend in-flight work cleanly so it can be resumed later.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/pause-safely.md",
+   "whatItIs": "Suspend work so it can be resumed.",
+   "steps": [
+    "Stop at a safe boundary",
+    "Take no irreversible action",
+    "Commit a wip: commit",
+    "Write a resume note off-context"
+   ]
+  },
+  {
+   "id": "multi-phase-plan",
+   "name": "multi-phase plan",
+   "summary": "work that spans phases or stacked PRs.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/multi-phase-plan.md",
+   "whatItIs": "Write a plan for work spanning phases or stacked PRs.",
+   "steps": [
+    "Skip for 1-2 file changes",
+    "Settle open questions by prototype",
+    "Explore in sub-agents",
+    "Fill the plan skeleton",
+    "Write under technical-writing then unslop",
+    "Run check-plan.mjs and fix its output",
+    "Hand back the plan path and stop"
+   ]
+  },
+  {
+   "id": "worktree-cleanup",
+   "name": "worktree cleanup",
+   "summary": "reclaim disk by pruning merged or abandoned worktrees and stale ios simulators, safety-gated.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/worktree-cleanup.md",
+   "whatItIs": "Free disk by pruning merged git worktrees and old simulators.",
+   "steps": [
+    "Snapshot disk and run worktree-audit.sh",
+    "Treat the bucket as advice, confirm pinned chats",
+    "Verify usage with sub-agents",
+    "Pause on uncommitted work",
+    "Prune the confirmed set",
+    "Clear simulators"
+   ]
+  },
+  {
+   "id": "opening-a-pr",
+   "name": "opening a pr",
+   "summary": "open a ready pr from small ordered commits with a conventional commits title and a briefing-style body. invoked at the end of every other playbook.",
+   "url": "https://github.com/cursor/plugins/blob/main/pstack/skills/poteto-mode/playbooks/opening-a-pr.md",
+   "whatItIs": "End step of every other playbook.",
+   "steps": [],
+   "stepsNote": "Playbook file not found in the Cursor skills tree; steps not read."
+  }
+ ],
+ "agents": [
+  {
+   "id": "poteto-agent",
+   "summary": "Subagent that runs poteto style end to end; reads poteto-mode in full first. Routing target for /poteto-mode (subagent_type \"poteto-agent\").",
+   "source": "both",
+   "whatItIs": "A sub-agent that reads poteto-mode first and then works in that style.",
+   "steps": [
+    "Used as subagent_type for code-writing helpers",
+    "Claude port adds poteto-agent-<level> variants for reasoning effort"
+   ]
+  },
+  {
+   "id": "comment-sicko",
+   "summary": "Read-only comment reviewer (\"deranged comment-hater\"); usually invoked via /no-comments.",
+   "source": "both",
+   "whatItIs": "A read-only reviewer that hunts needless comments.",
+   "steps": [
+    "Spawned by no-comments",
+    "Flags comments; never edits application code",
+    "Marks code needing a reshape as MUST KILL"
+   ]
+  },
+  {
+   "id": "effort-low..xhigh/max + poteto-agent-<level>",
+   "summary": "Claude port only: per-reasoning-level agent variants used for effort-per-role dispatch (effort-agents/ dir).",
+   "source": "claude",
+   "whatItIs": "Claude port only: agent variants for each reasoning level.",
+   "steps": [
+    "Dispatched when a role in your settings carries @level"
+   ]
+  }
+ ],
+ "links": [
+  "https://flaviocopes.com/pstack/",
+  "https://github.com/michael-denyer/pstack-claude",
+  "https://github.com/cursor/plugins/tree/main/pstack",
+  "https://x.com/poteto/status/2094457600259842065",
+  "https://cursor.com/marketplace/cursor/pstack",
+  "https://github.com/cursor/plugins/blob/main/pstack/docs/guide/README.md",
+  "https://github.com/michael-denyer/pstack-claude/blob/main/docs/reference.md"
+ ],
+ "categories": [
+  {
+   "id": "setup",
+   "name": "Set up & route",
+   "color": "amber",
+   "blurb": "Install pstack, pick models, and let one front door choose the workflow.",
+   "count": 4
+  },
+  {
+   "id": "understand",
+   "name": "Learn the code",
+   "color": "blue",
+   "blurb": "Read-only: how code works, why it was built that way, what you were doing.",
+   "count": 4
+  },
+  {
+   "id": "catchup",
+   "name": "Catch up & plain talk",
+   "color": "slate",
+   "blurb": "Summaries of a long chat, your commits, or a jargon-heavy answer.",
+   "count": 3
+  },
+  {
+   "id": "design",
+   "name": "Code design / architecture",
+   "color": "violet",
+   "blurb": "Settle the shape of the code (types, modules) before writing it. Not UI design.",
+   "count": 2
+  },
+  {
+   "id": "fanout",
+   "name": "Parallel work & second opinions",
+   "color": "indigo",
+   "blurb": "Run many agents at once, or have several models attack a change.",
+   "count": 2
+  },
+  {
+   "id": "build",
+   "name": "Build the change",
+   "color": "green",
+   "blurb": "Write the code with tests and typed-language rules.",
+   "count": 2
+  },
+  {
+   "id": "write",
+   "name": "Write clearly",
+   "color": "teal",
+   "blurb": "Docs, PR text and replies that read like a person wrote them.",
+   "count": 2
+  },
+  {
+   "id": "cleanup",
+   "name": "Clean up the diff",
+   "color": "lime",
+   "blurb": "Strip AI leftovers and needless comments before commit and review.",
+   "count": 2
+  },
+  {
+   "id": "review",
+   "name": "Review: risk, speed, quality",
+   "color": "orange",
+   "blurb": "Check what a change can break, whether a speed number is real, and code structure.",
+   "count": 3
+  },
+  {
+   "id": "prove",
+   "name": "Prove it works & log it",
+   "color": "cyan",
+   "blurb": "Scripted ways to drive the real app, plus a decision log for unattended runs.",
+   "count": 3
+  },
+  {
+   "id": "pr",
+   "name": "Get a PR merge-ready",
+   "color": "red",
+   "blurb": "Fix CI, merge conflicts and review comments, and make the PR easy to read.",
+   "count": 5
+  },
+  {
+   "id": "improve",
+   "name": "Improve pstack over time",
+   "color": "pink",
+   "blurb": "Turn session lessons and repeated mistakes into better skills and enforced rules.",
+   "count": 3
+  },
+  {
+   "id": "extras",
+   "name": "Extras (Cursor only)",
+   "color": "gray",
+   "blurb": "Cursor-specific helpers outside the main workflow.",
+   "count": 1
+  }
+ ],
+ "order": [
+  {
+   "n": 1,
+   "name": "Set up",
+   "sub": "Pick models, enable routing",
+   "skills": [
+    "setup-pstack",
+    "poteto-mode",
+    "poteto-help"
+   ]
+  },
+  {
+   "n": 2,
+   "name": "Understand",
+   "sub": "How and why first",
+   "skills": [
+    "how",
+    "why",
+    "recall",
+    "teach"
+   ]
+  },
+  {
+   "n": 3,
+   "name": "Design",
+   "sub": "Shape before code",
+   "skills": [
+    "architect",
+    "arena",
+    "swarm"
+   ]
+  },
+  {
+   "n": 4,
+   "name": "Build",
+   "sub": "Test-first, typed code",
+   "skills": [
+    "tdd",
+    "typescript-best-practices",
+    "technical-writing"
+   ]
+  },
+  {
+   "n": 5,
+   "name": "Clean & check",
+   "sub": "Strip slop, attack the diff",
+   "skills": [
+    "unslop",
+    "deslop",
+    "no-comments",
+    "interrogate",
+    "blast-radius",
+    "benchmark-checklist",
+    "thermo-nuclear-code-quality-review"
+   ]
+  },
+  {
+   "n": 6,
+   "name": "Ship",
+   "sub": "PR to merge-ready",
+   "skills": [
+    "make-pr-easy-to-review",
+    "babysit",
+    "fix-ci",
+    "fix-merge-conflicts",
+    "get-pr-comments"
+   ]
+  }
+ ],
+ "principleGroups": [
+  {
+   "id": "simple",
+   "name": "Keep it small",
+   "blurb": "Do less, delete more, make it easy to read.",
+   "howItWorks": "Applied when the task is sizing a diff, refactoring or migrating."
+  },
+  {
+   "id": "shape",
+   "name": "Design the shape",
+   "blurb": "Think about structure and the user before logic.",
+   "howItWorks": "Applied before writing code or when a design keeps failing."
+  },
+  {
+   "id": "structure",
+   "name": "Code structure & safety",
+   "blurb": "Where state, validation and types live; safe under retries and concurrency.",
+   "howItWorks": "Applied while writing stateful, typed, or concurrent code."
+  },
+  {
+   "id": "proof",
+   "name": "Prove it",
+   "blurb": "Check the real thing, test behavior, trace root causes, vet numbers.",
+   "howItWorks": "Applied after a task, when debugging, and when writing tests."
+  },
+  {
+   "id": "agents",
+   "name": "Work well with agents",
+   "blurb": "Protect context, keep moving, build tools, encode lessons.",
+   "howItWorks": "Applied to how the agent runs and delegates."
+  }
+ ],
+ "principlesHowItWorks": [
+  "Each of the 24 principles is its own small skill (skills/principle-<name>/SKILL.md) with disable-model-invocation: true, so it is not picked up by name matching on its own.",
+  "poteto-mode lists all 24 inline with a one-line 'when it applies' trigger. This is the index it reads at the start of every multi-step task.",
+  "When a trigger fits, the agent must read that principle's full SKILL.md, apply it, and name it in its reply with the decision it changed. It may only cite principles it read this session.",
+  "Other skills and playbooks call principles by name too (architect cites exhaust-the-design-space, refactoring cites subtract-before-you-add, bug-fix cites sequence-verifiable-units).",
+  "You do not run them as commands. You can steer with the name: 'use subtract before you add' points the agent at a rule it has already read (docs/guide/08-principles.md).",
+  "They are separate from the workflow skills: workflows say what steps to run; principles say what judgment to apply while running them."
+ ]
+}
