@@ -16,6 +16,7 @@ import http.client
 import threading
 import urllib.request
 from unittest import mock
+from fixtures.runtime_http_server import LoopbackHTTPServer
 
 PATH = pathlib.Path(__file__).resolve().parents[1] / 'skills/super-qa/scripts/runtime_compare.py'
 spec = importlib.util.spec_from_file_location('runtime_compare', PATH)
@@ -77,13 +78,11 @@ http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App).serve_forever()
 v=json.load(urllib.request.build_opener(urllib.request.ProxyHandler({})).open(os.environ['SB_RUNTIME_URL']))
 print(json.dumps({'correct':True,'duration_ms':v['duration'],'memory_bytes':2048,'environment':{'browser':'fixture-v1'}}))
 """
-            server_source = server_override or server
-            server_source = 'import faulthandler\nfaulthandler.dump_traceback_later(3)\n' + server_source
-            server_source = server_source.replace(
-                "http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App).serve_forever()",
-                "app=http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App)\n"
-                "faulthandler.cancel_dump_traceback_later()\napp.serve_forever()")
-            (root/'server.py').write_text(server_source)
+            shutil.copyfile(pathlib.Path(__file__).parent/'fixtures/runtime_http_server.py',
+                            root/'fixture_server.py')
+            server_source = 'from fixture_server import LoopbackHTTPServer\n' + (server_override or server)
+            (root/'server.py').write_text(server_source.replace('http.server.HTTPServer(',
+                                                               'LoopbackHTTPServer('))
             (root/'scenario.py').write_text(adapter_override or adapter)
             config = {'scenario_id':'fetch','data_id':'seed-1','environment_id':'local-fixture',
                       'scenario_command':[sys.executable,'scenario.py'], 'scenario_files':['scenario.py'],
@@ -176,6 +175,15 @@ http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App).serve_forever()
                 self.run_fixture(overrides={'baseline': {'revision':'invalid-v1', 'cwd':'.',
                     'url':url, 'start_command':[sys.executable,'-c','raise SystemExit(7)']}})
 
+    def test_loopback_fixtures_do_not_wait_for_reverse_dns(self):
+        # Same HTTPServer startup stall seen on macOS CI, through real child HTTP.
+        server = ("import socket,time\nsocket.getfqdn=lambda host: time.sleep(10) or 'localhost'\n" +
+                  self.redirect_server('/target'))
+        report,status=self.run_fixture(server_override=server,overrides={'ready_timeout_seconds':2})
+        self.assertEqual(status,0,self.diagnostics)
+        self.assertEqual(report['outcome'],'faster',self.diagnostics)
+        self.assertEqual(len(report['order']),10,self.diagnostics)
+
     def test_correctness_failure_cannot_claim_faster(self):
         adapter="""import os,json,urllib.request
 v=json.load(urllib.request.build_opener(urllib.request.ProxyHandler({})).open(os.environ['SB_RUNTIME_URL']))
@@ -227,7 +235,7 @@ class FailureTests(unittest.TestCase):
                 self.wfile.write(b'owned elsewhere')
             def log_message(self, *args):
                 pass
-        server = http.server.HTTPServer(('127.0.0.1', 0), App)
+        server = LoopbackHTTPServer(('127.0.0.1', 0), App)
         thread = threading.Thread(target=server.serve_forever)
         thread.start()
         url = 'http://127.0.0.1:' + str(server.server_port)

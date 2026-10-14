@@ -32,6 +32,7 @@ provide the command-line utilities; the safety workflow tests Python 3.9 and 3.1
 Node.js 22.
 Windows coverage remains limited to the Python status reader.
 
+Loopback HTTP test fixtures use a fixed local server name and skip reverse DNS.
 Runtime fixture failures print the report and app startup logs. Failed safety jobs also
 keep the fixture reports, app logs and adapter logs as `runtime-evidence-*` artifacts
 for seven days. Only generated offline fixtures go there; project runtime evidence does
