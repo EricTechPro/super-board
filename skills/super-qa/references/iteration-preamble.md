@@ -9,6 +9,11 @@ Resolve this lane for the actual host, load the report's files/fallbacks, halt
 on missing requirements and recheck each conditional helper before use.
 
 
+For existing project verifier coverage relevant to this iteration, follow
+[project-verifier.md](project-verifier.md): select mapped features, resolve the
+local skill for the actual host, run real checks and preserve proof. State
+uncovered/stale coverage in the report; continue ordinary issue checks.
+
 Run **one iteration** of the loop:
 1. **Regression** — re-run every spec in `e2e/paths/`. Fix any reds via TDD.
 2. **Explore** — pop the top `[ ]` item from `docs/super-qa/queue.md`,

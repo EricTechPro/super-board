@@ -140,6 +140,10 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ verification commands: preserve valid `verify_commands`; otherwise inspect the owning
    │    project's documented checks and stage those commands. Unresolved checks are a setup
    │    halt. Never save placeholders or invent a universal runner.
+   ├─ project verifier: detect `.agents/skills/verify-*/SKILL.md` and feature maps.
+   │    For creation or upkeep read `../../super-qa/references/project-verifier.md`;
+   │    stage real project checks only when source names accepted features. Optional
+   │    verifier gaps never replace or block the required verification commands.
    └─ machine time zone for config `timezone`: $TZ, else readlink /etc/localtime | sed
       's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 8.
 
@@ -347,6 +351,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │      Board    Ledgerly Roadmap #4 (+QA)    Branch   staging (new)
    │      Rules    safe defaults                Perms    7 lines
    │      AGENTS   rules moved, CLAUDE.md→@     Sources  sentry, github, prs, arch, linear
+   ├─ Existing or staged project verifier: list skill/map/runner paths and state
+   │    `starter, not run` or the actual selected-feature proof. Preserve human-owned
+   │    critical paths and flows; missing source leaves this optional helper absent.
    ├─ AskUserQuestion "Write everything?" (header "Save") [Write everything (Recommended) /
    │    Change one thing → pick the step, walk only it, back here / Cancel — nothing written].
    ├─ Write, in order (each atomic; stop and report on the first failure — answers are kept):
@@ -361,6 +368,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    super-board-settings.py hooks .claude/settings.json <pack>/hooks/settings-protect-main.json
    │    ├─ AGENTS.md / CLAUDE.md: super-board-agents-md.py backup, then write --src <staged>
    │    │    --dest AGENTS.md, pointer --tail <staged tail> --force, block, check
+   │    ├─ staged project verifier skill/map/scenarios/runner, if source-backed; then
+   │    │    inspect the saved map and resolve the local skill for the actual host.
    │    └─ docs/agents/issue-tracker.md; docs/super-board/PROJECT.md (a sub-agent drafts it from
    │       manifests + README + tree, no question; listed in the table as "PROJECT.md drafted")
    └─ Delete onboard-staged/; keep the answers file (re-runs use it).

@@ -31,7 +31,7 @@ TXT=$(python3 "$SETUP" check --root "$T" --text || true)
 echo "$TXT" | grep -q "✓ super-board skills, scripts and board engine present" || fail "text report should list what is present: $TXT"
 
 # 1b — missing safety helpers must trigger a repair even on a current installation.
-for helper in super-board-approval.py super-board-github-read.py; do
+for helper in super-board-approval.py super-board-github-read.py super-board-project-verifier.py; do
   rm "$T/.claude/bin/$helper"
   OUT=$(python3 "$SETUP" check --root "$T" || true)
   echo "$OUT" | q --arg helper "script $helper" '.missing | index($helper)' \

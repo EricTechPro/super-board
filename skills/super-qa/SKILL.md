@@ -636,11 +636,20 @@ See `.claude/skills/super-board/references/run.md` → Tester (first pass — re
 1. Pull latest of base; checkout `issue-<N>-<slug>` into worktree (a `qa` card: create it from the base).
 2. Read issue + PR + Builder's handoff.
 3. Build issue-scoped test plan: ONE observable test per AC.
+3a. Existing project verifier → follow [project-verifier.md](references/project-verifier.md)
+for affected selection, host readiness, real assertions and fresh proof.
 3b. Run the **Test-gap check** (above) against the Builder's diff; its High gaps join the plan.
 4. Run tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
 5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/super-board/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
 6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`super-board-pr-body.sh`) → `[qa] [report] ✅` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
 7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
+
+### Optional project feature verifier
+
+For an existing `.agents/skills/verify-<app>/` map, verifier creation during Onboard,
+or source/selector upkeep, read [project-verifier.md](references/project-verifier.md).
+Run relevant mapped features alongside issue AC checks; state missing/stale coverage
+in the existing handoff. A map inspection or starter template proves no test pass.
 
 ### Optional runtime performance and memory checks
 

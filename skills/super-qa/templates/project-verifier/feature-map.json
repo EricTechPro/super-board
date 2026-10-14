@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "app": "Replace with the owning app name",
+  "skill": ".agents/skills/verify-app/SKILL.md",
+  "features": []
+}

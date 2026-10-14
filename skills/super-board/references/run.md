@@ -335,6 +335,9 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 2. `target.url` set → health-check it first. Unhealthy → Block.
 3. Read issue + PR + Builder's handoff comment.
 4. Build issue-scoped test plan: one observable test per AC.
+4a. Existing project verifier → follow `../../super-qa/references/project-verifier.md`
+for affected feature selection, actual host readiness and new run-owned proof.
+Record uncovered/stale optional coverage alongside ordinary issue AC checks.
 4b. **Test-gap check** (super-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
 5. Run the tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
 6. **Pass** → commit test files + screenshots to same branch + push → tick the `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` → `[qa] [report] ✅` PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
