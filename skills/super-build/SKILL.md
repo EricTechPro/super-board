@@ -70,6 +70,16 @@ For each Ready item:
 
 If `Ready` is empty: print `📭 Project board "Ready" column is empty — nothing to dispatch.` and exit 0. This is not an error; it means the human hasn't curated work yet.
 
+### 1b. Resolve the selected worker skills before locks
+
+Hydrate each selected issue through `super-board-github-read.py --kind issue --
+issue view <N> --json number,title,body`. Save a JSON array with number, Ready
+status, labels and literal body. Run `.claude/bin/super-board-skills-ready.py
+--root <repo> --host claude --cards <cards.json> --lane build` before label
+creation, stale-lock recovery, comments or dispatch. Exit 10 halts and names the
+missing helpers. Preserve existing claims and worktrees. No automatic helper
+installation during dispatch. The dispatcher and worker repeat this check.
+
 ### 2. Ensure required labels exist (idempotent)
 
 Once per run, before first dispatch:

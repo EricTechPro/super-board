@@ -71,7 +71,7 @@ OLD_LABELS = {
 }
 SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
-BIN = ["super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
+BIN = ["super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-codex-lane.sh", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
        "super-board-deps.sh", "super-board-preflight.sh", "super-board-merge-gate.sh",
        "super-board-merge-policy.py", "super-board-approval.py", "super-board-env-check.sh", "super-board-agents-md.py",
        "super-board-settings.py", "super-board-setup.py", "super-board-usage.sh", "super-board-pr-body.sh",
@@ -87,7 +87,7 @@ TOOLS = {
            "dnf": "sudo dnf install -y gh", "win": "winget install --id GitHub.cli -e"}),
     "jq": ("the board scripts read JSON with it", {"mac": "brew install jq", "apt": "sudo apt-get install -y jq",
            "dnf": "sudo dnf install -y jq", "win": "winget install --id jqlang.jq -e"}),
-    "node": ("Matt Pocock's coding skills (tests, code review, debugging) the board uses",
+    "node": ("the helper installer; actual skill files are checked separately",
              {"mac": "brew install node", "apt": "sudo apt-get install -y nodejs npm",
               "dnf": "sudo dnf install -y nodejs npm", "win": "winget install --id OpenJS.NodeJS.LTS -e"}),
 }
@@ -169,14 +169,19 @@ def find_pack(explicit=None):
     return None
 
 
-def helper_skills_present(root):
-    lock = os.path.join(root, "skills-lock.json")
-    if "mattpocock/skills" in read(lock):
-        return True
-    for d in (os.path.join(root, ".claude", "skills"), os.path.expanduser("~/.claude/skills")):
-        if os.path.isfile(os.path.join(d, "grilling", "SKILL.md")) and os.path.isfile(os.path.join(d, "tdd", "SKILL.md")):
-            return True
-    return False
+def helper_readiness(root, host="claude", home=None, catalog=None):
+    command = [sys.executable, os.path.join(os.path.dirname(__file__), "super-board-skills-ready.py"),
+               "--root", root, "--host", host, "--profile", "setup"]
+    if home:
+        command += ["--home", home]
+    if catalog:
+        command += ["--catalog", catalog]
+    process = run(command)
+    try:
+        result = json.loads(process.stdout)
+    except ValueError:
+        result = {"ready": False, "entries": [], "error": process.stderr.strip()}
+    return result
 
 
 def is_git_repo(root):
@@ -272,7 +277,7 @@ def installed_version(root):
     return read(os.path.join(root, ".claude", "skills", "super-board", "VERSION")) or None
 
 
-def check(root, pack):
+def check(root, pack, host="claude", home=None, catalog=None):
     claude = os.path.join(root, ".claude")
     pack_version = read(os.path.join(pack, "VERSION")) if pack else None
     have_v = installed_version(root)
@@ -315,7 +320,8 @@ def check(root, pack):
             if t == "node":
                 cmd += " && " + HELPERS_CMD
             needs.append({"kind": "tool", "name": t, "why": why, "command": cmd})
-    helpers = helper_skills_present(root)
+    readiness = helper_readiness(root, host, home, catalog)
+    helpers = readiness["ready"]
     git = is_git_repo(root)
     ok = []
     if not missing:
@@ -325,14 +331,14 @@ def check(root, pack):
     if git:
         ok.append("git repo found")
     if helpers:
-        ok.append("Matt Pocock's coding skills (tests, code review, debugging) present")
-    red = bool(missing or old_dirs or configs or verification or not git or needs or (not helpers and have("npx")))
+        ok.append("required worker skills resolved for " + host)
+    red = bool(missing or old_dirs or configs or verification or not git or needs or not helpers)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
         "upgrade": older, "from": from_v or ("older" if older else None),
         "added_skills": upgrade_rec.get("added_skills", []),
         "missing": missing, "old_dirs": old_dirs, "configs": configs, "verification": verification, "git": git,
-        "helper_skills": helpers, "needs": needs, "os": fam, "ok": ok, "green": not red,
+        "helper_skills": helpers, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
     }
 
 
@@ -348,8 +354,8 @@ def backup(root, paths, stamp):
     return os.path.relpath(dest, root) + "/"
 
 
-def fix(root, pack, helpers=True, dry=False):
-    before = check(root, pack)
+def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=None):
+    before = check(root, pack, host, home, catalog)
     fixed, notes = [], []
     claude = os.path.join(root, ".claude")
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M")
@@ -408,17 +414,20 @@ def fix(root, pack, helpers=True, dry=False):
     if helpers and not before["helper_skills"] and have("npx"):
         if not dry:
             r = run(["bash", "-c", HELPERS_CMD], cwd=root, input="")
-            (fixed if r.returncode == 0 else notes).append(
-                "Matt Pocock's coding skills added" if r.returncode == 0
-                else "couldn't add Matt Pocock's skills — re-run later: " + HELPERS_CMD)
+            confirmed = helper_readiness(root, host, home, catalog)
+            if confirmed["ready"]:
+                fixed.append("worker skills re-resolved after helper installation")
+            else:
+                notes.append("helper install attempted; required skills remain unavailable: " +
+                             ", ".join(e["name"] for e in confirmed.get("entries", []) if e["status"] == "missing"))
         else:
-            fixed.append("Matt Pocock's coding skills added")
+            notes.append("would attempt helper installation, then re-resolve actual host-visible files")
 
     if not dry:
         up = os.path.join(claude, "super-board", "upgrade.json")
         if os.path.exists(up):
             os.remove(up)
-    after = check(root, pack) if not dry else before
+    after = check(root, pack, host, home, catalog) if not dry else before
     return {**after, "upgraded": before["upgrade"], "from": before["from"], "fixed": fixed,
             "notes": notes, "backup": bdir}
 
@@ -441,6 +450,11 @@ def text_report(res):
         lines += [f"  ✗ {r}" for r in red]
         if red:
             lines.append("  → fix: super-board-setup.py fix")
+    for entry in res.get("helper_readiness", {}).get("entries", []):
+        if entry["status"] == "missing":
+            lines.append(f"  ✗ missing {entry['name']} for {res['helper_readiness']['host']}; install it in that host and restart")
+    if res.get("helper_readiness", {}).get("error"):
+        lines.append("  ✗ " + res["helper_readiness"]["error"])
     for path, error in res.get("verification", {}).items():
         lines.append(f"  ✗ {path}: {error}")
     for n in res.get("needs", []):
@@ -947,13 +961,16 @@ def main(argv):
     try:
         if cmd in ("check", "fix"):
             pack = find_pack(flag(rest, "--pack"))
-            res = check(root, pack) if cmd == "check" else fix(root, pack, "--no-helpers" not in rest, dry)
+            host, home, catalog = flag(rest, "--host", "claude"), flag(rest, "--home", os.environ.get("SUPER_BOARD_SKILLS_HOME")), flag(rest, "--catalog", os.environ.get("SUPER_BOARD_SKILLS_CATALOG"))
+            if host not in ("claude", "codex"):
+                raise ValueError("--host must be claude or codex")
+            res = check(root, pack, host, home, catalog) if cmd == "check" else fix(root, pack, "--no-helpers" not in rest, dry, host, home, catalog)
             if res.get("error") == "pack-not-found":
                 print(json.dumps(res, indent=1))
                 return 66
             if "--text" in rest:
                 print(text_report(res))
-                return 0 if res["green"] or res.get("needs") else 1
+                return 0 if res["green"] else 1
             return out(res, 0 if res["green"] else 1)
         if cmd == "migrate-config":
             path = rest[0] if rest and not rest[0].startswith("-") else None

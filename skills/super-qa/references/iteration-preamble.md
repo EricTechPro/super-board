@@ -4,6 +4,11 @@ clarifying answers.
 
 ## Mission
 
+**Before worker writes or worktree creation:** follow [skill readiness](../../super-board/references/skills-readiness.md).
+Resolve this lane for the actual host, load the report's files/fallbacks, halt
+on missing requirements and recheck each conditional helper before use.
+
+
 Run **one iteration** of the loop:
 1. **Regression** — re-run every spec in `e2e/paths/`. Fix any reds via TDD.
 2. **Explore** — pop the top `[ ]` item from `docs/super-qa/queue.md`,

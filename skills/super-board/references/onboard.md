@@ -6,6 +6,18 @@ Config schema and field notes: `config-schema.json`. Loaded by `SKILL.md` for `s
 Invoked as `/super-board onboard` (get.sh / install.sh) or `/super-board:super-board onboard`
 (plugin install — skill names carry the plugin prefix).
 
+## Host-visible skill checks
+
+Checks use `.claude/bin/super-board-skills-ready.py --profile setup --host
+<claude|codex>` and show `helper_readiness`: exact files, declared fallbacks,
+optional skips and missing names. Setup checks the unconditional union; a
+selected card may need fewer helpers. Node or `skills-lock.json` never proves
+readiness. `check` and dispatch install nothing. Explicit `fix` retains helper
+installation, then re-resolves actual files; an installer exit of zero alone is
+not success. `--no-helpers` suppresses that repair attempt, not missing evidence.
+A host plugin inventory may be supplied with `--catalog <active-skills.json>`;
+only enabled entries applying to this project count.
+
 ## Design rules
 
 | Rule | How |
@@ -132,7 +144,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 8.
 
 1. 🔍 CHECKS — nothing asked except system tools and sign-ins
-   ├─ python3 $SB/super-board-setup.py fix --text
+   ├─ python3 $SB/super-board-setup.py fix --host <actual-worker-host> --text
    │    Fixes with NO question, backed up first to .claude/super-board/backup/<ts>/:
    │    skills, .claude/bin scripts, workflows, guard hooks + settings.json entries (runs the
    │    pack's install.sh), removes old skill folders (super-refine, cleanup-wt, arch-loop),
@@ -146,11 +158,12 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │        ✓ git repo found
    ├─ Each `needs` item (a system tool): one line, then run its `command` with Bash — Claude
    │    Code's permission prompt IS the question. No AskUserQuestion.
-   │      Needs your machine: Node.js isn't installed. It's needed for Matt Pocock's coding
+   │      Needs your machine: Node.js isn't installed. It's needed for the helper installer; actual coding
    │      skills (tests, code review, debugging) the board uses.
    │      → Bash(brew install node && npx -y skills@latest add mattpocock/skills)
    │    The command is per OS (brew / apt / dnf / winget) and comes from the script.
-   │    Declined: node → the board runs with built-in checklists instead (say so, continue);
+   │    Declined: node → report exact missing skills and keep readiness red; existing resolved
+   │    helpers still count, but missing required helpers halt dispatch;
    │    git or gh → halt: "Without <tool> the board can't <why>. Your answers are saved — run
    │    the command, then re-run onboard."
    ├─ Re-check (`check --text`) after every install; move on only when it says all green.
@@ -427,7 +440,7 @@ answers are kept and it resumes at <step>".
 |---|---|---|
 | 1 | Pack files not found (plugin) | `🛑 Can't find the super-board plugin files. Run the one-line installer (get.sh) or ./install.sh <this-dir> from a checkout, then re-run onboard.` |
 | 1 | A tool install declined (git, gh) | `Without <tool> the board can't <why>. Your answers are saved — run <command>, then re-run onboard.` |
-| 1 | Node declined, or `npx skills add` fails | `⚠️ Matt Pocock's skills aren't installed — lanes use built-in checklists. Later: <command>.` Continues. |
+| 1 | Node declined, or `npx skills add` fails | `⚠️ Required worker skills remain unavailable: <exact names>. Install for <host> and restart.` Setup stays red; dispatch halts before claims. |
 | 1 | Workflow still fails `node --check` after the re-copy | `🛑 .claude/workflows/super-board-wave.js is corrupt. Re-run ./install.sh <this-dir> — don't hand-edit it.` |
 | 1 | settings.json invalid JSON | `✋ .claude/settings.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings entries repeat.` |
 | 2 | Scope refused in the browser | `🔑 GitHub asked for project,read:project,repo and you said no. Without them I can't read or move cards. Re-run: gh auth refresh -s project,read:project,repo.` |

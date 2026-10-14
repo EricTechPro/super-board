@@ -78,7 +78,6 @@ LOG_DIR="$REPO_DIR/.planning/super-build-logs"
 LOG_FILE="$LOG_DIR/issue-$N.log"
 PROMPT_FILE="$LOG_DIR/issue-$N.prompt.md"
 
-mkdir -p "$LOG_DIR"
 
 # Refuse to clobber an existing worktree/branch silently
 if [[ -e ".worktrees/issue-$N" ]]; then
@@ -97,16 +96,24 @@ if git rev-parse --verify "$WORKER_BRANCH" >/dev/null 2>&1; then
 fi
 
 # Compose the worker prompt: preamble + issue body + working-dir footer
-ISSUE_JSON=$(gh issue view "$N" --json number,title,body,labels 2>&1) || {
+SB_BIN="$REPO_DIR/.claude/bin"
+ISSUE_JSON=$(python3 "$SB_BIN/super-board-github-read.py" --kind issue -- issue view "$N" --json number,title,body 2>&1) || {
   echo "error: gh issue view #$N failed:" >&2
   echo "$ISSUE_JSON" >&2
-  exit 64
+  exit 79
 }
+LABELS_JSON=$(python3 "$SB_BIN/super-board-github-read.py" --kind json -- issue view "$N" --json labels) || exit $?
+CARD_JSON=$(printf '%s' "$ISSUE_JSON" | jq -c --argjson labels "$LABELS_JSON" '[{number:.number,status:"Ready",body:.body,labels:($labels.labels // [])}]')
+SKILLS_RC=0
+printf '%s' "$CARD_JSON" | python3 "$SB_BIN/super-board-skills-ready.py" --root "$REPO_DIR" --host claude --cards - --lane build || SKILLS_RC=$?
+[ "$SKILLS_RC" -eq 0 ] || exit "$SKILLS_RC"
+mkdir -p "$LOG_DIR"
 
 ISSUE_TITLE=$(printf '%s' "$ISSUE_JSON" | jq -r '.title')
 ISSUE_BODY=$(printf '%s' "$ISSUE_JSON" | jq -r '.body')
 
 {
+  printf 'First operation: repeat super-board-skills-ready.py --root %s --host claude --cards - --lane build with %s as stdin. Halt on exit 10 before any lifecycle writes. Recheck conditional helpers with --require before use.\n' "$REPO_DIR" "$CARD_JSON"
   cat "$PREAMBLE"
   printf '\n# Issue #%s — %s\n\n' "$N" "$ISSUE_TITLE"
   printf '%s\n' "$ISSUE_BODY"

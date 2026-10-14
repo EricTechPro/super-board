@@ -9,6 +9,7 @@
 set -euo pipefail
 exec python3 - "${BASH_SOURCE[0]}" "$@" <<'PY'
 import argparse
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -100,9 +101,29 @@ if not helper.exists() or subprocess.run([sys.executable, str(helper), '--check'
     result('halted', 'required GitHub reads halted or helper missing; preserve claims and worktrees')
     sys.exit(79)
 
+resolver_path = script_path.with_name('super-board-skills-ready.py')
+try:
+    spec = importlib.util.spec_from_file_location('skills_ready', resolver_path)
+    resolver = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(resolver)
+    resolver.hydrate([card], root)
+    skills = resolver.report(root, 'codex', [card], lane=args.lane,
+                             home=os.environ.get('SUPER_BOARD_SKILLS_HOME'), catalog=os.environ.get('SUPER_BOARD_SKILLS_CATALOG'))
+except SystemExit as error:
+    result('halted', 'required GitHub reads halted while hydrating skills; preserve claims and worktrees')
+    sys.exit(error.code)
+except (OSError, ValueError, TypeError, KeyError) as error:
+    result('halted', 'skills-readiness: ' + str(error))
+    sys.exit(64)
+if not skills['ready']:
+    result('halted', 'skills-readiness: missing ' + ', '.join(dict.fromkeys(e['name'] for e in skills['entries'] if e['status'] == 'missing')))
+    sys.exit(10)
+
 skill = {'build': 'super-build', 'qa': 'super-qa', 'review': 'super-review'}[args.lane]
 section = {'build': 'Builder', 'qa': 'Tester', 'review': 'Reviewer'}[args.lane]
 prompt = f'''Run {skill} for issue #{card['number']} as a Codex lane worker.
+First operation: recheck .claude/bin/super-board-skills-ready.py --root {root} --host codex --cards - --lane {args.lane} with the Card JSON below as a one-element stdin array, before worktree creation, classification or lifecycle writes. Exit 10 means status=halted, detail=skills-readiness:, preserve all state. Load resolved_path files and only declared fallback IDs from the report. Before activating any conditional helper, repeat with --require <exact-name>.
+Resolved skill report: {json.dumps(skills)}
 Config: {config_path}
 Card: {json.dumps(card)}
 Read .claude/skills/{skill}/SKILL.md and .claude/skills/super-board/references/run.md → {section} lifecycle; follow all its board, branch, worktree, comments, test and merge requirements.
@@ -113,7 +134,7 @@ Codex adaptation: do not launch Claude or other sub-agents. Perform preflight, c
 Return JSON: status=advanced|bounced|blocked|human-gate|failed|halted; column=current board column; detail=one line; prUrl/branch when known, otherwise null; priorFindings=review counts or null. A non-advanced exit ends this card's lane chain. On merge-gate exit 9, return status=halted with detail starting exactly "verification-readiness:"; preserve work and never bounce/retry.
 '''
 if args.lane == 'build':
-    prompt += '''Before creating any worktree or changing code, perform run.md's Builder pre-flight inline: call super-board-preflight.sh, judge its candidates semantically, and act on proceed/hold/sequence/skipped. Blind preflight leaves Ready and returns failed. Your own issue branch PR is not a duplicate. Read the issue and all comments; preserve qa/bug/feature labels. If untyped, classify feature or bug and add that label, never qa. Then follow the Builder lifecycle.
+    prompt += '''Before creating any worktree or changing code, perform run.md's Builder pre-flight inline: call super-board-preflight.sh, judge its candidates semantically, and act on proceed/hold/sequence/skipped. Blind preflight leaves Ready and returns failed. Your own issue branch PR is not a duplicate. Read the issue and all comments; preserve qa/bug/feature labels. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. If truly untyped, classify feature or bug, re-run skills-ready on the proposed labelled card before adding that label, never qa. Then follow the Builder lifecycle.
 '''
 elif args.lane == 'qa' and card['status'] == 'Ready':
     prompt += 'This qa-labelled Ready card skips Building: move Ready → QA and create the issue branch from the base; test the existing product per run.md qa cards.\n'
@@ -167,16 +188,17 @@ with tempfile.TemporaryDirectory(prefix='super-board-codex-') as temporary:
         child.communicate(prompt)
         require_verification_ready()
         if child.returncode:
-            result('halted' if child.returncode in (9, 79) else 'failed',
+            result('halted' if child.returncode in (9, 10, 79) else 'failed',
                    'verification-readiness: repair verify_commands and restart explicitly; preserve work'
-                   if child.returncode == 9 else f'codex exec exited {child.returncode}')
-            sys.exit(child.returncode if child.returncode in (9, 79) else 1)
+                   if child.returncode == 9 else 'skills-readiness: required skills became unavailable; preserve work' if child.returncode == 10 else f'codex exec exited {child.returncode}')
+            sys.exit(child.returncode if child.returncode in (9, 10, 79) else 1)
         parsed = json.loads(output.read_text())
         if (not isinstance(parsed, dict) or parsed.get('status') not in properties['status']['enum']
                 or not all(isinstance(parsed.get(key), str) for key in ['column', 'detail'])):
             raise ValueError('lane result needs status, column and detail')
         print(json.dumps(parsed))
-        sys.exit(9 if parsed['status'] == 'halted' and parsed['detail'].startswith('verification-readiness:')
+        sys.exit(10 if parsed['status'] == 'halted' and parsed['detail'].startswith('skills-readiness:')
+                 else 9 if parsed['status'] == 'halted' and parsed['detail'].startswith('verification-readiness:')
                  else 79 if parsed['status'] == 'halted' else 0)
     except (OSError, ValueError) as error:
         result('failed', f'Codex returned no valid lane result: {error}')

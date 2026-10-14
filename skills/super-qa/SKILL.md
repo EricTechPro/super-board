@@ -10,6 +10,11 @@ description: >-
   "run super-qa", "QA review", "bug bash", "verify and fix", or invokes `/super-qa`.
 ---
 
+
+**For a board worker, before writes or worktree creation:** follow [skill readiness](../super-board/references/skills-readiness.md).
+Resolve this lane for the actual host, load the report's files/fallbacks, halt
+on missing requirements and recheck each conditional helper before use.
+
 # super-qa — BFS Route-Crawler that Builds the Spec Suite
 
 ## Auth bootstrap — auto-discover, never ask
@@ -505,6 +510,7 @@ Builder's reasoning.
    app code changed to pass or to become testable is a **Fail**: bounce to Builder
    (QA → Ready) with the list (witness, expected, rung, target file). Medium and Low go
    in the handoff under `Test gaps (not written)` and never block.
+
 
 ## Skill dependencies
 

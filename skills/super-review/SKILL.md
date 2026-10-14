@@ -3,6 +3,11 @@ name: super-review
 description: Reviewer lane of the super-board pipeline and standalone PR/branch readiness review — forms its own hypotheses before reading the builder's summary, remembers prior findings and re-checks each with file:line proof, runs an adversarial truth-check on non-trivial diffs, and classes every finding (Gap, Bug, Verification miss, Scope drift, Over-engineering via `ponytail:ponytail-review`). Merges only through `super-board-merge-gate.sh`, pinned to the reviewed head SHA, and routes other fixes to Super Build or Super QA via the board. Use when the user says "Super Review", "review this branch", "review loop", "make sure this is merge-ready", "PR review", or asks for code, architecture, security, QA evidence, or release-readiness judgment.
 ---
 
+
+**For a board worker, before writes or worktree creation:** follow [skill readiness](../super-board/references/skills-readiness.md).
+Resolve this lane for the actual host, load the report's files/fallbacks, halt
+on missing requirements and recheck each conditional helper before use.
+
 # Super Review — PR/code readiness reviewer
 
 **Super Review** is the super-board reviewer. It checks whether a branch or PR is safe to merge, records actionable findings, and routes fixes to the right Super workflow.
@@ -228,6 +233,7 @@ Super Review is done when one of these is true:
 - no blocking findings remain and the branch/PR has enough verification evidence to call it merge-ready;
 - all unresolved findings are explicitly human-gated;
 - required evidence cannot be collected because tooling/service access is unavailable, and the output clearly marks the result as unverified.
+
 
 ## Skill dependencies
 

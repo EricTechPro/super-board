@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import re
 import shlex
+import shutil
+import sys
 import subprocess
 import tempfile
 import unittest
@@ -42,6 +44,12 @@ class WorktreePaths(unittest.TestCase):
             path = bin_dir / name
             path.write_text(body)
             path.chmod(0o755)
+        self.run_cmd(sys.executable, str(PACK / 'tests/fixtures/install_worker_skills.py'), str(self.root))
+        helper_bin = self.root / '.claude/bin'; helper_bin.mkdir(parents=True)
+        for name in ['super-board-github-read.py', 'super-board-skills-ready.py']:
+            shutil.copy2(PACK / 'scripts' / name, helper_bin / name)
+        self.env['SUPER_BOARD_SKILLS_HOME'] = str(Path(self.tmp.name) / 'home')
+        Path(self.env['SUPER_BOARD_SKILLS_HOME']).mkdir()
         self.env.update(PATH=str(bin_dir) + os.pathsep + self.env["PATH"], BASE_BRANCH="main",
                         REPO_DIR=str(self.root), WORKER_CWD=str(Path(self.tmp.name) / "worker-cwd"))
 

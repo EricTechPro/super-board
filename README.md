@@ -184,3 +184,21 @@ MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://githu
 <a href="https://youtu.be/nX_bGyIOFM4">YouTube walkthrough</a>
 </p>
 <p align="center"><sub>Made by Eric Tech</sub></p>
+
+### Worker skill availability
+
+Setup and dispatch resolve real, nonempty `SKILL.md` files for the actual
+Claude or Codex host. Missing required skills halt before claims or workers;
+lockfiles and arbitrary plugin caches do not count. The shared registry in
+`scripts/super-board-skills-ready.py` owns lane dependencies, overrides and the
+two declared ponytail fallbacks. Setup's full helper union may be red while a
+selected card is runnable. Read-only checks never install; explicit onboard
+repair rechecks files after installation.
+
+The CLI accepts `--home <fixture-home>` and `--catalog <active-skills.json>`.
+Launchers accept the same inventory through `SUPER_BOARD_SKILLS_HOME` and
+`SUPER_BOARD_SKILLS_CATALOG`; neither changes the actual host. Catalog shape:
+`{"host":"codex","skills":[{"name":"vendor:skill","path":"/exact/SKILL.md",
+"enabled":true,"scope":"project","project_root":"/exact/project"}]}`.
+User entries use `scope:"user"`. Restart explicitly after repairing missing
+skills; readiness certifies availability, not their content or external tools.

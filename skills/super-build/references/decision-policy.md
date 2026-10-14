@@ -74,6 +74,11 @@ against the unfixed code (a timeout or missing selector means you pinned the
 harness, not the bug), and it must **survive a refactor** that leaves behaviour
 unchanged.
 
+
+**Before worker writes or worktree creation:** follow [skill readiness](../../super-board/references/skills-readiness.md).
+Resolve this lane for the actual host, load the report's files/fallbacks, halt
+on missing requirements and recheck each conditional helper before use.
+
 ## Label routing
 
 A ticket already declares what kind of work it is. Reading that label is cheaper

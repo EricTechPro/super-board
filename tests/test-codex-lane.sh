@@ -6,6 +6,18 @@ KIT=$(cd "$(dirname "$0")/.." && pwd)
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/bin" "$T/repo"
 git init -q "$T/repo"
+python3 "$KIT/tests/fixtures/install_worker_skills.py" "$T/repo"
+export SUPER_BOARD_SKILLS_HOME="$T/home"; mkdir -p "$SUPER_BOARD_SKILLS_HOME"
+cat > "$T/bin/gh" <<'PYGH'
+#!/usr/bin/env python3
+import json,sys
+args=sys.argv[1:]
+if args[:2]==['issue','view']:
+    print(json.dumps({'labels':[]} if args[args.index('--json')+1] == 'labels' else {'number':int(args[2]),'title':'fixture','body':''}))
+else:
+    sys.exit('unexpected gh fixture call: '+str(args))
+PYGH
+chmod +x "$T/bin/gh"
 export SB_CODEX_TEST_LOG="$T/calls.jsonl"
 export PATH="$T/bin:$PATH"
 cat > "$T/bin/codex" <<'PY'
@@ -146,6 +158,7 @@ rm -f "$T/stderr"
 # A .git pointer to a superproject-shaped external git dir, without a commit.
 mkdir -p "$T/super/.git/modules"
 git init -q --separate-git-dir="$T/super/.git/modules/kit" "$T/submodule"
+python3 "$KIT/tests/fixtures/install_worker_skills.py" "$T/submodule"
 cd "$T/submodule"
 lane review --codex >"$T/out"
 python3 - "$SB_CODEX_TEST_LOG" "$T/submodule" "$T/super/.git/modules/kit" <<'PY'

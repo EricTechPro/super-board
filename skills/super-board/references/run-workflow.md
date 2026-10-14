@@ -140,7 +140,9 @@ Repeat until a done condition or halt gate fires:
    **Usage guard** (Claude waves only; skip for `--codex`, explicit or host-switched) — `bash .claude/bin/super-board-usage.sh check --config <config-path>`
    (Claude 5-hour and weekly plan usage; threshold `usage_pause_pct`, default 95):
    - exit 0 → launch.
-   - exit 10 with `usage_fallback: "codex"` → Build/QA may use
+   - exit 10 with `usage_fallback: "codex"` → resolve the selected remaining
+     chain for `--host codex` before fallback claims; missing helpers halt with
+     `skills-readiness:` and preserve state. Build/QA may use
      `super-board-codex-lane.sh` WITHOUT `--codex`; Review remains refused.
      Fallback never grants merge ownership; use explicit `run --codex` for all lanes.
      Plan as usual, take the `build` and `qa` cards (`review` cards wait), and for ONE
@@ -175,6 +177,23 @@ Repeat until a done condition or halt gate fires:
    Exit 9 is a verification-readiness halt: preserve work and claims, repair the
    owning project's `verify_commands`, then restart explicitly. No GitHub recovery probe,
    rebase, Build bounce, or automatic retry.
+   **Skill readiness before any wave writes.** Hydrate every selected issue body
+   read-only with `.claude/bin/super-board-github-read.py --kind issue -- issue
+   view <N> --json number,title,body`. Keep number, status, labels and literal body
+   in a JSON array file. Run `python3 .claude/bin/super-board-skills-ready.py
+   --root <repo-root> --host <claude|codex> --cards <cards.json>` for the actual
+   worker host before sweep/resume/refresh/flag/stranded actions or Claim.
+   Exit 10 names missing helpers: halt, preserve all state, repair the exact
+   visible skill files and restart explicitly. Exit 64 means invalid input.
+   GitHub hydration failure follows the existing exit-79 read policy.
+   Empty selection checks no unused helpers. Repeat with the new host before
+   usage fallback; Claude availability never proves Codex availability.
+   Pass hydrated bodies into the wave. Workers recheck their lane before writes
+   and activate conditional helpers only after `--require <exact-name>` passes.
+   Untyped Ready cards conservatively check bug and feature chains before
+   classification. Existing docs/ux/tests/refactor rows keep their chain; check
+   any proposed new label chain before writing that label.
+
    The planner returns `cards`, `sweep`, `resume`, `refreshApproval`, `flag` and `stranded`. **Act on
    `sweep`, `resume`, `refreshApproval`, `flag` and `stranded` BEFORE launching** (run.md → "The wave-start
    sweep"): move every swept card to `Ready` with a comment naming what cleared
@@ -225,7 +244,7 @@ Repeat until a done condition or halt gate fires:
 4. **Launch** — With `--codex`, or no Workflow tool, or the host check printing `codex`, use
    "Codex runs" above; otherwise Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` straight from the planner: each
+   `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
    `tier` is the run's model ladder: `'low'` when the user invoked
@@ -312,6 +331,7 @@ don't stall on prompts:
     "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
     "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
     "Bash(bash .claude/bin/super-board-preflight.sh:*)",
+    "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
     "Bash(bash .claude/bin/super-board-codex-lane.sh:*)",
@@ -362,3 +382,13 @@ the policy. Pair auto-merge with a non-production `base_branch`.
 > ready, merge, **verify the merge commit is an ancestor of the base branch**,
 > and only then move the card to Done. A merge-blocked PR goes to Blocked, not
 > back to Review.
+
+### Skill-readiness reconciliation
+
+Exit 10 from a skill check or lane result with detail `skills-readiness:` is a
+readiness halt. Stop new dispatch, stop only this runner's active workers,
+and preserve claims, inflight records, worktrees, card state and approval
+evidence. Repair the exact host-visible skills and restart explicitly. Do not
+release claims, bounce a card or enter a retry loop on this halt. Existing
+preselection crash recovery remains the discovery step; once missing skills
+are known, recovery and wave writes stop.
