@@ -77,7 +77,13 @@ http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App).serve_forever()
 v=json.load(urllib.request.build_opener(urllib.request.ProxyHandler({})).open(os.environ['SB_RUNTIME_URL']))
 print(json.dumps({'correct':True,'duration_ms':v['duration'],'memory_bytes':2048,'environment':{'browser':'fixture-v1'}}))
 """
-            (root/'server.py').write_text(server_override or server)
+            server_source = server_override or server
+            server_source = 'import faulthandler\nfaulthandler.dump_traceback_later(3)\n' + server_source
+            server_source = server_source.replace(
+                "http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App).serve_forever()",
+                "app=http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App)\n"
+                "faulthandler.cancel_dump_traceback_later()\napp.serve_forever()")
+            (root/'server.py').write_text(server_source)
             (root/'scenario.py').write_text(adapter_override or adapter)
             config = {'scenario_id':'fetch','data_id':'seed-1','environment_id':'local-fixture',
                       'scenario_command':[sys.executable,'scenario.py'], 'scenario_files':['scenario.py'],

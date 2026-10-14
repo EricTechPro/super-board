@@ -81,6 +81,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      # Temporary startup probe: keep the actual failing macOS child stack.
+      - name: Diagnose runtime fixture startup
+        if: runner.os == 'macOS'
+        env:
+          SB_RUNTIME_TEST_ARTIFACTS: ${{ runner.temp }}/runtime-test-evidence
+        run: python tests/test_runtime_compare.py ExecutionTests.test_alternates_five_pairs_saves_memory_and_stops_apps
       - name: Run every offline safety suite
         env:
           SB_RUNTIME_TEST_ARTIFACTS: ${{ runner.temp }}/runtime-test-evidence

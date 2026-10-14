@@ -123,6 +123,7 @@ def local_http(url, timeout):
 
 
 def ready(url, process, timeout):
+    last_probe = 'no response'
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
@@ -131,10 +132,11 @@ def ready(url, process, timeout):
             with local_http(url, timeout=min(1, timeout)) as response:
                 if response.status == 200:
                     return
-        except OSError:
-            pass
+                last_probe = 'HTTP ' + str(response.status)
+        except OSError as exc:
+            last_probe = type(exc).__name__ + ': ' + str(exc)
         time.sleep(.05)
-    raise RuntimeError('app readiness timed out')
+    raise RuntimeError('app readiness timed out; last probe: ' + last_probe)
 
 
 def group_members(group):
