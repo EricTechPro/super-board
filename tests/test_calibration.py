@@ -44,13 +44,22 @@ class Calibration(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def prepare(self, config=None, receipt=None):
+    def prepare(self, config=None, receipt=None, receipt_bytes=None):
         cfg = self.root / 'config.json'
         cfg.write_text(json.dumps(self.config if config is None else config))
         note = self.run / 'completion.json'
         note.write_text(json.dumps(self.receipt if receipt is None else receipt))
+        if receipt_bytes is not None:
+            encoded = note.read_bytes()
+            self.assertLessEqual(len(encoded), receipt_bytes)
+            note.write_bytes(encoded + b' ' * (receipt_bytes - len(encoded)))
+        before = {path.relative_to(self.root): path.read_bytes()
+                  for path in self.root.rglob('*') if path.is_file() and '.git' not in path.parts}
         result = subprocess.run(['python3', str(SCRIPT), '--config', str(cfg), '--receipt', str(note)],
                                 cwd=self.root, text=True, capture_output=True)
+        after = {path.relative_to(self.root): path.read_bytes()
+                 for path in self.root.rglob('*') if path.is_file() and '.git' not in path.parts}
+        self.assertEqual(after, before, 'prepare must preserve targets, config, receipt and evidence')
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
@@ -67,6 +76,63 @@ class Calibration(unittest.TestCase):
         self.assertIn('AGENTS.md', result['brief'])
         self.assertIn('final reconciliation', result['provenance'])
         self.assertEqual(self.target.read_text().splitlines()[-1], 'Existing skill.')
+
+    def test_receipt_limit_accepts_64_kib_and_skips_one_byte_over(self):
+        self.assertEqual(self.prepare(receipt_bytes=65536)['status'], 'ready')
+        self.assertEqual(self.prepare(receipt_bytes=65537)['reason'],
+                         'receipt-unavailable-or-oversized')
+
+    def test_evidence_file_limit_accepts_32_kib_and_skips_one_byte_over(self):
+        self.proof.write_bytes(b'x' * 32768)
+        self.assertEqual(self.prepare()['status'], 'ready')
+        self.proof.write_bytes(b'x' * 32769)
+        self.assertEqual(self.prepare()['reason'], 'evidence-unavailable-or-oversized')
+
+    def test_evidence_count_counts_unique_files_including_manifest(self):
+        files = [self.manifest, self.proof]
+        for number in range(30):
+            path = self.run / f'evidence-{number}.md'
+            path.write_text('Current-run evidence.\n')
+            files.append(path)
+        note = copy.deepcopy(self.receipt)
+        # Repeated references do not consume extra file/byte budget.
+        note['cards'][0]['evidence_files'] = [str(path) for path in files] * 2
+        result = self.prepare(receipt=note)
+        self.assertEqual(result['status'], 'ready')
+        self.assertEqual(len(result['evidence_files']), 32)
+        extra = self.run / 'extra.md'
+        extra.write_text('One too many.\n')
+        note['cards'][0]['evidence_files'].append(str(extra))
+        self.assertEqual(self.prepare(receipt=note)['reason'], 'evidence-unavailable-or-oversized')
+
+    def test_total_evidence_limit_accepts_128_kib_and_skips_one_byte_over(self):
+        files = [self.manifest, self.proof]
+        for name in ('third.md', 'fourth.md'):
+            files.append(self.run / name)
+        for path in files:
+            path.write_bytes(b'x' * 32768)
+        note = copy.deepcopy(self.receipt)
+        note['cards'][0]['evidence_files'] = [str(path) for path in files]
+        self.assertEqual(self.prepare(receipt=note)['status'], 'ready')
+        extra = self.run / 'extra.md'
+        extra.write_bytes(b'x')
+        note['cards'][0]['evidence_files'].append(str(extra))
+        self.assertEqual(self.prepare(receipt=note)['reason'], 'evidence-unavailable-or-oversized')
+
+    def test_canonical_edit_allowlist_accepts_20_and_skips_21(self):
+        targets = [self.target]
+        for number in range(20):
+            path = self.root / f'.agents/skills/allowed-{number}/SKILL.md'
+            path.parent.mkdir(parents=True)
+            path.write_text(f'---\nname: allowed-{number}\n---\nExisting skill.\n')
+            targets.append(path)
+        cfg = copy.deepcopy(self.config)
+        cfg['calibration']['allowed_skill_paths'] = [str(path) for path in targets[:20]]
+        result = self.prepare(config=cfg)
+        self.assertEqual(result['status'], 'ready')
+        self.assertEqual(len(result['allowed_skill_paths']), 20)
+        cfg['calibration']['allowed_skill_paths'].append(str(targets[20]))
+        self.assertEqual(self.prepare(config=cfg)['reason'], 'edit-allowlist-unavailable')
 
     def test_exit_zero_done_counts_and_partial_states_do_not_authorize_calibration(self):
         for patch in ({'outcome': 'halted'}, {'active_workers': ['worker']}, {'pending': ['approval']},
@@ -137,7 +203,9 @@ class Calibration(unittest.TestCase):
             cfg = copy.deepcopy(self.config)
             cfg['calibration']['skill_path'] = str(self.skill)
             cfg['calibration']['allowed_skill_paths'] = [str(external)]
+            original = external.read_bytes()
             self.assertEqual(self.prepare(config=cfg)['allowed_skill_paths'], [str(external)])
+            self.assertEqual(external.read_bytes(), original)
         self.skill.unlink()
         self.assertEqual(self.prepare()['reason'], 'skill-unavailable')
 

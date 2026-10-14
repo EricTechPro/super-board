@@ -3,18 +3,18 @@ Date-only strings (`2026-09-01`) are parsed as UTC midnight and read back with l
 
 ## Context
 - **Where:** date handling, `src/reports/monthly.ts`, `src/budgets/alerts.ts`
-- Each PR fixed its own call site; there is no shared date-only helper, so the next caller repeats it.
+- **Boundary:** both callers convert a date-only value through UTC midnight and local month getters. Each PR fixed its own call site; the conversion remains available to the next caller.
 
 ## Evidence
 - PR #21 · super-review R1 `src/reports/monthly.ts:42` · thread by eric (America/Vancouver)
 - PR #24 · super-review R1 `src/budgets/alerts.ts:18` · coderabbitai thread
 
 ## Fix
-Add `parseDateOnly()` / `monthKey()` in one module and route both call sites through it.
+Route both callers through one date-only owner that preserves the calendar month and closes the unsafe conversion path. Reuse an adequate existing owner when available.
 
 ## Acceptance Criteria
-- [ ] One helper parses date-only strings; `monthly.ts` and `alerts.ts` use it.
-- [ ] A regression test runs the month bucketing under `TZ=America/Vancouver` and puts `2026-09-01` in September.
+- [ ] Both month-bucketing features put date-only `2026-09-01` in September under `TZ=America/Vancouver`.
+- [ ] Retain the cited prior bad witness: it fails old behavior for the month invariant, passes after correction and survives a behavior-preserving refactor. If the historical witness cannot be recovered, leave this proof unverified.
 
 ## Risk
 🟡 **Medium** · touches two features' month logic.

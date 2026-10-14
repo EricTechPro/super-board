@@ -41,3 +41,9 @@ it into the target's `docs/agents/issue-tracker.md` under `## Ticket format` (th
 | Labels | `money`, `auth`, `schema` route the merge to a human (merge_policy) · `schema` = destructive only (DROP/TRUNCATE/RENAME); additive migrations need no label |
 | Human-only step | a `needs-you: <command>` line in the PR body → 🙋 Blocked until done |
 | Size | one card = one PR under 400 changed lines (`merge_policy.auto_max_lines`) · bigger → split with `/to-tickets` |
+
+For recurring PR fixes, keep these sections. Context names the permitting shared boundary
+and prior failing input/action; Evidence cites the prior PRs/findings. Fix names the intended
+prevention, not an implementation plan. An AC requires the retained behavioral witness:
+old failure for the reported reason, corrected pass and behavior-preserving refactor survival.
+See [correction prevention](../../super-collect/references/correction-prevention.md).

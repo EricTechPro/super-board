@@ -105,8 +105,9 @@ Read the JSON for problems that **recur**, not one-off nits:
 
 Cluster by **root cause at a shared boundary**, not by wording. One ticket per cause with
 Problem, Context, Evidence (every PR, comment link and finding id), Fix (names the root cause),
-Acceptance Criteria, Risk — at least one criterion is a regression check that would have caught
-the recurrence.
+Acceptance Criteria, Risk. Before proposing Fix and its behavioral AC, follow
+[correction prevention](references/correction-prevention.md): identify what permitted the
+recurrence, prefer a fitting structural correction, and retain the actual prior bad witness.
 
 ### architecture — the finder
 

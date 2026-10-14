@@ -173,6 +173,16 @@ def prepare(config, receipt_path, cwd):
         'other runs, private chats, memory, or unrelated projects.',
         'Reuse the installed skill\'s learning/coverage process. Check coverage only in the allowed files '
         'and their explicitly referenced rules; read-only external skill instructions may be followed.',
+        'For recurring mistakes, prefer the strongest appropriate prevention: remove an invalid path '
+        'or use an already adequate owner; then types/schema; then an actionable lint/runtime boundary '
+        'guard; then a behavioral regression witness; prose last for judgment. These are preferences, '
+        'not five mandatory mechanisms. Add no dependency or abstraction solely to climb this list.',
+        'Retain the actual prior bad witness and source. Proposed proof must show the old failure for '
+        'the reported invariant, the corrected pass and behavior-preserving refactor survival. '
+        'An unavailable historical witness stays unverified; invented samples do not prove recurrence.',
+        'Product ownership/type/schema/guard/test changes are proposals for ordinary verified, curated '
+        'Backlog intake, not calibration edits or automatically filed tickets. This preference does '
+        'not widen the listed edit paths or bypass source verification and user curation.',
         'Do not write rules or memory, edit wrappers, create a skill, change AGENTS.md or CLAUDE.md, '
         'or write outside the listed canonical files. Those destinations require a human approval proposal.',
         'If the host cannot honor this scope, report skipped rather than applying edits. Do not commit, push, '

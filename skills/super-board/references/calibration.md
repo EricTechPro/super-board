@@ -72,6 +72,10 @@ python3 .claude/bin/super-board-calibration.py --config "$BOARD_CONFIG" --receip
    listed existing canonical skill files. No global chat search, memory/rules
    writes, wrapper edits, or new skills. AGENTS.md, CLAUDE.md, new skills and all
    unlisted destinations remain proposals requiring human approval.
+   For recurring mistakes, use [correction prevention](../../super-collect/references/correction-prevention.md).
+   Prefer a fitting structural correction before reminders. Product ownership/type/schema/guard/test
+   changes remain proposals for ordinary verified, curated Backlog intake. This preference
+   grants no product write authority and does not bypass verification or user curation.
 4. The host inspects the actual diff and changed paths before accepting edits.
    Compare them to `allowed_skill_paths`; halt/report unexpected edits, preserve
    them for review, and never stage or commit them automatically. The read-only
