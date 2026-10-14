@@ -4,9 +4,11 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 KIT = Path(os.environ.get('SB_TEST_PACK', Path(__file__).resolve().parents[1]))
@@ -158,11 +160,57 @@ dispatch_lane build 1
         self.full('claude')
         def reap_owned():
             path = self.root / 'owned.pid'
-            if path.exists():
+            if not path.exists():
+                return
+            pid = int(path.read_text())
+            def exited():
                 try:
-                    os.kill(int(path.read_text()), __import__('signal').SIGTERM)
+                    # Reap directly if this platform adopted the worker.
+                    child, _ = os.waitpid(pid, os.WNOHANG)
+                    return child == pid
+                except ChildProcessError:
+                    # The runner's worker is normally a grandchild. An orphaned
+                    # zombie has exited and cannot write, even before init reaps it.
+                    state = subprocess.run(['ps', '-p', str(pid), '-o', 'stat=', '-o', 'command='],
+                                           capture_output=True, text=True, timeout=1).stdout.strip()
+                    if not state:
+                        return True
+                    status, _, command = state.partition(' ')
+                    # This unique fixture path identifies the owned worker.
+                    # A reused PID belongs to somebody else and is never signalled.
+                    return status.startswith('Z') or str(self.bin / 'claude') not in command
+            def wait_for_exit():
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    if exited():
+                        return True
+                    time.sleep(.02)
+                return exited()
+            if exited():
+                return
+            # The dispatcher may already have sent TERM. Do not re-enter its
+            # asynchronous handler; wait for completion before deleting files.
+            if not (self.root / 'owned.stopped').exists() and not exited():
+                try:
+                    os.kill(pid, signal.SIGTERM)
                 except ProcessLookupError:
-                    pass
+                    return
+            if not wait_for_exit() and not exited():
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    return
+                if not wait_for_exit():
+                    raise RuntimeError('owned fixture worker did not exit before directory cleanup')
+        def require_worker_finished_before_directory_cleanup():
+            if (self.root / 'owned.pid').exists():
+                self.assertTrue((self.root / 'owned.finished').exists(),
+                                'fixture directory cleanup raced the owned worker shutdown')
+                status = subprocess.run(['ps', '-p', (self.root / 'owned.pid').read_text(), '-o', 'stat='],
+                                        capture_output=True, text=True, timeout=1).stdout.strip()
+                self.assertTrue(not status or status.startswith('Z'),
+                                'directory cleanup began while the fixture worker was still running')
+        self.addCleanup(require_worker_finished_before_directory_cleanup)
         self.addCleanup(reap_owned)
         unrelated = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
         def reap_unrelated():
@@ -184,7 +232,10 @@ root=Path(os.environ['ROOT_FIXTURE'])
 (root/'.claude/skills/diagnosing-bugs/SKILL.md').unlink()
 (root/'owned.started').write_text('started')
 def stop(*args):
-    (root/'owned.stopped').write_text('stopped'); raise SystemExit(0)
+    (root/'owned.stopped').write_text('stopped')
+    time.sleep(.2)  # Controlled asynchronous shutdown, after the halt proof.
+    (root/'owned.finished').write_text('finished')
+    raise SystemExit(0)
 signal.signal(signal.SIGTERM,stop)
 while True: time.sleep(.05)
 """)
