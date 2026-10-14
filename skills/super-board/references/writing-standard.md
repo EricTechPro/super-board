@@ -214,6 +214,10 @@ under Risk.
 | `## Risk` | 🟢/🟡/🔴 level + one line | yes |
 | `## Blocked by` | `- #N — why` bullets, or exactly `- None.` | yes |
 
+When an unsettled design triggers [design preflight](design-preflight.md), retain the
+approved choice and short rationale in the existing Context, or link its applicable
+spec/ADR there. Keep the same sections. Lint saves only the exact issue edit the user approves.
+
 Example:
 
 ```

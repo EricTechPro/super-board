@@ -79,7 +79,7 @@ PHASE 7 — Final summary + session-reset nudge
 
 ---
 
-## Lint criteria — 18-criterion table
+## Lint criteria — 19-criterion table
 
 An issue is flagged if any of these apply. An issue can fail multiple criteria; all firing criteria are surfaced in Phase 4.
 
@@ -103,6 +103,11 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 16 | Ticket sections missing (writing-standard.md § 3): `## Problem`, `## Context`, `## Fix`, `## Risk` — and `## Evidence` (the folded 12-row table) on a bug | Body has "What to build" and ACs only | Rewrite into the ticket format; draft Problem/Fix from the body, ask for Who and Risk |
 | 17 | Acceptance Criteria not a checklist | ACs as prose or plain `-` bullets | Rewrite as `- [ ] <checkable outcome>`, one per line |
 | 18 | Context steps not lettered under Where, more than one step per line, or chained with arrows | "Where: /x — sign in → open Receipts → drop file" | Rewrite as `- **Where:** …` then `  - a. Sign in` / `  - b. …`, one per line; embed the screenshot (raw URL pinned to a sha), never link it |
+| 19 | Unsettled new ownership boundary, new/changed public interface, or architecture expensive to reverse; no adequate applicable design record | Two callers could each own the new shared state, with no recorded choice | Follow [design preflight](design-preflight.md); compare two sketches and propose a choice in Context |
+
+Criterion 19 is conditional. Read the current flow, owners/callers and applicable specs/ADRs
+before flagging it. Labels alone do not trigger it. Ordinary bugs, mechanical refactors and
+choices already settled by an applicable design record keep the normal path.
 
 ---
 
@@ -169,9 +174,14 @@ ticket closes, or becomes the first slice, once the user approves the split.
 | Issue with multiple interpretations (criterion #12) | `mattpocock-skills:grilling` |
 | Ticket too big (criterion #15) | `/to-tickets` (split into vertical slices) |
 | Ticket format (criteria #16–18) | Inline rewrite into `ticket-format.md` (sub-agent in lint itself) |
+| Unsettled expensive design (criterion #19) | [Design preflight](design-preflight.md) with `mattpocock-skills:codebase-design`; `mattpocock-skills:domain-modeling` only for terminology/ADR work |
 | Catch-all (none of above) | Inline draft (sub-agent in lint itself) |
 
 One sub-agent per issue. User stays in control of pacing.
+When criterion 19 fires, propose the two sketches, choice and short rationale within that
+issue's existing loop.
+Save the exact approved edit in Context (or a link to an applicable spec/ADR). No separate
+local design file or extra save permission; unresolved human choices remain blocked.
 
 ---
 
@@ -262,7 +272,7 @@ Before declaring lint complete, the worker MUST verify all three:
 
 - [ ] `docs/super-board/pre-flight.md` exists and lists every credential / tool / env signal encountered while scanning issues + PROJECT.md.
 - [ ] Every issue in active-pipeline columns (Ready, Building, QA, Review) either:
-  - has a populated `## Acceptance Criteria` section that passes all 18 criteria, OR
+  - has a populated `## Acceptance Criteria` section that passes all 19 criteria (conditional #19 only when triggered), OR
   - was dropped on purpose (closed as not planned, Done, `🤷 dropped` comment), OR
   - carries a `🛡 Blocked` comment naming the human-gated blocker.
 - [ ] No issue is left in an in-between state (flagged but not resolved, partially edited, or awaiting user input that never came).

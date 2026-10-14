@@ -166,6 +166,14 @@ touches fewer files, adds no public surface, and can be reverted by dropping
 one commit. When two options tie on blast radius, take the one an existing test
 already constrains.
 
+For an authorized, unsettled technical rung-3 fork that introduces a new ownership boundary,
+new/changed public interface, or architecture expensive to reverse, follow
+[design preflight](../../super-board/references/design-preflight.md). An applicable supplied
+design/spec/ADR answers the question at an earlier rung; follow it. Labels alone, ordinary
+bugs and mechanical refactors do not trigger a comparison. Recheck conditional helper
+readiness before use. Record the choice in the existing decision trailer below.
+The comparison does not settle ambiguous product intent or waive any hard human gate.
+
 **One technical check is still mandatory before the final commit:** run
 `mattpocock-skills:code-review` against your own working diff, passing the
 merge-base as the fixed point (`git merge-base HEAD origin/<base>`). It never
