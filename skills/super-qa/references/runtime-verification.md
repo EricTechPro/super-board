@@ -96,7 +96,11 @@ object identifying its runtime), optional `memory_bytes` and diagnostic details.
 `SB_RUNTIME_URL` and `SB_RUNTIME_ARTIFACT_DIR` identify the local target/evidence.
 Commands run without a shell. Failures/timeouts are counted, never discarded into
 a claim of success. Started server process groups are terminated on completion.
-An occupied target URL is refused. This helper supports POSIX local process groups
+App URLs use HTTP, `localhost` or `127.0.0.1`, an explicit port, and no credentials.
+Readiness and occupancy probes bypass host proxies. Redirects may stay on loopback;
+an off-loopback destination is refused before a request is sent. Custom adapters
+keep their own network policy. An occupied target URL is refused, including HTTP
+error responses. This helper supports POSIX local process groups
 and needs the system `ps` command for bounded inspection of live members. Cleanup
 escalates the whole owned group, reaps the wrapper, and bounds pipe draining.
 Empty/zombie-only groups are not signalled; reused/foreign groups are refused.

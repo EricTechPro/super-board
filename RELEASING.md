@@ -28,8 +28,15 @@ run twice. Keep these tests offline and deterministic; paid agent evaluations be
 `evals/` and are not part of this gate.
 
 Dependencies: Bash, Python 3, Git, jq, Node.js, curl and tar. GitHub's Linux/macOS runners
-provide the command-line utilities; the workflow selects Python 3.12 and Node.js 22.
+provide the command-line utilities; the safety workflow tests Python 3.9 and 3.12 with
+Node.js 22.
 Windows coverage remains limited to the Python status reader.
+
+Runtime fixture failures print the report and app startup logs. Failed safety jobs also
+keep the fixture reports, app logs and adapter logs as `runtime-evidence-*` artifacts
+for seven days. Only generated offline fixtures go there; project runtime evidence does
+not. For the same files locally, set `SB_RUNTIME_TEST_ARTIFACTS` to a new scratch folder
+before running the suite.
 
 ## Repository settings still matter
 
@@ -64,12 +71,17 @@ change rules. Do not describe the settings above as protection against the owner
 Use these exact check names from the direct **cross-platform** branch/PR run:
 
 ```text
-safety (ubuntu-latest)
-safety (macos-latest)
+safety (ubuntu-latest / py3.9)
+safety (ubuntu-latest / py3.12)
+safety (macos-latest / py3.9)
+safety (macos-latest / py3.12)
+smoke (ubuntu-latest / py3.9)
 smoke (ubuntu-latest / py3.10)
 smoke (ubuntu-latest / py3.12)
+smoke (macos-latest / py3.9)
 smoke (macos-latest / py3.10)
 smoke (macos-latest / py3.12)
+smoke (windows-latest / py3.9)
 smoke (windows-latest / py3.10)
 smoke (windows-latest / py3.12)
 ```

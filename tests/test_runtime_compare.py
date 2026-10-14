@@ -11,6 +11,10 @@ import os
 import shutil
 import signal
 import time
+import http.server
+import http.client
+import threading
+import urllib.request
 from unittest import mock
 
 PATH = pathlib.Path(__file__).resolve().parents[1] / 'skills/super-qa/scripts/runtime_compare.py'
@@ -47,7 +51,7 @@ class ClassificationTests(unittest.TestCase):
 
 
 class ExecutionTests(unittest.TestCase):
-    def run_fixture(self, adapter_override=None, repetitions=5, overrides=None):
+    def run_fixture(self, adapter_override=None, repetitions=5, overrides=None, server_override=None):
         # Real subprocess/HTTP boundary; canned durations exercise orchestration, not browser speed.
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
@@ -70,10 +74,10 @@ class App(http.server.BaseHTTPRequestHandler):
 http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App).serve_forever()
 """
             adapter = """import os,json,urllib.request
-v=json.load(urllib.request.urlopen(os.environ['SB_RUNTIME_URL']))
+v=json.load(urllib.request.build_opener(urllib.request.ProxyHandler({})).open(os.environ['SB_RUNTIME_URL']))
 print(json.dumps({'correct':True,'duration_ms':v['duration'],'memory_bytes':2048,'environment':{'browser':'fixture-v1'}}))
 """
-            (root/'server.py').write_text(server)
+            (root/'server.py').write_text(server_override or server)
             (root/'scenario.py').write_text(adapter_override or adapter)
             config = {'scenario_id':'fetch','data_id':'seed-1','environment_id':'local-fixture',
                       'scenario_command':[sys.executable,'scenario.py'], 'scenario_files':['scenario.py'],
@@ -85,7 +89,16 @@ print(json.dumps({'correct':True,'duration_ms':v['duration'],'memory_bytes':2048
             path=root/'config.json'
             path.write_text(json.dumps(config))
             report,status=runtime.measure(path,root/'evidence')
-            self.assertTrue((root/'evidence/report.json').exists())
+            self.diagnostics = json.dumps(report, indent=2)
+            self.server_logs = ''
+            for log_path in sorted((root/'evidence').glob('*-server.log')):
+                contents = log_path.read_text()
+                self.server_logs += contents
+                self.diagnostics += '\n' + log_path.name + ':\n' + contents
+            artifact_root = os.environ.get('SB_RUNTIME_TEST_ARTIFACTS')
+            if artifact_root:
+                shutil.copytree(root/'evidence', pathlib.Path(artifact_root)/root.name)
+            self.assertTrue((root/'evidence/report.json').exists(), self.diagnostics)
             for port in ports:
                 with socket.socket() as sock:
                     self.assertNotEqual(sock.connect_ex(('127.0.0.1',port)),0,'server must be stopped')
@@ -93,25 +106,83 @@ print(json.dumps({'correct':True,'duration_ms':v['duration'],'memory_bytes':2048
 
     def test_alternates_five_pairs_saves_memory_and_stops_apps(self):
         report,status=self.run_fixture()
-        self.assertEqual(status,0)
+        self.assertEqual(status,0,self.diagnostics)
         self.assertEqual(report['outcome'],'faster')
         self.assertEqual(report['order'],['changed','baseline','baseline','changed','changed','baseline','baseline','changed','changed','baseline'])
         self.assertEqual(len(report['warmups']),2)
         self.assertEqual(report['memory']['changed']['median'],2048)
 
+    def test_loopback_measurement_ignores_broken_host_proxy(self):
+        # Real local HTTP must work even when host/system proxy settings do not bypass it.
+        env = {key: 'http://127.0.0.1:1' for key in
+               ('http_proxy', 'HTTP_PROXY', 'https_proxy', 'HTTPS_PROXY', 'all_proxy', 'ALL_PROXY')}
+        env.update(no_proxy='', NO_PROXY='')
+        with mock.patch.dict(os.environ, env):
+            report,status=self.run_fixture(overrides={'ready_timeout_seconds': 2})
+        self.assertEqual(status,0,self.diagnostics)
+        self.assertEqual(report['outcome'],'faster',self.diagnostics)
+        self.assertEqual(report['correctness_failures'],{'baseline':0,'changed':0},self.diagnostics)
+        self.assertEqual(len(report['order']),10,self.diagnostics)
+
+    def redirect_server(self, target):
+        # Log Host so the regression can prove no off-loopback request was sent.
+        return '''import http.server, sys, json
+class App(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        print(self.headers['Host'], flush=True)
+        if self.path == '/':
+            self.send_response(302)
+            self.send_header('Location', ''' + repr(target) + ''')
+            self.end_headers()
+        else:
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(json.dumps({'duration':int(sys.argv[2]),'name':sys.argv[3]}).encode())
+    def log_message(self,*args):pass
+http.server.HTTPServer(('127.0.0.1',int(sys.argv[1])),App).serve_forever()
+'''
+
+    def test_loopback_redirects_still_allow_measurement(self):
+        report,status=self.run_fixture(server_override=self.redirect_server('/target'))
+        self.assertEqual(status,0,self.diagnostics)
+        self.assertEqual(report['outcome'],'faster',self.diagnostics)
+
+    def test_external_redirect_is_rejected_before_sending_request(self):
+        # Route only this fake hostname back to the real local server for a safe red proof.
+        real_getaddrinfo = socket.getaddrinfo
+        def local_dns(host, *args, **kwargs):
+            return real_getaddrinfo('127.0.0.1' if host == 'outside.invalid' else host, *args, **kwargs)
+        server = self.redirect_server('http://outside.invalid:1/target').replace(
+            "'http://outside.invalid:1/target'", "'http://outside.invalid:' + sys.argv[1] + '/target'")
+        with mock.patch('socket.getaddrinfo', side_effect=local_dns):
+            report,status=self.run_fixture(server_override=server)
+        self.assertEqual(status,2,self.diagnostics)
+        self.assertIn('loopback HTTP URL',report['reason'],self.diagnostics)
+        self.assertNotIn('outside.invalid',self.server_logs,self.diagnostics)
+        self.assertEqual(report['order'],[],self.diagnostics)
+
+    def test_nonlocal_or_credential_app_urls_are_rejected_before_startup(self):
+        for url in ('http://localhost:80@outside.invalid:80',
+                    'http://user:password@localhost:80',
+                    'http://localhost:70000', 'http://localhost',
+                    'https://localhost:80', 'http://outside.invalid:80'):
+            with self.subTest(url=url), self.assertRaisesRegex(ValueError,'loopback HTTP URL'):
+                self.run_fixture(overrides={'baseline': {'revision':'invalid-v1', 'cwd':'.',
+                    'url':url, 'start_command':[sys.executable,'-c','raise SystemExit(7)']}})
+
     def test_correctness_failure_cannot_claim_faster(self):
         adapter="""import os,json,urllib.request
-v=json.load(urllib.request.urlopen(os.environ['SB_RUNTIME_URL']))
+v=json.load(urllib.request.build_opener(urllib.request.ProxyHandler({})).open(os.environ['SB_RUNTIME_URL']))
 print(json.dumps({'correct':v['name']=='baseline','duration_ms':v['duration'],'environment':{'browser':'fixture-v1'}}))
 """
         report,status=self.run_fixture(adapter)
         self.assertEqual(status,2)
         self.assertEqual(report['outcome'],'inconclusive')
-        self.assertEqual(report['correctness_failures']['changed'],6)
+        self.assertEqual(report['correctness_failures']['changed'],6,self.diagnostics)
 
     def test_mismatched_browser_invalidates_comparison(self):
         adapter="""import os,json,urllib.request
-v=json.load(urllib.request.urlopen(os.environ['SB_RUNTIME_URL']))
+v=json.load(urllib.request.build_opener(urllib.request.ProxyHandler({})).open(os.environ['SB_RUNTIME_URL']))
 print(json.dumps({'correct':True,'duration_ms':v['duration'],'environment':{'browser':v['name']}}))
 """
         report,status=self.run_fixture(adapter)
@@ -121,7 +192,7 @@ print(json.dumps({'correct':True,'duration_ms':v['duration'],'environment':{'bro
     def test_malformed_adapter_output_is_recorded(self):
         report,status=self.run_fixture("print('not json')")
         self.assertEqual(status,2)
-        self.assertEqual(report['correctness_failures'],{'baseline':6,'changed':6})
+        self.assertEqual(report['correctness_failures'],{'baseline':6,'changed':6},self.diagnostics)
 
     def test_non_object_output_is_recorded(self):
         report,status=self.run_fixture("print('null')")
@@ -139,7 +210,44 @@ class FailureTests(unittest.TestCase):
     def test_adapter_timeout_is_recorded_and_apps_stopped(self):
         report,status=self.run_fixture("import time; time.sleep(2)", overrides={'timeout_seconds': .03})
         self.assertEqual(status,2)
-        self.assertEqual(report['correctness_failures'],{'baseline':6,'changed':6})
+        self.assertEqual(report['correctness_failures'],{'baseline':6,'changed':6},self.diagnostics)
+
+    def test_occupied_loopback_url_is_rejected_even_with_host_proxy(self):
+        response_status = [200]
+        class App(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(response_status[0])
+                self.end_headers()
+                self.wfile.write(b'owned elsewhere')
+            def log_message(self, *args):
+                pass
+        server = http.server.HTTPServer(('127.0.0.1', 0), App)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+        url = 'http://127.0.0.1:' + str(server.server_port)
+        try:
+            for status_code in (200,503):
+                response_status[0] = status_code
+                with self.subTest(status=status_code), mock.patch.dict(os.environ, {
+                        'http_proxy':'http://127.0.0.1:1', 'HTTP_PROXY':'http://127.0.0.1:1',
+                        'no_proxy':'', 'NO_PROXY':''}):
+                    report,status=self.run_fixture(overrides={'baseline': {
+                        'revision':'occupied-v1', 'cwd':'.', 'url':url,
+                        'start_command':[sys.executable,'-c','raise SystemExit(7)']}})
+                self.assertEqual(status,2,self.diagnostics)
+                self.assertIn('app URL is already occupied: baseline',report['reason'],self.diagnostics)
+                self.assertEqual(report['order'],[],self.diagnostics)
+                # Rejecting the URL must not terminate its unrelated owner, even on HTTP errors.
+                connection = http.client.HTTPConnection('127.0.0.1',server.server_port,timeout=1)
+                try:
+                    connection.request('GET','/')
+                    self.assertEqual(connection.getresponse().read(),b'owned elsewhere')
+                finally:
+                    connection.close()
+        finally:
+            server.shutdown()
+            thread.join(timeout=2)
+            server.server_close()
 
     def test_startup_failure_keeps_inconclusive_report(self):
         report,status=self.run_fixture(overrides={'baseline': {'revision':'bad-v1','cwd':'.',

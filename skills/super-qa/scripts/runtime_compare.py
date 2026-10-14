@@ -16,7 +16,9 @@ import statistics
 import subprocess
 import sys
 import time
-from urllib.request import urlopen
+from urllib.error import HTTPError
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 
 def summary(values):
@@ -77,8 +79,9 @@ def validate(config, root):
         source_files = side.get('source_files', [])
         if not isinstance(source_files, list) or not all(isinstance(p, str) and (root / side.get('cwd', '.') / p).is_file() for p in source_files):
             raise ValueError(name + '.source_files must name existing source files')
-        if not side.get('revision') or not str(side.get('url', '')).startswith(('http://127.0.0.1:', 'http://localhost:')):
-            raise ValueError(name + ' needs a revision and a local HTTP URL')
+        if not side.get('revision'):
+            raise ValueError(name + ' needs a revision')
+        require_local_url(side.get('url'))
     if config['baseline']['url'] == config['changed']['url']:
         raise ValueError('baseline and changed need separate local URLs')
     for key in ('timeout_seconds', 'ready_timeout_seconds'):
@@ -92,13 +95,40 @@ def validate(config, root):
         raise ValueError('environment must be a string-to-string object')
 
 
+def require_local_url(url):
+    message = 'a loopback HTTP URL with an explicit port and no credentials is required'
+    try:
+        parsed = urlsplit(url) if isinstance(url, str) else None
+        valid = (parsed is not None and parsed.scheme == 'http' and
+                 parsed.hostname in ('127.0.0.1', 'localhost') and
+                 parsed.username is None and parsed.password is None and
+                 parsed.port is not None and 1 <= parsed.port <= 65535)
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError(message)
+
+
+class LocalRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        require_local_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def local_http(url, timeout):
+    # Validated app URLs are loopback-only. Host/system proxies must not intercept them.
+    # Keep this opener local so adapters and unrelated network traffic retain their policy.
+    require_local_url(url)
+    return build_opener(ProxyHandler({}), LocalRedirectHandler()).open(url, timeout=timeout)
+
+
 def ready(url, process, timeout):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise RuntimeError('app exited before becoming ready')
         try:
-            with urlopen(url, timeout=min(1, timeout)) as response:
+            with local_http(url, timeout=min(1, timeout)) as response:
                 if response.status == 200:
                     return
         except OSError:
@@ -232,8 +262,11 @@ def measure(config_path, output):
             report['sources'][name] = source
             # Refuse to measure an unrelated process already occupying the target.
             try:
-                with urlopen(side['url'], timeout=.3):
+                with local_http(side['url'], timeout=.3):
                     raise RuntimeError('app URL is already occupied: ' + name)
+            except HTTPError:
+                # An HTTP error still proves another server owns this URL.
+                raise RuntimeError('app URL is already occupied: ' + name)
             except OSError:
                 pass
             log = (output / (name + '-server.log')).open('w')

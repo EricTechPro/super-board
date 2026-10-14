@@ -82,4 +82,14 @@ jobs:
         with:
           node-version: "22"
       - name: Run every offline safety suite
+        env:
+          SB_RUNTIME_TEST_ARTIFACTS: ${{ runner.temp }}/runtime-test-evidence
         run: bash tests/run-safety.sh
+      - name: Keep runtime test evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-evidence-${{ matrix.os }}-py${{ matrix.python }}
+          path: ${{ runner.temp }}/runtime-test-evidence
+          if-no-files-found: ignore
+          retention-days: 7
