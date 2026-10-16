@@ -36,20 +36,31 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$CONFIG" ] && [ -f "$CONFIG" ] || { echo "config not found: ${CONFIG:-<unset>}" >&2; exit 66; }
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=super-board-gh-guard.sh
+. "$HERE/super-board-gh-guard.sh"
+SB_CONFIG="$CONFIG"
+FORGE_KIND=$(sb_gh_guard_kind)
 if [ -n "$RATE" ]; then
   PAYLOAD=$(cat "$RATE")
 else
-  # shellcheck source=super-board-gh-guard.sh
-  . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-gh-guard.sh"
-  PAYLOAD=$(sb_gh_quota_merge "$(gh api rate_limit 2>/dev/null || echo '{}')")
+  PAYLOAD=$(sb_gh_guard_quota 2>/dev/null || echo '{}')
 fi
-REMAINING=$(printf '%s' "$PAYLOAD" | jq -r '.resources.graphql.remaining // "unknown"' 2>/dev/null || echo unknown)
+# Gitea has one API bucket (the graphql slot mirrors it); instances without
+# rate limiting report the sentinel 5000 and never trip the remaining check —
+# there, only real evidence (a lane result reporting 429s) narrows the wave.
+BUCKET=graphql
+[ "$FORGE_KIND" = gitea ] && BUCKET=core
+REMAINING=$(printf '%s' "$PAYLOAD" | jq -r ".resources.${BUCKET}.remaining // \"unknown\"" 2>/dev/null || echo unknown)
+DISABLED=$(printf '%s' "$PAYLOAD" | jq -r '.rate_limits_disabled // false' 2>/dev/null || echo false)
 
 WHY=""
-[ "$REMAINING" = "0" ] && WHY="graphql remaining 0"
+if [ "$REMAINING" = "0" ] && [ "$DISABLED" != "true" ]; then
+  WHY="${BUCKET} remaining 0"
+fi
 if [ -z "$WHY" ] && [ -n "$RESULTS" ] && [ -f "$RESULTS" ] \
-   && grep -Eqi 'rate.?limit(ed)? (exceeded|hit|reached)|api rate limit|secondary rate limit|graphql.{0,40}(quota|rate.?limit)|was submitted too quickly' "$RESULTS"; then
-  WHY="a lane result reports a GitHub rate-limit failure"
+   && grep -Eqi 'rate.?limit(ed)? (exceeded|hit|reached)|api rate limit|secondary rate limit|graphql.{0,40}(quota|rate.?limit)|was submitted too quickly|too many requests|\b429\b' "$RESULTS"; then
+  WHY="a lane result reports a forge rate-limit failure"
 fi
 
 FROM=$(jq -r '.max_workers // 0' "$CONFIG")

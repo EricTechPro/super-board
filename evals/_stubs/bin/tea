@@ -102,10 +102,12 @@ fail_http() { echo "ServerError: $1 $2 (eval stub)" >&2; exit 1; }
 
 emit_headers() {
   [ "$HEADERS" = 1 ] || return 0
+  local rem=3597
+  [ -f "$FX/ratelimit-remaining" ] && rem=$(cat "$FX/ratelimit-remaining")
   { echo "HTTP/1.1 200 OK"
     if [ ! -e "$FX/no-ratelimit" ]; then
       echo "X-RateLimit-Limit: 3600"
-      echo "X-RateLimit-Remaining: 3597"
+      echo "X-RateLimit-Remaining: $rem"
       echo "X-RateLimit-Reset: $(( $(date +%s) + 3600 ))"
     fi
   } >&2

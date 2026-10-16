@@ -24,9 +24,35 @@ SB_GH_GUARD_STATE_FILE="${SB_GH_GUARD_STATE_FILE:-${TMPDIR:-/tmp}/super-board-gh
 
 # This file's own path: BASH_SOURCE under bash, the %x prompt escape under zsh.
 if [ -n "${BASH_SOURCE[0]:-}" ]; then _sb_guard_src="${BASH_SOURCE[0]}"; else eval '_sb_guard_src="${(%):-%x}"'; fi
-SB_GITHUB_READ="$(cd "$(dirname "$_sb_guard_src")" && pwd)/super-board-github-read.py"; unset _sb_guard_src
+SB_GUARD_BIN="$(cd "$(dirname "$_sb_guard_src")" && pwd)"; unset _sb_guard_src
+SB_GITHUB_READ="$SB_GUARD_BIN/super-board-github-read.py"
+SB_GITEA_READ="$SB_GUARD_BIN/super-board-gitea-read.py"
 sb_gh_required_read() { local kind="$1"; shift; python3 "$SB_GITHUB_READ" --kind "$kind" -- "$@"; }
 sb_gh_halt_check() { python3 "$SB_GITHUB_READ" --check; }
+
+sb_gh_guard_kind() {
+  # Which forge this worker talks to. SB_FORGE_KIND wins (forge.sh exports it);
+  # otherwise resolve from SB_CONFIG/the environment, defaulting to github.
+  if [ -z "${SB_FORGE_KIND:-}" ] && [ -f "$SB_GUARD_BIN/super-board-forge.sh" ]; then
+    # shellcheck source=super-board-forge.sh
+    . "$SB_GUARD_BIN/super-board-forge.sh"
+    sb_forge_resolve ${SB_CONFIG:+"$SB_CONFIG"} >/dev/null 2>&1 || true
+  fi
+  echo "${SB_FORGE_KIND:-github}"
+}
+
+sb_gh_guard_quota() {
+  # The forge's quota payload, in the github rate_limit shape, read WITHOUT the
+  # bounded helper: a failed quota probe must never halt a worker (throttle and
+  # the summary tolerate '{}'). Gitea instances without rate limiting answer
+  # {"rate_limits_disabled":true} with sentinel 5000s: callers must not sleep
+  # on those, the local budget is the guard.
+  if [ "$(sb_gh_guard_kind)" = gitea ]; then
+    python3 "$SB_GITEA_READ" --kind quota --quota 2>/dev/null || echo '{}'
+  else
+    sb_gh_quota_merge "$(gh api rate_limit 2>/dev/null || echo '{}')"
+  fi
+}
 
 # `gh api rate_limit` (REST) misreports the GraphQL bucket. Measured 2026-10-04,
 # back to back on one token: REST said graphql used=2 remaining=4998 while
@@ -46,12 +72,22 @@ sb_gh_quota_merge() {
 }
 
 sb_gh_guard_check() {
-  # Sleep until GraphQL quota recovers. Also checks REST.
+  # Sleep until the forge's quota recovers. GitHub keeps the bounded required
+  # read (its halt discipline protects the shared bucket) and checks the
+  # GraphQL bucket first, then REST; Gitea checks the single API bucket — and
+  # only when the instance actually rate-limits.
   # Arg 1: optional minimum-remaining threshold (default 200).
   local min="${1:-$SB_GH_GUARD_MIN_REMAINING_DEFAULT}"
   local payload graphql_remaining graphql_reset rest_remaining now wait
-  payload=$(sb_gh_required_read quota api rate_limit) || return $?
-  payload=$(sb_gh_quota_merge "$payload")
+  if [ "$(sb_gh_guard_kind)" = gitea ]; then
+    payload=$(python3 "$SB_GITEA_READ" --kind quota --quota) || return $?
+    if [ "$(echo "$payload" | jq -r '.rate_limits_disabled // false')" = "true" ]; then
+      return 0   # nothing to wait for; sb_gh_budget_spend is the protection
+    fi
+  else
+    payload=$(sb_gh_required_read quota api rate_limit) || return $?
+    payload=$(sb_gh_quota_merge "$payload")
+  fi
   graphql_remaining=$(echo "$payload" | jq -r '.resources.graphql.remaining // 5000')
   rest_remaining=$(echo "$payload" | jq -r '.resources.core.remaining // 5000')
 
@@ -75,8 +111,8 @@ sb_gh_guard_check() {
 sb_gh_guard_summary() {
   # One-line snapshot. Use in worker exit messages for trend tracking.
   local payload
-  payload=$(sb_gh_quota_merge "$(gh api rate_limit 2>/dev/null || echo '{}')")
-  echo "[gh-guard] $(echo "$payload" | jq -r '"graphql=\(.resources.graphql.remaining // "?")/\(.resources.graphql.limit // "?") rest=\(.resources.core.remaining // "?")/\(.resources.core.limit // "?")"')"
+  payload=$(sb_gh_guard_quota 2>/dev/null || echo '{}')
+  echo "[gh-guard] $(echo "$payload" | jq -r '"graphql=\(.resources.graphql.remaining // "?")/\(.resources.graphql.limit // "?") rest=\(.resources.core.remaining // "?")/\(.resources.core.limit // "?")" + (if (.rate_limits_disabled // false) then " rate_limits=off" else "" end)')"
 }
 
 sb_gh_budget_init() {

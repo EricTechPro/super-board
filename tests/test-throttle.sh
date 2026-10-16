@@ -73,4 +73,25 @@ RC=0; bash "$S" --config "$T/missing.json" >/dev/null 2>&1 || RC=$?
 RC=0; run --bogus >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 64 ] || fail "unknown arg should exit 64, got $RC"
 
-echo 'PASS: test-throttle.sh (graphql reading, ladder, floor, lane failures, dry-run)'
+# 8 — gitea: the single API bucket decides, disabled limits never hit, and a
+#     429 in the lane results is still trusted over any reading.
+cfg '{"max_workers":3,"forge":"gitea","forge_host":"http://localhost:3000","repo":{"remote":"http://localhost:3000/example/shop.git"}}'
+echo '{"resources":{"core":{"remaining":0,"limit":3600},"graphql":{"remaining":0,"limit":3600}},"rate_limits_disabled":false}' > "$T/rate.json"
+OUT=$(run --rate "$T/rate.json" --dry-run)
+echo "$OUT" | jq -e '.hit and .why == "core remaining 0" and .from == 3 and .to == 2' >/dev/null || fail "gitea core 0: $OUT"
+echo '{"resources":{"core":{"remaining":0,"limit":3600},"graphql":{"remaining":0,"limit":3600}},"rate_limits_disabled":true}' > "$T/rate.json"
+OUT=$(run --rate "$T/rate.json" --dry-run)
+echo "$OUT" | jq -e '.hit == false' >/dev/null || fail "disabled limits must not hit: $OUT"
+echo '{"resources":{"core":{"remaining":3597,"limit":3600},"graphql":{"remaining":3597,"limit":3600}}}' > "$T/rate.json"
+echo '[{"number":7,"detail":"tea: ServerError 429 Too Many Requests"}]' > "$T/results.json"
+OUT=$(run --rate "$T/rate.json" --results "$T/results.json" --dry-run)
+echo "$OUT" | jq -e '.hit and (.why | test("lane result"))' >/dev/null || fail "gitea 429 text: $OUT"
+
+# 9 — gitea live probe through the offline tea stub: healthy headers → no hit.
+mkdir -p "$T/.git"
+STUB="$KIT/evals/_stubs/bin/tea"
+if [ -x "/c/Program Files/Git/usr/bin/bash.exe" ]; then BASH_EXE="C:/Program Files/Git/usr/bin/bash.exe"; else BASH_EXE="bash"; fi
+OUT=$(cd "$T" && SB_GITEA_TEA="\"$BASH_EXE\" $(cygpath -m "$STUB" 2>/dev/null || echo "$STUB")" bash "$S" --config "$T/cfg.json" --dry-run)
+echo "$OUT" | jq -e '.hit == false' >/dev/null || fail "gitea live probe: $OUT"
+
+echo 'PASS: test-throttle.sh (graphql reading, ladder, floor, lane failures, dry-run, gitea bucket)'
