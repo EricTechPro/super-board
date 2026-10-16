@@ -11,8 +11,10 @@ Every template in this pack points here. Change the format here first, then the 
 - ALWAYS run prose through the `humanizer` skill when it is installed. Without it, use the
   plain-words rules at the bottom.
 - ONE step per line. NEVER chain steps with arrows (`→`) in Problem, Context or Steps.
-- EMBED screenshots (`![desktop](https://github.com/<o>/<r>/raw/<sha>/<path>)`), pinned to a
-  commit sha. NEVER link to them, NEVER upload to a public image host.
+- EMBED screenshots, pinned to a commit sha. NEVER link to them, NEVER upload to a public
+  image host. GitHub form: `![desktop](https://github.com/<o>/<r>/raw/<sha>/<path>)`.
+  Gitea form: `![desktop](https://<host>/<o>/<r>/raw/commit/<sha>/<path>)` — note the extra
+  `commit/` segment; a branch pin uses `raw/branch/<branch>/<path>`.
 - NEVER write a "Not verified" section or a "Next" section in a PR body. An unchecked AC
   with its one-line reason replaces both.
 - DON'T repeat a changed-file list in status comments. Explain each file in its own PR

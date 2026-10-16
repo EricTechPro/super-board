@@ -251,6 +251,7 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 
 ```
   worker_backend        workflow | claude-p
+  forge                 github (default, absent = github) | gitea — plus forge_host (+ optional forge_login) on gitea
   columns               Backlog · Ready · Building · QA · Review · Blocked · Done (always all seven)
   human_approves_merge  legacy: true = never auto-merge (prefer merge_policy.default "human")
   merge_policy          default auto|human · auto_max_lines (400) · size_exclude · always_human {money, auth, schema}
@@ -273,6 +274,12 @@ Minimal config at `.claude/super-board/configs/<slug>.json`:
 ```
 
 Every key, with notes: `skills/super-board/references/config-schema.json`.
+
+**Gitea boards** (`"forge": "gitea"`) run the same pipeline against a Gitea/Forgejo instance
+through the `tea` CLI: the board is a repo Project whose columns are the seven statuses, and
+`project.number` is the project's API id. Onboard asks for the host and token; every script
+resolves the forge from config/env. Full mapping, command dictionary and degradations:
+`skills/super-board/references/gitea.md`.
 
 ## How workers decide what test to write
 

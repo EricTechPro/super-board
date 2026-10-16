@@ -63,7 +63,7 @@ bounded receipt and delegate the external skill after normal final reconciliatio
 | Usable verification commands | Run `python3 .claude/bin/super-board-verification-ready.py --config <config>`. Exit 9 halts setup before dispatch: configure the owning project's checks, then restart explicitly. |
 | Active config exists | Halt: "Run `super-board onboard` first." |
 | Project + required columns exist | Halt: "Project / columns missing. Run `super-board onboard` to repair." |
-| `gh auth` valid with required scopes | Halt: "Re-auth: `gh auth refresh -s project,read:project,repo`." |
+| Forge auth valid | GitHub: `gh auth` with required scopes — Halt: "Re-auth: `gh auth refresh -s project,read:project,repo`." Gitea (`forge: "gitea"`): `tea api /user` answers — Halt: "Re-auth: `tea login add …` or set GITEA_TOKEN + TEA_HOST" (see gitea.md). |
 | `pre-flight.md` all items `[✓]` | Halt: "Pre-flight incomplete — fix these: [list]." |
 | No issues missing ACs in active columns | Halt: "N issues need clarification. Run `super-board lint`." |
 | Clean git working tree on base branch | Halt: "Working tree dirty. Stash or commit before running." |
@@ -72,7 +72,7 @@ bounded receipt and delegate the external skill after normal final reconciliatio
 | Production-merge guard | If `base_branch == "main"` AND `human_approves_merge == false` AND `merge_policy.default != "human"` AND `merge_policy.allow_auto_on_production != true` AND production-detection signals fire (see onboard → base branch), halt with: `🛡 Refusing to start: would auto-merge to production main. Set merge_policy.default: "human", switch base_branch to staging, or re-run super-board onboard to opt in explicitly.` |
 | Orphan-worker scan (added 2026-05-22 after #381 worker storm) | `pgrep -f 'claude -p .*super-board run'` must return zero. If any super-board worker is already alive from a prior crashed run, halt with: `🛑 ${N} super-board workers already running. Stop them first: pkill -f 'claude -p .*super-board run'`. The dispatcher must never run while orphan workers exist — they will collide on assignee claims and produce duplicate PRs. |
 | Database reach | Run every `migrations.checks[env]` for an env in `allowed_envs` (read-only, e.g. `supabase migration list --db-url …`). On failure halt with its error: "Migrate URL for <env> does not connect — fix it before a wave builds work the gate cannot land." |
-| GraphQL rate-limit guard | Before each tick, `sb_gh_guard_check` (super-board-gh-guard.sh — it reads GraphQL's own `rateLimit`, because `gh api rate_limit` misreports the GraphQL bucket). If GraphQL remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
+| Rate-limit guard | Before each tick, `sb_gh_guard_check` (super-board-gh-guard.sh — on GitHub it reads GraphQL's own `rateLimit`, because `gh api rate_limit` misreports the GraphQL bucket; on Gitea it reads the instance's `X-RateLimit-*` headers and no-ops when the instance has limits disabled — gitea.md). If remaining < 200, sleep until reset. Prevents the runner from dying mid-loop when the user has burned quota in another tool. |
 
 ## Lanes and label routing
 

@@ -244,8 +244,10 @@ Repeat until a done condition or halt gate fires:
 4. **Launch** — With `--codex`, or no Workflow tool, or the host check printing `codex`, use
    "Codex runs" above; otherwise Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
-   `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
-   carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
+   `args: { configPath, cards, humanApprovesMerge, tier, forge }` (`cards` hydrated after the planner: each
+   carries `lane` and `labels`, and a `qa` card skips the Builder; `forge` is the config's
+   `forge` value — `"gitea"` switches every lane prompt to the tea read shapes, gitea.md).
+   Runs in the background; the
    orchestrator stays responsive. `humanApprovesMerge` comes from the config; when false the workflow serializes Review-lane agents (merge-race guard, execution side).
    `tier` is the run's model ladder: `'low'` when the user invoked
    `super-board run --low` (haiku/sonnet/opus by card complexity), `'high'`
@@ -319,7 +321,9 @@ reported as skipped and does not change the completed product work.
 
 Lane agents inherit the session allowlist and run in acceptEdits. Add these
 to your project's `.claude/settings.json` → `permissions.allow` so waves
-don't stall on prompts:
+don't stall on prompts (on a Gitea board the `gh …` lines are replaced by one
+`"Bash(tea:*)"` — every forge call goes through the tea CLI; the script lines
+are forge-neutral and stay — gitea.md):
 
     "Bash(gh issue view:*)", "Bash(gh issue edit:*)", "Bash(gh issue comment:*)",
     "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)", "Bash(gh pr comment:*)",

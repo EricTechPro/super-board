@@ -4,6 +4,12 @@ Follow this when onboard step 2 chooses "Yes". Allow about 10 minutes.
 Keep the owner active until step 3 has picked or created the Project.
 Replace every `<placeholder>` below before running a command. NEVER read a `.env` file.
 
+> **On Gitea this page mostly does not apply.** There is no shared 5,000-points GraphQL budget —
+> a bot user is only worth it to keep robot comments visually separate, or when the instance
+> rate-limits per token. Create a plain bot user in the Gitea admin, give it repo write access,
+> mint its token, and `tea login add --name <bot> --url <host> --token <token>`; set
+> `forge_login` and `notifications.bot_identity` to its username (no `[bot]` suffix on Gitea).
+
 ## Why
 
 GraphQL calls from `gh issue`, `gh pr` and `gh project` use the signed-in user's

@@ -39,7 +39,7 @@ Or as a Claude Code plugin:
 ```
 
 > [!NOTE]
-> The plugin ships the skills only. Run `/super-board:super-board onboard` and its 🔍 Checks step adds the guard hooks, scripts and workflows. Needs Claude Code, `gh`, `jq`, bash 3.2+ and Python 3.9+; the installer checks.
+> The plugin ships the skills only. Run `/super-board:super-board onboard` and its 🔍 Checks step adds the guard hooks, scripts and workflows. Needs Claude Code, `gh` (GitHub boards) or `tea` v0.16+ (Gitea boards — `forge: "gitea"`), `jq`, bash 3.2+ and Python 3.9+; the installer checks.
 
 Optional post-run learning can delegate an already installed `calibrate` skill after
 verified selected work completes. It applies only to explicitly permitted existing
@@ -60,7 +60,7 @@ curl -fsSL https://raw.githubusercontent.com/mnphuc/super-board-gitea/main/get.s
 /super-board onboard
 ```
 
-Checks · GitHub · Board · Branch · AGENTS.md · Policies · Bug sources · Review. <kbd>Enter</kbd> takes the recommended answer.
+Checks · Forge (GitHub or Gitea) · Board · Branch · AGENTS.md · Policies · Bug sources · Review. <kbd>Enter</kbd> takes the recommended answer.
 
 ### 3. Run
 

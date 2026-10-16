@@ -2,6 +2,8 @@
 
 > This is the **only read-only verb** in the `super-board` skill. It performs
 > no GitHub mutations and is safe to invoke during a headless `super-board run`.
+> On a Gitea board (`forge: "gitea"`) the same snapshot renders from the tea-based
+> reads — see gitea.md; it is pure-read there too.
 
 ---
 

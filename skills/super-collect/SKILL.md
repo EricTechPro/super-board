@@ -5,6 +5,10 @@ description: Find problems in one project and file them as tickets into its supe
 
 # super-collect — find problems, file them into Backlog
 
+> **Gitea boards:** when the active config sets `"forge": "gitea"`, every `gh` command in this
+> skill is replaced by its `tea` equivalent in [gitea.md](../super-board/references/gitea.md);
+> the board scripts (card.sh, merge-gate, filers, read wrappers) resolve the forge themselves.
+
 One job: find problems and file tickets into the board's **Backlog**. The board fixes them.
 super-collect never builds, never edits app code, and never moves a card to `Ready` —
 `super-board lint` decides that. Per project only: it reads the active project's super-board

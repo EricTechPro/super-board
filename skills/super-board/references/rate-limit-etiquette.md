@@ -2,7 +2,10 @@
 
 The dispatcher's `gh_rate_guard` only protects the dispatcher's own ticks. Workers (Builder / Tester / Reviewer) run as independent `claude -p` sessions and **share the same gh-auth token bucket** — 5000 GraphQL points/hr for a PAT, 15000/hr for a GitHub App. The #381 worker storm (2026-05-21) drained the bucket because nothing in the worker contract told workers to watch the quota.
 
-This file is the worker-side contract. Every worker MUST follow it.
+This file is the worker-side contract. Every worker MUST follow it. On a **Gitea** board the
+same contract runs against the instance's `X-RateLimit-*` headers (often disabled — then the
+per-worker budget below is the ONLY guard, and `sb_gh_guard_check` never sleeps); the price list
+is GitHub-specific, the disciplines are not. See gitea.md.
 
 ## Price list
 
@@ -89,7 +92,9 @@ If a `gh` call returns 403 or a body containing `secondary rate limit`, do NOT r
 Every worker's PR handoff comment MUST include a final line:
 
 ```
-gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000
+gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000          ← GitHub
+gh-quota-on-exit: budget=<n> rate_limits=off              ← Gitea, limits disabled
+gh-quota-on-exit: budget=<n> rate_limits=<rem>/<limit>    ← Gitea, limits on
 ```
 
 Use `sb_gh_guard_summary` to grab the snapshot. This gives the run manifest visibility into which lane is the heaviest consumer over time.

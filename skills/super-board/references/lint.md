@@ -226,7 +226,7 @@ Sub-agent scans all linted issues + PROJECT.md to extract operational requiremen
    [ ] Stripe test secret key (issue #31)
 
 🛠  Tools the loop will need:
-   [✓] gh CLI authenticated (verified)
+   [✓] forge CLI authenticated — gh, or tea on a gitea board (verified)
    [ ] Playwright Chromium → run: `npx playwright install chromium`
    [✓] Node 20+ (verified)
 

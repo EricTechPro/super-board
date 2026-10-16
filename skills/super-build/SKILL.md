@@ -5,6 +5,10 @@ description: Builder lane of the super-board pipeline — takes a `Ready` GitHub
 
 # Super Build — Builder lane and legacy headless GitHub-Project executor
 
+> **Gitea boards:** when the active config sets `"forge": "gitea"`, every `gh` command in this
+> skill is replaced by its `tea` equivalent in [gitea.md](../super-board/references/gitea.md);
+> the board scripts (card.sh, merge-gate, filers, read wrappers) resolve the forge themselves.
+
 Inside `super-board run`, Super Build is the Builder lane: a lane agent in the in-session wave workflow (`workflows/super-board-wave.js`) that follows "super-board integration" below. Run on its own, `/super-build` is the **legacy headless path (opt-in)**: you are the orchestrator, the source of truth is the **`Ready` column of the configured GitHub Project board**, and your job is to dispatch every issue in `Ready` (in board order) as a headless `claude -p` worker in its own git worktree, open a PR for each finished branch, and move its card to `QA` so the Tester and Reviewer take it from there. Super Build never merges — merging happens only through the Reviewer's merge gate (`scripts/super-board-merge-gate.sh`).
 
 **Curation contract:** the human moves cards into `Ready` when they should be worked. The loop never reads `Backlog`, `In Progress`, or `Done` cards. If `Ready` is empty, the loop reports "queue empty" and exits cleanly — no error.
@@ -40,7 +44,7 @@ Surface: `🎯 Reading project: <owner>/<title> (#<n>), column "Ready"`.
 Before reading the board:
 
 - Confirm the main worktree is clean: `git status --porcelain` must be empty.
-- Confirm `gh auth status` works and the repo remote points at the expected GitHub repo.
+- Confirm `gh auth status` works and the repo remote points at the expected GitHub repo (on a Gitea board: `tea api /user` answers and the remote points at the expected instance — gitea.md).
 - Confirm `jq`, `git`, and `claude` are available.
 - Resolve and print `BUILD_LOOP_OWNER` and `BUILD_LOOP_PROJECT`.
 - Run `git fetch origin` and identify the base branch from the current checkout; do **not** assume `main`.

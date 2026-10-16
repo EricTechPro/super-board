@@ -10,6 +10,10 @@ on missing requirements and recheck each conditional helper before use.
 
 # Super Review — PR/code readiness reviewer
 
+> **Gitea boards:** when the active config sets `"forge": "gitea"`, every `gh` command in this
+> skill is replaced by its `tea` equivalent in [gitea.md](../super-board/references/gitea.md);
+> the board scripts (card.sh, merge-gate, filers, read wrappers) resolve the forge themselves.
+
 **Super Review** is the super-board reviewer. It checks whether a branch or PR is safe to merge, records actionable findings, and routes fixes to the right Super workflow.
 
 Super Review should be conservative with claims: only say **merge-ready** when review evidence is clean and verification has passed. If evidence is missing, say what is unverified.

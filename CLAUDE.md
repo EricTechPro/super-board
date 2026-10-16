@@ -5,6 +5,9 @@ This repo ships eight skills under `skills/`: five you type (`super-board`, `sup
 `super-review`). Architecture findings come from `/super-collect architecture`.
 Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill. README skill tables are generated
 by `scripts/super-board-readme-sync.py` from SKILL.md frontmatter and `skills/families.json`.
+A board runs on **GitHub (default) or Gitea** — the config's `forge` key decides; every forge
+rule, mapping and degradation lives in `skills/super-board/references/gitea.md`. Forge dispatch
+code: `scripts/super-board-forge.{py,sh}` + `super-board-gitea-{read.py,api.sh}`.
 
 ## The cardinal rule
 
@@ -20,22 +23,26 @@ The orchestrator MUST NOT:
 
 - Build, test, review, or fix issues itself. All product work is delegated to workflow lane agents (or `claude -p` workers on the legacy backend).
 - Patch the dispatcher script or skill files mid-run, even if it sees a problem. Capture the symptom and tell the user; wait for explicit approval.
-- Wait on individual workers or relay their work. They write their evidence back to the GitHub issue + PR. The orchestrator's user-facing output is the dispatch confirmation (claude-p) or one short report per wave (workflow), not the run result.
-- Hold context for multi-card progress. State lives on the GitHub Project board + the inflight lockfiles, not in the orchestrator's session.
+- Wait on individual workers or relay their work. They write their evidence back to the forge issue + PR (GitHub or Gitea). The orchestrator's user-facing output is the dispatch confirmation (claude-p) or one short report per wave (workflow), not the run result.
+- Hold context for multi-card progress. State lives on the board (GitHub Project / Gitea project) + the inflight lockfiles, not in the orchestrator's session.
 
 If a problem surfaces during the run, the orchestrator's reply is: "I saw X. Want me to dig in or stop the runner?" — not "I went ahead and fixed it."
 
 ## Worker rules
 
-Workers (`super-build`, `super-qa`, `super-review`) share the dispatcher's `gh` token bucket. They MUST:
+Workers (`super-build`, `super-qa`, `super-review`) share the dispatcher's forge token bucket
+(the `gh` GraphQL+REST budget, or the Gitea instance's API limits — often disabled, in which
+case the per-worker call budget is the only guard). They MUST:
 
-- Required GitHub reads use `.claude/bin/super-board-github-read.py`; exit 79 stops the run.
-- Check its `--check` before GitHub writes, migrations, merges, and new dispatch; preserve work when halted.
-- Source `.claude/bin/super-board-gh-guard.sh` (`scripts/` in this repo) at worker start.
-- Call `sb_gh_guard_check 200` before any burst of `gh` calls.
-- Prefer local `git blame` / `git log` over `gh api graphql` for any sub-agent that doesn't need fresh state.
-- Cap adversarial sub-agents at 50 gh calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
-- Append `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` to the PR handoff comment.
+- Required reads use the forge's wrapper — `.claude/bin/super-board-github-read.py`, or
+  `.claude/bin/super-board-gitea-read.py` on gitea boards; exit 79 stops the run.
+- Check its `--check` before forge writes, migrations, merges, and new dispatch; preserve work when halted.
+- Source `.claude/bin/super-board-gh-guard.sh` (`scripts/` in this repo) at worker start — it is forge-aware.
+- Call `sb_gh_guard_check 200` before any burst of forge calls.
+- Prefer local `git blame` / `git log` over forge API calls for any sub-agent that doesn't need fresh state.
+- Cap adversarial sub-agents at 50 forge calls each. If a sub-agent runs out, it returns `confidence: insufficient_data` rather than burning the shared quota.
+- Append `gh-quota-on-exit: graphql=<n>/5000 rest=<n>/5000` (GitHub) or
+  `gh-quota-on-exit: budget=<n> rate_limits=off|<rem>/<limit>` (Gitea) to the PR handoff comment.
 
 See `skills/super-board/references/rate-limit-etiquette.md` for the full discipline.
 
@@ -48,7 +55,7 @@ See `skills/super-board/references/rate-limit-etiquette.md` for the full discipl
 ├── skills/<all eight>/...
 ├── hooks/guard-*.py, cleanup-wt.py   (wired into settings.json; --no-hooks skips)
 ├── workflows/super-board-wave.js, ui-refine-loop.js
-└── bin/super-board-*.sh (incl. pr-body), super-board-*.py (status, merge-policy, agents-md, settings, setup), super-qa-file-bug.sh, super-review-file-refactor.sh
+└── bin/super-board-*.sh (incl. pr-body, forge, gitea-api), super-board-*.py (status, merge-policy, agents-md, settings, setup, forge, gitea-read), super-qa-file-bug.sh, super-review-file-refactor.sh
 ```
 
 It also refreshes the managed `<!-- super-board:begin … -->` block in the target's AGENTS.md when
@@ -63,6 +70,8 @@ Columns are always Backlog · Ready · Building · QA · Review · Blocked · Do
 per-board `variant`. Labels `qa` · `bug` · `feature` route cards: `qa` skips Building, everything
 else (and no label) is built. Change routing in `scripts/super-board-wave-plan.sh`,
 `workflows/super-board-wave.js` and `run.md` → "Lanes and label routing" together.
+On Gitea the seven columns are repo-project columns (`project.number` = the project's API id);
+`super-board-card.sh` normalizes both forges into one `{items,totalCount}` shape.
 
 Skills call the dispatcher scripts as `.claude/bin/<script>`.
 

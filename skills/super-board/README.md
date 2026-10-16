@@ -28,4 +28,4 @@ Drives a GitHub Project board on its own: drag a card into `Ready`, and it comes
 
 ## Install
 
-Part of the super-board pack: `./install.sh /path/to/project`. Needs `gh` (authenticated), `jq`, bash 3.2+, a GitHub Project (v2) with a `Status` field, dynamic workflows on in `/config`, and the [mattpocock/skills](https://github.com/mattpocock/skills) pack. Full reference: [`docs/super-board/README.md`](../../docs/super-board/README.md).
+Part of the super-board pack: `./install.sh /path/to/project`. Needs `gh` (authenticated) — or `tea` v0.16+ for a Gitea board (`forge: "gitea"`, see [gitea.md](references/gitea.md)) — plus `jq`, bash 3.2+, a GitHub Project (v2) with a `Status` field or a Gitea repo project, dynamic workflows on in `/config`, and the [mattpocock/skills](https://github.com/mattpocock/skills) pack. Full reference: [`docs/super-board/README.md`](../../docs/super-board/README.md).

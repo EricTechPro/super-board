@@ -17,6 +17,10 @@ on missing requirements and recheck each conditional helper before use.
 
 # super-qa — BFS Route-Crawler that Builds the Spec Suite
 
+> **Gitea boards:** when the active config sets `"forge": "gitea"`, every `gh` command in this
+> skill is replaced by its `tea` equivalent in [gitea.md](../super-board/references/gitea.md);
+> the board scripts (card.sh, merge-gate, filers, read wrappers) resolve the forge themselves.
+
 ## Auth bootstrap — auto-discover, never ask
 
 Before iter 1, resolve a test login. **Never ask the user; discover or create.** Order:

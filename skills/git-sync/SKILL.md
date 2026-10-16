@@ -5,6 +5,10 @@ description: Sync the current branch in one pass — commit the working tree as 
 
 # /git-sync
 
+> **Gitea boards:** when the active config sets `"forge": "gitea"`, every `gh` command in this
+> skill is replaced by its `tea` equivalent in [gitea.md](../super-board/references/gitea.md);
+> the board scripts (card.sh, merge-gate, filers, read wrappers) resolve the forge themselves.
+
 Commit what is in the working tree, pull, push, report. One step per line.
 Stop and tell the user when a step says stop. NEVER force push, rebase shared history, or
 skip a hook (`--no-verify`).
