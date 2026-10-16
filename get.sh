@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # super-board one-line installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash -s -- --protect-main
+#   curl -fsSL https://raw.githubusercontent.com/mnphuc/super-board-gitea/main/get.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/mnphuc/super-board-gitea/main/get.sh | bash -s -- --protect-main
 #
 # Options (everything else that starts with "-" goes straight to install.sh):
 #   --target <dir>        project to install into (default: the current folder)
@@ -13,7 +13,7 @@
 #
 # Environment:
 #   SUPER_BOARD_REF       same as --ref
-#   SUPER_BOARD_REPO      GitHub owner/repo to fetch from (default EricTechPro/super-board)
+#   SUPER_BOARD_REPO      GitHub owner/repo to fetch from (default mnphuc/super-board-gitea)
 #   SUPER_BOARD_TARBALL   exact tarball URL to fetch instead (file:// works; used by tests)
 #
 # Written for bash 3.2 (stock macOS). The whole script lives in main(), called on
@@ -43,7 +43,7 @@ helper_skills_present() {
 
 main() {
   local target="" ref="${SUPER_BOARD_REF:-}" helpers=1
-  local repo="${SUPER_BOARD_REPO:-EricTechPro/super-board}"
+  local repo="${SUPER_BOARD_REPO:-mnphuc/super-board-gitea}"
   local pass=()
 
   while [ $# -gt 0 ]; do
@@ -79,6 +79,9 @@ main() {
   have python3 || die "python3 is missing. super-board's installer and scripts use it. Install Python 3 (https://www.python.org/downloads/) and run this again." 69
 
   # One grouped line: what is here ✓, what is not ✗ (onboard's 🔍 Checks installs it).
+  # tea (the Gitea CLI) is deliberately not inventoried here: whether it is
+  # required depends on the board's forge, which only onboard knows — its
+  # 🔍 Checks (super-board-setup.py) lists tea in `needs` for gitea configs.
   local later="" ok="" t
   for t in curl tar git python3 gh jq node; do
     case "$t" in

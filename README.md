@@ -28,13 +28,13 @@
 In your project folder:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mnphuc/super-board-gitea/main/get.sh | bash
 ```
 
 Or as a Claude Code plugin:
 
 ```
-/plugin marketplace add EricTechPro/super-board
+/plugin marketplace add mnphuc/super-board-gitea
 /plugin install super-board@super-board
 ```
 
@@ -51,7 +51,7 @@ canonical skill files; the package bundles no private skill. See
 ### 1. Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mnphuc/super-board-gitea/main/get.sh | bash
 ```
 
 ### 2. Onboard

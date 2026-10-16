@@ -122,7 +122,7 @@ Source links that work away from a checkout.
   runs)" count and the family titles in step.
 - ✨ **`/visual render --source-base URL [--source-root DIR]`.** Node sources under the source root
   become links to the hosted file (`:12-20` → `#L12-L20`); others show as text. The skill-map
-  pages are re-rendered against `https://github.com/EricTechPro/super-board/blob/main/`.
+  pages are re-rendered against `https://github.com/mnphuc/super-board-gitea/blob/main/`.
 - 🧪 `test-readme-sync.sh` no longer needs a skills badge, and checks both counts and the family
   titles after a sync.
 
@@ -214,7 +214,7 @@ per file; failures still name the file. `install.sh` records an older install in
 > then without `--dry-run`, and check the columns, labels and card statuses before you run
 > onboard on the real board.
 
-1. Install over the old copy: `curl -fsSL https://raw.githubusercontent.com/EricTechPro/super-board/main/get.sh | bash`
+1. Install over the old copy: `curl -fsSL https://raw.githubusercontent.com/mnphuc/super-board-gitea/main/get.sh | bash`
    (or `./install.sh <project>`). It records the version you came from.
 2. Run `/super-board onboard`. Step 1 upgrades with no question and lists it under
    "Upgraded for you" (backup in `.claude/super-board/backup/<ts>/`):

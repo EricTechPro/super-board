@@ -113,13 +113,18 @@ the step-8 table, then "Onboard found an existing setup. What now?" [Keep all �
 
 ```json
 { "version": 2, "updated": "<iso>", "last_step": "policies",
-  "answers": { "github": {"login": "erictech", "remote": "github.com/erictech/my-app"},
+  "answers": { "forge": {"kind": "github"},
+               "github": {"login": "erictech", "remote": "github.com/erictech/my-app"},
                "board": {"owner": "erictech", "number": 4, "title": "Ledgerly Roadmap", "reused": true},
                "base_branch": "staging", "agents": "merged",
                "policies": {"merge_default": "auto", "protect_main": true, "allowed_envs": ["test", "staging"]},
                "permissions": "add", "collect": ["sentry", "github", "prs", "architecture", "linear"],
                "custom": [{"name": "linear", "kind": "mcp", "target": "linear"}] } }
 ```
+
+On a Gitea board, `answers.forge` is `{"kind": "gitea", "host": "https://gitea.example.com",
+"login": "<tea login name>", "remote": "gitea.example.com/acme/app", "project_id": 4}` and the
+`github` block is replaced by `gitea` with the same `login`/`remote` meaning.
 
 Write it atomically (temp file + rename) after every answer. A halt never loses work.
 
@@ -144,6 +149,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    For creation or upkeep read `../../super-qa/references/project-verifier.md`;
    │    stage real project checks only when source names accepted features. Optional
    │    verifier gaps never replace or block the required verification commands.
+   ├─ forge hint: `git remote get-url origin` — a non-github.com host (gitea/forgejo) stages
+   │    "Gitea" as the step-2 default; github.com or no remote stages "GitHub". A hint, never
+   │    a decision: step 2 is the question.
    └─ machine time zone for config `timezone`: $TZ, else readlink /etc/localtime | sed
       's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 8.
 
@@ -198,7 +206,38 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       root (or with the same `--root`). It resumes the saved plan and verifies remote results;
       it never takes a new snapshot over a partially upgraded board. No extra setup question.
 
-2. 🔑 GITHUB
+2. 🔑 FORGE (GitHub or Gitea)
+   ├─ One AskUserQuestion (header "Forge"), pre-selected from the step-0 hint:
+   │    "Where do the board, issues and pull requests live?"
+   │      • GitHub (Recommended when the remote is github.com)
+   │      • Gitea — a self-hosted Gitea/Forgejo instance (Recommended when the remote is one)
+   │    An existing config with `forge` set skips the question and shows the value.
+   ├─ GITEA branch (everything below about gh is skipped; see references/gitea.md):
+   │    ├─ tea present AND answering: step 1's needs list installs it (winget Gitea.tea /
+   │    │    brew install tea / the dl.gitea.com binary). A tea that hangs on `tea --version`
+   │    │    (>5 s) counts as missing — reinstall it; the check re-runs.
+   │    ├─ Host: from the origin remote, else AskUserQuestion "Other" → type the instance URL
+   │    │    (e.g. https://gitea.example.com or http://localhost:3000).
+   │    ├─ Capability gate (no question): `tea api swagger` (or GET <host>/api/v1/swagger) must
+   │    │    contain the projects-columns operations (`RepoListProjectColumns`,
+   │    │    `RepoMoveProjectIssue`). Missing → halt: "This Gitea is too old for board
+   │    │    columns — upgrade the instance or use forge github." The board needs them.
+   │    ├─ Sign-in: the user creates a token in the Gitea UI (Settings → Applications; scopes
+   │    │    write:issue, write:repository, and projects when the instance gates them), then
+   │    │    Bash(tea login add --name <slug> --url <host> --token <token>) — the permission
+   │    │    prompt is the question; the token itself is typed into the prompt, never into a
+   │    │    file. CI/headless: GITEA_TOKEN + TEA_HOST env instead (never persisted by tea).
+   │    ├─ Verify: `tea api /user` → `✓ Gitea connected as <login>.`
+   │    ├─ No remote → the repo must exist on the instance first (create it in the Gitea UI or
+   │    │    with tea), then `git remote add origin <host>/<owner>/<repo>.git`. Refused/missing
+   │    │    → "Not now — the robot can't open pull requests" is still a valid answer.
+   │    ├─ Second account: offered only as a one-liner ("On Gitea a bot user mainly keeps
+   │    │    comments separate — the rate-limit budget reason doesn't apply"). Default: skip.
+   │    └─ bot_identity: the login from `tea api /user` (a bot user's plain username — Gitea
+   │       has no `[bot]` suffix); stage it with the forge answers:
+   │       forge: "gitea", forge_host: <host>, forge_login: <tea login name>,
+   │       project.number: the board's API id (step 3 records it).
+   └─ GITHUB branch (default, unchanged):
    ├─ Bash(gh auth status). Signed in with project scopes → `✓ GitHub connected.`; continue below.
    ├─ Not signed in → one line, then Bash(gh auth login) — the permission prompt asks.
    ├─ Missing scopes → "This opens a browser to approve board access — needed to move cards and
@@ -229,6 +268,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │      Labels: feature · bug · qa (qa skips Building; no label = feature)
    ├─ python3 $SB/super-board-setup.py board-rank --owner <owner>   (boards ranked by matching
    │    columns; `recommend` = the best with ≥ 4 of 7)
+   │    Gitea: board-rank --owner <owner> --repo <owner/name> --forge gitea — the repo's
+   │    projects, same output shape; a board's `number` there is its API id.
    │  python3 $SB/super-board-setup.py names                         (two names from
    │    package.json / README / folder)
    ├─ AskUserQuestion "Which board?" (header "Board"):
@@ -239,9 +280,15 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    "Other" = Type a name.
    ├─ Reuse → board-migrate --owner <o> --number <n> --repo <owner/repo>: adds the missing
    │    columns, the three labels, keeps every card. Prints `<title> ready`.
+   │    Gitea: board-migrate --forge gitea … — additive only (columns/labels created when
+   │    missing, Skipped→Done); it snapshots to .claude/super-board/migrations/ first and
+   │    re-running the same command finishes an interrupted upgrade.
    └─ New → gh project create --owner <o> --title "<name>", link it to the repo, then
       board-migrate --prune-empty on it (the seven columns replace GitHub's default Todo /
       In Progress; labels). Prints its URL.
+      Gitea: tea api -X POST repos/<owner>/<repo>/projects -d '{"title":"<name>"}' — record the
+      returned id as project.number, then board-migrate --forge gitea --prune-empty creates the
+      seven colored columns and the three labels.
    There is no "Needs you" column and no Skipped column: a card waiting on a person goes to
    Blocked with 🙋 (block-template.md); a card dropped on purpose is closed and moved to Done.
    Second account chosen in step 2 → finish references/second-account.md now; verify bot access.
@@ -314,7 +361,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    Permission lines: the base list in run-workflow.md → "Mid-run permission prompts", plus the
    merge lines when merge_policy.default is "auto" ("Bash(bash .claude/bin/super-board-merge-gate.sh:*)",
    "Bash(gh pr merge:*)"), one "Bash(<migrate command>)" per allowed env, "Bash(bash
-   .claude/bin/super-board-env-check.sh:*)" and the test runner. N counts what is NOT already in
+   .claude/bin/super-board-env-check.sh:*)" and the test runner. On a Gitea board the gh lines
+   are replaced by "Bash(tea:*)" (all board calls go through the tea CLI) and the merge-gate
+   line stays — the gate owns merges on both forges. N counts what is NOT already in
    settings.json: `super-board-settings.py allow .claude/settings.json <rules…> --dry-run`.
 
 7. 📥 BUG SOURCES — tick sources; "Add another source" is the free-text box
@@ -341,6 +390,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │      python3 .claude/skills/super-collect/scripts/collect_sentry.py  --config <staged> ping
    │      python3 .claude/skills/super-collect/scripts/collect_posthog.py --config <staged> ping
    │      gh api graphql -f query='{viewer{login}}'          (github, prs)
+   │      tea api /user                                      (gitea: github/prs sources)
    └─ One result block, one line per source; a failure leaves that source out, never halts:
           ✅ linear — can read issues (12 open bugs); saved in this project's config
           ✅ sentry · github · prs · architecture
@@ -357,7 +407,9 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    ├─ AskUserQuestion "Write everything?" (header "Save") [Write everything (Recommended) /
    │    Change one thing → pick the step, walk only it, back here / Cancel — nothing written].
    ├─ Write, in order (each atomic; stop and report on the first failure — answers are kept):
-   │    ├─ .claude/super-board/configs/<slug>.json (committed): description, project, target
+   │    ├─ .claude/super-board/configs/<slug>.json (committed): description, forge ("github" or
+   │    │    "gitea" — plus forge_host/forge_login on gitea; project.number is the board's API
+   │    │    id there), project, target
    │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
    │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
    │    │    "session", bot_identity}, worker_backend "workflow", verify_commands (non-blank project checks). No `variant`.
@@ -380,6 +432,7 @@ DONE — run `python3 $SB/super-board-verification-ready.py --config <saved conf
       ⏺ Bash(self-check)  ⎿  all good
       ⏺ 🎉 Onboard complete.
         📋 Board: github.com/users/<owner>/projects/<n> (<title>)
+           — on Gitea: <host>/<owner>/<repo>?project=<id> (<title>)
         🧹 Next: /super-board lint — checks every ticket has clear success criteria.
         🤖 Then: /super-board run.
 ```
@@ -454,6 +507,9 @@ answers are kept and it resumes at <step>".
 | 1 | settings.json invalid JSON | `✋ .claude/settings.json is not valid JSON; I left it untouched. Fix it, then re-run — only the settings entries repeat.` |
 | 2 | Scope refused in the browser | `🔑 GitHub asked for project,read:project,repo and you said no. Without them I can't read or move cards. Re-run: gh auth refresh -s project,read:project,repo.` |
 | 2 | Repo create refused | `📦 GitHub refused to create the repo (org admin required, or the free-repo quota). Pick an existing repo, or create one in the web UI, then re-run.` |
+| 2 (gitea) | tea installed but hangs | `🔑 tea did not answer \`tea --version\` within 5s — a broken build blocks every board call. Reinstall it (winget install --id Gitea.tea -e · brew install tea · binary from dl.gitea.com/tea), then re-run onboard.` |
+| 2 (gitea) | Token refused (401/403) | `🔑 <host> refused the token. Recreate it with write:issue + write:repository (and projects when the instance gates it), then re-run: tea login add --name <slug> --url <host> --token <token>.` |
+| 2 (gitea) | Instance lacks the projects-columns API | `🔑 This Gitea has no project-columns API (swagger lacks RepoMoveProjectIssue). Upgrade the instance, or keep forge github. Nothing was written.` |
 | 3 | Org project denied | `🔑 You can't create projects under <org>. Ask an org admin, or use your account: gh project create --owner @me.` |
 | 3 | Board read-only | `🔑 That board is read-only for your account. Get write access, or pick another.` |
 | 3 | board-migrate exits 2 | Show its `error` and recovery-file path. Some changes may already be applied. Keep the board stopped and the recovery file; fix the access/read/write failure, then re-run the same command from the same project root. A concurrent-edit conflict needs review of the saved original/desired state; never delete the record to bypass it. |
@@ -485,10 +541,13 @@ remove a pending recovery record; use its saved state to reconcile a conflict be
 
 1. **Config validates** — `.claude/super-board/configs/<slug>.json` parses, has every required
    field from `config-schema.json` (incl. `notifications.bot_identity`, `merge_policy`,
-   `migrations`), has no `variant`, and `columns` is the seven.
+   `migrations`), has no `variant`, and `columns` is the seven. On a gitea config `forge`,
+   `forge_host` are present and `project.number` is the board's API id.
 2. **Active pointer** — `.claude/super-board/active` holds exactly the slug + `\n`.
 3. **Board columns and labels** — `gh project field-list <n> --owner <o>` returns Backlog, Ready,
    Building, QA, Review, Blocked, Done (no Skipped); `gh label list` has qa, bug, feature.
+   Gitea: `python3 .claude/bin/super-board-gitea-read.py --kind fields --fields <owner>/<repo>/<id>`
+   returns the seven options, and `tea api repos/<owner>/<repo>/labels` lists qa, bug, feature.
 4. **Setup green** — `python3 .claude/bin/super-board-setup.py check` exits 0 (or only `needs`
    the user declined).
 5. **Workflow runtime** — unless `worker_backend` is `"claude-p"`, the step-1 `node --check` passes.
