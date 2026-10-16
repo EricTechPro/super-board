@@ -39,7 +39,9 @@ Exit codes:
 from __future__ import annotations
 
 import datetime
+import importlib.util
 import json
+import os
 import re
 import subprocess
 import sys
@@ -368,6 +370,40 @@ def gh(*args: str, check: bool = True) -> str:
     return proc.stdout
 
 
+# ───────────────────────────── gitea ─────────────────────────────
+# Same read-only contract through the gitea twin of github-read: the wrapper
+# normalizes Gitea REST into the shapes this renderer already consumes.
+
+def forge_resolve(config_path: Path) -> dict[str, Any]:
+    """super-board-forge.py resolve() as a module (dashes rule out import)."""
+    path = Path(__file__).resolve().with_name("super-board-forge.py")
+    spec = importlib.util.spec_from_file_location("super_board_forge", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    res = mod.resolve(str(config_path))
+    mod.check(res)
+    return res
+
+
+def gitea_read(*args: str, check: bool = True, env: dict[str, str] | None = None) -> str:
+    """Run super-board-gitea-read.py; 79 (halt) propagates, others exit 67."""
+    helper = Path(__file__).resolve().with_name("super-board-gitea-read.py")
+    try:
+        proc = subprocess.run([sys.executable, str(helper), *args], capture_output=True,
+                              text=True, encoding="utf-8", check=False, env=env)
+    except OSError as e:
+        print(f"gitea read could not start: {e}", file=sys.stderr)
+        sys.exit(67)
+    if proc.returncode != 0:
+        if check:
+            print(f"gitea read failed ({' '.join(args[:4])}…)", file=sys.stderr)
+            if proc.stderr.strip():
+                print(proc.stderr.strip()[:800], file=sys.stderr)
+            sys.exit(79 if proc.returncode == 79 else 67)
+        return ""
+    return proc.stdout
+
+
 # ───────────────────────────── GraphQL ─────────────────────────────
 # Targeted query — number, title, labels, Status only. ~3 KB vs. 100+ KB for
 # `gh project item-list --format json` (which slurps every issue body).
@@ -515,49 +551,74 @@ def main() -> int:
     run_date = datetime.date.today().isoformat()
     manifest_path = Path(runs_dir) / f"{run_date}-{config_slug}.md"
 
-    # ── fetch project items (paginated) ──
-    def fetch_page(after: str | None) -> dict[str, Any]:
-        args = [
-            "api", "graphql",
-            "-f", f"query={ITEMS_QUERY}",
-            "-F", f"owner={project_owner}",
-            "-F", f"number={project_number}",
-        ]
-        if after:
-            # First page leaves `$after` unset → GraphQL defaults to null.
-            args += ["-F", f"after={after}"]
-        out = gh(*args)
-        payload: dict[str, Any] = json.loads(out)
-        if payload.get("errors"):
-            print("graphql returned errors:", file=sys.stderr)
-            for err in payload["errors"]:
-                print(f"  - {err.get('message')}", file=sys.stderr)
-            sys.exit(67)
-        return payload
+    forge = (os.environ.get("SB_FORGE") or cfg.get("forge") or "github").strip().lower()
+    genv: dict[str, str] | None = None
+    items: list[dict[str, Any]] = []
+    hit_cap = False
 
-    items_raw, hit_cap = paginate_items(fetch_page)
+    if forge == "gitea":
+        # ── gitea: one normalized board read (columns + per-column issues) ──
+        try:
+            res = forge_resolve(config_path)
+        except (ValueError, LookupError) as e:
+            print(f"forge config: {e}", file=sys.stderr)
+            return 66
+        genv = dict(os.environ, GITEA_REPO=f"{res['owner']}/{res['repo']}")
+        board = json.loads(gitea_read("--kind", "items", "--items",
+                                      f"{res['owner']}/{res['repo']}/{project_number}", env=genv))
+        for it in board.get("items") or []:
+            c = it.get("content") or {}
+            if not c.get("number"):
+                continue
+            items.append({
+                "number": c["number"],
+                "title": sanitize_title(it.get("title") or c.get("title") or ""),
+                "labels": it.get("labels") or [],
+                "status": it.get("status") or "",
+            })
+    else:
+        # ── github: fetch project items (paginated GraphQL) ──
+        def fetch_page(after: str | None) -> dict[str, Any]:
+            args = [
+                "api", "graphql",
+                "-f", f"query={ITEMS_QUERY}",
+                "-F", f"owner={project_owner}",
+                "-F", f"number={project_number}",
+            ]
+            if after:
+                # First page leaves `$after` unset → GraphQL defaults to null.
+                args += ["-F", f"after={after}"]
+            out = gh(*args)
+            payload: dict[str, Any] = json.loads(out)
+            if payload.get("errors"):
+                print("graphql returned errors:", file=sys.stderr)
+                for err in payload["errors"]:
+                    print(f"  - {err.get('message')}", file=sys.stderr)
+                sys.exit(67)
+            return payload
+
+        items_raw, hit_cap = paginate_items(fetch_page)
+        for n in items_raw:
+            c = n.get("content") or {}
+            if not c.get("number"):
+                continue
+            items.append({
+                "number": c["number"],
+                "title": sanitize_title(c.get("title") or ""),
+                "labels": [
+                    l["name"]
+                    for l in (c.get("labels", {}).get("nodes") or [])
+                    if l.get("name")
+                ],
+                "status": field_status(n),
+            })
+
     if hit_cap:
         print(
             f"warning: stopped after {MAX_ITEM_PAGES * 100} items — "
             f"kanban may not show every card",
             file=sys.stderr,
         )
-
-    items: list[dict[str, Any]] = []
-    for n in items_raw:
-        c = n.get("content") or {}
-        if not c.get("number"):
-            continue
-        items.append({
-            "number": c["number"],
-            "title": sanitize_title(c.get("title") or ""),
-            "labels": [
-                l["name"]
-                for l in (c.get("labels", {}).get("nodes") or [])
-                if l.get("name")
-            ],
-            "status": field_status(n),
-        })
 
     by_status: dict[str, list[dict[str, Any]]] = {
         s: sorted([i for i in items if i["status"] == s], key=lambda x: -x["number"])
@@ -571,14 +632,16 @@ def main() -> int:
     reasons: dict[int, str] = {}
     for it in by_status["Blocked"]:
         n = it["number"]
-        out = gh("issue", "view", str(n), "--json", "comments", check=False)
-        if not out:
-            continue
         try:
-            comments = json.loads(out).get("comments") or []
+            if forge == "gitea":
+                out = gitea_read("--kind", "comments", "--issue", str(n), check=False, env=genv)
+                comments = [c for page in json.loads(out) for c in page] if out else []
+            else:
+                out = gh("issue", "view", str(n), "--json", "comments", check=False)
+                comments = json.loads(out).get("comments") or [] if out else []
         except json.JSONDecodeError:
             continue
-        comments.sort(key=lambda c: c.get("createdAt", ""))
+        comments.sort(key=lambda c: c.get("createdAt") or c.get("created_at") or "")
         body = (comments[-1].get("body") if comments else "") or ""
         reasons[n] = body[:4000]
 

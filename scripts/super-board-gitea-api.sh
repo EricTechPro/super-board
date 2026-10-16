@@ -26,10 +26,12 @@ SB_GITEA_LABEL_DEFAULT_COLOR="ededed"
 
 sb_gitea_tea() {
   # Run tea with a bounded lifetime; prefer coreutils timeout when present.
-  # SB_GITEA_TEA overrides the executable (tests point it at the offline stub).
+  # SB_GITEA_TEA overrides the executable (tests point it at the offline stub);
+  # it is split with eval so quoted paths with spaces survive — the same value
+  # is shlex-split by super-board-gitea-read.py.
   local login_flag=() tea_cmd
   [ -n "${SB_FORGE_LOGIN:-}" ] && login_flag=(--login "$SB_FORGE_LOGIN")
-  read -r -a tea_cmd <<< "${SB_GITEA_TEA:-tea}"
+  eval "tea_cmd=(${SB_GITEA_TEA:-tea})"
   if command -v timeout >/dev/null 2>&1; then
     timeout "$SB_GITEA_TIMEOUT" "${tea_cmd[@]}" "${login_flag[@]}" "$@"
   else

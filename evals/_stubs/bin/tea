@@ -128,7 +128,9 @@ if [ "$METHOD" = GET ]; then
       emit_headers; cid=$(seg 7)
       state -c --argjson c "$cid" '[ .issues[] | select((._column // null) == $c) ]' | strip | page_slice; exit 0 ;;
     repos/*/*/projects/*/columns)
-      emit_headers; state -c '.columns'; exit 0 ;;
+      # columns with no _project belong to every project (single-board fixtures)
+      emit_headers; pid=$(seg 5)
+      state -c --argjson p "$pid" '[ .columns[] | select((._project // null) == null or ._project == $p) ]'; exit 0 ;;
     repos/*/*/projects/*)
       emit_headers; pid=$(seg 5)
       out=$(state -c --argjson p "$pid" '.projects[] | select(.id == $p)')
@@ -200,10 +202,16 @@ case "$PATHPART" in
       .issues = [ .issues[] | if .id == $g then ._column = $c else . end ] | .writes += 1'
     echo "" ;;   # 204
   repos/*/*/projects/*/columns)   # POST create column
-    put_state --argjson b "$BODY" '
+    pid=$(seg 5)
+    put_state --argjson b "$BODY" --argjson p "$pid" '
       (1 + ([ .columns[].id ] + [0] | max)) as $id |
-      .columns += [{ id: $id, title: ($b.title // ""), color: ($b.color // "") }] | .writes += 1'
+      .columns += [{ id: $id, title: ($b.title // ""), color: ($b.color // ""), _project: $p }] | .writes += 1'
     state -c '.columns[-1]' ;;
+  repos/*/*/projects/*/columns/*)   # DELETE one column
+    [ "$METHOD" = DELETE ] || { echo '{}'; exit 0; }
+    cid=$(seg 7)
+    put_state --argjson c "$cid" '.columns = [ .columns[] | select(.id != $c) ] | .writes += 1'
+    echo "" ;;
   repos/*/*/projects)   # POST create project
     put_state --argjson b "$BODY" '
       (1 + ([ .projects[].id ] + [0] | max)) as $id |

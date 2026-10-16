@@ -37,8 +37,8 @@
 #       79 reads halted (super-board-github-read.py) · 3 issue not on this board /
 #       Status option missing.
 set -euo pipefail
-# Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
-export SB_GITHUB_READ_STRICT=1
+# Fixed read commands: a malformed payload is the forge's, so it halts (#32).
+export SB_GITHUB_READ_STRICT=1 SB_GITEA_READ_STRICT=1
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 CONFIG="${SB_CONFIG:-}"; OWNER="${BUILD_LOOP_OWNER:-}"; NUMBER="${BUILD_LOOP_PROJECT:-}"; REPO=""
@@ -64,8 +64,24 @@ if [ -n "$CONFIG" ]; then
   [ -n "$NUMBER" ] || NUMBER=$(echo "$CJ" | jq -r '.project.number // ""')
   [ -n "$REPO" ]   || REPO=$(echo "$CJ" | jq -r '.repo.remote // ""')
 fi
-[ -n "$REPO" ] || REPO=$(git remote get-url origin 2>/dev/null || true)
-REPO=$(echo "$REPO" | sed -E 's#^(https?://github\.com/|git@github\.com:)##; s#\.git$##')
+
+# Forge resolution (github default): on gitea, NUMBER is the project's API id
+# and REPO comes from the resolver instead of the github.com strip below.
+FORGE_KIND=github
+if [ -f "$HERE/super-board-forge.sh" ]; then
+  # shellcheck source=super-board-forge.sh
+  . "$HERE/super-board-forge.sh"
+  sb_forge_resolve ${CONFIG:+"$CONFIG"} || exit $?
+  FORGE_KIND="$SB_FORGE_KIND"
+fi
+
+if [ "$FORGE_KIND" = gitea ] && [ -n "$SB_FORGE_OWNER" ] && [ -n "$SB_FORGE_REPO" ]; then
+  [ -n "$OWNER" ] || OWNER="$SB_FORGE_OWNER"
+  REPO="$SB_FORGE_OWNER/$SB_FORGE_REPO"
+else
+  [ -n "$REPO" ] || REPO=$(git remote get-url origin 2>/dev/null || true)
+  REPO=$(echo "$REPO" | sed -E 's#^(https?://github\.com/|git@github\.com:)##; s#\.git$##')
+fi
 [ -n "$OWNER" ] && [ -n "$NUMBER" ] || { echo "project owner/number unknown: pass --config or --owner/--number" >&2; exit 66; }
 
 # Reads go through the kit's bounded retry helper when it is installed, so a
@@ -102,6 +118,46 @@ cache_put() {  # $1 = jq filter applied to the current cache, with --arg/--argjs
 cache_drop() { rm -f "$CACHE"; }
 
 # ── reads ───────────────────────────────────────────────────────────────
+if [ "$FORGE_KIND" = gitea ]; then
+  GITEA_READ="$HERE/super-board-gitea-read.py"
+  [ -f "$GITEA_READ" ] || { echo "gitea read wrapper missing: $GITEA_READ" >&2; exit 67; }
+
+  load_ids() {  # columns → the github-shaped {projectId, fieldId, options} triple
+    PROJECT_ID=$(cache_get .projectId); FIELD_ID=$(cache_get .fieldId)
+    OPTIONS_JSON=$(cache_get '.options // empty | tojson')
+    [ -n "$PROJECT_ID" ] && [ -n "$FIELD_ID" ] && [ -n "$OPTIONS_JSON" ] && return 0
+    local out
+    out=$(python3 "$GITEA_READ" --kind fields --fields "$REPO/$NUMBER") || return $?
+    PROJECT_ID=$(echo "$out" | jq -r '.fields[0].id // empty')
+    FIELD_ID=$(echo "$out" | jq -r '.fields[0].id // empty')
+    OPTIONS_JSON=$(echo "$out" | jq -c '[.fields[0].options[]? | {(.name): .id}] | add // {}')
+    [ -n "$PROJECT_ID" ] && [ -n "$FIELD_ID" ] || { echo "project $OWNER/$NUMBER or its columns not found" >&2; return 69; }
+    cache_put '.projectId = $p | .fieldId = $f | .options = $o' --arg p "$PROJECT_ID" --arg f "$FIELD_ID" --argjson o "$OPTIONS_JSON"
+  }
+
+  read_card() {  # $1 = issue; whole-board read (Gitea has no targeted card query)
+    [ -n "$REPO" ] || { echo "repo unknown: pass --repo or a config with repo.remote" >&2; return 66; }
+    local board node
+    board=$(python3 "$GITEA_READ" --kind items --items "$REPO/$NUMBER") || return $?
+    node=$(echo "$board" | jq -c --argjson n "$1" '[.items[] | select(.content.number == $n)][0] // empty')
+    [ -n "$node" ] || { echo "#$1 is not on project $OWNER/$NUMBER" >&2; return 3; }
+    ITEM_ID=$(echo "$node" | jq -r .id)                 # "gitea:<global id>"
+    STATUS_NAME=$(echo "$node" | jq -r '.status // ""')
+    cache_put '.items[$k] = $v' --arg k "$1" --arg v "$ITEM_ID"
+  }
+
+  set_status() {  # $1 = gitea:<gid>, $2 = column id — one move, no halt on failure
+    local gid="${1#gitea:}" out rc=0
+    . "$HERE/super-board-gitea-api.sh"
+    out=$(sb_gitea_api POST "repos/$REPO/projects/$NUMBER/issues/$gid/move" \
+      "$(jq -cn --argjson c "$2" '{column_id:$c}')" 2>&1) || rc=$?
+    [ "$rc" -eq 0 ] || { echo "$out" >&2; return 69; }
+  }
+
+  items() {  # whole board, gh item-list shape (normalized by gitea-read)
+    python3 "$GITEA_READ" --kind items --items "$REPO/$NUMBER" || return $?
+  }
+else
 load_ids() {  # fills PROJECT_ID FIELD_ID OPTIONS_JSON — 0 points when cached, else 1
   PROJECT_ID=$(cache_get .projectId); FIELD_ID=$(cache_get .fieldId)
   OPTIONS_JSON=$(cache_get '.options // empty | tojson')
@@ -141,33 +197,12 @@ read_card() {  # $1 = issue; sets ITEM_ID STATUS_NAME
   cache_put '.items[$k] = $v' --arg k "$1" --arg v "$ITEM_ID"
 }
 
-item_id() {  # $1 = issue
-  ITEM_ID=$(cache_get ".items[\"$1\"]")
-  [ -n "$ITEM_ID" ] || read_card "$1"
-}
-
 set_status() {  # $1 = item id, $2 = option id — one mutation
   local out
   out=$(gh api graphql -f query='mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){
       updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){ projectV2Item{ id } } }' \
       -f p="$PROJECT_ID" -f i="$1" -f f="$FIELD_ID" -f o="$2" 2>&1) || { echo "$out" >&2; return 69; }
   echo "$out" | no_errors || { echo "$out" >&2; return 69; }
-}
-
-move() {  # $1 = issue, $2 = Status name
-  local issue="$1" name="$2" opt attempt
-  for attempt in 1 2; do
-    load_ids || return $?
-    opt=$(echo "$OPTIONS_JSON" | jq -r --arg n "$name" '.[$n] // empty')
-    if [ -z "$opt" ]; then
-      [ "$attempt" = 1 ] && { cache_drop; continue; }
-      echo "Status option '$name' is not on project $OWNER/$NUMBER" >&2; return 3
-    fi
-    item_id "$issue" || return $?
-    if set_status "$ITEM_ID" "$opt"; then echo "moved #$issue → $name"; return 0; fi
-    [ "$attempt" = 1 ] && { echo "move failed; re-reading board ids once" >&2; cache_drop; }
-  done
-  return 69
 }
 
 items() {  # whole board, gh item-list shape, ~1 point per 100 cards
@@ -199,6 +234,31 @@ items() {  # whole board, gh item-list shape, ~1 point per 100 cards
       then { items: $items, totalCount: $total }
       else error("board read incomplete: \([ $p[].nodes[] ] | length) of \($total) items") end' \
     || { echo "board read incomplete" >&2; return 69; }
+}
+fi
+
+# ── shared across forges ─────────────────────────────────────────────────
+item_id() {  # $1 = issue
+  ITEM_ID=$(cache_get ".items[\"$1\"]")
+  [ -n "$ITEM_ID" ] || read_card "$1"
+}
+
+move() {  # $1 = issue, $2 = Status name
+  local issue="$1" name="$2" opt attempt rc
+  for attempt in 1 2; do
+    load_ids || return $?
+    opt=$(echo "$OPTIONS_JSON" | jq -r --arg n "$name" '.[$n] // empty')
+    if [ -z "$opt" ]; then
+      [ "$attempt" = 1 ] && { cache_drop; continue; }
+      echo "Status option '$name' is not on project $OWNER/$NUMBER" >&2; return 3
+    fi
+    item_id "$issue" || return $?
+    rc=0; set_status "$ITEM_ID" "$opt" || rc=$?
+    [ "$rc" -eq 0 ] && { echo "moved #$issue → $name"; return 0; }
+    [ "$rc" -eq 79 ] && return 79
+    [ "$attempt" = 1 ] && { echo "move failed; re-reading board ids once" >&2; cache_drop; }
+  done
+  return 69
 }
 
 case "$VERB" in

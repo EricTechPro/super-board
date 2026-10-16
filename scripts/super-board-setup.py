@@ -54,9 +54,18 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
+
+# Windows consoles default to cp1252: the ✓ lists and install.sh's emoji output
+# would crash every onboard step. status.py already reconfigures the same way.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
 COLUMNS = ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"]
 LABELS = {
@@ -86,6 +95,10 @@ TOOLS = {
             "dnf": "sudo dnf install -y git", "win": "winget install --id Git.Git -e"}),
     "gh": ("reads and moves cards on GitHub", {"mac": "brew install gh", "apt": "sudo apt-get install -y gh",
            "dnf": "sudo dnf install -y gh", "win": "winget install --id GitHub.cli -e"}),
+    "tea": ("reads and moves cards on Gitea", {"mac": "brew install tea",
+            "apt": "curl -fsSL https://dl.gitea.com/tea/0.16.0/tea-0.16.0-linux-amd64 -o /usr/local/bin/tea && sudo chmod +x /usr/local/bin/tea",
+            "dnf": "curl -fsSL https://dl.gitea.com/tea/0.16.0/tea-0.16.0-linux-amd64 -o /usr/local/bin/tea && sudo chmod +x /usr/local/bin/tea",
+            "win": "winget install --id Gitea.tea -e"}),
     "jq": ("the board scripts read JSON with it", {"mac": "brew install jq", "apt": "sudo apt-get install -y jq",
            "dnf": "sudo dnf install -y jq", "win": "winget install --id jqlang.jq -e"}),
     "node": ("the helper installer; actual skill files are checked separately",
@@ -101,8 +114,11 @@ def out(obj, code=0):
     return code
 
 
-def run(cmd, cwd=None, check=False, input=None):
-    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, input=input)
+def run(cmd, cwd=None, check=False, input=None, timeout=None):
+    # encoding: child scripts print UTF-8 (emoji, ✓); Windows would otherwise
+    # decode them with the console codepage and die mid-onboard.
+    r = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, input=input,
+                       timeout=timeout, encoding="utf-8", errors="replace")
     if check and r.returncode != 0:
         raise RuntimeError(f"{' '.join(cmd[:3])} failed: {(r.stderr or r.stdout).strip()[:300]}")
     return r
@@ -134,7 +150,7 @@ def vtuple(v):
 
 def read(path, default=""):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             return f.read().strip()
     except OSError:
         return default
@@ -142,7 +158,7 @@ def read(path, default=""):
 
 def load_json(path):
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except (OSError, ValueError):
         return None
@@ -150,7 +166,7 @@ def load_json(path):
 
 def write_json(path, data):
     tmp = path + ".tmp"
-    with open(tmp, "w") as f:
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
     os.replace(tmp, path)
@@ -310,6 +326,10 @@ def check(root, pack, host="claude", home=None, catalog=None):
     old_dirs = [d for d in OLD_SKILL_DIRS if os.path.isdir(os.path.join(claude, "skills", d))]
     configs = {}
     verification = {}
+    forges = set()
+    env_forge = (os.environ.get("SB_FORGE") or "").strip().lower()
+    if env_forge:
+        forges.add(env_forge)
     for p in sorted(glob.glob(os.path.join(claude, "super-board", "configs", "*.json"))):
         cfg = load_json(p)
         ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__),
@@ -318,6 +338,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
         if ready.returncode:
             verification[os.path.relpath(p, root)] = ready.stderr.strip()
         if isinstance(cfg, dict):
+            forges.add((cfg.get("forge") or "github").strip().lower())
             _, ch = migrate_config(cfg)
             if ch:
                 configs[os.path.relpath(p, root)] = ch
@@ -328,13 +349,26 @@ def check(root, pack, host="claude", home=None, catalog=None):
     from_v = upgrade_rec.get("from") or (have_v if have_v and pack_version and vtuple(have_v) < vtuple(pack_version) else None)
     fam = os_family()
     needs = []
-    for t in ("git", "gh", "jq", "node"):
+    # Forge-aware tool requirements: gh for github boards (and while no config
+    # exists yet — github stays the default), tea for gitea boards.
+    tools = ["git", "jq", "node"]
+    if not forges or "github" in forges:
+        tools.insert(1, "gh")
+    if "gitea" in forges:
+        tools.append("tea")
+    for t in tools:
         if not have(t if t != "node" else "npx"):
             why, cmds = TOOLS[t]
             cmd = cmds[fam]
             if t == "node":
                 cmd += " && " + HELPERS_CMD
             needs.append({"kind": "tool", "name": t, "why": why, "command": cmd})
+        elif t == "tea" and not tea_probe():
+            # A tea binary that hangs (seen on Windows builds) is worse than a
+            # missing one: every board call would block until its timeout.
+            needs.append({"kind": "tool", "name": "tea",
+                          "why": "tea is installed but did not answer `tea --version` within 5s — reinstall it",
+                          "command": TOOLS["tea"][1][fam]})
     readiness = helper_readiness(root, host, home, catalog)
     helpers = readiness["ready"]
     git = is_git_repo(root)
@@ -355,6 +389,14 @@ def check(root, pack, host="claude", home=None, catalog=None):
         "missing": missing, "old_dirs": old_dirs, "configs": configs, "verification": verification, "git": git,
         "helper_skills": helpers, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
     }
+
+
+def bash_exe():
+    """Full path to a usable bash. On Windows a bare "bash" resolves through
+    System32 before PATH, so a broken WSL relay shadows Git's bash and every
+    install.sh run dies with execvpe(/bin/bash); shutil.which respects PATH
+    order, so the first working bash the user installed is the one we run."""
+    return shutil.which("bash") or "bash"
 
 
 def backup(root, paths, stamp):
@@ -384,7 +426,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
         if not pack:
             return {**before, "fixed": [], "error": "pack-not-found"}
         if not dry:
-            r = run(["bash", os.path.join(pack, "install.sh"), root],
+            r = run([bash_exe(), os.path.join(pack, "install.sh"), root],
                     input="", cwd=root)
             if r.returncode != 0:
                 return {**before, "fixed": fixed, "error": "install.sh failed: " + (r.stderr or r.stdout)[-300:]}
@@ -428,7 +470,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
 
     if helpers and not before["helper_skills"] and have("npx"):
         if not dry:
-            r = run(["bash", "-c", HELPERS_CMD], cwd=root, input="")
+            r = run([bash_exe(), "-c", HELPERS_CMD], cwd=root, input="")
             confirmed = helper_readiness(root, host, home, catalog)
             if confirmed["ready"]:
                 fixed.append("worker skills re-resolved after helper installation")
@@ -564,6 +606,193 @@ def board_rank(owner):
     ranked.sort(key=lambda r: (-r["matches"], -r["cards"], -r["number"]))
     best = ranked[0] if ranked and ranked[0]["matches"] >= 4 else None
     return {"owner": owner, "boards": ranked, "recommend": best and best["number"]}
+
+
+# ── Gitea board: rank and migrate (via tea api) ───────────────────────────────
+
+GITEA_COLUMN_COLORS = {"Backlog": "#6b7280", "Ready": "#2563eb", "Building": "#d97706",
+                       "QA": "#ea580c", "Review": "#7c3aed", "Blocked": "#dc2626", "Done": "#16a34a"}
+GITEA_LABEL_COLORS = {"qa": "#0e8a16", "bug": "#d73a4a", "feature": "#1d76db"}
+LABEL_DESCRIPTIONS = {"qa": "Test what exists; skips Building (super-board)",
+                      "bug": "Something is broken; built, tested, reviewed (super-board)",
+                      "feature": "New behaviour; built, tested, reviewed (super-board)"}
+
+
+def tea_cmd():
+    """The tea executable; SB_GITEA_TEA overrides it (tests use the offline stub)."""
+    cmd = shlex.split(os.environ.get("SB_GITEA_TEA", "tea"))
+    login = os.environ.get("SB_FORGE_LOGIN")
+    if login:
+        cmd += ["--login", login]
+    return cmd
+
+
+def tea_probe():
+    """True when tea answers --version within 5s. A hung binary counts as absent."""
+    try:
+        r = run(tea_cmd() + ["--version"], timeout=5)
+        return r.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def tea_json(*args, input=None, timeout=30):
+    """One `tea api` call → parsed JSON. Raises RuntimeError like gh_json.
+    `input` becomes the request body via -d (tea also accepts -d @-, but a
+    direct argument keeps the offline stub and the real CLI on one path)."""
+    a = list(args)
+    if input is not None:
+        a += ["-d", input]
+    r = run(tea_cmd() + ["api", *a], timeout=timeout)
+    if r.returncode != 0:
+        raise RuntimeError(f"tea {' '.join(args[:3])}: {(r.stderr or r.stdout).strip()[:300]}")
+    try:
+        return json.loads(r.stdout.strip() or "null")   # 204s answer with an empty body
+    except ValueError:
+        raise RuntimeError(f"tea {' '.join(args[:3])} printed non-JSON: {r.stdout.strip()[:200]}")
+
+
+def board_rank_gitea(owner, repo):
+    """The repo's Gitea projects, best column match first — same output shape
+    as board_rank so onboard step 3 renders either forge identically.
+    `repo` is already "owner/name" (the board-migrate convention)."""
+    base = f"repos/{repo}"
+    projects = tea_json("-X", "GET", f"{base}/projects") or []
+    ranked = []
+    for p in projects:
+        if not isinstance(p, dict) or not p.get("id"):
+            continue
+        if p.get("state") == "closed" or p.get("is_closed"):
+            continue
+        cols = tea_json("-X", "GET", f"{base}/projects/{p['id']}/columns") or []
+        have = [c.get("title", "") for c in cols if isinstance(c, dict)]
+        cards = 0
+        for c in cols:
+            issues = tea_json("-X", "GET", f"{base}/projects/{p['id']}/columns/{c['id']}/issues?page=1&limit=50") or []
+            cards += len(issues)
+        low = {h.lower() for h in have}
+        match = [c for c in COLUMNS if c.lower() in low]
+        ranked.append({"number": p["id"], "title": p.get("title"), "url": p.get("html_url"),
+                       "cards": cards, "matches": len(match),
+                       "missing": [c for c in COLUMNS if c not in match],
+                       "extra": [h for h in have if h.lower() not in {c.lower() for c in COLUMNS}]})
+    ranked.sort(key=lambda r: (-r["matches"], -r["cards"], -r["number"]))
+    best = ranked[0] if ranked and ranked[0]["matches"] >= 4 else None
+    return {"owner": owner, "boards": ranked, "recommend": best and best["number"]}
+
+
+def board_migrate_gitea(owner, number, repo, qa_all=False, dry=False, prune_empty=False, root=None, config_path=None):
+    """Gitea board half: additive only. Creates the seven columns and three
+    labels when missing, maps old type labels, moves Skipped cards to Done and
+    removes the Skipped column, and (with --prune-empty) deletes empty
+    non-canonical columns. Gitea has no destructive field rewrite, so there is
+    no option-remap recovery record — but the pre-write snapshot is still saved
+    under .claude/super-board/migrations/ and every step is idempotent: re-run
+    the same command after a failure to finish the upgrade.
+    `repo` is already "owner/name" (the board-migrate convention)."""
+    base = f"repos/{repo}"
+    proj = tea_json("-X", "GET", f"{base}/projects/{number}")
+    if not isinstance(proj, dict) or not proj.get("id"):
+        raise RuntimeError("Gitea omitted the project identity")
+    cols = tea_json("-X", "GET", f"{base}/projects/{number}/columns") or []
+    snapshot = {"project": proj, "columns": cols,
+                "issues": {str(c["id"]): tea_json("-X", "GET", f"{base}/projects/{number}/columns/{c['id']}/issues?page=1&limit=50") or []
+                           for c in cols if isinstance(c, dict) and c.get("id")}}
+    path = os.path.join(root or os.getcwd(), ".claude", "super-board", "migrations",
+                        f"gitea-board-{number}.json")
+    result = {"forge": "gitea", "url": proj.get("html_url"), "added_columns": [],
+              "labels_created": [], "labels_mapped": 0, "qa_labelled": 0,
+              "skipped_moved": 0, "skipped_removed": False, "pruned": [],
+              "snapshot": None, "dry": dry}
+    by_title = {c.get("title"): c for c in cols if isinstance(c, dict)}
+    result["added_columns"] = [c for c in COLUMNS if c not in by_title]
+    labels = tea_json("-X", "GET", f"{base}/labels") or []
+    label_by_name = {l.get("name", "").lower(): l for l in labels if isinstance(l, dict)}
+    result["labels_created"] = [n for n in GITEA_LABEL_COLORS if n not in label_by_name]
+    if dry:
+        skipped = by_title.get("Skipped")
+        if skipped:
+            result["skipped_moved"] = len(snapshot["issues"].get(str(skipped["id"]), []))
+            result["skipped_removed"] = True
+        return result
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    write_json(path, snapshot)
+    result["snapshot"] = os.path.relpath(path, root or os.getcwd())
+
+    for title in COLUMNS:
+        if title in by_title:
+            continue
+        created = tea_json("-X", "POST", f"{base}/projects/{number}/columns",
+                           input=json.dumps({"title": title, "color": GITEA_COLUMN_COLORS[title]}))
+        if not isinstance(created, dict) or not created.get("id"):
+            raise RuntimeError(f"Could not verify creation of column {title}")
+        by_title[title] = created
+    for name, color in GITEA_LABEL_COLORS.items():
+        if name in label_by_name:
+            continue
+        created = tea_json("-X", "POST", f"{base}/labels",
+                           input=json.dumps({"name": name, "color": color,
+                                             "description": LABEL_DESCRIPTIONS[name]}))
+        if not isinstance(created, dict) or not created.get("id"):
+            raise RuntimeError(f"Could not verify creation of label {name}")
+        label_by_name[name] = created
+
+    # Walk every column once: old type labels → the three v3 labels, qa_all on
+    # active cards, and Skipped → Done. Gitea's POST issue-labels is ADDITIVE
+    # (removals go through DELETE …/labels/{id}). No compare-and-swap exists;
+    # every step is idempotent, so re-running after a failure finishes the job.
+    skipped = by_title.get("Skipped")
+    done = by_title.get("Done")
+    for title, col in by_title.items():
+        issues = tea_json("-X", "GET", f"{base}/projects/{number}/columns/{col['id']}/issues?page=1&limit=50") or []
+        for it in issues:
+            if not isinstance(it, dict) or not it.get("id"):
+                continue
+            current = {l.get("name", "").lower(): l.get("id") for l in (it.get("labels") or []) if isinstance(l, dict)}
+            add, drop = set(), []
+            for old, new in OLD_LABELS.items():
+                if old in current:
+                    drop.append(current[old])
+                    add.add(new)
+            if title == "Skipped":
+                if done:
+                    tea_json("-X", "POST", f"{base}/projects/{number}/issues/{it['id']}/move",
+                             input=json.dumps({"column_id": done["id"]}))
+                    result["skipped_moved"] += 1
+            elif qa_all and title != "Done" and not (set(current) & set(GITEA_LABEL_COLORS)):
+                add.add("qa")
+            for lid in drop:
+                tea_json("-X", "DELETE", f"{base}/issues/{it['number']}/labels/{lid}")
+            if drop:
+                result["labels_mapped"] += len(drop)
+            add_ids = [label_by_name[n]["id"] for n in sorted(add) if n in label_by_name]
+            if add_ids:
+                if "qa" in add:
+                    result["qa_labelled"] += 1
+                tea_json("-X", "POST", f"{base}/issues/{it['number']}/labels",
+                         input=json.dumps({"labels": add_ids}))
+    if skipped:
+        left = tea_json("-X", "GET", f"{base}/projects/{number}/columns/{skipped['id']}/issues?page=1&limit=50") or []
+        if not left:
+            tea_json("-X", "DELETE", f"{base}/projects/{number}/columns/{skipped['id']}")
+            result["skipped_removed"] = True
+        else:
+            raise RuntimeError(f"Skipped column still holds {len(left)} cards; move them and re-run")
+    if prune_empty:
+        for c in cols:
+            title = c.get("title")
+            if not isinstance(c, dict) or title in COLUMNS or title == "Skipped":
+                continue
+            issues = tea_json("-X", "GET", f"{base}/projects/{number}/columns/{c['id']}/issues?page=1&limit=50") or []
+            if not issues:
+                tea_json("-X", "DELETE", f"{base}/projects/{number}/columns/{c['id']}")
+                result["pruned"].append(title)
+    if config_path:
+        current = load_json(config_path)
+        if isinstance(current, dict) and current.pop("_qa_all", None) is not None:
+            durable_json(os.path.abspath(config_path), current)
+    return result
 
 
 OPTIONS_Q = "query($id:ID!){node(id:$id){... on ProjectV2SingleSelectField{options{id name color description}}}}"
@@ -1003,6 +1232,11 @@ def main(argv):
             owner = flag(rest, "--owner")
             if not owner:
                 return 64
+            if (flag(rest, "--forge") or "github").lower() == "gitea":
+                repo = flag(rest, "--repo")
+                if not repo:
+                    return 64
+                return out(board_rank_gitea(owner, repo))
             return out(board_rank(owner))
         if cmd == "board-migrate":
             # --config fills owner / number / repo and the qa-all flag an upgraded
@@ -1022,7 +1256,12 @@ def main(argv):
             if not (owner and number and repo):
                 return 64
             qa_all = "--qa-all" in rest or bool(cfg.get("_qa_all"))
-            res = board_migrate(owner, int(number), repo, qa_all, dry, "--prune-empty" in rest, root, cfg_path)
+            forge_name = (flag(rest, "--forge") or cfg.get("forge") or os.environ.get("SB_FORGE") or "github").lower()
+            if forge_name == "gitea":
+                res = board_migrate_gitea(owner, int(number), repo, qa_all, dry,
+                                          "--prune-empty" in rest, root, cfg_path)
+            else:
+                res = board_migrate(owner, int(number), repo, qa_all, dry, "--prune-empty" in rest, root, cfg_path)
             return out(res)
     except (RuntimeError, OSError, ValueError, KeyError, TypeError) as e:
         return out({"error": str(e)}, 2)

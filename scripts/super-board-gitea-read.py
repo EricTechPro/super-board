@@ -135,7 +135,10 @@ def _tea(args):
     if login:
         cmd += ['--login', login]
     cmd += args
-    r = subprocess.run(cmd, capture_output=True, text=True, timeout=TEA_TIMEOUT, env=_tea_env())
+    # encoding: tea prints UTF-8 JSON; on Windows text=True would otherwise
+    # decode with the console codepage and mangle every emoji (reason tags!).
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8',
+                       errors='replace', timeout=TEA_TIMEOUT, env=_tea_env())
     return r.stdout, r.stderr, r.returncode
 
 
