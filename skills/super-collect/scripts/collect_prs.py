@@ -52,12 +52,46 @@ def gh_graphql(query, variables, run=subprocess.run):
     return json.loads(r.stdout)
 
 
-def repo_slug(cfg, override=None):
+# ── gitea (tea api) ────────────────────────────────────────────────────────────
+# Degradations vs the GraphQL search, documented in references/gitea.md:
+# no reviewThreads (empty list), no merged_at (closed_at/updated_at is the
+# merge-time approximation), author "bot" is a login heuristic, and the window
+# filter rides pulls?state=closed&sort=recentupdate.
+
+def forge_of(cfg):
+    return (os.environ.get("SB_FORGE") or (cfg or {}).get("forge") or "github").strip().lower()
+
+
+def tea_cmd():
+    import shlex
+    cmd = shlex.split(os.environ.get("SB_GITEA_TEA", "tea"))
+    login = os.environ.get("SB_FORGE_LOGIN")
+    if login:
+        cmd += ["--login", login]
+    return cmd
+
+
+def tea_get(endpoint, run=subprocess.run):
+    r = run(tea_cmd() + ["api", "-X", "GET", endpoint], capture_output=True,
+            text=True, encoding="utf-8")
+    if r.returncode != 0:
+        raise RuntimeError(f"tea api GET {endpoint.split('?')[0]} failed: {(r.stderr or r.stdout).strip()[:300]}")
+    return json.loads(r.stdout.strip() or "null")
+
+
+def repo_slug(cfg, override=None, forge="github"):
     if override:
         return override
     remote = ((cfg or {}).get("repo") or {}).get("remote") or ""
-    m = re.search(r"github\.com[:/]([^/]+/[^/.]+)", remote)
-    return m.group(1) if m else None
+    if forge == "github":
+        m = re.search(r"github\.com[:/]([^/]+/[^/.]+)", remote)
+        return m.group(1) if m else None
+    m = (re.match(r'^(?:https?|ssh|git)://(?:[^@/]+@)?[^/]+/(.+?)(?:\.git)?/?$', remote)
+         or re.match(r'^(?:[^@/\s]+@)?[^/:\s]+:(.+?)(?:\.git)?/?$', remote))
+    if not m:
+        return None
+    parts = [p for p in m.group(1).strip("/").split("/") if p]
+    return f"{parts[-2]}/{parts[-1]}" if len(parts) >= 2 else None
 
 
 def who(a):
@@ -95,6 +129,53 @@ def list_prs(repo, since, max_prs=200, run=subprocess.run):
     return prs[:max_prs], len(prs) >= max_prs
 
 
+def shape_gitea(pr, repo, run):
+    n = pr["number"]
+    comments = []
+    for page in range(1, 3):   # cap: the newest 100 comments, like the query's first:100
+        batch = tea_get(f"repos/{repo}/issues/{n}/comments?page={page}&limit=50", run) or []
+        comments += [note({"author": {"login": (c.get("user") or {}).get("login")},
+                           "body": c.get("body")}) for c in batch if isinstance(c, dict) and c.get("body")]
+        if len(batch) < 50:
+            break
+    reviews = []
+    try:
+        rvs = tea_get(f"repos/{repo}/pulls/{n}/reviews", run) or []
+    except RuntimeError:
+        rvs = []   # an unreadable review list must not lose the PR's comments
+    for rv in rvs:
+        if isinstance(rv, dict) and rv.get("body"):
+            reviews.append(note({"author": {"login": (rv.get("user") or {}).get("login")},
+                                 "body": rv.get("body")}, {"state": rv.get("state")}))
+    return {"number": n, "title": pr.get("title", ""), "url": pr.get("html_url", ""),
+            "mergedAt": pr.get("closed_at") or pr.get("updated_at"),
+            "author": who({"login": (pr.get("user") or {}).get("login")}),
+            "comments": comments, "reviews": reviews, "threads": []}
+
+
+def list_prs_gitea(repo, since, max_prs=200, run=subprocess.run):
+    cutoff = since.date().isoformat()
+    prs = []
+    for page in range(1, max_prs // 50 + 3):
+        batch = tea_get(f"repos/{repo}/pulls?state=closed&sort=recentupdate&page={page}&limit=50", run)
+        if not isinstance(batch, list) or not batch:
+            break
+        stop = False
+        for p in batch:
+            if not isinstance(p, dict) or not p.get("merged"):
+                continue
+            when = (p.get("closed_at") or p.get("updated_at") or "")[:10]
+            if when and when < cutoff:
+                stop = True   # recentupdate is newest-first: the window ended
+                break
+            prs.append(shape_gitea(p, repo, run))
+            if len(prs) >= max_prs:
+                return prs, True
+        if stop or len(batch) < 50:
+            break
+    return prs[:max_prs], len(prs) >= max_prs
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--config")
@@ -105,14 +186,18 @@ def main(argv=None):
     lp.add_argument("--max", type=int)
     a = p.parse_args(argv)
     cfg, _ = cc.active_config(a.config)
-    repo = repo_slug(cfg, a.repo)
+    forge = forge_of(cfg)
+    repo = repo_slug(cfg, a.repo, forge)
     if not repo:
         print(json.dumps({"source": "prs", "status": "unavailable", "error": "no repo.remote in config; pass --repo"}))
         return 2
     since = cc.since(a.since, cc.window_days(cfg))
     max_prs = a.max or int(cc.collect_block(cfg, "prs").get("max_prs", 200))
     try:
-        prs, truncated = list_prs(repo, since, max_prs)
+        if forge == "gitea":
+            prs, truncated = list_prs_gitea(repo, since, max_prs)
+        else:
+            prs, truncated = list_prs(repo, since, max_prs)
     except RuntimeError as e:
         print(json.dumps({"source": "prs", "status": "unavailable", "error": str(e)}))
         return 2

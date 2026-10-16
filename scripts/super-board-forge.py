@@ -114,8 +114,9 @@ def resolve(config_path=None, root=None):
             host = GITHUB_HOST
     host = host.rstrip("/")
 
-    owner = (cfg.get("project") or {}).get("owner") or (remote or {}).get("owner") or ""
-    repo = (remote or {}).get("repo") or ""
+    owner = (os.environ.get("SB_FORGE_OWNER") or (cfg.get("project") or {}).get("owner")
+             or (remote or {}).get("owner") or "")
+    repo = os.environ.get("SB_FORGE_REPO") or (remote or {}).get("repo") or ""
     login = os.environ.get("SB_FORGE_LOGIN") or cfg.get("forge_login") or ""
 
     return {"forge": forge, "host": host, "login": login, "owner": owner, "repo": repo,

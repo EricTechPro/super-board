@@ -345,6 +345,27 @@ def op_issue_history(owner, repo):
     return json.dumps(out), out
 
 
+def op_deps(owner, repo):
+    """Open issues with their last 8 comments — in the GraphQL node shape the
+    deps.sh parser reads (labels.nodes / comments.nodes; its jq `//` fallbacks
+    cannot catch a plain array, indexing it errors first).
+    One list read plus one comments read per open issue: Gitea has no single
+    query for both (documented degradation vs the GitHub GraphQL call)."""
+    out = []
+    for page in tea_get_paged(f'repos/{owner}/{repo}/issues?state=open&type=issues'):
+        for i in page:
+            require(type(i.get('number')) is int and i['number'] > 0, 'deps issue number missing')
+            comments = []
+            for cpage in tea_get_paged(f'repos/{owner}/{repo}/issues/{i["number"]}/comments'):
+                comments += [{'body': c.get('body') or ''} for c in cpage if isinstance(c, dict)]
+            out.append({'number': i['number'], 'title': i.get('title', ''),
+                        'body': i.get('body') or '', 'state': 'OPEN',
+                        'labels': {'nodes': [{'name': l.get('name', '')} for l in (i.get('labels') or [])
+                                             if isinstance(l, dict)]},
+                        'comments': {'nodes': comments[-8:]}})
+    return json.dumps(out), out
+
+
 def op_prs(owner, repo, kind):
     state = 'open' if kind == 'prs-open' else 'closed'
     out = []
@@ -464,6 +485,7 @@ def serve(argv, recovering=False):
     parser.add_argument('--projects', help='owner/repo — project list (kind projects)')
     parser.add_argument('--permission', help='owner/repo — collaborator level (kind permission)')
     parser.add_argument('--issue-history', help='owner/repo — complete all-state issue history')
+    parser.add_argument('--deps', help='owner/repo — open issues + last 8 comments (deps.sh node shape)')
     parser.add_argument('--prs-open', help='owner/repo')
     parser.add_argument('--prs-merged', help='owner/repo')
     parser.add_argument('--issues-closed', help='owner/repo')
@@ -473,7 +495,7 @@ def serve(argv, recovering=False):
     command = args.command[1:] if args.command[:1] == ['--'] else args.command
     kind = args.kind
     composite = any([args.issue, args.pr, args.items, args.fields, args.project, args.projects,
-                     args.permission, args.issue_history, args.prs_open, args.prs_merged,
+                     args.permission, args.issue_history, args.deps, args.prs_open, args.prs_merged,
                      args.issues_closed, args.quota])
 
     try:
@@ -542,6 +564,8 @@ def serve(argv, recovering=False):
                 return op_permission(*_or_path(args.permission))
             if args.issue_history:
                 return op_issue_history(*_or_path(args.issue_history))
+            if args.deps:
+                return op_deps(*_or_path(args.deps))
             if args.prs_open:
                 require(kind == 'prs-open', '--prs-open serves kind prs-open')
                 return op_prs(*_or_path(args.prs_open), 'prs-open')

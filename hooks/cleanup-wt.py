@@ -169,8 +169,84 @@ def merged_state(cwd, tip, bases, merged_pr_oids=()):
     return None
 
 
+def _remote_owner_repo(cwd):
+    """owner/name from the origin remote (any forge, https/http/ssh/scp), else None."""
+    import re
+    url = (git_out(cwd, "remote", "get-url", "origin") or "").strip()
+    m = (re.match(r'^(?:https?|ssh|git)://(?:[^@/]+@)?[^/]+/(.+?)(?:\.git)?/?$', url)
+         or re.match(r'^(?:[^@/\s]+@)?[^/:\s]+:(.+?)(?:\.git)?/?$', url))
+    if not m:
+        return None
+    parts = [p for p in m.group(1).strip("/").split("/") if p]
+    return (parts[-2], parts[-1]) if len(parts) >= 2 else None
+
+
+def _gitea_forge(cwd):
+    """Gitea when told (SB_FORGE/CLEANUP_WT_TEA), else when origin is not GitHub."""
+    forge = (os.environ.get("SB_FORGE") or "").strip().lower()
+    if forge:
+        return forge == "gitea"
+    if os.environ.get("CLEANUP_WT_TEA"):
+        return True
+    remote = (git_out(cwd, "remote", "get-url", "origin") or "").lower()
+    return bool(remote) and "github.com" not in remote
+
+
+def pull_requests_gitea(cwd):
+    """{open: {branch: number}, merged: {branch: [oid]}} via tea api, or None."""
+    import shlex
+    exe = shlex.split(os.environ.get("CLEANUP_WT_TEA", "tea"))
+    orr = _remote_owner_repo(cwd)
+    if not orr:
+        return None
+    base = f"repos/{orr[0]}/{orr[1]}"
+
+    def tea(endpoint):
+        try:
+            r = subprocess.run(exe + ["api", "-X", "GET", endpoint], cwd=cwd,
+                               capture_output=True, text=True, encoding="utf-8",
+                               errors="replace", timeout=15)
+            return json.loads(r.stdout) if r.returncode == 0 else None
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            return None
+
+    def paged(endpoint, cap):
+        out = []
+        for page in range(1, cap // 50 + 1):
+            batch = tea(f"{endpoint}&page={page}&limit=50")
+            if not isinstance(batch, list):
+                return None if page == 1 else out
+            out += batch
+            if len(batch) < 50:
+                return out
+        return out
+
+    opened = paged(f"{base}/pulls?state=open", 200)
+    if not isinstance(opened, list):
+        return None
+    closed = paged(f"{base}/pulls?state=closed", 300) or []
+    open_by, merged_by = {}, {}
+    for pr in opened:
+        head = (pr.get("head") or {}).get("ref")
+        open_by.setdefault(head, pr.get("number"))
+        open_by.setdefault(pr.get("base", {}).get("ref") if isinstance(pr.get("base"), dict) else None,
+                           pr.get("number"))
+    open_by.pop(None, None)
+    for pr in closed:
+        if not pr.get("merged"):
+            continue
+        head = (pr.get("head") or {}).get("ref")
+        sha = (pr.get("head") or {}).get("sha")
+        if head and sha:
+            merged_by.setdefault(head, []).append(sha)
+    return {"open": open_by, "merged": merged_by}
+
+
 def pull_requests(cwd):
-    """{open: {branch: number}, merged: {branch: [oid]}}, or None when gh is unavailable."""
+    """{open: {branch: number}, merged: {branch: [oid]}}, or None when the forge
+    CLI is unavailable (callers then keep remote branches — never guess)."""
+    if _gitea_forge(cwd):
+        return pull_requests_gitea(cwd)
     exe = os.environ.get("CLEANUP_WT_GH", "gh")
     env = dict(os.environ, GH_PROMPT_DISABLED="1", GH_NO_UPDATE_NOTIFIER="1", GH_PAGER="cat")
 

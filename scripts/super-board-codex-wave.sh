@@ -130,6 +130,7 @@ except FileExistsError:
 # The router only grades scope; it writes nothing. A Codex-only run grades with
 # the cheapest Codex model rather than waking Claude.
 ROUTER_MODEL = 'gpt-6-luna'
+FORGE = (os.environ.get('SB_FORGE') or config.get('forge') or 'github').lower()
 GRADE_SCHEMA = {'type': 'object', 'additionalProperties': False, 'required': ['complexity'],
                 'properties': {'complexity': {'type': 'string', 'enum': ['low', 'medium', 'high']}}}
 
@@ -139,11 +140,18 @@ def grade(card):
         return card.get('complexity') if card.get('complexity') in ['low', 'medium', 'high'] else None, False
     if card.get('complexity') in ['low', 'medium', 'high']:
         return card['complexity'], False
-    prompt = (f"Read GitHub issue #{card['number']} (\"{card.get('title', '')}\") - body and all comments - with "
-              f".claude/bin/super-board-github-read.py --kind issue -- issue view {card['number']} --json number,title,body and "
-              f"--kind comments -- api repos/{{owner}}/{{repo}}/issues/{card['number']}/comments --paginate --slurp. "
-              'Grade complexity (low|medium|high) by the scope of change required. Read only: change no file, '
-              'label, comment or board state. Exit 79 from the read helper means stop and return nothing.\n')
+    if FORGE == 'gitea':
+        prompt = (f"Read Gitea issue #{card['number']} (\"{card.get('title', '')}\") - body and all comments - with "
+                  f".claude/bin/super-board-gitea-read.py --kind issue --issue {card['number']} and "
+                  f"--kind comments --issue {card['number']}. "
+                  'Grade complexity (low|medium|high) by the scope of change required. Read only: change no file, '
+                  'label, comment or board state. Exit 79 from the read helper means stop and return nothing.\n')
+    else:
+        prompt = (f"Read GitHub issue #{card['number']} (\"{card.get('title', '')}\") - body and all comments - with "
+                  f".claude/bin/super-board-github-read.py --kind issue -- issue view {card['number']} --json number,title,body and "
+                  f"--kind comments -- api repos/{{owner}}/{{repo}}/issues/{card['number']}/comments --paginate --slurp. "
+                  'Grade complexity (low|medium|high) by the scope of change required. Read only: change no file, '
+                  'label, comment or board state. Exit 79 from the read helper means stop and return nothing.\n')
     with tempfile.TemporaryDirectory(prefix='super-board-codex-grade-') as temporary:
         schema_path, output = Path(temporary) / 'schema.json', Path(temporary) / 'grade.json'
         schema_path.write_text(json.dumps(GRADE_SCHEMA))

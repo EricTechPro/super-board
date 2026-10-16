@@ -91,7 +91,19 @@ CONFIG_JSON=$(cat "$CONFIG")
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/super-board-verification-ready.py" --config -
 export SB_REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
-python3 "$HERE/super-board-github-read.py" --check
+# Forge resolution from the (already once-read) config, exported so card.sh and
+# deps.sh in this process tree resolve the same forge without the config file
+# ($CONFIG may be a FIFO that cannot be read twice).
+FORGE_CFG=$(mktemp); trap 'rm -f "$FORGE_CFG"' EXIT
+printf '%s\n' "$CONFIG_JSON" > "$FORGE_CFG"
+eval "$(python3 "$HERE/super-board-forge.py" get --shell --config "$FORGE_CFG")" || exit $?
+rm -f "$FORGE_CFG"; trap - EXIT
+export SB_FORGE="$SB_FORGE_KIND" SB_FORGE_HOST SB_FORGE_LOGIN SB_FORGE_OWNER SB_FORGE_REPO
+if [ "$SB_FORGE_KIND" = gitea ]; then
+  python3 "$HERE/super-board-gitea-read.py" --check
+else
+  python3 "$HERE/super-board-github-read.py" --check
+fi
 VARIANT=$(echo "$CONFIG_JSON" | jq -r '.variant // ""')
 # 0 or absent = unlimited. A wave is sized by the dependency graph, not a knob.
 MAX_WORKERS=$(echo "$CONFIG_JSON" | jq -r '.max_workers // 0')
@@ -118,8 +130,12 @@ esac
 if [ -n "$DEPS_FILE" ]; then
   DEPS=$(cat "$DEPS_FILE")
 else
-  REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // ""' \
-           | sed -E 's#^https?://github\.com/##; s#\.git$##')
+  if [ "$SB_FORGE_KIND" = gitea ] && [ -n "$SB_FORGE_OWNER" ] && [ -n "$SB_FORGE_REPO" ]; then
+    REPO="$SB_FORGE_OWNER/$SB_FORGE_REPO"
+  else
+    REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // ""' \
+             | sed -E 's#^https?://github\.com/##; s#\.git$##')
+  fi
   [ -n "$REPO" ] || { echo "config.repo.remote is required to derive dependencies" >&2; exit 66; }
   HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   # A graph we cannot fetch is not a graph of zero blockers. Fail rather than

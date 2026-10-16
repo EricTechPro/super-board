@@ -60,21 +60,29 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-REPO=""; LIMIT="200"; ONLY=""; FROM=""
+REPO=""; LIMIT="200"; ONLY=""; FROM=""; FORGE_ARG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo)   REPO="$2"; shift 2 ;;
     --limit)  LIMIT="$2"; shift 2 ;;
     --issues) ONLY="$2"; shift 2 ;;
-    --from)   FROM="$2"; shift 2 ;;   # a saved `gh issue list --json …` payload; tests use this
+    --forge)  FORGE_ARG="$2"; shift 2 ;;   # github|gitea; default: env SB_FORGE, else github
+    --from)   FROM="$2"; shift 2 ;;   # a saved issue-list payload; tests use this
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
 done
+FORGE_KIND="${FORGE_ARG:-${SB_FORGE:-github}}"
 
 # Open issues carry the graph; closed ones are only needed to answer "is this
 # blocker still open?", which `openBlockers` derives from the open set itself.
 if [ -n "$FROM" ]; then
   ISSUES=$(cat "$FROM")
+elif [ "$FORGE_KIND" = gitea ]; then
+  [ -n "$REPO" ] || { echo "--repo <owner/name> is required" >&2; exit 64; }
+  # One list read + one comments read per open issue (Gitea has no combined
+  # query). The node shape matches the GitHub GraphQL page below, so the
+  # fail-safe parser and the approval enrichment are forge-neutral.
+  ISSUES=$(GITEA_REPO="$REPO" python3 "$HERE/super-board-gitea-read.py" --deps "$REPO") || exit $?
 else
   [ -n "$REPO" ] || { echo "--repo <owner/name> is required" >&2; exit 64; }
   # GraphQL rather than `gh issue list`, because the lanes' `blocked-by:` line
@@ -95,6 +103,7 @@ fi
 
 APPROVAL_REPO="$REPO"
 [ -z "$FROM" ] || APPROVAL_REPO=""
+APPROVAL_FORGE=(--forge "$FORGE_KIND")
 echo "$ISSUES" | jq --arg only "$ONLY" '
   # ---- the parser ---------------------------------------------------------
   # Everything after the LAST "## Blocked by" heading, stopping at the next
@@ -192,4 +201,4 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           needsYouDone: false }
     ]
   | ( if $filter == null then . else map(select(.number as $n | $filter | index($n))) end )
-  | INDEX(.number | tostring)' | python3 "$(dirname "${BASH_SOURCE[0]}")/super-board-approval.py" --deps --repo "$APPROVAL_REPO"
+  | INDEX(.number | tostring)' | python3 "$(dirname "${BASH_SOURCE[0]}")/super-board-approval.py" --deps --repo "$APPROVAL_REPO" "${APPROVAL_FORGE[@]}"

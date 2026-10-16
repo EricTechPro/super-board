@@ -45,10 +45,10 @@
 # Exit 0 ok · 64 usage · 79 required GitHub evidence unavailable (pause the run;
 # a blind pre-flight never says proceed).
 set -euo pipefail
-# Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
-export SB_GITHUB_READ_STRICT=1
+# Fixed read commands: a malformed payload is the forge's, so it halts (#32).
+export SB_GITHUB_READ_STRICT=1 SB_GITEA_READ_STRICT=1
 
-REPO=""; ISSUES=""; INFLIGHT=""; FILES=""; THRESHOLD="0.6"
+REPO=""; ISSUES=""; INFLIGHT=""; FILES=""; THRESHOLD="0.6"; FORGE_ARG=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --repo)      REPO="$2"; shift 2 ;;
@@ -56,11 +56,14 @@ while [ $# -gt 0 ]; do
     --inflight)  INFLIGHT="$2"; shift 2 ;;
     --files)     FILES="$2"; shift 2 ;;
     --threshold) THRESHOLD="$2"; shift 2 ;;
+    --forge)     FORGE_ARG="$2"; shift 2 ;;   # github|gitea; default: env SB_FORGE
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
 done
 [ -n "$REPO" ] && [ -n "$ISSUES" ] || { echo "usage: --repo <owner/name> --issues <N[,M…]>" >&2; exit 64; }
 echo "$ISSUES" | grep -Eq '^[0-9]+(,[0-9]+)*$' || { echo "--issues must be numbers: $ISSUES" >&2; exit 64; }
+FORGE_KIND="${FORGE_ARG:-${SB_FORGE:-github}}"
+export SB_FORGE="$FORGE_KIND"
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 if [ -f "$HERE/super-board-gh-guard.sh" ]; then
@@ -69,15 +72,27 @@ if [ -f "$HERE/super-board-gh-guard.sh" ]; then
   sb_gh_guard_check 200 || exit $?
 fi
 
-MERGED=$(python3 "$HERE/super-board-github-read.py" --kind prs-merged -- pr list --repo "$REPO" --state merged --limit 100 --json number,title,body,url ) || exit $?
-OPEN=$(python3 "$HERE/super-board-github-read.py" --kind prs-open -- pr list --repo "$REPO" --state open --limit 100 --json number,title,body,url,headRefName,files ) || exit $?
-CLOSED=$(python3 "$HERE/super-board-github-read.py" --kind issues-closed -- issue list --repo "$REPO" --state closed --limit 100 --json number,title,body,stateReason ) || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  GITEA_READ="$HERE/super-board-gitea-read.py"
+  export GITEA_REPO="$REPO"
+  MERGED=$(python3 "$GITEA_READ" --kind prs-merged --prs-merged "$REPO") || exit $?
+  OPEN=$(python3 "$GITEA_READ" --kind prs-open --prs-open "$REPO") || exit $?
+  CLOSED=$(python3 "$GITEA_READ" --kind issues-closed --issues-closed "$REPO") || exit $?
+else
+  MERGED=$(python3 "$HERE/super-board-github-read.py" --kind prs-merged -- pr list --repo "$REPO" --state merged --limit 100 --json number,title,body,url ) || exit $?
+  OPEN=$(python3 "$HERE/super-board-github-read.py" --kind prs-open -- pr list --repo "$REPO" --state open --limit 100 --json number,title,body,url,headRefName,files ) || exit $?
+  CLOSED=$(python3 "$HERE/super-board-github-read.py" --kind issues-closed -- issue list --repo "$REPO" --state closed --limit 100 --json number,title,body,stateReason ) || exit $?
+fi
 CARDS="[]"
 [ -n "$INFLIGHT" ] && CARDS=$(cat "$INFLIGHT")
 
 TARGETS="[]"
 for n in ${ISSUES//,/ }; do
-  one=$(python3 "$HERE/super-board-github-read.py" --kind issue -- issue view "$n" --repo "$REPO" --json number,title,body ) || exit $?
+  if [ "$FORGE_KIND" = gitea ]; then
+    one=$(python3 "$GITEA_READ" --kind issue --issue "$n") || exit $?
+  else
+    one=$(python3 "$HERE/super-board-github-read.py" --kind issue -- issue view "$n" --repo "$REPO" --json number,title,body ) || exit $?
+  fi
   TARGETS=$(jq -c --argjson one "$one" '. + [$one]' <<<"$TARGETS")
 done
 
