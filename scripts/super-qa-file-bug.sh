@@ -144,39 +144,76 @@ if [ -z "$FINGERPRINT" ]; then
     | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')"
 fi
 
-GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
-python3 "$GITHUB_READ" --check || exit $?
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GITHUB_READ="$HERE/super-board-github-read.py"
+GITEA_READ="$HERE/super-board-gitea-read.py"
+# Forge resolution: env SB_FORGE (or an SB_CONFIG config) picks gitea; the
+# default stays github. Lane workers on a gitea board export both.
+FORGE_KIND=github
+if [ -f "$HERE/super-board-forge.sh" ]; then
+  # shellcheck source=super-board-forge.sh
+  . "$HERE/super-board-forge.sh"
+  sb_forge_resolve ${SB_CONFIG:+"$SB_CONFIG"} || exit $?
+  FORGE_KIND="$SB_FORGE_KIND"
+fi
+if [ "$FORGE_KIND" = gitea ]; then READ_PY="$GITEA_READ"; else READ_PY="$GITHUB_READ"; fi
+if [ "$FORGE_KIND" = gitea ]; then
+  # shellcheck source=super-board-gitea-api.sh
+  . "$HERE/super-board-gitea-api.sh"
+fi
+python3 "$READ_PY" --check || exit $?
 
 # --- project resolution -----------------------------------------------------
-OWNER="${SUPER_QA_PROJECT_OWNER:-}"
-if [ -z "$OWNER" ]; then
-  OWNER=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json owner -q .owner.login) || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  REPO_NAME="${SUPER_QA_REPO:-$SB_FORGE_OWNER/$SB_FORGE_REPO}"
+  OWNER="${SUPER_QA_PROJECT_OWNER:-$SB_FORGE_OWNER}"
+else
+  OWNER="${SUPER_QA_PROJECT_OWNER:-}"
+  if [ -z "$OWNER" ]; then
+    OWNER=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json owner -q .owner.login) || exit $?
+  fi
 fi
 PROJECT_TITLE="${SUPER_QA_PROJECT_TITLE:-Super Ultimate QA}"
 TARGET_COLUMN="${SUPER_QA_TARGET_OPTION_NAME:-Bug}"
 
-PROJECT_LIST=$(python3 "$GITHUB_READ" --kind projects -- project list --owner "$OWNER" --format json) || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  PROJECT_LIST=$(python3 "$GITEA_READ" --kind projects --projects "$REPO_NAME") || exit $?
+else
+  PROJECT_LIST=$(python3 "$GITHUB_READ" --kind projects -- project list --owner "$OWNER" --format json) || exit $?
+fi
 NUMBER=$(echo "$PROJECT_LIST" | jq -r --arg t "$PROJECT_TITLE" \
-  '[.projects[] | select((.title // "" | ascii_downcase) == ($t | ascii_downcase))] | first | .number // empty')
+  '[.projects[] | select((.title // "" | ascii_downcase) == ($t | ascii_downcase))] | first | (.number // .id) // empty')
 # Do NOT silently fall back to the repo's primary project — its columns mean
 # different things, and QA cards would enter a lane that never expects them.
 [ -n "$NUMBER" ] || die "no project titled '${PROJECT_TITLE}' under ${OWNER} — create one, or set SUPER_QA_PROJECT_TITLE" 70
 
 # --- dedupe -----------------------------------------------------------------
-REPO_NAME="${SUPER_QA_REPO:-}"
-if [ -z "$REPO_NAME" ]; then
-  REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  : "${REPO_NAME:=$SB_FORGE_OWNER/$SB_FORGE_REPO}"
+else
+  REPO_NAME="${SUPER_QA_REPO:-}"
+  if [ -z "$REPO_NAME" ]; then
+    REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
+  fi
 fi
 REPO_FLAG=(-R "$REPO_NAME")
-ISSUES_JSON=$(python3 "$GITHUB_READ" --issue-history "$REPO_NAME") || exit $?
+ISSUES_JSON=$(python3 "$READ_PY" --issue-history "$REPO_NAME") || exit $?
 EXISTING=$(printf '%s' "$ISSUES_JSON" | jq -r --arg fingerprint "$FINGERPRINT" '[.[] | select(.state == "OPEN" and any(.body | splits("\\s+"); . == $fingerprint)) | .number] | first // empty')
 
 
 if [ -n "$EXISTING" ]; then
-  python3 "$GITHUB_READ" --check || exit $?
-  gh issue comment "$EXISTING" "${REPO_FLAG[@]}" --body "Seen again${ITER:+ on iteration ${ITER}}.
+  python3 "$READ_PY" --check || exit $?
+  SEEN_BODY="Seen again${ITER:+ on iteration ${ITER}}.
 
-${BODY_RAW}" >/dev/null 2>&1 || { python3 "$GITHUB_READ" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
+${BODY_RAW}"
+  if [ "$FORGE_KIND" = gitea ]; then
+    sb_gitea_api POST "repos/$REPO_NAME/issues/${EXISTING}/comments" \
+      "$(jq -cn --arg b "$SEEN_BODY" '{body:$b}')" >/dev/null 2>&1 \
+      || { python3 "$READ_PY" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
+  else
+    gh issue comment "$EXISTING" "${REPO_FLAG[@]}" --body "$SEEN_BODY" >/dev/null 2>&1 \
+      || { python3 "$READ_PY" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
+  fi
   echo "$EXISTING"
   exit 0
 fi
@@ -238,24 +275,67 @@ if [ -n "$CATEGORY" ]; then LABELS+=("qa:${CATEGORY}"); fi
 if [ -n "$SUGGESTED_SKILL" ]; then LABELS+=("skill:${SUGGESTED_SKILL}"); fi
 
 # `gh issue create` hard-fails on an unknown label, which would lose the finding
-# entirely. Create them best-effort first.
+# entirely. Create them best-effort first. On Gitea, POST issues takes label IDs,
+# so resolve-or-create each one and pass the ids in the create payload.
+GITEA_LABEL_IDS="[]"
 for l in "${LABELS[@]}"; do
-  python3 "$GITHUB_READ" --check || exit $?
-  gh label create "$l" "${REPO_FLAG[@]}" --color D93F0B --force >/dev/null 2>&1 || true
+  python3 "$READ_PY" --check || exit $?
+  if [ "$FORGE_KIND" = gitea ]; then
+    lid=$(sb_gitea_api GET "repos/$REPO_NAME/labels" 2>/dev/null | jq -r --arg n "$l" '[.[] | select(.name == $n) | .id][0] // empty')
+    if [ -z "$lid" ]; then
+      lid=$(sb_gitea_api POST "repos/$REPO_NAME/labels" \
+        "$(jq -cn --arg n "$l" '{name:$n,color:"#d93f0b"}')" 2>/dev/null | jq -r '.id // empty') || lid=""
+    fi
+    [ -n "$lid" ] && GITEA_LABEL_IDS=$(jq -cn --argjson a "$GITEA_LABEL_IDS" --argjson i "$lid" '$a + [$i]')
+  else
+    gh label create "$l" "${REPO_FLAG[@]}" --color D93F0B --force >/dev/null 2>&1 || true
+  fi
 done
 LABEL_ARGS=()
 for l in "${LABELS[@]}"; do LABEL_ARGS+=(--label "$l"); done
 
-python3 "$GITHUB_READ" --check || exit $?
-ISSUE_URL=$(gh issue create "${REPO_FLAG[@]}" --title "$FULL_TITLE" --body-file "$BODY_TMP" "${LABEL_ARGS[@]}") \
-  || { python3 "$GITHUB_READ" --halt "Issue creation response failed; reconcile fingerprint ${FINGERPRINT} before retrying"; exit 79; }
-ISSUE_N=$(basename "$ISSUE_URL")
+python3 "$READ_PY" --check || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  CREATED=$(sb_gitea_api POST "repos/$REPO_NAME/issues" \
+    "$(jq -cn --arg t "$FULL_TITLE" --rawfile b "$BODY_TMP" --argjson l "$GITEA_LABEL_IDS" \
+       '{title:$t, body:$b, labels:$l}')") \
+    || { python3 "$READ_PY" --halt "Issue creation response failed; reconcile fingerprint ${FINGERPRINT} before retrying"; exit 79; }
+  ISSUE_N=$(echo "$CREATED" | jq -r .number)
+  ISSUE_URL=$(echo "$CREATED" | jq -r '.html_url // empty')
+  [ -n "$ISSUE_URL" ] || ISSUE_URL="http://gitea/$REPO_NAME/issues/$ISSUE_N"
+  GITEA_ISSUE_GID=$(echo "$CREATED" | jq -r .id)
+else
+  ISSUE_URL=$(gh issue create "${REPO_FLAG[@]}" --title "$FULL_TITLE" --body-file "$BODY_TMP" "${LABEL_ARGS[@]}") \
+    || { python3 "$READ_PY" --halt "Issue creation response failed; reconcile fingerprint ${FINGERPRINT} before retrying"; exit 79; }
+  ISSUE_N=$(basename "$ISSUE_URL")
+fi
 
 # --- promote onto the board -------------------------------------------------
 # Past this point the issue exists, so the number goes to stdout no matter what:
 # exit 71 tells the caller "filed, needs a manual move" rather than losing it.
 promote() {
   local item_id project_id field_json field_id option_id
+  if [ "$FORGE_KIND" = gitea ]; then
+    # One step on Gitea: adding the issue straight into the target column.
+    local column_id candidate
+    python3 "$READ_PY" --check || return $?
+    field_json=$(python3 "$GITEA_READ" --kind fields --fields "$REPO_NAME/$NUMBER") || return $?
+    column_id=""
+    for candidate in "$TARGET_COLUMN" Bug Ready Todo Backlog Triage; do
+      column_id=$(echo "$field_json" | jq -r --arg c "$candidate" \
+        '[.fields[0].options[]? | select(.name==$c) | .id][0] // empty')
+      if [ -n "$column_id" ]; then
+        [ "$candidate" = "$TARGET_COLUMN" ] || \
+          echo "note: no '${TARGET_COLUMN}' column on this board — filed the bug into '${candidate}'" >&2
+        break
+      fi
+    done
+    [ -n "$column_id" ] || { echo "warn: no '${TARGET_COLUMN}' column and no alias (Bug, Ready, Todo, Backlog, Triage) on the board" >&2; return 1; }
+    python3 "$READ_PY" --check || return $?
+    sb_gitea_api POST "repos/$REPO_NAME/projects/$NUMBER/columns/$column_id/issues/$GITEA_ISSUE_GID" >/dev/null \
+      || { python3 "$READ_PY" --halt "Project column add outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }
+    return 0
+  fi
   python3 "$GITHUB_READ" --check || return $?
   item_id=$(gh project item-add "$NUMBER" --owner "$OWNER" --url "$ISSUE_URL" --format json --jq '.id') || { python3 "$GITHUB_READ" --halt "Project item add outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }
   project_id=$(python3 "$GITHUB_READ" --kind scalar -- project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return $?

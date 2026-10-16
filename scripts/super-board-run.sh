@@ -31,14 +31,57 @@
 # (no subshell, no `exec` of a native PE), so `$!` names the worker itself rather than a bash stub.
 
 set -euo pipefail
-SB_GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
-gh_checkpoint() { python3 "$SB_GITHUB_READ" --check || exit $?; }
+SB_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SB_GITHUB_READ="$SB_BIN_DIR/super-board-github-read.py"
+SB_GITEA_READ="$SB_BIN_DIR/super-board-gitea-read.py"
+# READ_PY/FORGE_KIND are set by the forge resolution after the config read; the
+# defaults keep lib-only sourcing (SB_LIB_ONLY=1) on the github path.
+FORGE_KIND="${SB_FORGE_KIND:-github}"
+if [ "$FORGE_KIND" = gitea ]; then READ_PY="$SB_GITEA_READ"; else READ_PY="$SB_GITHUB_READ"; fi
+gh_checkpoint() { python3 "$READ_PY" --check || exit $?; }
+forge_halt_exit() {
+  python3 "$READ_PY" --halt "$1" >&2 || true
+  exit 79
+}
 gh_write_once() {
   gh_checkpoint
-  gh "$@" || {
-    python3 "$SB_GITHUB_READ" --halt "GitHub $1 $2 response failed; reconcile the write before restarting" >&2 || true
-    exit 79
-  }
+  gh "$@" || forge_halt_exit "GitHub $1 $2 response failed; reconcile the write before restarting"
+}
+forge_assign() {
+  # forge_assign add|remove <issue> <login> — the claim mutex on either forge.
+  # Gitea has no compare-and-swap: the local inflight lock stays the primary
+  # claim, this mirrors it for humans (documented gitea degradation).
+  local op="$1" issue="$2" login="$3"
+  gh_checkpoint
+  if [ "$FORGE_KIND" = gitea ]; then
+    # shellcheck source=super-board-gitea-api.sh
+    . "$SB_BIN_DIR/super-board-gitea-api.sh"
+    local method=POST
+    [ "$op" = remove ] && method=DELETE
+    sb_gitea_api "$method" "repos/{owner}/{repo}/issues/${issue}/assignees" \
+      "$(jq -cn --arg l "$login" '{assignees:[$l]}')" >/dev/null 2>&1 \
+      || forge_halt_exit "Gitea assignee ${op} on #${issue} response failed; reconcile the write before restarting"
+  else
+    local flag="--add-assignee"
+    [ "$op" = remove ] && flag="--remove-assignee"
+    gh issue edit "$issue" "$flag" "$login" >/dev/null 2>&1 \
+      || forge_halt_exit "GitHub issue edit ${flag} #${issue} response failed; reconcile the write before restarting"
+  fi
+}
+forge_comment() {
+  # forge_comment <issue> <body>
+  local issue="$1" body="$2"
+  gh_checkpoint
+  if [ "$FORGE_KIND" = gitea ]; then
+    # shellcheck source=super-board-gitea-api.sh
+    . "$SB_BIN_DIR/super-board-gitea-api.sh"
+    sb_gitea_api POST "repos/{owner}/{repo}/issues/${issue}/comments" \
+      "$(jq -cn --arg b "$body" '{body:$b}')" >/dev/null 2>&1 \
+      || forge_halt_exit "Gitea comment on #${issue} response failed; reconcile the write before restarting"
+  else
+    gh issue comment "$issue" --body "$body" >/dev/null 2>&1 \
+      || forge_halt_exit "GitHub issue comment #${issue} response failed; reconcile the write before restarting"
+  fi
 }
 
 # ───────────────────────────── args + paths ─────────────────────────────
@@ -108,6 +151,20 @@ INFLIGHT_DIR=".claude/super-board/inflight"
 mkdir -p "docs/super-board/runs" "$WORKER_LOG_DIR" .claude/worktrees "$INFLIGHT_DIR"
 fi  # end non-lib-only setup
 
+# Forge resolution (github default): a lib-only source keeps whatever the
+# caller set; a real run resolves from its config, env and remote.
+if [ -f "$SB_BIN_DIR/super-board-forge.sh" ]; then
+  # shellcheck source=super-board-forge.sh
+  . "$SB_BIN_DIR/super-board-forge.sh"
+  if [ "${SB_LIB_ONLY:-0}" != "1" ]; then
+    sb_forge_resolve "$CONFIG_PATH" || exit $?
+  else
+    sb_forge_resolve || true
+  fi
+  FORGE_KIND="$SB_FORGE_KIND"
+  if [ "$FORGE_KIND" = gitea ]; then READ_PY="$SB_GITEA_READ"; else READ_PY="$SB_GITHUB_READ"; fi
+fi
+
 # Defaults so the helpers below are safe to source under `set -u` in lib-only mode.
 : "${RUN_MANIFEST:=/dev/null}"
 : "${WORKER_LOG_DIR:=/dev/null}"
@@ -157,8 +214,14 @@ status_option_id() {
 }
 
 set_card_status() {
-  # $1 = project item id, $2 = target status name. Returns non-zero if unresolvable.
-  local item_id="$1" name="$2" opt_id
+  # $1 = project item id, $2 = target status name, $3 = issue number (gitea).
+  # Returns non-zero if unresolvable. Gitea moves through card.sh, which owns
+  # the column cache and the move endpoint; github keeps the direct mutation.
+  local item_id="$1" name="$2" issue="${3:-}" opt_id
+  if [ "$FORGE_KIND" = gitea ]; then
+    "$SB_BIN_DIR/super-board-card.sh" --config "$CONFIG_PATH" move "$issue" "$name" >/dev/null || return 1
+    return 0
+  fi
   resolve_status_field || { gh_checkpoint; log "⚠ could not resolve Status field — skipping reconcile"; return 1; }
   opt_id=$(status_option_id "$name") || {
     log "⚠ Status option '${name}' not present on the board — skipping reconcile"; return 1; }
@@ -183,7 +246,11 @@ issue_is_open() {
   # $1 = issue number. Returns 0 when OPEN, 1 when CLOSED.
   # Unreadable is distinct from both OPEN and CLOSED: exit 79 halts the run.
   local state
-  state=$(python3 "$SB_GITHUB_READ" --kind state -- issue view "$1" --json state -q '.state') || return 79
+  if [ "$FORGE_KIND" = gitea ]; then
+    state=$(python3 "$SB_GITEA_READ" --kind state --issue "$1") || return 79
+  else
+    state=$(python3 "$SB_GITHUB_READ" --kind state -- issue view "$1" --json state -q '.state') || return 79
+  fi
   [ "$state" != "CLOSED" ]
 }
 
@@ -218,9 +285,9 @@ top_card_in_column() {
     [ "$issue_rc" -le 1 ] || exit "$issue_rc"
     if [ "$issue_rc" -ne 0 ]; then
       log "reconciled closed #${issue} -> Done (was '${col}') — dispatching 0 workers for it"
-      set_card_status "$item_id" "Done" || { gh_checkpoint; log "  ↳ reconcile of #${issue} could not be written to the board"; return 1; }
+      set_card_status "$item_id" "Done" "$issue" || { gh_checkpoint; log "  ↳ reconcile of #${issue} could not be written to the board"; return 1; }
       gh_checkpoint
-      [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+      [ -n "$BOT_LOGIN" ] && forge_assign remove "$issue" "$BOT_LOGIN" || true
       rm -f "$INFLIGHT_DIR/$issue"
       continue
     fi
@@ -271,8 +338,23 @@ lane_idle() {
 }
 
 gh_rate_guard() {
-  # Sleep until rate limit resets if GraphQL remaining < 200.
+  # Sleep until rate limit resets if the forge's bucket is nearly empty.
   local payload remaining reset now wait
+  if [ "$FORGE_KIND" = gitea ]; then
+    payload=$(python3 "$SB_GITEA_READ" --kind quota --quota) || return $?
+    # An instance without rate limiting has nothing to wait for.
+    [ "$(echo "$payload" | jq -r '.rate_limits_disabled // false')" = "true" ] && return 0
+    remaining=$(echo "$payload" | jq -r '.resources.core.remaining // 5000')
+    if [ "$remaining" -lt 200 ]; then
+      reset=$(echo "$payload" | jq -r '.resources.core.reset // 0')
+      now=$(date +%s)
+      wait=$((reset - now + 10))
+      [ "$wait" -lt 60 ] && wait=60
+      log "⚠ Gitea API rate limit low (${remaining} left) — sleeping ${wait}s until reset"
+      sleep "$wait"
+    fi
+    return 0
+  fi
   payload=$(python3 "$SB_GITHUB_READ" --kind quota -- api rate_limit) || return $?
   # REST misreports the GraphQL bucket; super-board-gh-guard.sh → sb_gh_quota_merge.
   payload=$(. "$(dirname "$SB_GITHUB_READ")/super-board-gh-guard.sh" && sb_gh_quota_merge "$payload")
@@ -297,7 +379,7 @@ try_claim_assignee() {
   local issue="$1"
   [ -z "$BOT_LOGIN" ] && return 0
   gh_checkpoint
-  gh_write_once issue edit "$issue" --add-assignee "$BOT_LOGIN" >/dev/null 2>&1 || {
+  forge_assign add "$issue" "$BOT_LOGIN" || {
     log "claim failed on #${issue} (race or gh api error) — skipping this tick"
     return 1
   }
@@ -400,7 +482,7 @@ check_lane_zombie() {
     sleep 1
     kill -9 "$pid" 2>/dev/null || true
     gh_checkpoint
-    [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+    [ -n "$BOT_LOGIN" ] && forge_assign remove "$issue" "$BOT_LOGIN" || true
     gh_checkpoint
     rm -f "$INFLIGHT_DIR/$issue"
     case "$lane" in
@@ -479,7 +561,7 @@ reap_finished_locks() {
       gh_checkpoint
       if [ -n "$BOT_LOGIN" ]; then
         gh_checkpoint
-        gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+        forge_assign remove "$issue" "$BOT_LOGIN" || true
         log "reaped stale lock + swept assignee on #${issue} (pid=${PID:-empty})"
       else
         log "reaped stale lock for #${issue} (pid=${PID:-empty})"
@@ -544,18 +626,18 @@ reclaim_stranded_building() {
         continue
       fi
     fi
-    if ! set_card_status "$item_id" "Ready"; then
+    if ! set_card_status "$item_id" "Ready" "$issue"; then
       gh_checkpoint
       log "⚠ stranded #${issue} in Building — could not move it to Ready; drag it by hand"
       continue
     fi
-    [ -n "$BOT_LOGIN" ] && gh_write_once issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
+    [ -n "$BOT_LOGIN" ] && forge_assign remove "$issue" "$BOT_LOGIN" || true
     # Comment format: writing-standard.md § 4.
     gh_checkpoint
-    gh_write_once issue comment "$issue" --body "[orchestrator] [report] ↩️ back to Ready · stranded in Building
+    forge_comment "$issue" "[orchestrator] [report] ↩️ back to Ready · stranded in Building
 Did: found no live worker; the last run stopped mid-build
 ✅ Done: card moved to Ready · branch ${branch:-none found}${branch:+ kept}
-Next: builder (next tick${branch:+, continues on the branch})" >/dev/null 2>&1 || true
+Next: builder (next tick${branch:+, continues on the branch})" || true
     log "↩ stranded #${issue}: Building → Ready (branch ${branch:-none})"
   done <<EOF
 $(echo "$PROJECT_ITEMS_JSON" | jq -r --arg bot "$BOT_LOGIN" '

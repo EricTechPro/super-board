@@ -38,10 +38,29 @@ const readyLane = (card) => card.lane || (labelsOf(card).includes('qa') ? 'qa' :
 if (input.tier && !['low', 'medium', 'high'].includes(input.tier)) {
   throw new Error(`super-board-wave: unknown tier "${input.tier}" — use low | medium | high`)
 }
+// Forge of this board's config (v3.2.0): the orchestrator passes config.forge.
+// Prompts, read shapes and the label one-liner below follow it; the board
+// scripts (card.sh, merge-gate, filers) resolve the same key themselves.
+const FORGE = input.forge || 'github'
+if (!['github', 'gitea'].includes(FORGE)) {
+  throw new Error(`super-board-wave: unknown forge "${FORGE}" — use github | gitea`)
+}
+const FORGE_NAME = FORGE === 'gitea' ? 'Gitea' : 'GitHub'
+const READ_HELPER = `.claude/bin/super-board-${FORGE}-read.py`
 
 let halted = false
-// Valid form per --kind, from validate() in scripts/super-board-github-read.py (#32).
-const READ_SHAPES = [
+// Valid form per --kind, from validate() in the forge's read wrapper (#32).
+const READ_SHAPES = FORGE === 'gitea' ? [
+  `Read shapes (helper: ${READ_HELPER}; GITEA_REPO is exported by the lane setup):`,
+  `- issue title+body: --kind issue --issue <N>`,
+  `- issue comments: --kind comments --issue <N> (zero comments = [[]])`,
+  `- other JSON, incl. maybe-empty lists: --kind json -- api repos/{owner}/{repo}/… (GET only)`,
+  `- PR branch+head: --kind head --pr <N>`,
+  `- PR body+head: --kind body --pr <N>`,
+  `- PR metadata: --kind metadata --pr <N>`,
+  `- issue state: --kind state --issue <N>`,
+  `A read whose output misses its shape exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
+].join('\n') : [
   `Read shapes (helper: .claude/bin/super-board-github-read.py --kind <kind> -- <gh args>):`,
   `- issue title+body: --kind issue -- issue view <N> --json number,title,body`,
   `- issue comments: --kind comments -- api repos/{owner}/{repo}/issues/<N>/comments --paginate --slurp (zero comments = [[]])`,
@@ -52,7 +71,7 @@ const READ_SHAPES = [
   `- issue state: --kind state -- issue view <N> --json state --jq .state`,
   `A read whose output misses its shape exits 64 for that call only and prints the valid form: fix the read, do not halt.`,
 ].join('\n')
-const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required GitHub reads use .claude/bin/super-board-github-read.py: three total attempts, exit 79 means run halted. Check --check before any GitHub write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more GitHub calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
+const READ_FAILURE = READ_SHAPES + '\n' + `Verification-readiness exit 9 means missing/unusable config.verify_commands: preserve card/worktree/approval/claims, report status=halted (preflight verdict=halted), stop dispatch, repair project configuration before explicit restart; no Build bounce or automatic retries. ` + `Required ${FORGE_NAME} reads use ${READ_HELPER}: three total attempts, exit 79 means run halted. Check --check before any ${FORGE_NAME} write, migration, or merge. On exit 79 preserve worktree/card/approval/claims, make no more ${FORGE_NAME} calls, and report status=halted (preflight verdict=halted). Never retry a mutation. Config: ${input.configPath}.`
 
 const CLASSIFY_SCHEMA = {
   type: 'object',
@@ -132,7 +151,9 @@ const REVIEW_MEMORY = [
 // and its Status options with `gh project field-list` (101) before each move.
 const BOARD_IO = () =>
   `Board moves and reads: .claude/bin/super-board-card.sh --config ${input.configPath} move <issue> <Status> ` +
-  `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per .claude/skills/super-board/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`
+  (FORGE === 'gitea'
+    ? `(one move call) · status <issue> · items. Comments, labels, PR reads: tea through ${READ_HELPER} per .claude/skills/super-board/references/gitea.md. Read the forge once per decision, never in a sleep loop.`
+    : `(1 GraphQL point) · status <issue> · items. Comments, labels, PR reads: REST per .claude/skills/super-board/references/rate-limit-etiquette.md → "Price list". Read GitHub once per decision, never in a sleep loop.`)
 
 // The orchestrator resolves every remaining chain before claims. The runtime has
 // no subprocess API; each worker repeats the deterministic CLI before its writes.
@@ -294,12 +315,15 @@ const results = await pipeline(
     const labels = labelsOf(card)
     const typed = ['qa', 'bug', 'feature'].find((l) => labels.includes(l))
     const cls = await agent(
-      SKILLS_CHECK([card]) + '\n' + READ_FAILURE + '\n' + `Read GitHub issue #${card.number} ("${card.title}") — body (--kind issue) and all comments (--kind comments) — with the read shapes above. ` +
+      SKILLS_CHECK([card]) + '\n' + READ_FAILURE + '\n' + `Read ${FORGE_NAME} issue #${card.number} ("${card.title}") — body (--kind issue) and all comments (--kind comments) — with the read shapes above. ` +
       `Classify it: kind (feature|bug|qa) and complexity (low|medium|high) judged by the scope of change required. ` +
       (typed
         ? `Its label says "${typed}": return kind "${typed}" — the label routes the card, you never override it.`
         : `It has no type label, so it is built (no label = Building). Return feature or bug — never qa, ` +
-          `which only a person sets. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. For a truly untyped card, re-run skills-ready against a copy of this card with the proposed label before any label write, then add that label: gh issue edit ${card.number} --add-label <kind>.`),
+          `which only a person sets. Existing docs/ux/tests/refactor/tech-debt rows keep their label chain: classify complexity without adding feature/bug. For a truly untyped card, re-run skills-ready against a copy of this card with the proposed label before any label write, then add that label: ` +
+          (FORGE === 'gitea'
+            ? `bash -c '. .claude/bin/super-board-forge.sh && sb_forge_resolve ${input.configPath} && sb_forge_label_add ${card.number} <kind>'.`
+            : `gh issue edit ${card.number} --add-label <kind>.`)),
       { label: `classify:#${card.number}`, phase: 'Classify', model: classifyModel, schema: CLASSIFY_SCHEMA }
     )
     if (cls && cls.status === 'halted') halted = true

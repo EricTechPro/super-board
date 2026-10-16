@@ -70,12 +70,33 @@ SRC="${BODY_FILE:-$APPEND_FILE}"
 [ -r "$SRC" ] || die "cannot read $SRC" 66
 [ "$DRY" -eq 1 ] || [ -n "$HEAD" ] || die "--expect-head <sha> is required (the PR head your edit is based on)" 64
 
-GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
-# REST, not `gh pr view`/`gh pr edit`: this script runs ~3 times per lane per
-# card, and the REST core bucket is separate from the GraphQL one the board
-# lives on. GH_REPO fills {owner}/{repo}; unset, gh uses the current checkout.
-export GH_REPO="${REPO:-${GH_REPO:-}}"; [ -n "$GH_REPO" ] || unset GH_REPO
-META=$(python3 "$GITHUB_READ" --kind body -- api "repos/{owner}/{repo}/pulls/$PR" --jq '{headRefOid: .head.sha, body: (.body // "")}' ) || exit $?
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GITHUB_READ="$HERE/super-board-github-read.py"
+GITEA_READ="$HERE/super-board-gitea-read.py"
+
+# Forge resolution: github (default) reads/PATCHes through gh; gitea through
+# tea api. Same markers, same head-pin, same exits.
+FORGE_KIND=github
+if [ -f "$HERE/super-board-forge.sh" ]; then
+  # shellcheck source=super-board-forge.sh
+  . "$HERE/super-board-forge.sh"
+  sb_forge_resolve ${CONFIG:+"$CONFIG"} || exit $?
+  FORGE_KIND="$SB_FORGE_KIND"
+fi
+
+if [ "$FORGE_KIND" = gitea ]; then
+  READ_PY="$GITEA_READ"
+  # GITEA_REPO fills tea's {owner}/{repo} placeholders in every worktree.
+  if [ -n "$REPO" ]; then export GITEA_REPO="$REPO"; fi
+  META=$(python3 "$GITEA_READ" --kind body --pr "$PR") || exit $?
+else
+  READ_PY="$GITHUB_READ"
+  # REST, not `gh pr view`/`gh pr edit`: this script runs ~3 times per lane per
+  # card, and the REST core bucket is separate from the GraphQL one the board
+  # lives on. GH_REPO fills {owner}/{repo}; unset, gh uses the current checkout.
+  export GH_REPO="${REPO:-${GH_REPO:-}}"; [ -n "$GH_REPO" ] || unset GH_REPO
+  META=$(python3 "$GITHUB_READ" --kind body -- api "repos/{owner}/{repo}/pulls/$PR" --jq '{headRefOid: .head.sha, body: (.body // "")}' ) || exit $?
+fi
 NOW=$(printf '%s' "$META" | jq -r '.headRefOid // empty')
 if [ -n "$HEAD" ]; then
   # Short or full sha both work: the PR head must start with what you passed.
@@ -147,8 +168,15 @@ sys.stdout.write(out)
 PY
 
 if [ "$DRY" -eq 1 ]; then cat "$NEW_TMP"; exit 0; fi
-# $(…) drops trailing newlines, which GitHub does not keep either.
+# $(…) drops trailing newlines, which neither forge keeps.
 if [ "$(cat "$OLD_TMP")" = "$(cat "$NEW_TMP")" ]; then echo unchanged; exit 0; fi
-python3 "$GITHUB_READ" --check || exit $?
-jq -n --rawfile b "$NEW_TMP" '{body: $b}' | gh api -X PATCH "repos/{owner}/{repo}/pulls/$PR" --input - >/dev/null 2>&1 || { python3 "$GITHUB_READ" --halt "PR body update outcome unknown for #$PR; read the body before retrying"; exit 79; }
+python3 "$READ_PY" --check || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  # shellcheck source=super-board-gitea-api.sh
+  . "$HERE/super-board-gitea-api.sh"
+  sb_gitea_api PATCH "repos/{owner}/{repo}/pulls/$PR" "$(jq -n --rawfile b "$NEW_TMP" '{body: $b}')" >/dev/null 2>&1 \
+    || { python3 "$READ_PY" --halt "PR body update outcome unknown for #$PR; read the body before retrying"; exit 79; }
+else
+  jq -n --rawfile b "$NEW_TMP" '{body: $b}' | gh api -X PATCH "repos/{owner}/{repo}/pulls/$PR" --input - >/dev/null 2>&1 || { python3 "$READ_PY" --halt "PR body update outcome unknown for #$PR; read the body before retrying"; exit 79; }
+fi
 echo updated

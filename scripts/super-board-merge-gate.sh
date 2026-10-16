@@ -108,10 +108,11 @@
 # and migrations run after verification, inside the lock, right before the
 # merge. `--dry-run` reports both and runs neither.
 set -euo pipefail
-# Fixed read commands: a malformed payload is GitHub's, so it halts (#32).
-export SB_GITHUB_READ_STRICT=1
+# Fixed read commands: a malformed payload is the forge's, so it halts (#32).
+export SB_GITHUB_READ_STRICT=1 SB_GITEA_READ_STRICT=1
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 GITHUB_READ="$HERE/super-board-github-read.py"
+GITEA_READ="$HERE/super-board-gitea-read.py"
 
 CONFIG=""; PR=""; LOCK_TIMEOUT=1800; STALE_AFTER=""; DRY=0; EXPECT_HEAD=""; SUBJECT=""; MSG_FILE=""
 while [ $# -gt 0 ]; do
@@ -145,7 +146,26 @@ fi
 CONFIG_JSON=$(cat "$CONFIG")
 printf '%s\n' "$CONFIG_JSON" | python3 "$HERE/super-board-verification-ready.py" --config -
 BASE=$(echo "$CONFIG_JSON" | jq -r '.base_branch // "main"')
-REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // ""' | sed -E 's#^https?://github\.com/##; s#\.git$##')
+
+# Forge resolution: github (default) reads through github-read + gh; gitea
+# through gitea-read + tea api. Same verbs, same exit codes, one halt file.
+FORGE_KIND=github
+if [ -f "$HERE/super-board-forge.sh" ]; then
+  # shellcheck source=super-board-forge.sh
+  . "$HERE/super-board-forge.sh"
+  sb_forge_resolve "$CONFIG" || exit $?
+  FORGE_KIND="$SB_FORGE_KIND"
+fi
+if [ "$FORGE_KIND" = gitea ]; then
+  READ_PY="$GITEA_READ"
+  REPO="$SB_FORGE_OWNER/$SB_FORGE_REPO"
+else
+  READ_PY="$GITHUB_READ"
+  REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // ""' | sed -E 's#^https?://github\.com/##; s#\.git$##')
+fi
+gate_check() { python3 "$READ_PY" --check; }
+gate_halt() { python3 "$READ_PY" --halt "$1"; }
+
 REPO_PATH=$(echo "$CONFIG_JSON" | jq -r '.repo.path // "."')
 export SB_REPO_PATH="$REPO_PATH"
 # Read with a while-loop rather than `mapfile`: macOS ships bash 3.2 and every
@@ -160,7 +180,7 @@ if [ "${#VERIFY[@]}" -eq 0 ]; then
   echo "verification-readiness: verify_commands yielded no usable shell commands; repair the project config and restart the board." >&2
   exit 9
 fi
-python3 "$GITHUB_READ" --check
+gate_check
 
 LOCK_DIR="${REPO_PATH}/.claude/super-board/inflight/merge.lock"
 mkdir -p "$(dirname "$LOCK_DIR")"
@@ -206,12 +226,20 @@ trap cleanup EXIT
 # ---- the head guard --------------------------------------------------------
 # Review evidence belongs to one commit. If the branch moved after the Reviewer
 # passed it, the tests it reran and the diff it read describe something else.
-pr_head() { python3 "$GITHUB_READ" --kind head -- pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName,headRefOid \
-              -q '.headRefName + " " + .headRefOid'; }
+if [ "$FORGE_KIND" = gitea ]; then
+  pr_head() { python3 "$GITEA_READ" --kind head --pr "$PR"; }
+else
+  pr_head() { python3 "$GITHUB_READ" --kind head -- pr view "$PR" ${REPO:+--repo "$REPO"} --json headRefName,headRefOid \
+                -q '.headRefName + " " + .headRefOid'; }
+fi
 HEAD=$(pr_head) || exit $?
 read -r HEAD_REF HEAD_SHA <<<"$HEAD"
-[ -n "${HEAD_SHA:-}" ] || { say "could not read the PR head from GitHub"; exit 1; }
-pr_state() { python3 "$GITHUB_READ" --kind merge-state -- pr view "$PR" ${REPO:+--repo "$REPO"} --json state,mergeCommit,headRefOid; }
+[ -n "${HEAD_SHA:-}" ] || { say "could not read the PR head from the forge"; exit 1; }
+if [ "$FORGE_KIND" = gitea ]; then
+  pr_state() { python3 "$GITEA_READ" --kind merge-state --pr "$PR"; }
+else
+  pr_state() { python3 "$GITHUB_READ" --kind merge-state -- pr view "$PR" ${REPO:+--repo "$REPO"} --json state,mergeCommit,headRefOid; }
+fi
 STATE=$(pr_state) || exit $?
 if [ "$(echo "$STATE" | jq -r .state)" = MERGED ]; then
   say "already merged; no verification, migration, or merge is repeated"
@@ -236,8 +264,19 @@ fi
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # Outside $SCRATCH: `git worktree add` below needs that directory empty.
 META=$(mktemp); DIFF=$(mktemp)
-python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
-python3 "$GITHUB_READ" --kind diff --meta "$META" -- pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF"
+read_meta() {
+  if [ "$FORGE_KIND" = gitea ]; then
+    python3 "$GITEA_READ" --kind metadata --pr "$PR" > "$META"
+  else
+    python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
+  fi
+}
+read_meta
+if [ "$FORGE_KIND" = gitea ]; then
+  python3 "$GITEA_READ" --kind diff --pr "$PR" --meta "$META" > "$DIFF"
+else
+  python3 "$GITHUB_READ" --kind diff --meta "$META" -- pr diff "$PR" ${REPO:+--repo "$REPO"} > "$DIFF"
+fi
 PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
   echo "human-gate: policy — could not classify the PR (unreadable metadata)"
   say "merge policy could not be evaluated — a human merges this one"; exit 7; }
@@ -246,13 +285,13 @@ PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$M
 # and policy/commands. Re-read trusted approval evidence; never mint it here.
 APPROVED=false
 approval_check() {
-  APPROVAL=$(python3 "$HERE/super-board-approval.py" --repo "$REPO" --pr "$PR" \
+  APPROVAL=$(python3 "$HERE/super-board-approval.py" --forge "$FORGE_KIND" --repo "$REPO" --pr "$PR" \
     --head "$HEAD_SHA" --plan "$PLAN") || APPROVAL='{"approved":false}'
-  python3 "$GITHUB_READ" --check || exit $?
+  gate_check || exit $?
   APPROVED=$(echo "$APPROVAL" | jq -r '.approved // false')
 }
 approval_request() {
-  python3 "$HERE/super-board-approval.py" --request --repo "$REPO" --pr "$PR" \
+  python3 "$HERE/super-board-approval.py" --forge "$FORGE_KIND" --request --repo "$REPO" --pr "$PR" \
     --head "$HEAD_SHA" --plan "$PLAN"
 }
 HUMAN=$(echo "$PLAN" | jq -r '.human[] | "human-gate: \(.category) — \(.why)"')
@@ -289,7 +328,7 @@ for cmd in "${VERIFY[@]}"; do
 done
 say "verified green against ${BASE} (${#VERIFY[@]} command(s))"
 
-python3 "$GITHUB_READ" --check
+gate_check
 
 # ---- migrations (inside the lock, after the build proof) -------------------
 # Run the configured migrate command for every allowed env, from the verified
@@ -303,7 +342,7 @@ if [ "$(echo "$PLAN" | jq '.migrations | length')" -gt 0 ]; then
     [ -n "$env" ] || continue
     if [ "$DRY" -eq 1 ]; then say "dry run: would migrate ${env}: ${cmd}"; continue; fi
     say "migrate ${env}: ${cmd}"
-    python3 "$GITHUB_READ" --check
+    gate_check
     if ! ( cd "$SCRATCH" && eval "$cmd" ) >"$SCRATCH/.migrate.log" 2>&1; then
       say "FAILED: migrate ${env}"; tail -20 "$SCRATCH/.migrate.log" >&2
       NEEDS+=("${cmd}   # ${env}: failed in the merge gate — fix, run it, then mark done")
@@ -326,7 +365,7 @@ fi
 if [ "$APPROVED" = true ]; then
   # Code remains pinned; body-declared human steps and config can change without
   # a commit. Reclassify them too instead of reusing the old approval scope.
-  python3 "$GITHUB_READ" --kind metadata -- pr view "$PR" ${REPO:+--repo "$REPO"} --json labels,files,additions,deletions,changedFiles,body > "$META"
+  read_meta
   PLAN=$(python3 "$HERE/super-board-merge-policy.py" --config "$CONFIG" --meta "$META" --diff "$DIFF") || {
     say "human approval scope could not be refreshed"; exit 7; }
   approval_check
@@ -343,12 +382,29 @@ if [ "$DRY" -eq 1 ]; then
   exit 0
 fi
 
-# --match-head-commit makes GitHub refuse if anything was pushed after HEAD_SHA,
-# including during the verification run above.
-python3 "$GITHUB_READ" --check
-if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
-     ${SUBJECT:+--subject "$SUBJECT"} ${MSG_FILE:+--body-file "$MSG_FILE"} \
-     --match-head-commit "$HEAD_SHA" 2>&1 | tail -3 >&2; then
+# The forge pins the code itself: GitHub via --match-head-commit, Gitea via the
+# merge API's head_commit_id (a server old enough to ignore that field is a
+# documented gitea degradation — the pr_state read below bounds the damage).
+gate_check
+do_merge() {
+  if [ "$FORGE_KIND" = gitea ]; then
+    # shellcheck source=super-board-gitea-api.sh
+    . "$HERE/super-board-gitea-api.sh"
+    local body
+    body=$(jq -cn --arg sha "$HEAD_SHA" --arg title "$SUBJECT" \
+      '{do:"squash", head_commit_id:$sha, delete_branch_after_merge:true, merge_when_checks_succeed:false}
+       + (if $title != "" then {merge_title_field:$title} else {} end)')
+    if [ -n "$MSG_FILE" ]; then
+      body=$(jq -c --rawfile m "$MSG_FILE" '. + {merge_message_field:$m}' <<<"$body")
+    fi
+    sb_gitea_api POST "repos/$REPO/pulls/$PR/merge" "$body"
+  else
+    gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
+      ${SUBJECT:+--subject "$SUBJECT"} ${MSG_FILE:+--body-file "$MSG_FILE"} \
+      --match-head-commit "$HEAD_SHA"
+  fi
+}
+if do_merge 2>&1 | tail -3 >&2; then
   say "merged ${HEAD_SHA}"
   # Post-merge tidy-up: drop worktrees and local branches the merge just made
   # redundant. Optional (only when the cleanup-wt hook is installed), local-only, and it
@@ -360,7 +416,7 @@ if gh pr merge "$PR" ${REPO:+--repo "$REPO"} --squash --delete-branch \
 fi
 STATE=$(pr_state) || exit $?
 if [ "$(echo "$STATE" | jq -r .state)" = MERGED ]; then
-  say "merge response was lost; GitHub confirms the merge commit"
+  say "merge response was lost; the forge confirms the merge commit"
   exit 0
 fi
 NOW_SHA=$(echo "$STATE" | jq -r .headRefOid)
@@ -369,4 +425,4 @@ if [ "$NOW_SHA" != "$HEAD_SHA" ]; then
   say "the review evidence is void — send the card back to Review"
   exit 6
 fi
-python3 "$GITHUB_READ" --halt "Merge response failed and GitHub has not confirmed a merge; reconcile PR #${PR} before restarting. No merge was retried."
+gate_halt "Merge response failed and the forge has not confirmed a merge; reconcile PR #${PR} before restarting. No merge was retried."

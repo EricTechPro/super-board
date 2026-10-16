@@ -12,6 +12,7 @@ from pathlib import Path
 from datetime import datetime
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -203,6 +204,79 @@ class GitHub:
         return validate(comments, expected, self.permission)
 
 
+class Gitea(GitHub):
+    """Same trust model on Gitea, through super-board-gitea-read.py as a
+    subprocess (its halt/retry discipline stays in one place). Degradations,
+    documented in references/gitea.md:
+      - closingIssuesReferences does not exist: the PR body's `Closes #N`
+        trailer (guaranteed by the writing standard) is the link, parsed by
+        gitea-read; no trailer → no linked issues → fail closed.
+      - per-user collaborator permission does not exist: the repo owner is
+        admin, a listed collaborator counts as write (Gitea's default grant),
+        everyone else is untrusted."""
+
+    def _cli(self, *cli_args):
+        helper = Path(__file__).with_name("super-board-gitea-read.py")
+        env = dict(os.environ, GITEA_REPO=self.repo)
+        proc = subprocess.run([sys.executable, str(helper), *cli_args],
+                              capture_output=True, text=True, encoding="utf-8", env=env)
+        if proc.returncode == github_read.HALTED:
+            raise github_read.ReadHalted(proc.stderr.strip() or "gitea reads are halted")
+        if proc.returncode != 0:
+            raise ValueError(proc.stderr.strip()[:300] or f"gitea read failed ({proc.returncode})")
+        return proc.stdout
+
+    def permission(self, login):
+        if not re.fullmatch(r"[A-Za-z0-9_-]+(?:\[bot\])?", login):
+            return None
+        owner = self.repo.split("/")[0]
+        if login.lower() == owner.lower():
+            return "admin"
+        if login not in self.permissions:
+            perm = None
+            try:
+                value = json.loads(self._cli("--kind", "json", "--", "api",
+                                             f"repos/{self.repo}/collaborators"))
+                for c in value if isinstance(value, list) else []:
+                    if isinstance(c, dict) and (c.get("login") or "").lower() == login.lower():
+                        p = c.get("permissions") or {}
+                        if isinstance(c.get("permission"), str):
+                            perm = c["permission"]
+                        elif p:
+                            perm = ("admin" if p.get("admin") else "write" if p.get("push")
+                                    else "read" if p.get("pull") else None)
+                        else:
+                            perm = "write"   # a listed collaborator holds Gitea's default grant
+                        break
+            except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError):
+                perm = None   # unreadable collaborator list → fail closed
+            self.permissions[login] = perm
+        return self.permissions[login]
+
+    def comments(self, number):
+        pages = json.loads(self._cli("--kind", "comments", "--issue", str(number)))
+        if not isinstance(pages, list) or not pages or any(not isinstance(p, list) for p in pages):
+            raise ValueError("unreadable comments")
+        if any(not isinstance(c, dict) for page in pages for c in page):
+            raise ValueError("unreadable comment")
+        return [dict(comment, source=number) for page in pages for comment in page]
+
+    def pr(self, number):
+        value = json.loads(self._cli("--kind", "approval", "--pr", str(number)))
+        if value.get("state") != "OPEN":
+            raise ValueError("PR is not open")
+        head = value.get("headRefOid") or ""
+        if not SHA.fullmatch(head):
+            raise ValueError("unreadable PR head")
+        issues = {i["number"] for i in value.get("closingIssues") or []
+                  if isinstance(i, dict) and isinstance(i.get("number"), int)}
+        return head, issues
+
+
+def forge_class(name):
+    return Gitea if (name or "github").strip().lower() == "gitea" else GitHub
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo", required=True)
@@ -211,7 +285,9 @@ def main():
     ap.add_argument("--plan", help="JSON plan from merge-policy")
     ap.add_argument("--request", action="store_true", help="print a pinned request; no network or writes")
     ap.add_argument("--deps", action="store_true", help="enrich the dependency graph on stdin")
+    ap.add_argument("--forge", help="github (default) or gitea; SB_FORGE overrides nothing here — the caller passes it")
     args = ap.parse_args()
+    forge = forge_class(args.forge or os.environ.get("SB_FORGE"))
     if args.request:
         if not args.pr or not args.head or not SHA.fullmatch(args.head) or not args.plan:
             ap.error("request requires --pr, full --head and --plan")
@@ -219,7 +295,7 @@ def main():
         return
     if args.deps:
         graph = json.load(sys.stdin)
-        github = GitHub(args.repo) if args.repo else None
+        github = forge(args.repo) if args.repo else None
         for entry in graph.values():
             entry["needsYouDone"] = False
             entry["approvalRefresh"] = False
@@ -243,7 +319,7 @@ def main():
     if not args.pr or not args.head or not args.plan:
         ap.error("check requires --pr, --head and --plan")
     try:
-        result = GitHub(args.repo).check(args.pr, args.head, scope_for(json.loads(args.plan)))
+        result = forge(args.repo).check(args.pr, args.head, scope_for(json.loads(args.plan)))
     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError):
         result = {"approved": False, "why": "approval evidence could not be verified"}
     print(json.dumps(result))

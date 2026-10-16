@@ -66,37 +66,66 @@ OWNER=$(echo "$CONFIG_JSON" | jq -r '.project.owner')
 NUMBER=$(echo "$CONFIG_JSON" | jq -r '.project.number')
 REPO=$(echo "$CONFIG_JSON" | jq -r '.repo.remote // empty')
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GITHUB_READ="$HERE/super-board-github-read.py"
+GITEA_READ="$HERE/super-board-gitea-read.py"
+# Forge resolution from the config the reviewer already passes.
+FORGE_KIND=github
+if [ -f "$HERE/super-board-forge.sh" ]; then
+  # shellcheck source=super-board-forge.sh
+  . "$HERE/super-board-forge.sh"
+  sb_forge_resolve "$CONFIG" || exit $?
+  FORGE_KIND="$SB_FORGE_KIND"
+fi
+if [ "$FORGE_KIND" = gitea ]; then
+  READ_PY="$GITEA_READ"
+  # shellcheck source=super-board-gitea-api.sh
+  . "$HERE/super-board-gitea-api.sh"
+else
+  READ_PY="$GITHUB_READ"
+fi
+
 # `gh issue` needs an -R when the CWD is a worktree of a different remote; the
 # reviewer always runs from one, so resolve it rather than trusting the CWD.
-if [ -n "$REPO" ]; then
+if [ "$FORGE_KIND" = gitea ]; then
+  REPO_FLAG=()
+  REPO_NAME="$SB_FORGE_OWNER/$SB_FORGE_REPO"
+elif [ -n "$REPO" ]; then
   REPO_FLAG=(-R "$(echo "$REPO" | sed -E 's#(git@github\.com:|https://github\.com/)##; s#\.git$##')")
 else
   REPO_FLAG=()
 fi
 
-GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
-python3 "$GITHUB_READ" --check || exit $?
+python3 "$READ_PY" --check || exit $?
 
 # --- dedupe -----------------------------------------------------------------
 # The fingerprint is stamped into the body as an HTML comment so it survives
 # edits to the prose and stays invisible on the rendered issue.
 STAMP="<!-- super-review-fingerprint: ${FINGERPRINT} -->"
-REPO_NAME="${REPO_FLAG[1]:-}"
-if [ -z "$REPO_NAME" ]; then
-  REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
+if [ "$FORGE_KIND" != gitea ]; then
+  REPO_NAME="${REPO_FLAG[1]:-}"
+  if [ -z "$REPO_NAME" ]; then
+    REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
+  fi
 fi
-ISSUES_JSON=$(python3 "$GITHUB_READ" --issue-history "$REPO_NAME") || exit $?
+ISSUES_JSON=$(python3 "$READ_PY" --issue-history "$REPO_NAME") || exit $?
 EXISTING=$(printf '%s' "$ISSUES_JSON" | jq -r --arg fingerprint "$FINGERPRINT" '[.[] | select(.state == "OPEN" and any(.body | splits("\\s+"); . == $fingerprint)) | .number] | first // empty')
 
 
 if [ -n "$EXISTING" ]; then
   # Same shape problem, seen again on a later PR. Add the sighting, don't stack cards.
-  python3 "$GITHUB_READ" --check || exit $?
-  gh issue comment "$EXISTING" "${REPO_FLAG[@]}" \
-    --body "Seen again during review${PR:+ of #${PR}}.
+  python3 "$READ_PY" --check || exit $?
+  SEEN_BODY="Seen again during review${PR:+ of #${PR}}.
 
-$(cat "$BODY_FILE")" >/dev/null 2>&1 \
-    || { python3 "$GITHUB_READ" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
+$(cat "$BODY_FILE")"
+  if [ "$FORGE_KIND" = gitea ]; then
+    sb_gitea_api POST "repos/$REPO_NAME/issues/${EXISTING}/comments" \
+      "$(jq -cn --arg b "$SEEN_BODY" '{body:$b}')" >/dev/null 2>&1 \
+      || { python3 "$READ_PY" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
+  else
+    gh issue comment "$EXISTING" "${REPO_FLAG[@]}" --body "$SEEN_BODY" >/dev/null 2>&1 \
+      || { python3 "$READ_PY" --halt "Comment outcome unknown for #${EXISTING}; inspect before retrying"; exit 79; }
+  fi
   echo "$EXISTING"
   exit 0
 fi
@@ -172,9 +201,20 @@ if [ -n "$AREA" ]; then LABELS+=("area:${AREA}"); fi
 
 # Labels may not exist yet on a fresh repo. Create them best-effort; `gh issue
 # create` hard-fails on an unknown label, which would lose the finding entirely.
+# On Gitea, POST issues takes label IDs: resolve-or-create each one.
+GITEA_LABEL_IDS="[]"
 for l in "${LABELS[@]}"; do
-  python3 "$GITHUB_READ" --check || exit $?
-  gh label create "$l" "${REPO_FLAG[@]}" --color BFD4F2 --force >/dev/null 2>&1 || true
+  python3 "$READ_PY" --check || exit $?
+  if [ "$FORGE_KIND" = gitea ]; then
+    lid=$(sb_gitea_api GET "repos/$REPO_NAME/labels" 2>/dev/null | jq -r --arg n "$l" '[.[] | select(.name == $n) | .id][0] // empty')
+    if [ -z "$lid" ]; then
+      lid=$(sb_gitea_api POST "repos/$REPO_NAME/labels" \
+        "$(jq -cn --arg n "$l" '{name:$n,color:"#bfd4f2"}')" 2>/dev/null | jq -r '.id // empty') || lid=""
+    fi
+    [ -n "$lid" ] && GITEA_LABEL_IDS=$(jq -cn --argjson a "$GITEA_LABEL_IDS" --argjson i "$lid" '$a + [$i]')
+  else
+    gh label create "$l" "${REPO_FLAG[@]}" --color BFD4F2 --force >/dev/null 2>&1 || true
+  fi
 done
 
 LABEL_ARGS=()
@@ -183,13 +223,22 @@ for l in "${LABELS[@]}"; do LABEL_ARGS+=(--label "$l"); done
 # Title: `♻️ [refactor] <scope>: <title>`; scope = --area, else the fingerprint's module.
 SCOPE="${AREA:-${FINGERPRINT%%|*}}"
 SCOPE=$(echo "${SCOPE:-code}" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._/-]+#-#g; s#^-+|-+$##g')
-python3 "$GITHUB_READ" --check || exit $?
-ISSUE_URL=$(gh issue create "${REPO_FLAG[@]}" \
-  --title "♻️ [refactor] ${SCOPE:-code}: ${TITLE}" \
-  --body-file "$BODY_TMP" \
-  "${LABEL_ARGS[@]}") || { python3 "$GITHUB_READ" --halt "Issue creation response failed; reconcile fingerprint ${FINGERPRINT} before retrying"; exit 79; }
-
-ISSUE_N=$(basename "$ISSUE_URL")
+python3 "$READ_PY" --check || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  CREATED=$(sb_gitea_api POST "repos/$REPO_NAME/issues" \
+    "$(jq -cn --arg t "♻️ [refactor] ${SCOPE:-code}: ${TITLE}" --rawfile b "$BODY_TMP" --argjson l "$GITEA_LABEL_IDS" \
+       '{title:$t, body:$b, labels:$l}')") \
+    || { python3 "$READ_PY" --halt "Issue creation response failed; reconcile fingerprint ${FINGERPRINT} before retrying"; exit 79; }
+  ISSUE_URL=$(echo "$CREATED" | jq -r '.html_url // empty')
+  ISSUE_N=$(echo "$CREATED" | jq -r .number)
+  GITEA_ISSUE_GID=$(echo "$CREATED" | jq -r .id)
+else
+  ISSUE_URL=$(gh issue create "${REPO_FLAG[@]}" \
+    --title "♻️ [refactor] ${SCOPE:-code}: ${TITLE}" \
+    --body-file "$BODY_TMP" \
+    "${LABEL_ARGS[@]}") || { python3 "$READ_PY" --halt "Issue creation response failed; reconcile fingerprint ${FINGERPRINT} before retrying"; exit 79; }
+  ISSUE_N=$(basename "$ISSUE_URL")
+fi
 
 # --- place on the board -----------------------------------------------------
 # The holding column is deliberately NOT in the config's managed `columns` list,
@@ -206,11 +255,6 @@ ISSUE_N=$(basename "$ISSUE_URL")
 place_card() {
   local item_id project_id field_json field_id option_id candidate
   local -a candidates
-  python3 "$GITHUB_READ" --check || return $?
-  item_id=$(gh project item-add "$NUMBER" --owner "$OWNER" --url "$ISSUE_URL" --format json --jq '.id') || { python3 "$GITHUB_READ" --halt "Project item add outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }
-  project_id=$(python3 "$GITHUB_READ" --kind scalar -- project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return $?
-  field_json=$(python3 "$GITHUB_READ" --kind fields -- project field-list "$NUMBER" --owner "$OWNER" --format json) || return $?
-  field_id=$(echo "$field_json" | jq -r '.fields[] | select(.name=="Status") | .id')
   # The requested name first, then the conventional aliases for "not started".
   # Ordered by intent: a holding column beats Ready, because a card filed by a
   # reviewer has no acceptance criteria and Ready feeds the build lane directly.
@@ -225,6 +269,37 @@ place_card() {
   else
     candidates=("$COLUMN" "Backlog" "Todo" "To do" "Triage" "Inbox")
   fi
+  if [ "$FORGE_KIND" = gitea ]; then
+    # Gitea places the card by adding it straight into the chosen column.
+    python3 "$READ_PY" --check || return $?
+    field_json=$(python3 "$GITEA_READ" --kind fields --fields "$REPO_NAME/$NUMBER") || return $?
+    option_id=""
+    for candidate in "${candidates[@]}"; do
+      option_id=$(echo "$field_json" | jq -r --arg c "$candidate" \
+        '[.fields[0].options[]? | select(.name==$c) | .id][0] // empty')
+      if [ -n "$option_id" ]; then
+        [ "$candidate" = "$COLUMN" ] || \
+          echo "note: no '${COLUMN}' column on this board — filed #${ISSUE_N} into '${candidate}'" >&2
+        break
+      fi
+    done
+    if [ -n "$option_id" ]; then
+      python3 "$READ_PY" --check || return $?
+      sb_gitea_api POST "repos/$REPO_NAME/projects/$NUMBER/columns/$option_id/issues/$GITEA_ISSUE_GID" >/dev/null \
+        || { python3 "$READ_PY" --halt "Project column add outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }
+    else
+      echo "warn: this board has no '${COLUMN}' column and none of the usual aliases" >&2
+      echo "warn: (Backlog, Todo, To do, Triage, Inbox) — #${ISSUE_N} exists but is NOT on the board;" >&2
+      echo "warn: add a holding column or pass --column, then move it by hand." >&2
+      return 1
+    fi
+    return 0
+  fi
+  python3 "$GITHUB_READ" --check || return $?
+  item_id=$(gh project item-add "$NUMBER" --owner "$OWNER" --url "$ISSUE_URL" --format json --jq '.id') || { python3 "$GITHUB_READ" --halt "Project item add outcome unknown for issue #${ISSUE_N}; reconcile before retrying"; return 79; }
+  project_id=$(python3 "$GITHUB_READ" --kind scalar -- project view "$NUMBER" --owner "$OWNER" --format json --jq '.id') || return $?
+  field_json=$(python3 "$GITHUB_READ" --kind fields -- project field-list "$NUMBER" --owner "$OWNER" --format json) || return $?
+  field_id=$(echo "$field_json" | jq -r '.fields[] | select(.name=="Status") | .id')
   for candidate in "${candidates[@]}"; do
     option_id=$(echo "$field_json" | jq -r --arg c "$candidate" \
       '.fields[] | select(.name=="Status") | .options[]? | select(.name==$c) | .id')
@@ -248,7 +323,7 @@ place_card() {
 
 if ! place_card; then
   echo "$ISSUE_N"
-  python3 "$GITHUB_READ" --check || exit 79
+  python3 "$READ_PY" --check || exit 79
   echo "warn: filed #${ISSUE_N} but could not place it on project ${OWNER}/${NUMBER}; inspect before retrying" >&2
   exit 71
 fi

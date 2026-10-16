@@ -72,7 +72,21 @@ unset SB_GITEA_TEA SB_GITEA_TIMEOUT
 export SB_GITEA_TEA="bash $STUB"
 ok "hung tea → bounded failure (rc=$RC)"
 
-# 7 — every write was logged for auditability.
+# 7 — the merge endpoint pins the head: a stale head_commit_id is refused (409),
+#     the current one merges and records the merge commit.
+jq '.pulls = [{"number":7,"title":"Fix","state":"open","merged":false,
+               "head":{"ref":"fix","sha":"abc123"}}]' .git/tea-state.json > "$TMP/s2" && mv "$TMP/s2" .git/tea-state.json
+RC=0; sb_gitea_api POST 'repos/{owner}/{repo}/pulls/7/merge' \
+  '{"do":"squash","head_commit_id":"stale000"}' >/dev/null 2>&1 || RC=$?
+[ "$RC" != 0 ] || fail "stale head_commit_id must be refused"
+jq -e '.pulls[0].merged == false' .git/tea-state.json >/dev/null || fail "refused merge mutated state"
+sb_gitea_api POST 'repos/{owner}/{repo}/pulls/7/merge' \
+  '{"do":"squash","head_commit_id":"abc123","delete_branch_after_merge":true}' >/dev/null || fail "pinned merge"
+jq -e '.pulls[0].merged == true and .pulls[0].state == "closed"' .git/tea-state.json >/dev/null \
+  || fail "merge not recorded: $(jq -c .pulls .git/tea-state.json)"
+ok "merge pins head_commit_id: stale refused, current merges"
+
+# 8 — every write was logged for auditability.
 [ "$(grep -c '^POST' .git/tea-writes.log)" -ge 4 ] || fail "write log: $(cat .git/tea-writes.log)"
 ok "writes logged to tea-writes.log"
 

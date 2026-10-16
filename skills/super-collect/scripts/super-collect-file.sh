@@ -97,10 +97,29 @@ fi
 
 # Router-owned duplicate/adopt writes share the same halt as the child filers.
 GITHUB_READ="$BIN/super-board-github-read.py"
-python3 "$GITHUB_READ" --check || exit $?
-REPO_NAME="${REPO_FLAG[1]:-}"
-if [ -z "$REPO_NAME" ]; then
-  REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
+GITEA_READ="$BIN/super-board-gitea-read.py"
+FORGE_KIND=github
+if [ -f "$BIN/super-board-forge.sh" ]; then
+  # shellcheck source=/dev/null
+  . "$BIN/super-board-forge.sh"
+  sb_forge_resolve "$CONFIG" || exit $?
+  FORGE_KIND="$SB_FORGE_KIND"
+fi
+if [ "$FORGE_KIND" = gitea ]; then
+  READ_PY="$GITEA_READ"
+  # shellcheck source=/dev/null
+  . "$BIN/super-board-gitea-api.sh"
+else
+  READ_PY="$GITHUB_READ"
+fi
+python3 "$READ_PY" --check || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  REPO_NAME="$SB_FORGE_OWNER/$SB_FORGE_REPO"
+else
+  REPO_NAME="${REPO_FLAG[1]:-}"
+  if [ -z "$REPO_NAME" ]; then
+    REPO_NAME=$(python3 "$GITHUB_READ" --kind scalar -- repo view --json nameWithOwner --jq .nameWithOwner) || exit $?
+  fi
 fi
 case "$REPO_NAME" in */*) ;; *) die "cannot resolve owner/name for collector" 70;; esac
 STATE="$BIN/super-board-collect-state.py"
@@ -141,7 +160,11 @@ if [ -z "$ADOPT" ]; then
 fi
 
 # --- holding column ---------------------------------------------------------
-FIELDS=$(python3 "$GITHUB_READ" --kind fields -- project field-list "$NUMBER" --owner "$OWNER" --format json) || exit $?
+if [ "$FORGE_KIND" = gitea ]; then
+  FIELDS=$(python3 "$GITEA_READ" --kind fields --fields "$REPO_NAME/$NUMBER") || exit $?
+else
+  FIELDS=$(python3 "$GITHUB_READ" --kind fields -- project field-list "$NUMBER" --owner "$OWNER" --format json) || exit $?
+fi
 HOLD=""
 for c in Backlog Todo "To do" Triage Inbox; do
   hit=$(echo "$FIELDS" | jq -r --arg c "$c" '.fields[] | select(.name=="Status") | .options[]? | select(.name==$c) | .name' | head -1)
@@ -149,7 +172,7 @@ for c in Backlog Todo "To do" Triage Inbox; do
 done
 [ -n "$HOLD" ] || die "project ${OWNER}/${NUMBER} has no holding column (Backlog, Todo, To do, Triage, Inbox) — refusing: the filers would fall back to Ready" 65
 
-place() { # $1 = issue url
+place() { # $1 = issue url (github) — gitea uses place_gitea with the global id
   local item_id project_id field_id option_id
   python3 "$GITHUB_READ" --check || return $?
   item_id=$(gh project item-add "$NUMBER" --owner "$OWNER" --url "$1" --format json --jq '.id') || return 1
@@ -162,8 +185,30 @@ place() { # $1 = issue url
     --field-id "$field_id" --single-select-option-id "$option_id" >/dev/null
 }
 
+place_gitea() { # $1 = issue global id — one add-to-column call places the card
+  local option_id
+  python3 "$READ_PY" --check || return $?
+  option_id=$(echo "$FIELDS" | jq -r --arg c "$HOLD" '.fields[] | select(.name=="Status") | .options[] | select(.name==$c) | .id')
+  [ -n "$option_id" ] && [ "$option_id" != "null" ] || return 1
+  sb_gitea_api POST "repos/$REPO_NAME/projects/$NUMBER/columns/$option_id/issues/$1" >/dev/null
+}
+
 tag() { # $1 = issue number, rest = labels; best-effort
   local n="$1"; shift
+  if [ "$FORGE_KIND" = gitea ]; then
+    local l lid
+    for l in "$@"; do
+      python3 "$READ_PY" --check || return $?
+      lid=$(sb_gitea_api GET "repos/$REPO_NAME/labels" 2>/dev/null | jq -r --arg n "$l" '[.[] | select(.name == $n) | .id][0] // empty')
+      [ -n "$lid" ] || sb_gitea_api POST "repos/$REPO_NAME/labels" \
+        "$(jq -cn --arg n "$l" '{name:$n,color:"#5319e7"}')" >/dev/null 2>&1 || true
+    done
+    for l in "$@"; do
+      python3 "$READ_PY" --check || return $?
+      sb_gitea_label_add "$n" "$l" >/dev/null 2>&1 || echo "warn: could not label #${n} ${l}" >&2
+    done
+    return 0
+  fi
   for l in "$@"; do
     python3 "$GITHUB_READ" --check || return $?
     gh label create "$l" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --color 5319E7 --force >/dev/null 2>&1 || true
@@ -178,13 +223,21 @@ tag() { # $1 = issue number, rest = labels; best-effort
 # --- adopt ------------------------------------------------------------------
 if [ -n "$ADOPT" ]; then
   if [ "$YES" -ne 1 ]; then echo "would-adopt|#${ADOPT}|${TYPE}|${HOLD}"; exit 0; fi
-  URL=$(python3 "$GITHUB_READ" --kind scalar -- issue view "$ADOPT" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --json url --jq .url) || exit $?
-  BOARD=$(python3 "$GITHUB_READ" --kind items -- project item-list "$NUMBER" --owner "$OWNER" --format json --limit 500) || exit $?
+  GITEA_GID=""
+  if [ "$FORGE_KIND" = gitea ]; then
+    ADOPT_JSON=$(python3 "$READ_PY" --kind issue --issue "$ADOPT") || exit $?
+    URL=$(echo "$ADOPT_JSON" | jq -r .url)
+    GITEA_GID=$(echo "$ADOPT_JSON" | jq -r .id)
+    BOARD=$(python3 "$READ_PY" --kind items --items "$REPO_NAME/$NUMBER") || exit $?
+  else
+    URL=$(python3 "$GITHUB_READ" --kind scalar -- issue view "$ADOPT" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --json url --jq .url) || exit $?
+    BOARD=$(python3 "$GITHUB_READ" --kind items -- project item-list "$NUMBER" --owner "$OWNER" --format json --limit 500) || exit $?
+  fi
   # A matching issue number without its repository URL cannot prove whether
   # this is already our card. Preserve potentially live work until reconciled.
   AMBIGUOUS=$(printf '%s' "$BOARD" | jq -r --argjson n "$ADOPT" '[.items[] | select(.content.type == "Issue" and .content.number == $n and ((.content.url // "") == ""))] | length') || exit 70
   if [ "$AMBIGUOUS" != 0 ]; then
-    python3 "$GITHUB_READ" --halt "Board identity is incomplete for issue #${ADOPT}; reconcile before adoption"
+    python3 "$READ_PY" --halt "Board identity is incomplete for issue #${ADOPT}; reconcile before adoption"
     exit 79
   fi
   # Never reset a card already on the board to Backlog, especially live work.
@@ -192,7 +245,11 @@ if [ -n "$ADOPT" ]; then
   if [ "$ON_BOARD" != 0 ]; then echo "$ADOPT"; exit 0; fi
   state begin "$ADOPT" || exit $?
   tag "$ADOPT" "$TYPE" "source:collect" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"} || { RC=$?; echo "$ADOPT"; exit "$RC"; }
-  place "$URL" || { RC=$?; echo "$ADOPT"; [ "$RC" -eq 79 ] && exit 79; echo "warn: #${ADOPT} not placed in '${HOLD}'" >&2; exit 71; }
+  if [ "$FORGE_KIND" = gitea ]; then
+    place_gitea "$GITEA_GID" || { RC=$?; echo "$ADOPT"; [ "$RC" -eq 79 ] && exit 79; echo "warn: #${ADOPT} not placed in '${HOLD}'" >&2; exit 71; }
+  else
+    place "$URL" || { RC=$?; echo "$ADOPT"; [ "$RC" -eq 79 ] && exit 79; echo "warn: #${ADOPT} not placed in '${HOLD}'" >&2; exit 71; }
+  fi
   state success "$ADOPT" || exit $?
   echo "$ADOPT"; exit 0
 fi
@@ -201,7 +258,7 @@ fi
 # Repo-wide, any label, any state. An open hit is a duplicate; a closed-only hit
 # is a recurrence — file again, but name the issue that claimed the fix.
 # Exact match on a whitespace-delimited token: `err|sentry|441` must not hit `err|sentry|4411`.
-ISSUES_JSON=$(python3 "$GITHUB_READ" --issue-history "$REPO_NAME") || exit $?
+ISSUES_JSON=$(python3 "$READ_PY" --issue-history "$REPO_NAME") || exit $?
 HITS=$(printf '%s' "$ISSUES_JSON" | jq -r --arg fp "$FP" '[.[] | select(any(.body | splits("\\s+"); . == $fp))] | sort_by(.state != "OPEN") | map("\(.number) \(.state)") | .[]') || exit 70
 
 OPEN_HIT=$(echo "$HITS" | awk '$2=="OPEN"{print $1; exit}')
@@ -209,13 +266,21 @@ CLOSED_HIT=$(echo "$HITS" | awk '$2!="OPEN" && $1!=""{print $1; exit}')
 
 if [ -n "$OPEN_HIT" ]; then
   if [ "$YES" -ne 1 ]; then echo "duplicate|#${OPEN_HIT}|${TYPE}|${TITLE}"; exit 0; fi
-  python3 "$GITHUB_READ" --check || { RC=$?; echo "$OPEN_HIT"; exit "$RC"; }
+  python3 "$READ_PY" --check || { RC=$?; echo "$OPEN_HIT"; exit "$RC"; }
   SEEN=$(state seen "$OPEN_HIT") || exit $?
   if [ "$SEEN" = unchanged ]; then echo "$OPEN_HIT"; exit 0; fi
   state begin "$OPEN_HIT" || exit $?
-  gh issue comment "$OPEN_HIT" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --body "Seen again by super-collect (${SOURCE}).
+  SEEN_BODY="Seen again by super-collect (${SOURCE}).
 
-$(cat "$BODY_FILE")" >/dev/null 2>&1 || { python3 "$GITHUB_READ" --halt "Collector comment outcome unknown for #${OPEN_HIT}; reconcile before retrying"; echo "$OPEN_HIT"; exit 79; }
+$(cat "$BODY_FILE")"
+  if [ "$FORGE_KIND" = gitea ]; then
+    sb_gitea_api POST "repos/$REPO_NAME/issues/${OPEN_HIT}/comments" \
+      "$(jq -cn --arg b "$SEEN_BODY" '{body:$b}')" >/dev/null 2>&1 \
+      || { python3 "$READ_PY" --halt "Collector comment outcome unknown for #${OPEN_HIT}; reconcile before retrying"; echo "$OPEN_HIT"; exit 79; }
+  else
+    gh issue comment "$OPEN_HIT" ${REPO_FLAG[@]+"${REPO_FLAG[@]}"} --body "$SEEN_BODY" >/dev/null 2>&1 \
+      || { python3 "$READ_PY" --halt "Collector comment outcome unknown for #${OPEN_HIT}; reconcile before retrying"; echo "$OPEN_HIT"; exit 79; }
+  fi
   state success "$OPEN_HIT" || exit $?
   echo "$OPEN_HIT"; exit 0
 fi
@@ -252,6 +317,7 @@ case "$TYPE" in
     case "$TYPE" in bug) KIND=bug; WEAK=0 ;; feature) KIND=feature; WEAK=1 ;; fix) KIND=tech-debt; WEAK=1 ;; esac
     OUT=$(SUPER_QA_PROJECT_OWNER="$OWNER" SUPER_QA_PROJECT_TITLE="$PTITLE" \
       SUPER_QA_TARGET_OPTION_NAME="$HOLD" SUPER_QA_ALLOW_WEAK_BODY="$WEAK" SUPER_QA_REPO="$REPO_NAME" \
+      SB_FORGE="$FORGE_KIND" SB_CONFIG="$CONFIG" \
       "$BIN/super-qa-file-bug.sh" --title "$TITLE" --body-file "$BODY_TMP" --kind "$KIND" \
       --priority "$PRIORITY" --fingerprint "$FP" ${AREA:+--area "$AREA"} 2>"$ERR"); RC=$? ;;
 esac
@@ -263,7 +329,7 @@ if [ "$RC" -eq 79 ]; then [ -z "$N" ] || echo "$N"; exit 79; fi
 if [ "$RC" -eq 64 ] || [ "$RC" -eq 66 ]; then state known-failure || true; fi
 case "$N" in ''|*[!0-9]*) die "filer failed (exit ${RC})" "$([ "$RC" -ne 0 ] && echo "$RC" || echo 70)" ;; esac
 if [ "$RC" -ne 0 ]; then
-  python3 "$GITHUB_READ" --halt "Collector filing/placement incomplete for #${N}; reconcile before retrying"
+  python3 "$READ_PY" --halt "Collector filing/placement incomplete for #${N}; reconcile before retrying"
   echo "$N"; exit 79
 fi
 tag "$N" "source:collect" "collect:${SOURCE}" ${EXTRA_LABELS[@]+"${EXTRA_LABELS[@]}"} || { RC=$?; echo "$N"; exit "$RC"; }

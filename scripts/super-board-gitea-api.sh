@@ -33,7 +33,7 @@ sb_gitea_tea() {
   [ -n "${SB_FORGE_LOGIN:-}" ] && login_flag=(--login "$SB_FORGE_LOGIN")
   eval "tea_cmd=(${SB_GITEA_TEA:-tea})"
   if command -v timeout >/dev/null 2>&1; then
-    timeout "$SB_GITEA_TIMEOUT" "${tea_cmd[@]}" "${login_flag[@]}" "$@"
+    timeout "${SB_GITEA_TIMEOUT:-30}" "${tea_cmd[@]}" "${login_flag[@]}" "$@"
   else
     "${tea_cmd[@]}" "${login_flag[@]}" "$@"
   fi

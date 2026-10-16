@@ -58,6 +58,18 @@ RUN_DATE=$(date +%Y-%m-%d)
 RUN_MANIFEST="docs/super-board/runs/${RUN_DATE}-${CONFIG_SLUG}.md"
 TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+# Forge resolution (github default). Stop is best-effort on the network side:
+# a failed comment or release is logged, never fatal (stop.md's contract).
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SB_GITEA_READ="$HERE/super-board-gitea-read.py"
+FORGE_KIND=github
+if [ -f "$HERE/super-board-forge.sh" ]; then
+  # shellcheck source=super-board-forge.sh
+  . "$HERE/super-board-forge.sh"
+  sb_forge_resolve "$CONFIG_PATH" || exit $?
+  FORGE_KIND="$SB_FORGE_KIND"
+fi
+
 # ───────────────────────────── helpers ─────────────────────────────
 log() {
   printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"
@@ -79,9 +91,14 @@ read_lock() {
   return 0
 }
 
-# Look up the PR number for an issue's branch (if any). One gh call.
+# Look up the PR number for an issue's branch (if any). One bounded read.
 pr_for_issue() {
   local issue="$1"
+  if [ "$FORGE_KIND" = gitea ]; then
+    python3 "$SB_GITEA_READ" --kind prs-open --prs-open "$SB_FORGE_OWNER/$SB_FORGE_REPO" 2>/dev/null \
+      | jq -r --arg p "issue-${issue}-" '[.[] | select(.headRefName | startswith($p)) | .number][0] // empty'
+    return 0
+  fi
   gh pr list --state open --json number,headRefName \
     --jq ".[] | select(.headRefName | startswith(\"issue-${issue}-\")) | .number" 2>/dev/null | head -1
 }
@@ -106,6 +123,20 @@ Did: \`super-board stop\` ended worker PID ${pid:-unknown} at ${TS}
 ❌ Not done: interrupted work may be uncommitted; inspect the preserved worktree
 Next: preserve edits before \`super-board run ${CONFIG_SLUG}\`; dirty or legacy worktrees need inspection"
 
+  if [ "$FORGE_KIND" = gitea ]; then
+    # On Gitea a PR IS an issue: one comments endpoint serves both.
+    # shellcheck source=super-board-gitea-api.sh
+    . "$HERE/super-board-gitea-api.sh"
+    sb_gitea_api POST "repos/{owner}/{repo}/issues/${issue}/comments" "$(jq -cn --arg b "$body" '{body:$b}')" >/dev/null 2>&1 \
+      && log "  💬 issue comment posted on #${issue}" \
+      || log "  ⚠ failed to comment on issue #${issue} (continuing)"
+    if [ -n "$pr" ]; then
+      sb_gitea_api POST "repos/{owner}/{repo}/issues/${pr}/comments" "$(jq -cn --arg b "$body" '{body:$b}')" >/dev/null 2>&1 \
+        && log "  💬 PR comment posted on #${pr}" \
+        || log "  ⚠ failed to comment on PR #${pr} (continuing)"
+    fi
+    return 0
+  fi
   gh issue comment "$issue" --body "$body" >/dev/null 2>&1 \
     && log "  💬 issue comment posted on #${issue}" \
     || log "  ⚠ failed to comment on issue #${issue} (continuing)"
@@ -120,6 +151,19 @@ Next: preserve edits before \`super-board run ${CONFIG_SLUG}\`; dirty or legacy 
 release_claim() {
   local issue="$1"
   [ -z "$BOT_LOGIN" ] && return 0
+  if [ "$FORGE_KIND" = gitea ]; then
+    # shellcheck source=super-board-gitea-api.sh
+    . "$HERE/super-board-gitea-api.sh"
+    sb_gitea_api DELETE "repos/{owner}/{repo}/issues/${issue}/assignees" \
+      "$(jq -cn --arg l "$BOT_LOGIN" '{assignees:[$l]}')" >/dev/null 2>&1 || true
+    for label in loop:in-build loop:in-qa loop:in-review; do
+      local lid
+      lid=$(sb_gitea_label_id "$label" 2>/dev/null || true)
+      [ -n "$lid" ] && sb_gitea_api DELETE "repos/{owner}/{repo}/issues/${issue}/labels/${lid}" >/dev/null 2>&1 || true
+    done
+    log "  🔓 released assignee + lane labels on #${issue}"
+    return 0
+  fi
   gh issue edit "$issue" --remove-assignee "$BOT_LOGIN" >/dev/null 2>&1 || true
   for label in loop:in-build loop:in-qa loop:in-review; do
     gh issue edit "$issue" --remove-label "$label" >/dev/null 2>&1 || true
