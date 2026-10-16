@@ -49,6 +49,7 @@ import contextlib
 import hashlib
 import datetime as dt
 import glob
+import importlib.util
 import json
 import os
 import platform
@@ -71,7 +72,7 @@ OLD_LABELS = {
 }
 SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
-BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-codex-lane.sh", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
+BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-codex-lane.sh", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-forge.py", "super-board-forge.sh", "super-board-gitea-api.sh", "super-board-gitea-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
        "super-board-deps.sh", "super-board-preflight.sh", "super-board-merge-gate.sh",
        "super-board-merge-policy.py", "super-board-approval.py", "super-board-env-check.sh", "super-board-agents-md.py",
        "super-board-settings.py", "super-board-setup.py", "super-board-usage.sh", "super-board-pr-body.sh",
@@ -153,6 +154,20 @@ def write_json(path, data):
         json.dump(data, f, indent=2)
         f.write("\n")
     os.replace(tmp, path)
+
+
+_FORGE_MOD = None
+
+
+def forge_mod():
+    """super-board-forge.py loaded as a module (dashes rule out `import`)."""
+    global _FORGE_MOD
+    if _FORGE_MOD is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "super-board-forge.py")
+        spec = importlib.util.spec_from_file_location("super_board_forge", path)
+        _FORGE_MOD = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_FORGE_MOD)
+    return _FORGE_MOD
 
 
 def find_pack(explicit=None):
@@ -1000,10 +1015,10 @@ def main(argv):
             cfg = load_json(cfg_path) if cfg_path else {}
             cfg = cfg if isinstance(cfg, dict) else {}
             proj = cfg.get("project") or {}
-            m = re.search(r"github\.com[:/]([^/]+/[^/.]+)", ((cfg.get("repo") or {}).get("remote") or ""))
+            remote = forge_mod().parse_remote((cfg.get("repo") or {}).get("remote") or "")
             owner = flag(rest, "--owner") or proj.get("owner")
             number = flag(rest, "--number") or proj.get("number")
-            repo = flag(rest, "--repo") or (m.group(1) if m else None)
+            repo = flag(rest, "--repo") or (f"{remote['owner']}/{remote['repo']}" if remote else None)
             if not (owner and number and repo):
                 return 64
             qa_all = "--qa-all" in rest or bool(cfg.get("_qa_all"))

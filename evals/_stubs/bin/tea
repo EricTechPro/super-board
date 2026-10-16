@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+# Offline `tea` stand-in for evals and tests. Stateful: reads/writes
+# <repo>/.git/tea-state.json (seeded from <repo>/.git/tea-fixture/ on first
+# call), logs every call to <repo>/.git/tea-calls.log and every write to
+# <repo>/.git/tea-writes.log, and never touches the network.
+#
+# Only the surface the gitea adapter uses is implemented:
+#   tea --version · tea login ls
+#   tea api [-X M] [-d json] [-i] [--login L] <endpoint>
+# Endpoints may carry literal {owner}/{repo} placeholders; they are expanded
+# from $GITEA_REPO like the real `tea api` does.
+#
+# State shape (.git/tea-state.json):
+#   {issues:[gitea issue objects + stub-only _column], pulls:[…], labels:[…],
+#    projects:[{id,title}], columns:[{id,title,color}], comments:{"<n>":[…]}}
+# Fixture seeds (all optional): issues.json pulls.json labels.json projects.json
+#   columns.json board.json ([{column:<cid>, numbers:[…]}] → sets _column)
+#   pull-<n>-files.json pull-<n>.diff version.json user.json repo.json
+#   no-ratelimit (existence → -i prints no X-RateLimit-* headers)
+set -uo pipefail
+ROOT="$PWD"
+while [ "$ROOT" != / ] && [ ! -d "$ROOT/.git" ]; do ROOT="$(dirname "$ROOT")"; done
+[ -d "$ROOT/.git" ] || ROOT="$PWD"
+FX="$ROOT/.git/tea-fixture"
+STATE="$ROOT/.git/tea-state.json"
+printf '%s\n' "tea $*" >>"$ROOT/.git/tea-calls.log"
+
+# ── args: drop global flags, find the subcommand ─────────────────────────────
+args=(); skip=0
+for a in "$@"; do
+  if [ "$skip" = 1 ]; then skip=0; continue; fi
+  case "$a" in
+    --login|--config) skip=1 ;;
+    *) args+=("$a") ;;
+  esac
+done
+CMD="${args[0]:-}"
+
+case "$CMD" in
+  --version|-v) echo "tea version 0.16.0 (eval stub)"; exit 0 ;;
+  version) echo "0.16.0 (eval stub)"; exit 0 ;;
+esac
+if [ "$CMD" = login ]; then echo "eval-stub (https://gitea.example.com) <current>"; exit 0; fi
+[ "$CMD" = api ] || { echo "ok (eval stub)"; exit 0; }
+
+# ── parse `api` ───────────────────────────────────────────────────────────────
+METHOD="GET"; BODY=""; HEADERS=0; ENDPOINT=""
+rest=("${args[@]:1}"); i=0
+while [ $i -lt ${#rest[@]} ]; do
+  a="${rest[$i]}"
+  case "$a" in
+    -X|--method) METHOD="${rest[$((i+1))]}"; i=$((i+2)); continue ;;
+    -d|--data) BODY="${rest[$((i+1))]}"; i=$((i+2)); continue ;;
+    -i) HEADERS=1; i=$((i+1)); continue ;;
+    -f|-F) i=$((i+2)); continue ;;
+    -*) i=$((i+1)); continue ;;
+    *) ENDPOINT="$a"; i=$((i+1)) ;;
+  esac
+done
+[ -n "$ENDPOINT" ] || { echo "tea stub: api without endpoint" >&2; exit 64; }
+# placeholder expansion, like real tea with a repo context
+if [ -n "${GITEA_REPO:-}" ]; then
+  ENDPOINT="${ENDPOINT//\{owner\}/${GITEA_REPO%%/*}}"
+  ENDPOINT="${ENDPOINT//\{repo\}/${GITEA_REPO##*/}}"
+fi
+PATHPART="${ENDPOINT%%\?*}"; QUERY=""
+[ "$PATHPART" = "$ENDPOINT" ] || QUERY="${ENDPOINT#*\?}"
+PATHPART="${PATHPART#/}"   # accept a leading slash
+q() { # q <name> → query param value
+  local kv
+  local -a _qs=()
+  IFS='&' read -ra _qs <<<"$QUERY"
+  for kv in ${_qs+"${_qs[@]}"}; do case "$kv" in "$1="*) echo "${kv#*=}"; return ;; esac; done
+  echo ""
+}
+segs() { local s=${PATHPART//[^\/]/}; echo $(( ${#s} + 1 )); }
+seg() { # seg <1-based index>
+  local IFS='/'; local -a p=($PATHPART); echo "${p[$(( $1 - 1 ))]:-}";
+}
+
+# ── state ─────────────────────────────────────────────────────────────────────
+fx() { [ -f "$FX/$1" ] && cat "$FX/$1"; }
+seed_state() {
+  local issues pulls labels projects columns board
+  issues=$(fx issues.json); pulls=$(fx pulls.json); labels=$(fx labels.json)
+  projects=$(fx projects.json); columns=$(fx columns.json); board=$(fx board.json)
+  jq -cn \
+    --argjson issues "${issues:-[]}" --argjson pulls "${pulls:-[]}" \
+    --argjson labels "${labels:-[]}" --argjson projects "${projects:-[]}" \
+    --argjson columns "${columns:-[]}" --argjson board "${board:-[]}" '{
+      issues: [ $issues[] | . as $it
+                | ($board | map(select(.numbers | index($it.number))) | (.[0].column // null)) as $c
+                | if $c then ._column = $c else . end ],
+      pulls: $pulls, labels: $labels, projects: $projects, columns: $columns,
+      comments: {}, writes: 0 }'
+}
+[ -s "$STATE" ] || seed_state > "$STATE"
+state() { jq "$@" "$STATE"; }
+put_state() { local tmp; tmp=$(mktemp "$STATE.XXXXXX") && jq "$@" "$STATE" > "$tmp" && mv "$tmp" "$STATE"; }
+log_write() { printf '%s %s %s\n' "$METHOD" "$PATHPART" "$BODY" >> "$ROOT/.git/tea-writes.log"; }
+fail_http() { echo "ServerError: $1 $2 (eval stub)" >&2; exit 1; }
+
+emit_headers() {
+  [ "$HEADERS" = 1 ] || return 0
+  { echo "HTTP/1.1 200 OK"
+    if [ ! -e "$FX/no-ratelimit" ]; then
+      echo "X-RateLimit-Limit: 3600"
+      echo "X-RateLimit-Remaining: 3597"
+      echo "X-RateLimit-Reset: $(( $(date +%s) + 3600 ))"
+    fi
+  } >&2
+}
+
+strip() { jq -c 'walk(if type == "object" then del(._column) else . end)'; }
+page_slice() { # page_slice <json array on stdin> → the requested page
+  local p l; p=$(q page); l=$(q limit); p=${p:-1}; l=${l:-30}
+  jq -c --argjson s "$(( (p - 1) * l ))" --argjson l "$l" '.[$s:$s+$l]'
+}
+
+# ── GET routes (specific first; `*` spans slashes in case globs) ─────────────
+if [ "$METHOD" = GET ]; then
+  case "$PATHPART" in
+    version) emit_headers; fx version.json || echo '{"version":"1.25.0 (eval stub)"}'; exit 0 ;;
+    user) emit_headers; fx user.json || echo '{"login":"eval-bot"}'; exit 0 ;;
+  esac
+  case "$PATHPART" in
+    repos/*/*/projects/*/columns/*/issues)
+      emit_headers; cid=$(seg 7)
+      state -c --argjson c "$cid" '[ .issues[] | select((._column // null) == $c) ]' | strip | page_slice; exit 0 ;;
+    repos/*/*/projects/*/columns)
+      emit_headers; state -c '.columns'; exit 0 ;;
+    repos/*/*/projects/*)
+      emit_headers; pid=$(seg 5)
+      out=$(state -c --argjson p "$pid" '.projects[] | select(.id == $p)')
+      [ -n "$out" ] && echo "$out" || fail_http 404 "project $pid"; exit 0 ;;
+    repos/*/*/projects)
+      emit_headers; state -c '.projects'; exit 0 ;;
+    repos/*/*/issues/*/comments)
+      emit_headers; n=$(seg 5)
+      state -c --arg n "$n" '.comments[$n] // []' | page_slice; exit 0 ;;
+    repos/*/*/issues/*)
+      emit_headers; n=$(seg 5)
+      case "$n" in ''|*[!0-9]*) echo '{}'; exit 0 ;; esac
+      out=$(state -c --argjson n "$n" '[ .issues[] | select(.number == $n) ] | .[0] // empty' | strip)
+      [ -n "$out" ] && echo "$out" || fail_http 404 "issue $n"; exit 0 ;;
+    repos/*/*/issues)
+      emit_headers; st=$(q state); ty=$(q type)
+      state -c --arg st "${st:-open}" --arg ty "$ty" '
+        [ .issues[]
+          | select(($st == "all") or ((.state // "open") == $st))
+          | select(($ty != "issues") or ((.pull_request // null) == null)) ]' | strip | page_slice; exit 0 ;;
+    repos/*/*/pulls/*.diff)
+      n=$(seg 5); n=${n%%.*}
+      fx "pull-$n.diff" || echo ""; exit 0 ;;
+    repos/*/*/pulls/*/files)
+      emit_headers; n=$(seg 5)
+      fx "pull-$n-files.json" || echo '[]'; exit 0 ;;
+    repos/*/*/pulls/*/merge) echo '{}' ; exit 0 ;;
+    repos/*/*/pulls/*)
+      emit_headers; n=$(seg 5)
+      out=$(state -c --argjson n "$n" '.pulls[] | select(.number == $n)')
+      [ -n "$out" ] && echo "$out" || fail_http 404 "pull $n"; exit 0 ;;
+    repos/*/*/pulls)
+      emit_headers; st=$(q state)
+      state -c --arg st "${st:-open}" '[ .pulls[] | select(($st == "all") or ((.state // "open") == $st)) ]' | page_slice; exit 0 ;;
+    repos/*/*/labels)
+      emit_headers; state -c '.labels'; exit 0 ;;
+  esac
+  if [ "$(segs)" = 3 ]; then   # bare repo read: repos/<owner>/<repo>
+    emit_headers
+    fx repo.json || echo '{"full_name":"'"${GITEA_REPO:-example/shop}"'","default_branch":"main","permissions":{"admin":true,"push":true,"pull":true}}'
+    exit 0
+  fi
+  emit_headers; echo '{}'; exit 0
+fi
+
+# ── writes ────────────────────────────────────────────────────────────────────
+log_write
+[ -n "$BODY" ] || BODY='{}'
+case "$PATHPART" in
+  repos/*/*/issues)   # POST create
+    [ "$METHOD" = POST ] || { echo '{}'; exit 0; }
+    put_state --argjson b "$BODY" '
+      (1 + ([ .issues[].number ] + [0] | max)) as $n | (1 + ([ .issues[].id ] + [0] | max)) as $id |
+      .issues += [{ id: $id, number: $n, title: ($b.title // ""), body: ($b.body // ""),
+                    state: "open", labels: [], html_url: ("https://gitea.example/issues/" + ($n|tostring)),
+                    created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }] |
+      .writes += 1'
+    state -c '.issues[-1]' | strip ;;
+  repos/*/*/projects/*/columns/*/issues/*)   # POST add issue to column
+    gid=$(seg 9); cid=$(seg 7)
+    put_state --argjson g "$gid" --argjson c "$cid" '
+      .issues = [ .issues[] | if .id == $g then ._column = $c else . end ] | .writes += 1'
+    echo '{}' ;;
+  repos/*/*/projects/*/issues/*/move)   # POST move between columns
+    gid=$(seg 7); cid=$(jq -r '.column_id // empty' <<<"$BODY")
+    state -e --argjson g "$gid" 'any(.issues[]; .id == $g)' >/dev/null || fail_http 404 "issue $gid not found"
+    [ -n "$cid" ] || fail_http 422 "column_id required"
+    put_state --argjson g "$gid" --argjson c "$cid" '
+      .issues = [ .issues[] | if .id == $g then ._column = $c else . end ] | .writes += 1'
+    echo "" ;;   # 204
+  repos/*/*/projects/*/columns)   # POST create column
+    put_state --argjson b "$BODY" '
+      (1 + ([ .columns[].id ] + [0] | max)) as $id |
+      .columns += [{ id: $id, title: ($b.title // ""), color: ($b.color // "") }] | .writes += 1'
+    state -c '.columns[-1]' ;;
+  repos/*/*/projects)   # POST create project
+    put_state --argjson b "$BODY" '
+      (1 + ([ .projects[].id ] + [0] | max)) as $id |
+      .projects += [{ id: $id, title: ($b.title // "") }] | .writes += 1'
+    state -c '.projects[-1]' ;;
+  repos/*/*/issues/*/comments)   # POST comment
+    n=$(seg 5)
+    put_state --arg n "$n" --argjson b "$BODY" '
+      (1 + ([ .comments[][]?.id ] + [0] | max)) as $id |
+      .comments[$n] = ((.comments[$n] // []) + [{ id: $id, body: ($b.body // ""),
+        user: { login: "eval-bot" }, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }]) |
+      .writes += 1'
+    state -c --arg n "$n" '.comments[$n][-1]' ;;
+  repos/*/*/issues/*/labels*)   # POST attach / DELETE remove label ids
+    n=$(seg 5)
+    if [ "$METHOD" = DELETE ]; then
+      lid=${PATHPART##*/labels/}
+      put_state --argjson n "$n" --argjson l "${lid:-0}" '
+        .issues = [ .issues[] | if .number == $n then
+          .labels = [ (.labels // [])[] | select(.id != $l) ] else . end ] | .writes += 1'
+    else
+      put_state --argjson n "$n" --argjson b "$BODY" '
+        ($b.labels // []) as $ids |
+        ([ .labels[] | select(.id as $i | $ids | index($i)) ]) as $add |
+        .issues = [ .issues[] | if .number == $n then
+          .labels = (((.labels // []) + $add) | unique_by(.id)) else . end ] | .writes += 1'
+    fi
+    state -c --argjson n "$n" '[ .issues[] | select(.number == $n) | .labels // [] ] | .[0] // []' ;;
+  repos/*/*/issues/*/assignees)   # POST add / DELETE remove assignees
+    n=$(seg 5)
+    if [ "$METHOD" = DELETE ]; then
+      put_state --argjson n "$n" --argjson b "$BODY" '
+        ($b.assignees // []) as $l |
+        .issues = [ .issues[] | if .number == $n then
+          .assignees = [ (.assignees // [])[] | select(.login as $x | $l | index($x) | not) ] else . end ] | .writes += 1'
+    else
+      put_state --argjson n "$n" --argjson b "$BODY" '
+        ($b.assignees // []) as $l |
+        .issues = [ .issues[] | if .number == $n then
+          .assignees = (((.assignees // []) + [ $l[] | { login: . } ]) | unique_by(.login)) else . end ] | .writes += 1'
+    fi
+    state -c --argjson n "$n" '[ .issues[] | select(.number == $n) | .assignees // [] ] | .[0] // []' ;;
+  repos/*/*/labels)   # POST create label (after the deeper issues/*/labels route:
+    # case globs span slashes, so this bare pattern would swallow it)
+    [ "$METHOD" = POST ] || { echo '{}'; exit 0; }
+    name=$(jq -r '.name // ""' <<<"$BODY")
+    state -e --arg n "$name" 'any(.labels[]; .name == $n) | not' >/dev/null || fail_http 422 "label already exists"
+    put_state --argjson b "$BODY" '
+      (1 + ([ .labels[].id ] + [0] | max)) as $id |
+      .labels += [{ id: $id, name: ($b.name // ""), color: ($b.color // "#ededed") }] | .writes += 1'
+    state -c '.labels[-1]' ;;
+  repos/*/*/pulls/*/merge)   # POST merge
+    n=$(seg 5)
+    want=$(jq -r '.head_commit_id // empty' <<<"$BODY")
+    head=$(state -r --argjson n "$n" '[ .pulls[] | select(.number == $n) | .head.sha // empty ] | .[0] // empty')
+    if [ -n "$want" ] && [ -n "$head" ] && [ "$want" != "$head" ]; then
+      fail_http 409 "head_commit_id mismatch"; fi
+    sha="merge$(printf '%036d' "$n")"
+    put_state --argjson n "$n" --arg s "$sha" '
+      .pulls = [ .pulls[] | if .number == $n then
+        .merged = true | .state = "closed" | .merge_commit_sha = $s else . end ] | .writes += 1'
+    echo '{}' ;;
+  repos/*/*/pulls/*)   # PATCH pull (body etc.)
+    [ "$METHOD" = PATCH ] || { echo '{}'; exit 0; }
+    n=$(seg 5)
+    put_state --argjson n "$n" --argjson b "$BODY" '
+      .pulls = [ .pulls[] | if .number == $n then . * $b else . end ] | .writes += 1'
+    state -c --argjson n "$n" '.pulls[] | select(.number == $n)' ;;
+  repos/*/*/issues/*)   # PATCH issue
+    [ "$METHOD" = PATCH ] || { echo '{}'; exit 0; }
+    n=$(seg 5)
+    put_state --argjson n "$n" --argjson b "$BODY" '
+      .issues = [ .issues[] | if .number == $n then . * $b else . end ] | .writes += 1'
+    state -c --argjson n "$n" '.issues[] | select(.number == $n)' | strip ;;
+  *) echo '{}' ;;
+esac
+exit 0

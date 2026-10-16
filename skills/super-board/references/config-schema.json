@@ -13,10 +13,26 @@
   // E.g. "staging QA" or "admin build pipeline".
   "description": "<short scannable label, e.g. 'staging QA' or 'admin build pipeline'>",
 
+  // Which forge hosts the board, issues and PRs (v3.2.0). "github" (default,
+  // absent means github) or "gitea". Resolution order for every script:
+  // env SB_FORGE / SB_FORGE_HOST / SB_FORGE_LOGIN → these keys → the git
+  // remote (advisory: fills owner/repo and a gitea host, never flips the
+  // kind). See references/gitea.md for the full mapping and degradations.
+  "forge": "github",
+  // Instance base URL, REQUIRED when forge is "gitea" (e.g.
+  // "https://gitea.example.com" or "http://localhost:3000"). A gitea config
+  // with no resolvable host exits 66 — scripts never guess the server.
+  "forge_host": null,
+  // Optional tea login name (`tea login ls`) for machines with several
+  // Gitea accounts; absent lets tea use its default login, or the
+  // GITEA_TOKEN + TEA_HOST env pair in CI.
+  "forge_login": null,
+
   "project": {
     "owner": "<github-owner>",
     "title": "<project title on GitHub>",
     // Required; `gh project` CLI takes number, not title (titles aren't unique).
+    // On Gitea this is the project's API id (onboard records id + UI URL).
     "number": 0
   },
 
