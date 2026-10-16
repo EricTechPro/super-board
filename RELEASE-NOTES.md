@@ -1,5 +1,51 @@
 # Release notes
 
+## v3.2.0 — 2026-10-16
+
+A board can live on **Gitea**, not only GitHub: one config key (`"forge": "gitea"`) and the
+whole pipeline — board, lanes, merge gate, collectors, onboard — runs against a Gitea/Forgejo
+instance through the `tea` CLI. GitHub stays the default and is untouched.
+
+- ✨ **Forge adapter layer.** `super-board-forge.py/.sh` resolve the forge once (env `SB_FORGE`
+  → config `forge`/`forge_host`/`forge_login` → git remote → github) and dispatch reads/writes;
+  every script keeps its verbs, exit codes (79/73/69/67/64/66) and the one shared halt file.
+- ✨ **`super-board-gitea-read.py`** — the bounded, read-only twin of github-read: same CLI,
+  retries, permanent-error halts and `--kind` shapes, with composite reads that normalize
+  Gitea REST into the github shapes (items/fields/quota/approval/diff…). Writes go through
+  `super-board-gitea-api.sh` (`tea api`, every spawn timeout-bounded — a hung tea.exe on
+  Windows fails instead of blocking a worker).
+- ✨ **The board is a Gitea repo project.** The seven columns are project columns;
+  `project.number` is the project's API id. `card.sh` moves a card in one
+  `POST …/issues/{gid}/move` with the same cache and stale-id retry; onboard's
+  `board-rank`/`board-migrate` gained `--forge gitea` (additive columns/labels, Skipped→Done,
+  idempotent re-runs, snapshot first).
+- ✨ **Merge gate on Gitea** squash-merges via `POST pulls/{i}/merge` pinned with
+  `head_commit_id` (the `--match-head-commit` analog); the lost-response reconciliation and
+  human-approval flow are unchanged. Approval trust fails closed: owner = admin, listed
+  collaborators = write, `Closes #N` trailers replace `closingIssuesReferences`.
+- ✨ **Onboard asks the forge.** Step 2 becomes 🔑 FORGE: tea install/probe (a binary that
+  hangs counts as missing), host, token via `tea login add` or `GITEA_TOKEN`+`TEA_HOST`, and a
+  swagger capability gate on the projects-columns API before anything is written.
+- ⚡ **Rate-limit honesty.** Gitea instances without limits report `rate_limits_disabled`;
+  the guard never sleeps on sentinels and the per-worker budget (exit 73) becomes the primary
+  protection; the throttle steps `max_workers` down only on real 429 evidence.
+- 🧪 **Offline tea stub + suites.** `evals/_stubs/bin/tea` is a stateful offline Gitea
+  (fixtures → `.git/tea-state.json`, calls/writes logs, rate-limit headers); new suites
+  `test_forge.py`, `test-forge.sh`, `test_gitea_reads.py`, `test-gitea-api.sh`,
+  `test-card-gitea.sh`, `test-status-gitea.sh`, `test-setup-gitea.sh`,
+  `test-gh-guard-gitea.sh`, `test-pr-body-gitea.sh`, `test-deps-gitea.sh` plus gitea cases in
+  `test-throttle.sh` — all in `run-safety.sh`, no network.
+- 🐛 **Windows onboard repairs.** `super-board-setup.py` resolves bash via `shutil.which` (a
+  broken WSL relay no longer shadows Git bash), and reads/writes child output as UTF-8 —
+  emoji-heavy install output crashed onboard on cp1252 consoles.
+- 📝 **`references/gitea.md`** — the mapping table, a gh↔tea dictionary for every literal
+  command the skills quote, lane checklist and the accepted degradations (no GraphQL economy,
+  best-effort assignee claims, no draft-issue cards). Screenshot URLs: Gitea pins with
+  `/raw/commit/<sha>/` (writing-standard.md first, as always).
+- Minimum versions: **tea 0.16.x** (`tea api` required; 1.0 renames commands — pinned
+  spellings live in gitea-read/gitea-api) and a Gitea new enough to serve the
+  projects-columns endpoints (onboard refuses older instances with a named fix).
+
 ## v3.1.2 — 2026-10-11
 
 `/super-collect` dedupes on the exact fingerprint and says when Sentry or PostHog is down.

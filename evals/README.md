@@ -38,6 +38,16 @@ Offline regression tests for the same skill (no model, no cost) run in `tests/ru
   `issues.json`, `prs-merged.json`, `project-items.json`, `fields.json` and `graphql.json`.
   Writes are recorded, never sent: `issue create` bodies go to `.git/gh-created.md`, comments
   to `.git/gh-comments.md`, and every call to `.git/gh-calls.log` (plain text, for graders).
+- `tea` — offline, STATEFUL. Serves the gitea twin of the gh stub for boards with
+  `"forge": "gitea"`: first call seeds `.git/tea-state.json` from `.git/tea-fixture/`
+  (`issues.json` `pulls.json` `labels.json` `projects.json` `columns.json`
+  `board.json` = [{column, numbers}] placements, `pull-<n>-files.json`, `pull-<n>.diff`,
+  `version.json`, `user.json`, `repo.json`, `no-ratelimit`, `ratelimit-remaining`), then
+  reads AND writes go through that state (create/comment/label/move/merge all mutate it, so
+  a grader can assert the final board). Calls log to `.git/tea-calls.log`, writes to
+  `.git/tea-writes.log`. Only `tea api` (+ `--version`, `login ls`) is implemented — the
+  gitea adapter never calls anything else. `{owner}/{repo}` placeholders expand from
+  `GITEA_REPO`, like the real CLI.
 - `py/sitecustomize.py` — offline Sentry and PostHog. `collect-seed.sh` puts it on `PYTHONPATH`
   with `SC_FIXTURES` pointing at a rendered copy of `tests/fixtures/collect/`, so the real
   `collect_sentry.py` / `collect_posthog.py` read canned payloads through
