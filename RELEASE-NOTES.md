@@ -1,5 +1,40 @@
 # Release notes
 
+## v3.2.0 — 2026-10-17
+
+Pi (pi.dev) is a third agent host: `/super-board run --pi` drains the board on Pi's models.
+
+- ✨ **A Pi lane and wave.** `super-board-pi-wave.sh` → `super-board-pi-lane.sh` runs every
+  lane headless (`pi -p -a`) with the same claims, worktrees, handoff and halt contract as
+  Codex. Pi has no `--output-schema`: the worker writes its final JSON to a private result
+  file that the wrapper validates fail-closed (a missing, malformed or contradicting file
+  fails the lane; exit 9/10/79 keep their halt meanings).
+- ✨ **`--pi[=<model>] [--low|--high]`.** Ladders default to haiku/sonnet/opus and Pi resolves
+  a model pattern fuzzily across the providers you connected; a haiku router grades each
+  Ready card and `pi.model` / `pi.router_model` / `pi.ladders` override the defaults.
+  `--pi` is always required: unlike Codex there is no Claude-usage fallback that may start
+  Pi on its own, and `review` without the flag refuses with its own message.
+- ✨ **A Pi session means `--pi`.** `super-board-host.sh` reads `AI_AGENT=pi` /
+  `PI_CODING_AGENT=true` before the Codex ids, a plain `run` inside Pi takes the Pi ladder,
+  and Pi invokes the skill as `/skill:super-board run`.
+- 🛡️ **The guards port to Pi.** `.pi/extensions/super-board-guards.ts` translates Pi tool
+  calls into the same payloads the `.claude` hooks read, so worktree, secrets, key-literal,
+  delete-outside and the opt-in protected-push guard behave identically — fail-open, like
+  the hooks. `install.sh` installs it; `--no-hooks` skips it, and
+  `--no-hooks --protect-main` installs it with the push guard alone.
+- 🔧 **Stop and calibration know Pi.** `super-board-stop.sh` validates and stops a Pi wave
+  (its own `pi-wave.pid`) with the same SIGTERM-then-claims order; a completed calibration
+  receipt is refused while a Pi wave marker exists.
+- 🔎 **Skill readiness resolves Pi's real surfaces**: the scoped `.agents/skills` search,
+  project `.pi/skills`, user and agent-directory roots, and the fail-closed
+  `skills`/`packages` settings policy (authoritative `--catalog` unblocks it).
+- 📝 **Docs.** `references/run-workflow.md` gains "Pi runs", the README models table gains
+  Pi rows, and `references/config-schema.json` documents the `pi` block.
+- 🧪 **Offline tests.** `tests/test-pi-lane.sh` (opt-in, models, ladders, wave, halt,
+  cancellation), the Pi marker scenarios in `tests/test-codex-stop.sh`, and
+  `tests/test-pi-guards.sh`, which runs the real extension through Node's type stripping
+  against a stub Pi API.
+
 ## v3.1.2 — 2026-10-11
 
 `/super-collect` dedupes on the exact fingerprint and says when Sentry or PostHog is down.
