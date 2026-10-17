@@ -111,20 +111,20 @@ while read -r TIER GRADE WANT; do
   lane build --pi --tier "$TIER" ${GRADE:+--complexity "$GRADE"} >"$T/out"
   [ "$(last_model)" = "$WANT" ] || fail "ladder $TIER/$GRADE must pick $WANT, got $(last_model)"
 done <<'CELLS'
-medium low sonnet
-medium medium sonnet
-medium high opus
-low low haiku
-low medium sonnet
-low high sonnet
-high low opus
-high medium opus
-high high opus
+medium low claude-sonnet-latest
+medium medium claude-sonnet-latest
+medium high claude-opus-latest
+low low claude-haiku-latest
+low medium claude-sonnet-latest
+low high claude-sonnet-latest
+high low claude-opus-latest
+high medium claude-opus-latest
+high high claude-opus-latest
 CELLS
 lane qa --pi --tier medium >"$T/out"
-[ "$(last_model)" = sonnet ] || fail 'ungraded default card takes the medium cell'
+[ "$(last_model)" = claude-sonnet-latest ] || fail 'ungraded default card takes the medium cell'
 lane qa --pi --tier low >"$T/out"
-[ "$(last_model)" = sonnet ] || fail 'ungraded --low card takes the medium cell'
+[ "$(last_model)" = claude-sonnet-latest ] || fail 'ungraded --low card takes the medium cell'
 lane build --pi=flag-model --tier high --complexity high >"$T/out"
 [ "$(last_model)" = flag-model ] || fail 'explicit --pi=<model> beats the ladder'
 echo '{"pi":{"model":"config-model"},"verify_commands":["git diff --check"]}' > "$T/config.json"
@@ -132,7 +132,7 @@ lane build --pi --tier low --complexity low >"$T/out"
 [ "$(last_model)" = config-model ] || fail 'pi.model beats the ladder'
 echo '{"pi":{"model":""},"verify_commands":["git diff --check"]}' > "$T/config.json"
 lane build --pi --tier high --complexity low >"$T/out"
-[ "$(last_model)" = opus ] || fail 'empty pi.model leaves the ladder in charge'
+[ "$(last_model)" = claude-opus-latest ] || fail 'empty pi.model leaves the ladder in charge'
 echo '{"pi":{"ladders":{"low":{"low":"l-low","medium":"l-med","high":"l-high"},"medium":{"low":"m-low","medium":"m-med","high":"m-high"},"high":{"low":"h-low","medium":"h-med","high":"h-high"}}},"verify_commands":["git diff --check"]}' > "$T/config.json"
 lane build --pi --tier high --complexity low >"$T/out"
 [ "$(last_model)" = h-low ] || fail 'pi.ladders override must drive the ladder'
@@ -178,18 +178,18 @@ import json, pathlib, sys
 calls = [json.loads(line) for line in pathlib.Path(sys.argv[1]).read_text().splitlines()]
 grades = [call for call in calls if call['lane'] == 'grade']
 assert [call['number'] for call in grades] == [1], grades
-assert grades[0]['model'] == 'haiku'
+assert grades[0]['model'] == 'claude-haiku-latest'
 card1 = [call['model'] for call in calls if call['number'] == 1 and call['lane'] != 'grade']
-assert card1 == ['haiku'] * 3, card1          # --low x low on build, qa and review
+assert card1 == ['claude-haiku-latest'] * 3, card1          # --low x low on build, qa and review
 card2 = [call['model'] for call in calls if call['number'] == 2]
-assert card2 == ['sonnet'], card2             # ungraded Review card: --low medium cell
+assert card2 == ['claude-sonnet-latest'], card2             # ungraded Review card: --low medium cell
 PY
 : > "$SB_PI_TEST_LOG"
 SB_PI_TEST_GRADE=high wave --pi >"$T/out"
-jq -s -e '[.[] | select(.number == 1 and .lane != "grade") | .model] | all(. == "opus")' "$SB_PI_TEST_LOG" >/dev/null || fail 'default ladder sends a hard card to opus'
+jq -s -e '[.[] | select(.number == 1 and .lane != "grade") | .model] | all(. == "claude-opus-latest")' "$SB_PI_TEST_LOG" >/dev/null || fail 'default ladder sends a hard card to opus'
 : > "$SB_PI_TEST_LOG"
 SB_PI_TEST_GRADE_EXIT=1 wave --pi --tier high >"$T/out"
-jq -s -e '[.[] | select(.number == 1 and .lane != "grade") | .model] | all(. == "opus")' "$SB_PI_TEST_LOG" >/dev/null || fail 'a failed grade falls back to the medium cell'
+jq -s -e '[.[] | select(.number == 1 and .lane != "grade") | .model] | all(. == "claude-opus-latest")' "$SB_PI_TEST_LOG" >/dev/null || fail 'a failed grade falls back to the medium cell'
 : > "$SB_PI_TEST_LOG"
 echo '{"max_workers":1,"pi":{"router_model":"router-x"},"verify_commands":["git diff --check"]}' > "$T/config.json"
 SB_PI_TEST_GRADE=low wave --pi >"$T/out"

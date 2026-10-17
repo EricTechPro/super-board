@@ -3,8 +3,9 @@
 # Claude workflow's {cards:[summary...], halted} reconciliation contract.
 # Usage: --config f --cards '<JSON array>' --pi[=model] [--tier low|medium|high] [--output f]
 # Unless one model is pinned (--pi=<model> or pi.model), a cheap router
-# (pi.router_model, default haiku) grades each Ready card low/medium/high; the
-# lane launcher maps tier x grade to a model through its PI_LADDERS table.
+# (pi.router_model, default claude-haiku-latest) grades each Ready card
+# low/medium/high; the lane launcher maps tier x grade to a model through its
+# PI_LADDERS table.
 set -euo pipefail
 exec python3 - "${BASH_SOURCE[0]}" "$@" <<'PY'
 import argparse
@@ -57,7 +58,7 @@ try:
     root = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()).resolve()
     configured = (config.get('pi') or {}).get('model')
     pinned = pi_flags[0].startswith('--pi=') or (isinstance(configured, str) and configured.strip())
-    router = (config.get('pi') or {}).get('router_model') or 'haiku'
+    router = (config.get('pi') or {}).get('router_model') or 'claude-haiku-latest'
     if not isinstance(router, str) or not router.strip():
         raise ValueError('pi.router_model must be a non-empty string')
     ROUTER_MODEL = router
@@ -132,8 +133,8 @@ except FileExistsError:
     parser.error('Pi wave PID marker exists; reconcile the previous wave before starting another')
 
 # The router only grades scope; it writes nothing. A Pi run grades with the
-# configured cheap model (pi.router_model, default haiku) rather than waking
-# Claude; a failed grade falls back to the medium ladder cell.
+# configured cheap model (pi.router_model, default claude-haiku-latest) rather
+# than waking Claude; a failed grade falls back to the medium ladder cell.
 def grade(card):
     """Return (complexity or None, halted). A failed grade falls back to the medium cell."""
     if pinned or card['status'] != 'Ready':

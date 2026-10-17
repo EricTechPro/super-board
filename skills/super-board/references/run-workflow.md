@@ -44,11 +44,13 @@ use the lane launcher's sandbox settings, including an external submodule git di
 overriding `worker_backend`. Use it to run the board on Pi's connected providers.
 `--pi --low` / `--pi --high` pick the Pi ladder the same way the tier flags
 pick Claude's (flag, else config `model_tier`, else medium); pass it as `--tier`.
-A cheap router (`pi.router_model`, default `haiku`) grades each Ready card
+A cheap router (`pi.router_model`, default `claude-haiku-latest`) grades each Ready card
 low/medium/high, and the lane launcher's `PI_LADDERS` table maps tier × grade to
-`--model <model>`; Pi resolves a model pattern fuzzily across connected providers,
-so the defaults are Claude-family names and a board on other providers overrides
-`pi.ladders` in the config. A card entering past Ready takes its tier's medium cell.
+`--model <model>`, an optional `:thinking` suffix included; Pi resolves a model
+pattern across connected providers, so the defaults are the `claude-<family>-latest`
+aliases (bare `haiku`/`sonnet`/`opus` can land on a `:batch` catalog variant no chat
+endpoint accepts) and a board on other providers overrides `pi.ladders` in the config.
+A card entering past Ready takes its tier's medium cell.
 `--pi=<model>`, else optional `pi.model`, pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
 

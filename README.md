@@ -144,12 +144,15 @@ A cheap router grades each card easy, medium or hard first; the run flag picks t
 | `/super-board run --codex` | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol | gpt-6-astra |
 | `/super-board run --codex --low` | gpt-6-luna | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol |
 | `/super-board run --codex --high` | gpt-6-luna | gpt-6-astra | gpt-6-astra | gpt-6-astra |
-| `/super-board run --pi` | haiku | sonnet | sonnet | opus |
-| `/super-board run --pi --low` | haiku | haiku | sonnet | sonnet |
-| `/super-board run --pi --high` | haiku | opus | opus | opus |
+| `/super-board run --pi` | claude-haiku-latest | claude-sonnet-latest | claude-sonnet-latest | claude-opus-latest |
+| `/super-board run --pi --low` | claude-haiku-latest | claude-haiku-latest | claude-sonnet-latest | claude-sonnet-latest |
+| `/super-board run --pi --high` | claude-haiku-latest | claude-opus-latest | claude-opus-latest | claude-opus-latest |
 
 `/super-board run --codex=<model>` or `--pi=<model>` pins one model for every card and skips the router.
-The Pi names are defaults: Pi resolves a model pattern fuzzily across the providers you connected, so a board on another provider overrides `pi.ladders` (and `pi.model`/`pi.router_model`) in the config.
+The Pi names are defaults: Pi resolves a model pattern across the providers you connected, and bare
+`haiku`/`sonnet`/`opus` can land on a `:batch` catalog variant no chat endpoint accepts, so the
+defaults use the `claude-<family>-latest` aliases — a board on another provider overrides
+`pi.ladders` (and `pi.model`/`pi.router_model`) in the config, and a `:thinking` suffix still applies.
 
 Run inside Codex or Pi? plain `/super-board run` switches to that host's ladder by itself. Codex has no
 `/super-board` command: it finds skills in `.agents/skills/` (symlinks followed), so link

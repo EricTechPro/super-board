@@ -9,11 +9,14 @@ Pi (pi.dev) is a third agent host: `/super-board run --pi` drains the board on P
   Codex. Pi has no `--output-schema`: the worker writes its final JSON to a private result
   file that the wrapper validates fail-closed (a missing, malformed or contradicting file
   fails the lane; exit 9/10/79 keep their halt meanings).
-- ✨ **`--pi[=<model>] [--low|--high]`.** Ladders default to haiku/sonnet/opus and Pi resolves
-  a model pattern fuzzily across the providers you connected; a haiku router grades each
-  Ready card and `pi.model` / `pi.router_model` / `pi.ladders` override the defaults.
-  `--pi` is always required: unlike Codex there is no Claude-usage fallback that may start
-  Pi on its own, and `review` without the flag refuses with its own message.
+- ✨ **`--pi[=<model>] [--low|--high]`.** Ladders default to the
+  `claude-haiku-latest` / `claude-sonnet-latest` / `claude-opus-latest` aliases and Pi resolves
+  a model pattern across the providers you connected (bare `haiku`/`sonnet`/`opus` can land on
+  a `:batch` catalog variant no chat endpoint accepts — found in a live smoke); a
+  `claude-haiku-latest` router grades each Ready card and `pi.model` / `pi.router_model` /
+  `pi.ladders` override the defaults. `--pi` is always required: unlike Codex there is no
+  Claude-usage fallback that may start Pi on its own, and `review` without the flag refuses
+  with its own message.
 - ✨ **A Pi session means `--pi`.** `super-board-host.sh` reads `AI_AGENT=pi` /
   `PI_CODING_AGENT=true` before the Codex ids, a plain `run` inside Pi takes the Pi ladder,
   and Pi invokes the skill as `/skill:super-board run`.

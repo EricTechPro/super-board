@@ -157,8 +157,8 @@ def check(command, cwd, root_of, env):
         where = ("resolves to " + resolved) if resolved else "cannot be resolved before it runs"
         return (
             'Blocked: worktree path "%s" %s, outside %s/.\n'
-            "Worktrees live only under .claude/worktrees/ so cleanup-wt and Claude Code's sweep can see them.\n"
-            'Prefer the Agent tool\'s isolation: "worktree" or `claude --worktree <name>`. If you need git directly:\n'
+            "Worktrees live only under .claude/worktrees/ so cleanup-wt and the host's worktree sweep can see them.\n"
+            'Prefer your host\'s isolation (Claude Code: the Agent tool\'s "worktree" option or `claude --worktree <name>`). If you need git directly:\n'
             "  git worktree add .claude/worktrees/<name> -b <branch> <base>\n"
             "(from the repo root, with a literal path)." % (raw, where, allowed)
         )

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # super-board installer.
 # Copies skills/, scripts/, workflows/ and the guard hooks into the target
-# project's .claude/ tree, and merges the hook settings into
-# .claude/settings.json (backed up first, never duplicated).
+# project's .claude/ tree, the Pi guard extension into .pi/extensions/, and
+# merges the hook settings into .claude/settings.json (backed up first, never
+# duplicated).
 #
 # Usage:
 #   ./install.sh [--no-hooks] [--protect-main] [target-project-dir]

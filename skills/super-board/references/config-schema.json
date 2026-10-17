@@ -69,12 +69,13 @@
     // (run tier x card grade, see scripts/super-board-pi-lane.sh).
     "model": null,
     // Optional cheap model grading each Ready card before its lanes (default
-    // "haiku"); resolved fuzzily across the providers the Pi session has.
+    // "claude-haiku-latest"); resolved across the providers the Pi session has.
     "router_model": null,
     // Optional override of the built-in tier x grade table. Keys must be
     // low/medium/high tiers, each with low/medium/high grades and non-empty
     // model strings; Pi accepts an optional `:thinking` suffix (for example
-    // "sonnet:high"). Absent/null keeps PI_LADDERS in the lane launcher.
+    // "claude-sonnet-latest:high"). Absent/null keeps PI_LADDERS in the lane
+    // launcher (the claude-<family>-latest aliases).
     "ladders": null
   },
 

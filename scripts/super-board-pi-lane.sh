@@ -69,13 +69,15 @@ try:
         raise ValueError('pi.model must be a string')
     model = model if model is not None else (configured if configured and configured.strip() else None)
     # Pi run ladders, the one copy: run tier x card complexity -> `pi --model`.
-    # Pi resolves patterns fuzzily across whatever providers the user connected,
-    # so the defaults are the Claude-family names with an optional `:thinking`
-    # suffix; boards on other providers override pi.ladders in the config.
+    # Pi resolves patterns fuzzily across whatever providers the user connected.
+    # Bare `haiku`/`sonnet`/`opus` can land on a `:batch` catalog variant that
+    # no chat endpoint accepts, so the defaults use the unambiguous
+    # `claude-<family>-latest` aliases (an optional `:thinking` suffix still
+    # applies); boards on other providers override pi.ladders in the config.
     PI_LADDERS = {
-        'low': {'low': 'haiku', 'medium': 'sonnet', 'high': 'sonnet'},
-        'medium': {'low': 'sonnet', 'medium': 'sonnet', 'high': 'opus'},
-        'high': {'low': 'opus', 'medium': 'opus', 'high': 'opus'},
+        'low': {'low': 'claude-haiku-latest', 'medium': 'claude-sonnet-latest', 'high': 'claude-sonnet-latest'},
+        'medium': {'low': 'claude-sonnet-latest', 'medium': 'claude-sonnet-latest', 'high': 'claude-opus-latest'},
+        'high': {'low': 'claude-opus-latest', 'medium': 'claude-opus-latest', 'high': 'claude-opus-latest'},
     }
     configured_ladders = (config.get('pi') or {}).get('ladders')
     if configured_ladders is not None:
