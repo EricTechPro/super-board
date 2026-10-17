@@ -251,6 +251,36 @@ def codex_disabled(config_path, root, home):
     return disabled, bool(records)
 
 
+def pi_skill_resources(paths):
+    """True when a Pi settings file carries skill-affecting config we cannot verify.
+
+    Pi settings can add skills through `skills` resource arrays (plain paths,
+    `+`/`-`/`!` glob entries) and through `packages` that bundle skills. Resolving
+    those — glob semantics, trust layers, package contents — is not reimplemented
+    here: an authoritative catalog is required instead, exactly like unsupported
+    Codex activation. Unrelated settings (models, themes, tools) never matter.
+    """
+    affected = False
+    for path in paths:
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except ValueError:
+            raise ValueError('unsupported Pi settings: expected valid JSON in ' + str(path))
+        if not isinstance(data, dict):
+            raise ValueError('unsupported Pi settings: expected an object in ' + str(path))
+        for key in ('skills', 'packages'):
+            value = data.get(key)
+            if value is None:
+                continue
+            if not isinstance(value, list):
+                raise ValueError('unsupported Pi settings: ' + key + ' must be an array')
+            if value:
+                affected = True
+    return affected
+
+
 class Inventory:
     def __init__(self, root, host, home=None, catalog=None):
         self.root, self.host = Path(root).resolve(), host
@@ -264,6 +294,33 @@ class Inventory:
         if host == 'claude':
             self.roots = [self.root / '.claude/skills', self.home / '.claude/skills']
             self.claude_plugins()
+        elif host == 'pi':
+            # Pi keeps the Agent Skills locations and adds its own roots. Project
+            # `.agents/skills` search stops at this independent repository's root,
+            # the same boundary rule Codex uses; `.pi/skills` is the Pi-native
+            # project surface. User roots: ~/.agents/skills plus the Pi agent
+            # directory (`PI_CODING_AGENT_DIR`, default ~/.pi/agent).
+            process = subprocess.run(['git', '-C', str(self.root), 'rev-parse', '--show-toplevel'],
+                                     text=True, capture_output=True)
+            boundary = Path(process.stdout.strip()).resolve() if process.returncode == 0 else self.root
+            scoped = [self.root]
+            if boundary in self.root.parents:
+                for parent in self.root.parents:
+                    scoped.append(parent)
+                    if parent == boundary:
+                        break
+            pi_home = (self.home / '.pi/agent') if home else Path(os.environ.get('PI_CODING_AGENT_DIR', self.home / '.pi/agent'))
+            self.roots = [parent / '.agents/skills' for parent in scoped]
+            self.roots += [self.root / '.pi/skills', self.home / '.agents/skills', pi_home / 'skills']
+            try:
+                if pi_skill_resources([pi_home / 'settings.json', self.root / '.pi/settings.json']):
+                    raise ValueError('Pi skill resources or packages need an authoritative --catalog for effective trusted settings')
+            except ValueError:
+                if not catalog:
+                    raise
+                # Unknown native activation semantics need a complete active inventory.
+                self.roots = []
+                self.catalog_only = True
         else:
             # Codex discovery stops at this independent repository's root.
             process = subprocess.run(['git', '-C', str(self.root), 'rev-parse', '--show-toplevel'],
@@ -377,8 +434,8 @@ class Inventory:
             candidates[1:1] = self.project_exact.get(name, [])
         else:
             candidates = list(self.project_exact.get(name, []))
-        # Core direct reads are part of the Codex launcher contract, helpers are not.
-        if self.host == 'codex' and name in CORE and not self.catalog_only:
+        # Core direct reads are part of the Codex and Pi launcher contract, helpers are not.
+        if self.host in ('codex', 'pi') and name in CORE and not self.catalog_only:
             candidates.insert(0, self.root / '.claude/skills' / name / 'SKILL.md')
         candidates += self.exact.get(name, [])
         for path in candidates:
@@ -454,7 +511,7 @@ class UsageParser(argparse.ArgumentParser):
 def main(argv=None):
     parser = UsageParser(description=__doc__)
     parser.add_argument('--root', required=True)
-    parser.add_argument('--host', required=True, choices=['claude', 'codex'])
+    parser.add_argument('--host', required=True, choices=['claude', 'codex', 'pi'])
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument('--cards')
     selection.add_argument('--profile', choices=['setup'])

@@ -236,6 +236,80 @@ class Readiness(unittest.TestCase):
         path.write_text('in owning repository')
         self.run_cli(host='codex')
 
+    def test_pi_core_direct_read_native_and_user_roots(self):
+        # The eight core skills keep the `.claude/skills` launcher contract;
+        # helpers resolve from Pi's own surfaces, never from `.claude` alone.
+        helpers = ['tdd', 'implement', 'codebase-design', 'code-review', 'diagnosing-bugs',
+                   'verification-before-completion', 'testing-strategy']
+        self.full()
+        self.run_cli(host='pi', expected=10)
+        agents = self.root / '.agents/skills'; agents.mkdir(parents=True)
+        for name in helpers:
+            (agents / name).symlink_to(self.root / '.claude/skills' / name, target_is_directory=True)
+        result = self.run_cli(host='pi')
+        core = next(e for e in result['entries'] if e['name'] == 'super-board')
+        self.assertEqual(core['resolved_path'], str((self.root / '.claude/skills/super-board/SKILL.md').resolve()))
+        self.assertTrue(all(Path(e['resolved_path']).is_file() for e in result['entries'] if e['status'] == 'resolved'))
+        # A helper only present under the native project root `.pi/skills` is found too.
+        (agents / 'tdd').unlink()
+        native = self.root / '.pi/skills/tdd/SKILL.md'
+        native.parent.mkdir(parents=True); native.write_text('native project skill')
+        result = self.run_cli(host='pi')
+        self.assertEqual(next(e['resolved_path'] for e in result['entries'] if e['name'] == 'mattpocock-skills:tdd'), str(native.resolve()))
+        # User surfaces: the Pi agent directory and the shared Agent Skills home.
+        native.rename(self.home / 'moved-out'); native.parent.rmdir()
+        user = self.home / '.pi/agent/skills/tdd/SKILL.md'
+        user.parent.mkdir(parents=True); user.write_text('pi agent directory skill')
+        result = self.run_cli(host='pi')
+        self.assertEqual(next(e['resolved_path'] for e in result['entries'] if e['name'] == 'mattpocock-skills:tdd'), str(user.resolve()))
+        user.unlink(); user.parent.rmdir()
+        shared = self.put('tdd', host='pi', root=self.home)
+        result = self.run_cli(host='pi')
+        self.assertEqual(next(e['resolved_path'] for e in result['entries'] if e['name'] == 'mattpocock-skills:tdd'), str(shared.resolve()))
+
+    def test_pi_discovery_stops_at_independent_repository_root(self):
+        self.full('pi')
+        subprocess.run(['git','init','-q',str(self.root)], check=True)
+        path = self.root / '.agents/skills/tdd/SKILL.md'; path.unlink()
+        outside = self.root.parent / '.agents/skills/tdd/SKILL.md'
+        outside.parent.mkdir(parents=True); outside.write_text('outside owning repository')
+        self.run_cli(host='pi', expected=10)
+        nested = self.root / 'nested'; nested.mkdir()
+        self.root = nested
+        # The project root is still visible from an in-repository subdirectory.
+        path.write_text('in owning repository')
+        self.run_cli(host='pi')
+
+    def test_pi_skill_resources_and_packages_require_catalog(self):
+        self.full('pi')
+        settings = self.root / '.pi/settings.json'; settings.parent.mkdir()
+        settings.write_text('{"theme":"system"}')
+        self.run_cli(host='pi')
+        for payload in ['{"skills":["./extra"]}', '{"packages":["npm:@fixture/skills"]}',
+                        '{"skills":"nope"}', 'not json']:
+            settings.write_text(payload)
+            diagnostic = self.run_cli(host='pi', expected=64)
+            self.assertIn('Pi', diagnostic)
+            self.assertNotIn('Traceback', diagnostic)
+        settings.write_text('{"skills":[],"packages":[]}')
+        self.run_cli(host='pi')
+        # User-level resources affect every project and fail closed the same way.
+        user_settings = self.home / '.pi/agent/settings.json'
+        user_settings.parent.mkdir(parents=True)
+        user_settings.write_text('{"skills":["~/skills"]}')
+        self.run_cli(host='pi', expected=64)
+        user_settings.write_text('{}')
+        # An authoritative catalog resolves the effective inventory instead.
+        settings.write_text('{"skills":["./extra"]}')
+        catalog = self.root / 'active.json'
+        entries = []
+        for name in CORE + ['tdd', 'implement', 'codebase-design', 'code-review', 'diagnosing-bugs',
+                             'verification-before-completion', 'testing-strategy']:
+            entries.append(dict(name=name, path=str((self.root / '.agents/skills' / name / 'SKILL.md').resolve()),
+                                enabled=True, scope='project', project_root=str(self.root)))
+        catalog.write_text(json.dumps(dict(host='pi', skills=entries)))
+        self.run_cli(host='pi', extra=['--catalog', str(catalog)])
+
     def test_codex_native_disabled_paths_apply_to_real_symlink_targets(self):
         self.full('codex')
         path = self.root / '.agents/skills/tdd/SKILL.md'
