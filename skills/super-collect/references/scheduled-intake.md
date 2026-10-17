@@ -26,9 +26,10 @@ Confirm the active config matches the intended repo/board, then test a dry run.
 > and stop; do not clear the halt or blindly retry create/comment.
 
 Adapt invocation to the host: Claude uses `/super-collect --yes`; Codex uses
-`$super-collect --yes`. A local timer can start that host's normal agent runner
-with this prompt. A cloud job needs equivalent repo, tool, skill and credential
-access. No universal scheduler service is bundled.
+`$super-collect --yes`; Pi uses `/skill:super-collect --yes`. A local timer can
+start that host's normal agent runner with this prompt. A cloud job needs
+equivalent repo, tool, skill and credential access. No universal scheduler
+service is bundled.
 
 ## Same-host overlap and receipts
 
