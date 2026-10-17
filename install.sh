@@ -145,7 +145,17 @@ copy_file() {
   fi
 }
 
-for script in super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh; do
+# Pi loads project guards from .pi/extensions/; the extension drives the same
+# .claude/hooks/*.py scripts, so it is only useful when they were installed.
+install_pi_extension() {
+  mkdir -p "$TARGET/.pi/extensions"
+  for ext in "$REPO_ROOT"/extensions/*.ts; do
+    [ -f "$ext" ] || continue
+    copy_file "$ext" "$TARGET/.pi/extensions/$(basename "$ext")"
+  done
+}
+
+for script in super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-pi-lane.sh super-board-pi-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$TARGET/.claude/bin/$script"
     chmod +x "$TARGET/.claude/bin/$script"
@@ -188,15 +198,17 @@ if [ "$HOOKS" -eq 1 ]; then
   done
   SNIPPETS="$REPO_ROOT/hooks/settings-snippet.json"
   if [ "$PROTECT" -eq 1 ]; then SNIPPETS="$SNIPPETS $REPO_ROOT/hooks/settings-protect-main.json"; fi
+  install_pi_extension
   # shellcheck disable=SC2086
-  echo "   🛡️  $n guard hooks → .claude/settings.json ($(merge_settings $SNIPPETS))"
+  echo "   🛡️  $n guard hooks → .claude/settings.json + .pi/extensions/ ($(merge_settings $SNIPPETS))"
 elif [ "$PROTECT" -eq 1 ]; then
   # --no-hooks --protect-main: the one guard asked for, nothing else. This is the
   # command onboard names when its protect-main question finds no guard script.
   mkdir -p "$TARGET/.claude/hooks"
   copy_file "$REPO_ROOT/hooks/guard-protected-push.py" "$TARGET/.claude/hooks/guard-protected-push.py"
   chmod +x "$TARGET/.claude/hooks/guard-protected-push.py"
-  echo "   🛡️  --no-hooks: only the push guard → .claude/settings.json ($(merge_settings "$REPO_ROOT/hooks/settings-protect-main.json"))"
+  install_pi_extension
+  echo "   🛡️  --no-hooks: only the push guard → .claude/settings.json + .pi/extensions/ ($(merge_settings "$REPO_ROOT/hooks/settings-protect-main.json"))"
 else
   echo "   ⏭️  guard hooks skipped (--no-hooks)"
 fi

@@ -166,7 +166,8 @@ rm -rf "$T"
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
 for s in super-board-run.sh super-board-stop.sh super-board-wave-plan.sh \
-         super-board-codex-lane.sh super-board-codex-wave.sh super-board-card.sh super-board-throttle.sh super-board-host.sh \
+         super-board-codex-lane.sh super-board-codex-wave.sh super-board-pi-lane.sh super-board-pi-wave.sh \
+         super-board-card.sh super-board-throttle.sh super-board-host.sh \
          super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-usage.sh super-board-pr-body.sh \
          super-review-file-refactor.sh super-qa-file-bug.sh; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
@@ -186,6 +187,9 @@ for h in guard-worktree-path.py guard-secrets.py guard-key-literals.py guard-del
 done
 [ ! -e "$T/.claude/skills/cleanup-wt" ] || fail "cleanup-wt is a hook now, not a skill"
 [ ! -e "$T/.claude/hooks/dev" ] && [ ! -e "$T/.claude/hooks/gate-skill-evals.py" ] || fail "hooks/dev/ (skill-eval gate) must never be installed into a target"
+[ -f "$T/.pi/extensions/super-board-guards.ts" ] || fail "the Pi guards extension was not installed"
+grep -q 'guard-worktree-path.py' "$T/.pi/extensions/super-board-guards.ts" || fail "the Pi extension must drive the guard scripts"
+grep -q 'guard-protected-push.py' "$T/.pi/extensions/super-board-guards.ts" || fail "the Pi extension must know the opt-in push guard"
 S="$T/.claude/settings.json"
 jq -e '.permissions.allow == ["Bash(ls:*)"]' "$S" >/dev/null || fail "existing permissions were lost"
 jq -e '[.hooks.PreToolUse[].hooks[].command] | index("echo mine") != null' "$S" >/dev/null || fail "existing PreToolUse hook was lost"
@@ -207,11 +211,12 @@ jq -e '[.hooks[] | [.[].hooks[].command] as $c | ($c | length) == ($c | unique |
   || fail "a hook command appears twice in one event"
 rm -rf "$T"
 
-# 7 — --no-hooks: no hook scripts, no settings.json written.
+# 7 — --no-hooks: no hook scripts, no settings.json written, no Pi extension.
 T=$(mktemp -d)
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ ! -e "$T/.claude/hooks" ] || fail "--no-hooks still installed hooks"
 [ ! -e "$T/.claude/settings.json" ] || fail "--no-hooks still wrote settings.json"
+[ ! -e "$T/.pi/extensions" ] || fail "--no-hooks still installed the Pi guards extension"
 [ -f "$T/.claude/skills/super-board/SKILL.md" ] || fail "--no-hooks must still install the skills"
 rm -rf "$T"
 
@@ -220,6 +225,7 @@ rm -rf "$T"
 T=$(mktemp -d)
 "$INSTALL" --no-hooks --protect-main "$T" >/dev/null 2>&1
 [ "$(ls "$T/.claude/hooks")" = "guard-protected-push.py" ] || fail "--no-hooks --protect-main should install only the push guard, got: $(ls "$T/.claude/hooks")"
+[ -f "$T/.pi/extensions/super-board-guards.ts" ] || fail "--no-hooks --protect-main should still port the push guard to Pi"
 jq -e '[.hooks[][].hooks[].command] == ["python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-protected-push.py"]' "$T/.claude/settings.json" >/dev/null \
   || fail "--no-hooks --protect-main should wire only the push guard"
 rm -rf "$T"
@@ -264,7 +270,7 @@ OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
 [ "$(echo "$OUT" | head -1)" = "🔧 installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
 echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
 echo "$OUT" | grep -q "✓ skills, scripts and workflows → .claude/" || fail "quiet mode should print the grouped files line"
-echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
+echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json + .pi/extensions/ (new file)" || fail "guard line should count hooks, got: $OUT"
 [ "$(echo "$OUT" | wc -l | tr -d ' ')" -le 3 ] || fail "grouped output should be ≤ 3 lines here, got: $OUT"
 rm -rf "$T"
 
@@ -285,7 +291,7 @@ rm -rf "$T"
 T=$(mktemp -d); printf '# AGENTS.md\n- mine\n' > "$T/AGENTS.md"
 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1
 [ "$(cat "$T/AGENTS.md")" = "$(printf '# AGENTS.md\n- mine')" ] || fail "install must not add a block uninvited"
-for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.sh super-board-codex-lane.sh super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py super-board-setup.py; do
+for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.sh super-board-codex-lane.sh super-board-pi-wave.sh super-board-pi-lane.sh super-board-env-check.sh super-board-merge-policy.py super-board-agents-md.py super-board-settings.py super-board-setup.py; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed"
 done
 rm -rf "$T"

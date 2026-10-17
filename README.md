@@ -119,7 +119,7 @@ Flags: `run --low|--high` · `run --codex[=<model>]` · `run --pi[=<model>]` · 
 
 ## Guards & hooks
 
-Run automatically once installed. Python stdlib, JSON in, JSON out.
+Run automatically once installed. Python stdlib, JSON in, JSON out. In Pi the same guards run through `.pi/extensions/super-board-guards.ts`.
 
 | | |
 | --- | --- |

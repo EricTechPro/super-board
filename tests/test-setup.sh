@@ -41,6 +41,12 @@ for helper in super-board-approval.py super-board-github-read.py super-board-pro
   echo "$OUT" | q '.missing == []' || fail "repair must leave no missing scripts: $OUT"
 done
 
+# 1c — host validation: codex and pi are accepted, anything else refuses.
+OUT=$(python3 "$SETUP" check --root "$T" --host pi || true)
+echo "$OUT" | q '.missing' || fail "pi host should be accepted: $OUT"
+RC=0; python3 "$SETUP" check --root "$T" --host p1 >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 2 ] || fail "--host must accept claude, codex or pi (rc=$RC)"
+
 # 2 — upgrade: an older super-board (VERSION 1.8.2, removed skill folders, a qa-only
 #     config with Skipped, old collect keys, telegram) is detected and upgraded with
 #     no question, backed up first, and listed as "Upgraded for you".

@@ -79,6 +79,23 @@ project and merges the block below (kept in `settings-snippet.json`) into
 }
 ```
 
+## Pi port: `.pi/extensions/super-board-guards.ts`
+
+Pi uses its own extension API instead of Claude Code hooks. `install.sh` copies
+`extensions/super-board-guards.ts` into the target's `.pi/extensions/`, with the same
+switches as the hooks: skipped by `--no-hooks`, installed by `--no-hooks --protect-main`
+for the push guard alone. The extension translates Pi's tool calls (`bash`, `read`,
+`grep`, `edit`, `write`) into the same stdin JSON these scripts already read, runs them
+with `python3`, and turns a `permissionDecision: deny` into `{ block: true, reason }`.
+A missing script, a crash or malformed output never blocks a call — the hooks' fail-open
+contract. PostToolUse key-literals warnings ride along with the tool result, and
+`cleanup-wt.py --auto --fetch` runs detached on interactive session start only (lanes
+already get the merge gate's `--post-merge` run). `guard-protected-push.py` stays
+opt-in: the extension runs it only when `.claude/settings.json` wires it, the same
+switch `onboard` and `install.sh --protect-main` flip. Pi loads project extensions
+only after the project is trusted; interactive users answer the trust prompt once, and
+headless lanes pass `-a`.
+
 ## Opt-in: block pushes to the base branch
 
 `guard-protected-push.py` — PreToolUse `Bash`: denies a `git push` that would update or delete
