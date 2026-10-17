@@ -108,7 +108,8 @@ def prepare(config, receipt_path, cwd):
     require(not inflight.exists() or not any(re.fullmatch(r'\d+', p.name) for p in inflight.iterdir()),
             'unfinished-work')
     require(not (inflight / 'workflow-wave.lock').exists() and
-            not (root / '.claude/super-board/codex-wave.pid').exists(), 'unfinished-work')
+            not (root / '.claude/super-board/codex-wave.pid').exists() and
+            not (root / '.claude/super-board/pi-wave.pid').exists(), 'unfinished-work')
     selected = receipt.get('selected_issues')
     cards = receipt.get('cards')
     require(isinstance(selected, list) and 0 < len(selected) <= 100 and

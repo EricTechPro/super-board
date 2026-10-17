@@ -61,4 +61,31 @@ rc=0
 [ "$rc" -eq 1 ] || { echo 'FAIL: reused PID not refused'; exit 1; }
 [ ! -s "$STOP_TRACE" ] || { echo 'FAIL: reused PID released claims'; exit 1; }
 [ -f "$TMP/.claude/super-board/inflight/13" ] || { echo 'FAIL: reused PID removed worker lock'; exit 1; }
-echo 'PASS: test-codex-stop.sh (stop order, control markers, reused PID)'
+
+# The Pi wave marker gets the same stop-order protection as the Codex one.
+rm -f "$TMP/.claude/super-board/codex-wave.pid"
+python3 - "$TMP" <<'PY' &
+import os, pathlib, signal, sys, time
+root = pathlib.Path(sys.argv[1])
+def stop(*_):
+    with (root / 'trace').open('a') as f:
+        f.write('pi-wave-stopped\n')
+    sys.exit(0)
+signal.signal(signal.SIGTERM, stop)
+(root / '.claude/super-board/pi-wave.pid').write_text(str(os.getpid()) + '\n')
+while True:
+    time.sleep(.05)
+PY
+wave_pid=$!
+for attempt in {1..100}; do
+  [ -f "$TMP/.claude/super-board/pi-wave.pid" ] && break
+  sleep .02
+done
+printf '#!/usr/bin/env bash\necho "python3 - /kit/scripts/super-board-pi-wave.sh"\n' > "$TMP/bin/ps"
+: > "$STOP_TRACE"
+(cd "$TMP" && PATH="$TMP/bin:$PATH" bash "$ROOT/scripts/super-board-stop.sh" test > stop.log)
+wait "$wave_pid"
+wave_pid=""
+[ "$(head -1 "$STOP_TRACE")" = pi-wave-stopped ] || { echo 'FAIL: Pi claims released before wave stopped'; exit 1; }
+[ ! -e "$TMP/.claude/super-board/pi-wave.pid" ] || { echo 'FAIL: Pi marker retained'; exit 1; }
+echo 'PASS: test-codex-stop.sh (stop order, control markers, reused PID, Pi marker)'
