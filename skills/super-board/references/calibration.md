@@ -17,7 +17,7 @@ approval, Blocked card, partial delivery, or halt. An empty board with no landed
 work does not trigger calibration. Closed-as-not-planned cards are not merges.
 After confirming all waves/tasks ended, the host releases only its own native
 `workflow-wave.lock`, matching the run identity it saved at creation. Numeric
-lane locks, the native workflow marker, or a Codex wave marker still present
+lane locks, the native workflow marker, or a Codex/Pi wave marker still present
 mean unfinished work. An uncertain/other host's marker is preserved and learning
 is skipped; the adapter never clears or reaps markers.
 

@@ -61,6 +61,23 @@
     "model": null
   },
 
+  // Optional Pi lane settings. Used by explicit `run --pi` or a Pi host; never
+  // selects the backend by itself and never grants Review/merge ownership.
+  "pi": {
+    // Optional model pattern passed to `pi --model` for every card, over the
+    // Pi ladder. `--pi=<model>` wins; absent/null lets the ladder pick
+    // (run tier x card grade, see scripts/super-board-pi-lane.sh).
+    "model": null,
+    // Optional cheap model grading each Ready card before its lanes (default
+    // "haiku"); resolved fuzzily across the providers the Pi session has.
+    "router_model": null,
+    // Optional override of the built-in tier x grade table. Keys must be
+    // low/medium/high tiers, each with low/medium/high grades and non-empty
+    // model strings; Pi accepts an optional `:thinking` suffix (for example
+    // "sonnet:high"). Absent/null keeps PI_LADDERS in the lane launcher.
+    "ladders": null
+  },
+
   "target": {
     // "repo" | "repo+url". A board always drives a repo; `url` is the live or
     // preview site the Tester may also hit. Testing a live site with no repo is
@@ -263,7 +280,7 @@
   // orchestrator runs super-board-usage.sh check; if the 5-hour or weekly
   // window is at or above this percentage, no new wave launches until it
   // resets. Default 95. See references/run-workflow.md → wave loop step 1.
-  // Explicit `run --codex` skips this Claude-only guard.
+  // Explicit `run --codex` or `run --pi` skips this Claude-only guard.
   "usage_pause_pct": 95,
 
   // What the orchestrator does while the usage guard pauses (exit 10).

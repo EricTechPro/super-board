@@ -9,7 +9,7 @@ Invoked as `/super-board onboard` (get.sh / install.sh) or `/super-board:super-b
 ## Host-visible skill checks
 
 Checks use `.claude/bin/super-board-skills-ready.py --profile setup --host
-<claude|codex>` and show `helper_readiness`: exact files, declared fallbacks,
+<claude|codex|pi>` and show `helper_readiness`: exact files, declared fallbacks,
 optional skips and missing names. Setup checks the unconditional union; a
 selected card may need fewer helpers. Node or `skills-lock.json` never proves
 readiness. `check` and dispatch install nothing. Explicit `fix` retains helper

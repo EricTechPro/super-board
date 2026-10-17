@@ -1,7 +1,7 @@
 # Skill readiness before dispatch
 
 Run `python3 .claude/bin/super-board-skills-ready.py --root <project> --host
-<claude|codex> --cards <cards.json>` before any claims or wave writes. The cards
+<claude|codex|pi> --cards <cards.json>` before any claims or wave writes. The cards
 array carries number, status, labels and literal issue body; hydrate absent
 bodies read-only with the guarded GitHub reader (`--hydrate` does this).
 For a worker boundary add `--lane build|qa|review`. Before using a conditional
@@ -47,3 +47,20 @@ host's effective active catalog; the resolver uses only its exact enabled
 paths rather than guessing trust or layer precedence. Ordinary project
 configs with no activation leave discovery unchanged. See [Codex project
 configuration](https://learn.chatgpt.com/docs/config-file/config-basic).
+
+Pi sees the same scoped `.agents/skills` search (current directory through the
+owning Git root) plus project `.pi/skills`, user `~/.agents/skills`, and the Pi
+agent directory's skills (`~/.pi/agent/skills`, or `PI_CODING_AGENT_DIR`).
+Its core `.claude` direct reads are supported; helper files in `.claude` alone
+are not Pi availability. Discovery follows [Pi skill
+documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md).
+
+Pi settings can add skills too: `skills` resource arrays (plain paths and
+`+`/`-`/`!` glob entries) in `.pi/settings.json` or the agent directory's
+`settings.json`, and `packages` that may bundle skills. Resolving those — glob
+semantics, project trust, package contents — is not reimplemented here. When
+either settings file carries a non-empty `skills` or `packages` list, provide
+the host's effective active catalog; the resolver fails closed (exit 64) and
+uses only its exact enabled paths. Ordinary settings (models, themes, tools)
+leave discovery unchanged. See [Pi
+settings](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/settings.md).

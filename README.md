@@ -115,7 +115,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /git-sync                     # commit, pull, push
 ```
 
-Flags: `run --low|--high` · `run --codex[=<model>]` · `super-collect --since 30d`
+Flags: `run --low|--high` · `run --codex[=<model>]` · `run --pi[=<model>]` · `super-collect --since 30d`
 
 ## Guards & hooks
 
@@ -134,7 +134,7 @@ Run automatically once installed. Python stdlib, JSON in, JSON out.
 
 ## Models
 
-A cheap router grades each card easy, medium or hard first; the run flag picks the model for each grade. With `--codex`, every lane runs on Codex GPT models instead of Claude.
+A cheap router grades each card easy, medium or hard first; the run flag picks the model for each grade. With `--codex` or `--pi`, every lane runs on that backend instead of Claude.
 
 | Command | Router | Easy card | Medium card | Hard card |
 | --- | --- | --- | --- | --- |
@@ -144,12 +144,18 @@ A cheap router grades each card easy, medium or hard first; the run flag picks t
 | `/super-board run --codex` | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol | gpt-6-astra |
 | `/super-board run --codex --low` | gpt-6-luna | gpt-6-luna | gpt-6.1-sol | gpt-6.1-sol |
 | `/super-board run --codex --high` | gpt-6-luna | gpt-6-astra | gpt-6-astra | gpt-6-astra |
+| `/super-board run --pi` | haiku | sonnet | sonnet | opus |
+| `/super-board run --pi --low` | haiku | haiku | sonnet | sonnet |
+| `/super-board run --pi --high` | haiku | opus | opus | opus |
 
-`/super-board run --codex=<model>` pins one model for every card and skips the router.
+`/super-board run --codex=<model>` or `--pi=<model>` pins one model for every card and skips the router.
+The Pi names are defaults: Pi resolves a model pattern fuzzily across the providers you connected, so a board on another provider overrides `pi.ladders` (and `pi.model`/`pi.router_model`) in the config.
 
-Run inside Codex? plain `/super-board run` switches to the Codex ladder by itself. Codex has no
+Run inside Codex or Pi? plain `/super-board run` switches to that host's ladder by itself. Codex has no
 `/super-board` command: it finds skills in `.agents/skills/` (symlinks followed), so link
-`.claude/skills/super-board` there and type `$super-board run`.
+`.claude/skills/super-board` there and type `$super-board run`. Pi discovers the same
+`.agents/skills/` locations, plus `.pi/skills/` and its agent directory; invoke it as
+`/skill:super-board run`. There is no Claude-usage fallback into Pi: `--pi` (or the Pi host) is required.
 
 ## Writing standard
 
@@ -188,7 +194,7 @@ MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://githu
 ### Worker skill availability
 
 Setup and dispatch resolve real, nonempty `SKILL.md` files for the actual
-Claude or Codex host. Missing required skills halt before claims or workers;
+Claude, Codex or Pi host. Missing required skills halt before claims or workers;
 lockfiles and arbitrary plugin caches do not count. The shared registry in
 `scripts/super-board-skills-ready.py` owns lane dependencies, overrides and the
 two declared ponytail fallbacks. Setup's full helper union may be red while a
