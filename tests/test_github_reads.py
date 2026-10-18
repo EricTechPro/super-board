@@ -166,6 +166,21 @@ dispatch_lane build 7
         self.assertEqual(result.stdout, b'')
         self.assertEqual(self.log.read_text(), '3')
 
+    def test_diff_lines_with_line_like_characters_are_complete_evidence(self):
+        # VT, FF, FS, NEL, U+2028/9 and a lone CR are content inside a changed line,
+        # not line breaks; only \n ends a diff line (#62).
+        metadata = self.root / 'meta.json'
+        metadata.write_text(json.dumps({'files':[{'path':'dump.sql'}], 'additions':4,'deletions':1}))
+        diff = ('diff --git a/dump.sql b/dump.sql\nindex 1..2 100644\n--- a/dump.sql\n+++ b/dump.sql\n'
+                '@@ -1,3 +1,6 @@\n keep\n-old\x0bline\n+new\x0bvt\x0cff\n+sep\u2028\u2029para\x1c\x85\n'
+                '+lone\rcr\n+crlf\r\n keep2\n')
+        self.env['READ_RESPONSES'] = json.dumps([{'out': diff}])
+        result = subprocess.run(['python3', str(HELPER), '--kind', 'diff', '--meta', str(metadata),
+                                 '--', 'pr', 'diff', '1'], env=self.env, cwd=self.root, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.log.read_text(), '1')
+        self.assertEqual(result.stdout.decode(), diff)
+
     def test_corrected_query_can_resume_without_erasing_original_failure(self):
         bad = ['api', 'graphql', '-f', 'query=query { wrong }']
         self.assertEqual(self.read([{'rc':1,'err':'Cannot query field wrong'}], command=bad).returncode,79)
