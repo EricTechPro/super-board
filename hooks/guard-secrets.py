@@ -28,8 +28,8 @@ SECRET_RE = re.compile("|".join([
 # present / empty / missing per key and never a value. Allowed only as a single
 # plain call -- no pipe, redirect, chain or substitution can ride along.
 ENV_CHECK = re.compile(
-    r"^\s*(?:bash\s+|sh\s+)?(?:\S*/)?super-board-env-check\.sh"
-    r"(?:\s+[A-Za-z0-9_./=-]+)*\s*$")
+    r"^[ \t]*(?:(?:bash|sh)[ \t]+)?(?:[A-Za-z0-9_./-]*/)?super-board-env-check\.sh"
+    r"(?:[ \t]+[A-Za-z0-9_./=-]+)*[ \t]*\Z")
 
 REASON = ("Blocked by guard-secrets: this touches a secret file. Read the checked-in example env "
           "file (.env.example) for the key names, or ask the user to run the command themselves "
