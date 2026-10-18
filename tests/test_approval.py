@@ -121,7 +121,8 @@ class ApprovalTests(unittest.TestCase):
 class GitHubTests(unittest.TestCase):
     def setUp(self):
         self.github = approval.GitHub("x/y")
-        self.pr_page = {"data": {"repository": {"pullRequest": {"headRefOid": HEAD, "state": "OPEN",
+        self.pr_page = {"data": {"repository": {"defaultBranchRef": {"name": "main"},
+            "pullRequest": {"headRefOid": HEAD, "state": "OPEN", "baseRefName": "main", "body": "",
             "closingIssuesReferences": {"pageInfo": {"hasNextPage": False, "endCursor": None},
                 "nodes": [{"number": 3, "repository": {"nameWithOwner": "x/y"}}]}}}}}
         self.calls = []
@@ -160,6 +161,33 @@ class GitHubTests(unittest.TestCase):
     def test_unlinked_issue_cannot_supply_approval(self):
         self.assertFalse(self.github.check(9, HEAD, REQUEST["scope"], issue=77)["approved"])
 
+    def non_default_base(self, body):
+        # GitHub leaves closingIssuesReferences empty for PRs into a non-default base (#63).
+        pr = self.pr_page["data"]["repository"]["pullRequest"]
+        pr["baseRefName"], pr["body"] = "staging", body
+        pr["closingIssuesReferences"]["nodes"] = []
+
+    def test_non_default_base_takes_closing_keywords_from_body(self):
+        self.non_default_base("Ships login.\n\nCloses #3")
+        self.assertTrue(self.github.check(9, HEAD, REQUEST["scope"], issue=3)["approved"])
+
+    def test_non_default_base_without_closing_keyword_is_unlinked(self):
+        self.non_default_base("Related to #3, see x/y#3 discussion")
+        self.assertFalse(self.github.check(9, HEAD, REQUEST["scope"], issue=3)["approved"])
+
+    def test_non_default_base_ignores_other_repository_references(self):
+        self.non_default_base("Fixes other/repo#3")
+        self.assertFalse(self.github.check(9, HEAD, REQUEST["scope"], issue=3)["approved"])
+
+    def test_non_default_base_accepts_same_repository_form(self):
+        self.non_default_base("resolved: X/Y#3")
+        self.assertTrue(self.github.check(9, HEAD, REQUEST["scope"], issue=3)["approved"])
+
+    def test_default_base_ignores_body_keywords(self):
+        self.pr_page["data"]["repository"]["pullRequest"]["closingIssuesReferences"]["nodes"] = []
+        self.pr_page["data"]["repository"]["pullRequest"]["body"] = "Closes #3"
+        self.assertFalse(self.github.check(9, HEAD, REQUEST["scope"], issue=3)["approved"])
+
     def test_unreadable_permission_never_approves(self):
         self.permission_error = True
         self.assertFalse(self.github.check(9, HEAD, REQUEST["scope"])["approved"])
@@ -184,7 +212,7 @@ args=" ".join(sys.argv[1:])
 if "issues(states:OPEN" in args:
     out=[{"data":{"repository":{"issues":{"nodes":[f["issue"]],"pageInfo":{"hasNextPage":False,"endCursor":None}}}}}]
 elif "graphql" in args:
-    out=[{"data":{"repository":{"pullRequest":{"headRefOid":f["head"],"state":"OPEN","closingIssuesReferences":{"pageInfo":{"hasNextPage":False},"nodes":[{"number":3,"repository":{"nameWithOwner":"x/y"}}]}}}}}]
+    out=[{"data":{"repository":{"defaultBranchRef":{"name":"main"},"pullRequest":{"headRefOid":f["head"],"state":"OPEN","baseRefName":"main","body":"","closingIssuesReferences":{"pageInfo":{"hasNextPage":False},"nodes":[{"number":3,"repository":{"nameWithOwner":"x/y"}}]}}}}}]
 elif "/issues/3/comments" in args:
     out=[f["records"]]
 elif "/issues/9/comments" in args:

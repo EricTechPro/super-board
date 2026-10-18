@@ -152,7 +152,7 @@ for i, f in enumerate(m.get('files', [])):
 DIFF
     ;;
   "api graphql")
-    jq -n --arg head "$STUB_OID" '[{data:{repository:{pullRequest:{headRefOid:$head,state:"OPEN",closingIssuesReferences:{pageInfo:{hasNextPage:false,endCursor:null},nodes:[{number:42,repository:{nameWithOwner:"x/y"}}]}}}}}]' ;;
+    jq -n --arg head "$STUB_OID" '[{data:{repository:{defaultBranchRef:{name:"main"},pullRequest:{headRefOid:$head,state:"OPEN",baseRefName:"main",body:"",closingIssuesReferences:{pageInfo:{hasNextPage:false,endCursor:null},nodes:[{number:42,repository:{nameWithOwner:"x/y"}}]}}}}}]' ;;
   "api --paginate")
     [ "${STUB_APPROVAL:-0}" = 1 ] || { echo '[[]]'; exit 0; }
     case "$*" in
