@@ -3,15 +3,26 @@
 
 The lock is inherited by the real shell filer and its synchronous children.
 A pending write survives interruption and blocks retry until explicitly reconciled.
+
+POSIX: flock, exec into the filer, and the child proves the lock by the inherited fd's inode.
+Windows (no fcntl): msvcrt locking, the filer runs as a `bash` child while this process holds
+the lock, and the child proves it by a per-hold random token. Needs bash and python3 on PATH.
 """
 import argparse
-import fcntl
+try:
+    import fcntl
+except ImportError:  # Windows
+    fcntl = None
+    import msvcrt
 import hashlib
 import importlib.util
 import json
 import math
 import os
 from pathlib import Path
+import secrets
+import shutil
+import subprocess
 import sys
 import time
 
@@ -28,6 +39,51 @@ def paths(repo):
         ignore.write_text('*\n')
     key = hashlib.sha256(repo.lower().encode()).hexdigest()
     return key, root / (key + '.lock'), root / (key + '.json')
+
+
+def try_lock(fd):
+    """Take the exclusive lock without waiting; BlockingIOError when another holder has it."""
+    if fcntl:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return
+    os.lseek(fd, 0, os.SEEK_SET)
+    try:
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    except OSError as exc:
+        raise BlockingIOError(*exc.args) from exc
+
+
+def run_locked(fd, key, lock_path, args):
+    """Run the filer holding the lock; returns only on the portable path."""
+    if fcntl:
+        os.set_inheritable(fd, True)
+        env = dict(os.environ, SB_COLLECT_LOCK_HELD=key, SB_COLLECT_LOCK_FD=str(fd))
+        os.execvpe(args[0], args, env)
+    # No shebang exec and no fd inheritance: run the filer as a child under a token file.
+    token_path = lock_path.with_suffix('.token')
+    token = secrets.token_hex(16)
+    token_path.write_text(token)
+    env = dict(os.environ, SB_COLLECT_LOCK_HELD=key, SB_COLLECT_LOCK_TOKEN=token)
+    env.pop('SB_COLLECT_LOCK_FD', None)
+    if args[0].endswith('.sh'):
+        args = [shutil.which('bash') or 'bash', *args]
+    try:
+        return subprocess.call(args, env=env)
+    finally:
+        token_path.unlink(missing_ok=True)
+
+
+def lock_held(key, lock_path):
+    if os.environ.get('SB_COLLECT_LOCK_HELD') != key:
+        return False
+    if fcntl:
+        fd = int(os.environ.get('SB_COLLECT_LOCK_FD', '-1'))
+        return os.fstat(fd).st_ino == lock_path.stat().st_ino
+    token = os.environ.get('SB_COLLECT_LOCK_TOKEN', '')
+    try:
+        return bool(token) and secrets.compare_digest(lock_path.with_suffix('.token').read_text(), token)
+    except FileNotFoundError:
+        return False
 
 
 def load(path):
@@ -71,7 +127,7 @@ def main():
             while True:
                 gh.check_halt()
                 try:
-                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    try_lock(fd)
                     break
                 except BlockingIOError:
                     if time.monotonic() >= deadline:
@@ -83,20 +139,15 @@ def main():
                 gh.halt('Collector write outcome unresolved; reconcile pending receipt before retrying', 1)
             if not args:
                 raise ValueError('--lock needs the existing filer command')
-            os.set_inheritable(fd, True)
-            env = dict(os.environ, SB_COLLECT_LOCK_HELD=key, SB_COLLECT_LOCK_FD=str(fd))
-            os.execvpe(args[0], args, env)
+            return run_locked(fd, key, lock_path, args)
         elif a.action:
-            fd = int(os.environ.get('SB_COLLECT_LOCK_FD', '-1'))
-            held = os.environ.get('SB_COLLECT_LOCK_HELD') == key
-            if held:
-                held = os.fstat(fd).st_ino == lock_path.stat().st_ino
+            held = lock_held(key, lock_path)
             # Explicit manual reconciliation acquires the same lock; never clears a live writer.
             stream = None
             if a.action == 'reconcile' and not held:
                 stream = lock_path.open('a+')
                 try:
-                    fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    try_lock(stream.fileno())
                 except BlockingIOError:
                     return 4
                 held = True
