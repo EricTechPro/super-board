@@ -7,8 +7,8 @@
 # warning; unavailable required evidence or an unknown write outcome pauses the
 # run (79) while preserving any issue already created. No mutation is retried.
 #
-# Cards land in Backlog, not Ready. A refactor the reviewer noticed has had no human
-# eyes on it and no acceptance criteria; auto-promoting it to Ready would feed the
+# A card with real acceptance criteria lands in Ready; one without lands in Backlog.
+# A bare note has had no human eyes on it; auto-promoting it to Ready would feed the
 # build lane work nobody asked for. It waits for `super-board lint` like any other
 # unrefined ticket.
 #
@@ -181,6 +181,10 @@ LABEL_ARGS=()
 for l in "${LABELS[@]}"; do LABEL_ARGS+=(--label "$l"); done
 
 # Title: `♻️ [refactor] <scope>: <title>`; scope = --area, else the fingerprint's module.
+# --title is the bare problem. A caller that followed the house format passes
+# `<emoji> [<kind>] <scope>: <subject>`; drop that prefix so it is not doubled. Only a
+# leading all-non-ASCII word (the emoji) triggers it, so `Map [x] fields: keep order` stays.
+TITLE=$(printf '%s' "$TITLE" | LC_ALL=C sed -E 's/^[^ -~]{1,16} \[[a-z-]+\] [^:]{1,40}: //')
 SCOPE="${AREA:-${FINGERPRINT%%|*}}"
 SCOPE=$(echo "${SCOPE:-code}" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._/-]+#-#g; s#^-+|-+$##g')
 python3 "$GITHUB_READ" --check || exit $?

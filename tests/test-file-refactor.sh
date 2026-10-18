@@ -95,6 +95,17 @@ has "lands in Backlog, not Ready"  "$(cat "$GH_LOG")" "opt_Backlog"
 has "labels the source"            "$(cat "$GH_LOG")" "source:review"
 has "labels the strength"          "$(cat "$GH_LOG")" "strength:strong"
 has "title in ticket format"       "$(cat "$GH_LOG")" "♻️ [refactor] orderintake: OrderIntake is shallow"
+
+echo "── a pre-formatted title is not prefixed twice (#65)"
+title_of() { grep '^issue create' "$GH_LOG" | sed -E 's/.*--title (.*) --body-file.*/\1/'; }
+for case in "♻️ [refactor] images: one image-with-fallback component|♻️ [refactor] orderintake: one image-with-fallback component" \
+            "🐛 [bug] people: buttons squeeze names|♻️ [refactor] orderintake: buttons squeeze names" \
+            "Map [x] fields: keep order|♻️ [refactor] orderintake: Map [x] fields: keep order" \
+            "drop the web root-path fallbacks: after the move|♻️ [refactor] orderintake: drop the web root-path fallbacks: after the move"; do
+  DEDUPE_HIT="" run --config "$WORK/config.json" --title "${case%%|*}" \
+    --body-file "$WORK/body.md" --fingerprint "OrderIntake|title-${#case}" >/dev/null
+  is "title: ${case%%|*}" "${case#*|}" "$(title_of)"
+done
 printf 'just a note\n' > "$WORK/nosections.md"
 is "refuses a body without Problem/Context/Fix" 66 "$( DEDUPE_HIT="" "$SCRIPT" --config "$WORK/config.json" --title T --fingerprint f --body-file "$WORK/nosections.md" >/dev/null 2>&1; echo $? )"
 
