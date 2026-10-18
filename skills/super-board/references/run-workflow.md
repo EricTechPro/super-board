@@ -331,6 +331,9 @@ don't stall on prompts:
     "Bash(mkdir:*)", "Bash(pgrep:*)", "Bash(node --check:*)",
     "Bash(bash .claude/bin/super-board-wave-plan.sh:*)",
     "Bash(bash .claude/bin/super-board-preflight.sh:*)",
+    "Bash(python3 .claude/bin/super-board-github-read.py:*)",
+    "Bash(.claude/bin/super-board-github-read.py:*)",
+    "Bash(python3 .claude/bin/super-board-verification-ready.py:*)",
     "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
@@ -338,7 +341,25 @@ don't stall on prompts:
     "Bash(bash .claude/bin/super-board-codex-wave.sh:*)",
     "Bash(bash .claude/bin/super-board-host.sh:*)",
     "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",
+    "Bash(bash .claude/bin/super-board-stop.sh:*)",
     plus your project's test runners (e.g. "Bash(npm test:*)", "Bash(npx playwright:*)").
+
+`tests/test_run_allowlist.py` fails when pre-flight or a lane calls a `.claude/bin`
+script this list does not cover. The read helper is listed in both forms: scripts call
+`python3 .claude/bin/super-board-github-read.py`, lane prompts call it directly.
+
+**Headless runs (`claude -p "/super-board run"`).** Supported only where Claude Code may
+write the project's `.claude/` folder without a prompt. `.claude/` is a protected path:
+the wave lock under `.claude/super-board/` (inflight lock, halt and PID files) is prompted
+in `default` and `acceptEdits`, denied in `dontAsk`, and no `permissions.allow` rule
+(e.g. `Edit(.claude/**)`) pre-approves it. Claude's own git worktrees under
+`.claude/worktrees/` are exempt, so lane worktrees need only `Bash(git worktree:*)`.
+Pick one:
+- Interactive (recommended): start `/super-board run` in a terminal session and answer
+  the first `.claude/` write prompt with "allow Claude to edit files in this project's
+  .claude folder for this session".
+- Headless: `claude -p "/super-board run" --permission-mode bypassPermissions`, only in
+  an isolated container or VM. `--permission-mode acceptEdits` stops at the wave lock.
 
 Merging is NOT in the base list. On a board whose `merge_policy.default` is
 `"auto"`, `super-board onboard` offers the merge lines as a diff to approve
