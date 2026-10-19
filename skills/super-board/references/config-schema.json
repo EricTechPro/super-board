@@ -31,6 +31,13 @@
   // only; the dispatcher refuses to run (exit 78) unless set here.
   "worker_backend": "workflow",
 
+  // Agent host this project runs on: "claude" | "codex" | "opencode". Separate from
+  // worker_backend. Onboard and setup's fix ALWAYS write it (setup fills a missing key
+  // from --host and never replaces a set one); setup's check flags any other value.
+  // `super-board-host.sh --config <this file>` uses it only when SUPER_BOARD_HOST and
+  // every env sign (Codex ids, OPENCODE, CLAUDECODE) are absent. See docs/hosts.md.
+  "host": "claude",
+
   // Optional post-completion adapter; never bundles or installs the external skill.
   // Runs only after selected work is verified merged and no work/approvals remain.
   // The supervising host checks the resulting diff; the helper itself is read-only.

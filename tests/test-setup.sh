@@ -74,6 +74,7 @@ q '.columns == ["Backlog","Ready","Building","QA","Review","Blocked","Done"]' "$
 q '.collect.sources == ["sentry","github","prs","architecture"] and (.collect | has("lookback_runs") | not)' "$C" || fail "collect keys not migrated"
 q '.merge_policy.default == "human" and .notifications.channel == "session" and (.refine | has("qa_hook_rounds") | not)' "$C" \
   || fail "merge rule / notifications / refine not migrated: $(cat "$C")"
+q '.host == "claude"' "$C" || fail "fix must always write the top-level host (from --host): $(cat "$C")"
 [ ! -e "$T/.claude/super-board/upgrade.json" ] || fail "upgrade.json should be cleared once the upgrade is done"
 TXT=$(python3 "$SETUP" check --root "$T" --text || true)
 echo "$TXT" | grep -q "Upgraded for you" && fail "a finished upgrade must not be reported again"
@@ -301,4 +302,22 @@ cmp -s "$GH_STATE" "$WORK/before.json" || fail "dry-run changed board state: $(c
 [ ! -e "$WORK/dry/.claude" ] || fail "dry-run must not write a backup file"
 echo "$OUT" | q '.status_backup == null and .restored == 0 and .added_columns != []' || fail "dry-run report wrong: $OUT"
 
-echo "PASS: test-setup.sh (12 scenarios)"
+# 13 — config `host`: check accepts claude / codex / opencode, flags anything else, and
+#      fix never overwrites a host that is already set.
+H="$WORK/bare/.claude/super-board/configs"; mkdir -p "$H"
+for h in claude codex opencode; do
+  printf '{"host":"%s"}' "$h" > "$H/b.json"
+  OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
+  echo "$OUT" | q '.host_errors == {}' || fail "host $h must be accepted: $OUT"
+done
+printf '{"host":"gemini"}' > "$H/b.json"
+OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
+echo "$OUT" | q '.green == false and (.host_errors | to_entries | .[0].value | test("gemini"))' \
+  || fail "host gemini must be flagged: $OUT"
+TXT=$(python3 "$SETUP" check --root "$WORK/bare" --text || true)
+echo "$TXT" | grep -q "✗ .*b.json.*gemini" || fail "text report must name the bad host: $TXT"
+python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
+q '.host == "gemini"' "$H/b.json" || fail "fix must not guess over a set host: $(cat "$H/b.json")"
+rm "$H/b.json"
+
+echo "PASS: test-setup.sh (13 scenarios)"

@@ -21,7 +21,7 @@ pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
 
 **Inside Codex, plain `run` is `--codex`.** Your tool list has no Workflow tool, or
-`bash .claude/bin/super-board-host.sh` prints `codex` → run as `--codex` (tier flags and
+`bash .claude/bin/super-board-host.sh --config <config-path>` prints `codex` → run as `--codex` (tier flags and
 `--codex=<model>` still apply); it counts as explicit `--codex`, Review included.
 Say so once, in the first wave report: `🔁 codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
 

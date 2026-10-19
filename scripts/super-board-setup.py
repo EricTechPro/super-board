@@ -22,7 +22,8 @@ What `fix` does, with NO question (all of it backed up first to
   - installs or refreshes skills, .claude/bin scripts, workflows, guard hooks and their
     settings.json entries (runs the pack's install.sh) when any is missing or older
   - removes the folders of skills that no longer exist: super-refine, cleanup-wt, arch-loop
-  - migrates every .claude/super-board/configs/*.json to the v3 keys (migrate-config)
+  - migrates every .claude/super-board/configs/*.json to the v3 keys (migrate-config), and
+    writes a missing top-level `host` from --host (check flags a host outside claude/codex/opencode)
   - `git init` when the folder is not a repo
   - adds Matt Pocock's helper skills with npx when Node is present and they are missing
 It never installs a system tool or signs in: those come back in `needs` with the exact
@@ -58,6 +59,7 @@ import subprocess
 import sys
 
 COLUMNS = ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"]
+HOSTS = ("claude", "codex", "opencode")  # config `host`; super-board-host.sh accepts the same
 LABELS = {
     "qa": ("0e8a16", "Test what exists; skips Building (super-board)"),
     "bug": ("d73a4a", "Something is broken; built, tested, reviewed (super-board)"),
@@ -215,9 +217,10 @@ def machine_tz():
     return "UTC"
 
 
-def migrate_config(cfg):
+def migrate_config(cfg, host=None):
     """Return (new config, [human-readable change lines]). Pure; never drops a project setting
-    that still means something."""
+    that still means something. `host` (the actual worker host) fills a missing top-level
+    `host` key; a set one is never replaced."""
     c = json.loads(json.dumps(cfg))
     changes = []
     variant = c.pop("variant", None)
@@ -268,6 +271,9 @@ def migrate_config(cfg):
     if not c.get("worker_backend"):
         c["worker_backend"] = "workflow"
         changes.append("worker_backend \"workflow\" added")
+    if host and "host" not in c:
+        c["host"] = host
+        changes.append(f"host \"{host}\" added")
     return c, changes
 
 
@@ -295,6 +301,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
     old_dirs = [d for d in OLD_SKILL_DIRS if os.path.isdir(os.path.join(claude, "skills", d))]
     configs = {}
     verification = {}
+    host_errors = {}
     for p in sorted(glob.glob(os.path.join(claude, "super-board", "configs", "*.json"))):
         cfg = load_json(p)
         ready = subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__),
@@ -303,7 +310,10 @@ def check(root, pack, host="claude", home=None, catalog=None):
         if ready.returncode:
             verification[os.path.relpath(p, root)] = ready.stderr.strip()
         if isinstance(cfg, dict):
-            _, ch = migrate_config(cfg)
+            if "host" in cfg and cfg["host"] not in HOSTS:
+                host_errors[os.path.relpath(p, root)] = (
+                    f"host \"{cfg['host']}\" must be one of {', '.join(HOSTS)}")
+            _, ch = migrate_config(cfg, host)
             if ch:
                 configs[os.path.relpath(p, root)] = ch
     older = bool(upgrade_rec.get("from")) or bool(old_dirs) or any(
@@ -332,12 +342,13 @@ def check(root, pack, host="claude", home=None, catalog=None):
         ok.append("git repo found")
     if helpers:
         ok.append("required worker skills resolved for " + host)
-    red = bool(missing or old_dirs or configs or verification or not git or needs or not helpers)
+    red = bool(missing or old_dirs or configs or verification or host_errors or not git or needs or not helpers)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
         "upgrade": older, "from": from_v or ("older" if older else None),
         "added_skills": upgrade_rec.get("added_skills", []),
-        "missing": missing, "old_dirs": old_dirs, "configs": configs, "verification": verification, "git": git,
+        "missing": missing, "old_dirs": old_dirs, "configs": configs, "verification": verification,
+        "host_errors": host_errors, "git": git,
         "helper_skills": helpers, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
     }
 
@@ -397,7 +408,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
 
     for rel, ch in before["configs"].items():
         p = os.path.join(root, rel)
-        new, _ = migrate_config(load_json(p))
+        new, _ = migrate_config(load_json(p), host)
         if not dry:
             write_json(p, new)
         if before["upgrade"]:
@@ -455,7 +466,7 @@ def text_report(res):
             lines.append(f"  ✗ missing {entry['name']} for {res['helper_readiness']['host']}; install it in that host and restart")
     if res.get("helper_readiness", {}).get("error"):
         lines.append("  ✗ " + res["helper_readiness"]["error"])
-    for path, error in res.get("verification", {}).items():
+    for path, error in {**res.get("verification", {}), **res.get("host_errors", {})}.items():
         lines.append(f"  ✗ {path}: {error}")
     for n in res.get("needs", []):
         lines.append(f"  Needs your machine: {n['name']} isn't installed. It's needed for {n['why']}.")
