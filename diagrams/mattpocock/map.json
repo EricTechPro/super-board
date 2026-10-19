@@ -25,6 +25,10 @@
    {
     "label": "Docs pages",
     "url": "https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/docs/engineering/ask-matt.md"
+   },
+   {
+    "label": "Gary Chen: 1.3 update breakdown (YouTube, zh-TW)",
+    "url": "https://youtu.be/QqhyqMvdx5Q"
    }
   ],
   "countNote": "27 skills in the plugin.json manifest (20 engineering + 7 productivity). Skipped: skills/misc/*, skills/in-progress/* (not in the manifest; the misc ones are frozen per .out-of-scope/frozen-misc-skills.md).",
@@ -1815,7 +1819,8 @@
    "when": [
     "When you want the **whole spec built in one run** → [[implement-spec]]",
     "When many tickets can go **in parallel** → [[implement-spec]]",
-    "When you would rather ==be the manager== than drive each ticket → [[implement-spec]]"
+    "When you would rather ==be the manager== than drive each ticket → [[implement-spec]]",
+    "When you are **looping by hand**, one ticket per prompt → [[implement-spec]]"
    ],
    "whatItIs": "It builds a whole plan by running **helper agents** on its tickets, in the right order, on one branch.",
    "howItWorks": [
@@ -1825,10 +1830,11 @@
     "At the end it runs **/code-review** over the whole branch and fixes issues"
    ],
    "example": {
-    "situation": "A spec with 8 tickets, 3 unblocked.",
-    "youType": "/implement-spec",
+    "situation": "Spec #87 was split into tickets #88 to #97; some don't depend on each other.",
+    "youType": "/implement-spec #87",
     "whatHappens": [
-     "Three helpers start in parallel.",
+     "It maps which tickets wait on others.",
+     "The ready ones start in parallel, each in its own worktree.",
      "Finished work merges; new tickets unlock.",
      "One review at the end."
     ],
@@ -1864,6 +1870,10 @@
     {
      "label": "ask-matt SKILL.md (main flow step 3)",
      "url": "https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/ask-matt/SKILL.md"
+    },
+    {
+     "label": "Gary Chen: 1.3 update breakdown (YouTube, zh-TW)",
+     "url": "https://youtu.be/QqhyqMvdx5Q"
     }
    ],
    "kind": "skill",
@@ -2082,8 +2092,8 @@
    "whatItIs": "The **shape of a good PR body**: a small picture, before/after proof, and how risky the merge is.",
    "howItWorks": [
     "Summary: the smallest visual that shows the change",
-    "Evidence: before and after",
-    "Merge danger: one-way or two-way door, plus blast radius",
+    "Evidence: before and after; **screenshots** are best, then test runs or output",
+    "Merge danger: can you **roll it back** (two-way door) or not (one-way), plus blast radius",
     "The agent reaches for it by itself when writing a PR"
    ],
    "example": {
@@ -2121,6 +2131,10 @@
     {
      "label": "ask-matt SKILL.md (main flow step 3)",
      "url": "https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/ask-matt/SKILL.md"
+    },
+    {
+     "label": "Gary Chen: 1.3 update breakdown (YouTube, zh-TW)",
+     "url": "https://youtu.be/QqhyqMvdx5Q"
     }
    ],
    "kind": "skill",
@@ -2198,14 +2212,15 @@
    "when": [
     "When a build **went sideways** → [[retro]]",
     "When the fix is done and you ask ==what would have prevented this?== → [[retro]]",
-    "When you want to **improve the agent's setup** → [[retro]]"
+    "When you want to **improve the agent's setup** → [[retro]]",
+    "When AGENTS.md is **bloated** with rules that change nothing → [[retro]]"
    ],
    "whatItIs": "It looks back at a session and suggests changes to the **environment**, not the code.",
    "howItWorks": [
-    "It reads the session log",
-    "It checks navigation, automated checks, coding standards, AGENTS.md, tools, info access",
-    "Mechanical mistakes → an automated check; judgement → a coding standard",
-    "It lists the fixes, most serious first"
+    "It reads the session log (the current one by default)",
+    "It checks 7 areas: navigation, automated checks, coding standards, AGENTS.md size, tool economy, no-op instructions, info access",
+    "Mechanical mistakes → a **lint rule, pre-commit hook or CI job**; judgement calls → CODING_STANDARDS.md",
+    "It ==presents== the fixes to you, most serious first; you pick which to apply"
    ],
    "example": {
     "situation": "The agent wasted 20 minutes finding the config file.",
@@ -2242,6 +2257,10 @@
     {
      "label": "ask-matt SKILL.md (main flow step 4)",
      "url": "https://github.com/mattpocock/skills/blob/49dd158d1076134a641b33efb035946536778336/skills/engineering/ask-matt/SKILL.md"
+    },
+    {
+     "label": "Gary Chen: 1.3 update breakdown (YouTube, zh-TW)",
+     "url": "https://youtu.be/QqhyqMvdx5Q"
     }
    ],
    "kind": "skill",
