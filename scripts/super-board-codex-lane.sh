@@ -153,6 +153,21 @@ properties = {
                       'required': list(counts), 'additionalProperties': False}]},
 }
 schema = {'type': 'object', 'properties': properties, 'required': list(properties), 'additionalProperties': False}
+JSON_TYPES = {'object': dict, 'array': list, 'string': str, 'null': type(None)}
+def conforms(value, rule):
+    # The subset of JSON Schema the lane schema uses: type, enum, anyOf, properties/required/additionalProperties.
+    if 'anyOf' in rule:
+        return any(conforms(value, option) for option in rule['anyOf'])
+    kinds = rule['type'] if isinstance(rule['type'], list) else [rule['type']]
+    if not any(type(value) is int if kind == 'integer' else isinstance(value, JSON_TYPES[kind]) for kind in kinds):
+        return False
+    if 'enum' in rule and value not in rule['enum']:
+        return False
+    if isinstance(value, dict):
+        if set(value) - set(rule['properties']) or not set(rule['required']) <= set(value):
+            return False
+        return all(conforms(value[key], rule['properties'][key]) for key in value)
+    return True
 child = None
 def interrupted(signum, frame):
     if child is not None:
@@ -193,9 +208,8 @@ with tempfile.TemporaryDirectory(prefix='super-board-codex-') as temporary:
                    if child.returncode == 9 else 'skills-readiness: required skills became unavailable; preserve work' if child.returncode == 10 else f'codex exec exited {child.returncode}')
             sys.exit(child.returncode if child.returncode in (9, 10, 79) else 1)
         parsed = json.loads(output.read_text())
-        if (not isinstance(parsed, dict) or parsed.get('status') not in properties['status']['enum']
-                or not all(isinstance(parsed.get(key), str) for key in ['column', 'detail'])):
-            raise ValueError('lane result needs status, column and detail')
+        if not conforms(parsed, schema):
+            raise ValueError('lane result does not match the lane schema')
         print(json.dumps(parsed))
         sys.exit(10 if parsed['status'] == 'halted' and parsed['detail'].startswith('skills-readiness:')
                  else 9 if parsed['status'] == 'halted' and parsed['detail'].startswith('verification-readiness:')

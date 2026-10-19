@@ -51,6 +51,8 @@ status = os.environ.get('SB_CODEX_TEST_STATUS', 'advanced')
 column = {'build':'QA', 'qa':'Review', 'review':'Done'}[lane] if status == 'advanced' else card['status']
 if os.environ.get('SB_CODEX_TEST_INVALID'):
     output.write_text('not json')
+elif os.environ.get('SB_CODEX_TEST_RESULT'):
+    output.write_text(os.environ['SB_CODEX_TEST_RESULT'])
 else:
     output.write_text(json.dumps(dict(status=status, column=column, detail=os.environ.get('SB_CODEX_TEST_DETAIL', 'stub lane result'), prUrl=None, branch=None, priorFindings=None)))
 print('codex log noise must not appear in result stdout')
@@ -185,6 +187,28 @@ lane build --codex >"$T/out" || RC=$?
 unset SB_CODEX_TEST_INVALID
 RC=0; SB_CODEX_TEST_EXIT=2 lane build --codex >"$T/out" || RC=$?
 [ "$RC" -eq 1 ] && jq -e '.status == "failed"' "$T/out" >/dev/null || fail 'nonzero exec never trusts success JSON'
+
+# The whole result is checked against the lane schema, not only status/column/detail.
+while IFS= read -r BAD; do
+  RC=0; SB_CODEX_TEST_RESULT="$BAD" lane build --codex >"$T/out" || RC=$?
+  [ "$RC" -eq 1 ] && jq -e '.status == "failed" and .column == "Ready"' "$T/out" >/dev/null || fail "malformed result must fail: $BAD"
+done <<'BAD'
+{"status":"advanced","column":"QA","detail":"d","prUrl":7,"branch":null,"priorFindings":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null,"extra":1}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":{"fixed":1,"noLongerApplies":0}}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":{"fixed":1,"notFixed":true,"noLongerApplies":0}}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"priorFindings":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":["b"],"priorFindings":null}
+{"status":"done","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null}
+["status","advanced"]
+BAD
+while IFS= read -r GOOD; do
+  SB_CODEX_TEST_RESULT="$GOOD" lane build --codex >"$T/out" || fail "valid result must exit 0: $GOOD"
+  [ "$(cat "$T/out")" = "$(jq -c . <<<"$GOOD" | python3 -c 'import json,sys; print(json.dumps(json.load(sys.stdin)))')" ] || fail "valid result must print unchanged: $GOOD"
+done <<'GOOD'
+{"status":"advanced","column":"QA","detail":"d","prUrl":null,"branch":null,"priorFindings":null}
+{"status":"advanced","column":"QA","detail":"d","prUrl":"https://github.com/o/r/pull/2","branch":"sb/1","priorFindings":{"fixed":2,"notFixed":0,"noLongerApplies":1}}
+GOOD
 
 CARDS='[{"number":1,"status":"Ready"},{"number":2,"status":"Ready","labels":["qa"]},{"number":3,"status":"QA"},{"number":4,"status":"Review"}]'
 echo '{"max_workers":1,"codex":{"model":"config-model"},"verify_commands":["git diff --check"]}' > "$T/config.json"
