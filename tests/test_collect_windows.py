@@ -18,6 +18,9 @@ ROOT = intake.ROOT
 STATE = ROOT/'scripts/super-board-collect-state.py'
 SHIM = r'''#!/usr/bin/env python3
 import fcntl as _real, os, runpy, sys, types
+# Python 3.12+ stdlib (subprocess) probes `import msvcrt` to decide it is on Windows; load it
+# before the stand-in exists so only the script under test sees msvcrt.
+import subprocess  # noqa: F401
 sys.modules['fcntl'] = None  # import fcntl -> ImportError, as on Windows
 m = types.ModuleType('msvcrt'); m.LK_NBLCK, m.LK_UNLCK = 2, 0
 def locking(fd, mode, nbytes):
@@ -78,6 +81,11 @@ class WindowsIntakeTests(intake.IntakeTests):
 
 
 class ImportTests(unittest.TestCase):
+    def test_shim_loads_stdlib_before_the_msvcrt_stand_in(self):
+        # Regression guard (PR #68 CI): on 3.12 a stand-in msvcrt visible to subprocess's
+        # import flips it to its Windows branch (_winapi). Holds on every interpreter.
+        self.assertLess(SHIM.index('import subprocess'), SHIM.index("sys.modules['msvcrt']"))
+
     def test_module_imports_without_fcntl(self):
         with tempfile.TemporaryDirectory() as tmp:
             bin_dir = shim_bin(Path(tmp))
