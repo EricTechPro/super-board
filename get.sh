@@ -9,7 +9,7 @@
 #   --ref <tag|branch>    which version to fetch (default: the latest release)
 #   --no-helper-skills    skip `npx skills@latest add mattpocock/skills`
 #   -h, --help            show this help
-# Passed through to install.sh: --no-hooks, --protect-main.
+# Passed through to install.sh: --no-hooks, --protect-main, --hosts=<list>.
 #
 # Environment:
 #   SUPER_BOARD_REF       same as --ref

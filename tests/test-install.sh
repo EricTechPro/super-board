@@ -23,6 +23,9 @@ fail() { echo "FAIL: $1" >&2; exit 1; }
 plant_decoys() { for d in decoy-one decoy-two decoy-three; do mkdir -p "$1/.claude/skills/$d"; touch "$1/.claude/skills/$d/SKILL.md"; done; }
 decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
 
+# A Codex shell would add .codex/ links by detection; keep the default layout predictable.
+unset CODEX_THREAD_ID CODEX_SESSION_ID SUPER_BOARD_HOST
+
 SKILLS="super-board super-build super-qa super-review"
 ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual git-sync"
 
@@ -263,7 +266,7 @@ T=$(mktemp -d)
 OUT=$(SUPER_BOARD_QUIET_NEXT=1 "$INSTALL" "$T" 2>&1)
 [ "$(echo "$OUT" | head -1)" = "🔧 installing" ] || fail "quiet mode should start at the installing group, got: $OUT"
 echo "$OUT" | grep -q "next:" && fail "quiet mode must not print the next step"
-echo "$OUT" | grep -q "✓ skills, scripts and workflows → .claude/" || fail "quiet mode should print the grouped files line"
+echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/" || fail "quiet mode should print the grouped files line"
 echo "$OUT" | grep -q "🛡️  6 guard hooks → .claude/settings.json (new file)" || fail "guard line should count hooks, got: $OUT"
 [ "$(echo "$OUT" | wc -l | tr -d ' ')" -le 3 ] || fail "grouped output should be ≤ 3 lines here, got: $OUT"
 rm -rf "$T"
@@ -290,6 +293,120 @@ for s in super-board-skills-ready.py super-board-host.sh super-board-codex-wave.
 done
 rm -rf "$T"
 
+# 13 — shared layout: the files live once under .agents/; .claude/ reaches them through
+#      links. No .codex/ or .opencode/ unless that host is configured, detected or asked for.
+resolves() { # <target> <host> — host paths reach the .agents/ copy
+  for p in skills/super-board/SKILL.md skills/git-sync/SKILL.md bin/super-board-host.sh workflows/super-board-wave.js; do
+    [ "$1/.$2/$p" -ef "$1/.agents/$p" ] || fail "$2: $p does not resolve to .agents/$p"
+  done
+}
+T=$(mktemp -d)
+OUT=$("$INSTALL" "$T" 2>&1)
+[ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "fresh: .agents/skills/super-board should be a real directory"
+[ -f "$T/.agents/bin/super-board-host.sh" ] && [ ! -L "$T/.agents/bin/super-board-host.sh" ] || fail "fresh: .agents/bin should hold real files"
+[ -x "$T/.agents/bin/super-board-run.sh" ] || fail "fresh: .agents/bin scripts must be executable"
+resolves "$T" claude
+[ -L "$T/.claude/skills/super-board" ] || fail "fresh: .claude/skills/super-board should be a link"
+[ "$(readlink "$T/.claude/skills/super-board")" = "../../.agents/skills/super-board" ] || fail "fresh: links must be relative, got $(readlink "$T/.claude/skills/super-board")"
+[ "$T/.claude/hooks/guard-secrets.py" -ef "$T/.agents/hooks/guard-secrets.py" ] || fail "fresh: hooks should resolve to .agents/hooks"
+[ ! -e "$T/.codex" ] && [ ! -e "$T/.opencode" ] || fail "fresh: no host was asked for, yet .codex/ or .opencode/ appeared"
+echo "$OUT" | grep -q "✓ skills, scripts and workflows → .agents/ (linked from .claude)" || fail "fresh: grouped line should name .agents/ and the hosts, got: $OUT"
+rm -rf "$T"
+
+# 14 — --hosts adds hosts (claude is always kept); both flag forms; unknown names refused.
+T=$(mktemp -d)
+"$INSTALL" --no-hooks --hosts codex,opencode "$T" >/dev/null 2>&1 || fail "--hosts codex,opencode failed"
+for h in claude codex opencode; do resolves "$T" "$h"; done
+rm -rf "$T"
+T=$(mktemp -d)
+"$INSTALL" --no-hooks --hosts=opencode "$T" >/dev/null 2>&1 || fail "--hosts=opencode failed"
+resolves "$T" opencode; resolves "$T" claude
+[ ! -e "$T/.codex" ] || fail "--hosts=opencode must not create .codex/"
+rm -rf "$T"
+T=$(mktemp -d)
+if OUT=$("$INSTALL" --hosts claude,cursor "$T" 2>&1); then fail "an unknown host should be refused"; fi
+echo "$OUT" | grep -q "unknown host: cursor" || fail "unknown host should be named, got: $OUT"
+[ ! -e "$T/.agents" ] || fail "a refused --hosts must install nothing"
+rm -rf "$T"
+
+# 15 — detection: an existing .codex/ or .opencode/ folder, a config "host" key, or a Codex shell.
+T=$(mktemp -d); mkdir -p "$T/.codex"
+"$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" codex
+[ ! -e "$T/.opencode" ] || fail "detection: .codex/ alone must not add .opencode/"
+rm -rf "$T"
+T=$(mktemp -d); mkdir -p "$T/.claude/super-board/configs"
+echo '{"host": "opencode"}' > "$T/.claude/super-board/configs/app.json"
+"$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" opencode
+rm -rf "$T"
+T=$(mktemp -d)
+CODEX_THREAD_ID=t1 "$INSTALL" --no-hooks "$T" >/dev/null 2>&1; resolves "$T" codex
+rm -rf "$T"
+
+# 16 — upgrade a real-directory .claude/ install: every path it had still resolves, super-board's
+#      own entries become links, anything that is not super-board's stays exactly as it was.
+T=$(mktemp -d)
+mkdir -p "$T/.claude/skills/super-board" "$T/.claude/skills/super-qa" "$T/.claude/skills/other-skill" \
+         "$T/.claude/bin" "$T/.claude/workflows" "$T/.claude/hooks"
+echo "1.8.2" > "$T/.claude/skills/super-board/VERSION"; echo old > "$T/.claude/skills/super-board/SKILL.md"
+echo old > "$T/.claude/skills/super-board/stale-file.md"
+echo mine > "$T/.claude/skills/other-skill/SKILL.md"
+echo old > "$T/.claude/bin/super-board-run.sh"; echo mine > "$T/.claude/bin/mine.sh"
+echo old > "$T/.claude/workflows/super-board-wave.js"; echo mine > "$T/.claude/hooks/my-hook.py"
+echo old > "$T/.claude/hooks/guard-secrets.py"
+"$INSTALL" "$T" >/dev/null 2>&1 || fail "upgrade from a real-directory install failed"
+resolves "$T" claude
+for p in skills/super-board skills/super-qa bin/super-board-run.sh workflows/super-board-wave.js hooks/guard-secrets.py; do
+  [ -L "$T/.claude/$p" ] || fail "upgrade: .claude/$p should now be a link into .agents/"
+done
+[ ! -e "$T/.agents/skills/super-board/stale-file.md" ] || fail "upgrade: stale files must not carry over"
+[ "$(cat "$T/.claude/skills/other-skill/SKILL.md")" = mine ] && [ ! -L "$T/.claude/skills/other-skill" ] || fail "upgrade: other-skill was touched"
+[ "$(cat "$T/.claude/bin/mine.sh")" = mine ] && [ "$(cat "$T/.claude/hooks/my-hook.py")" = mine ] || fail "upgrade: user bin/hooks were touched"
+[ ! -e "$T/.agents/skills/other-skill" ] || fail "upgrade: other-skill must not move into .agents/"
+jq -e '.from == "1.8.2"' "$T/.claude/super-board/upgrade.json" >/dev/null || fail "upgrade: upgrade.json not recorded"
+rm -rf "$T"
+
+# 17 — a second run changes nothing (tree, link targets, file contents).
+snapshot() { python3 - "$1" <<'PY'
+import hashlib, os, sys
+root = sys.argv[1]
+for d, dirs, files in sorted(os.walk(root)):
+    for n in sorted(dirs + files):
+        p = os.path.join(d, n); r = os.path.relpath(p, root)
+        if os.path.islink(p): print("L", r, os.readlink(p))
+        elif os.path.isfile(p): print("F", r, hashlib.sha256(open(p, "rb").read()).hexdigest())
+        else: print("D", r)
+PY
+}
+T=$(mktemp -d)
+"$INSTALL" --hosts codex "$T" >/dev/null 2>&1
+BEFORE=$(snapshot "$T")
+"$INSTALL" --hosts codex "$T" >/dev/null 2>&1
+[ "$(snapshot "$T")" = "$BEFORE" ] || fail "a second install changed the tree: $(diff <(echo "$BEFORE") <(snapshot "$T"))"
+rm -rf "$T"
+
+# 18 — a host folder whose skills/ (or bin/) is itself a link into .agents/ is already shared:
+#      nothing is replaced, nothing loops, the neighbours survive.
+T=$(mktemp -d); mkdir -p "$T/.agents/skills" "$T/.agents/bin" "$T/.claude"
+ln -s ../.agents/skills "$T/.claude/skills"; ln -s ../.agents/bin "$T/.claude/bin"
+plant_decoys "$T"
+"$INSTALL" --no-hooks "$T" >/dev/null 2>&1 || fail "whole-folder link layout failed"
+[ -d "$T/.agents/skills/super-board" ] && [ ! -L "$T/.agents/skills/super-board" ] || fail "whole-folder link: skill turned into a self-link"
+[ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-run.sh" ] || fail "whole-folder link: files missing"
+decoys_intact "$T" || fail "whole-folder link: DECOYS DESTROYED"
+rm -rf "$T"
+
+# 19 — no symlinks (Windows without symlink rights): copy instead, so every path still resolves.
+T=$(mktemp -d); FAKE=$(mktemp -d)
+printf '#!/bin/sh\nexit 1\n' > "$FAKE/ln"; chmod +x "$FAKE/ln"
+for run in 1 2; do
+  OUT=$(PATH="$FAKE:$PATH" "$INSTALL" "$T" 2>&1) || fail "no-symlink install failed: $OUT"
+  [ -f "$T/.claude/skills/super-board/SKILL.md" ] && [ -x "$T/.claude/bin/super-board-host.sh" ] \
+    && [ -f "$T/.claude/hooks/guard-secrets.py" ] || fail "no-symlink install: .claude paths missing"
+  cmp -s "$T/.claude/skills/super-board/SKILL.md" "$T/.agents/skills/super-board/SKILL.md" || fail "no-symlink: copy differs"
+done
+echo "$OUT" | grep -q "copied" || fail "no-symlink install should say it copied, got: $OUT"
+rm -rf "$T" "$FAKE"
+
 # 9 — the snippet the installer merges is the one hooks/README.md documents.
 python3 - ../hooks/README.md ../hooks/settings-snippet.json <<'PY' || fail "hooks/README.md snippet and hooks/settings-snippet.json differ"
 import json, re, sys
@@ -297,4 +414,4 @@ doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
 sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
 PY
 
-echo "PASS: test-install.sh (17 scenarios)"
+echo "PASS: test-install.sh (24 scenarios)"
