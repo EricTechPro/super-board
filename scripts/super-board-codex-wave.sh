@@ -63,7 +63,7 @@ readiness = launcher.with_name('super-board-verification-ready.py')
 if subprocess.run([sys.executable, str(readiness), '--config', str(config_path)]).returncode:
     result = json.dumps({'cards': [dict(number=c['number'], finalStatus='halted', lastLane='none',
                                        column=c['status'], detail='verification-readiness: repair verify_commands and restart explicitly',
-                                       lanesRun='none:halted') for c in cards], 'halted': True})
+                                       prUrl=None, priorFindings=None, lanesRun='none:halted') for c in cards], 'halted': True})
     if output_path:
         output_path.write_text(result + '\n')
     print(result)
@@ -86,7 +86,7 @@ else:
     detail = 'skills-readiness: missing ' + ', '.join(dict.fromkeys(e['name'] for e in skills['entries'] if e['status'] == 'missing'))
 if code:
     result = json.dumps(dict(cards=[dict(number=c['number'], finalStatus='halted', lastLane='none', column=c['status'],
-                                       detail=detail, lanesRun='none:halted') for c in cards], halted=True))
+                                       detail=detail, prUrl=None, priorFindings=None, lanesRun='none:halted') for c in cards], halted=True))
     if output_path:
         output_path.write_text(result + '\n')
     print(result)
