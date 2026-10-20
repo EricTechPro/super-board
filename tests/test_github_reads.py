@@ -32,7 +32,7 @@ sys.exit(r.get('rc', 0))
         gh.chmod(0o755)
         self.env = dict(os.environ, PATH=f'{self.root}:{os.environ["PATH"]}',
                         READ_CALLS=str(self.log), SB_GITHUB_HALT_FILE=str(self.halt),
-                        SB_GITHUB_RETRY_DELAY='0')
+                        SB_GITHUB_RETRY_DELAY='0', SB_GITHUB_READ_STRICT='')
 
     def tearDown(self):
         self.temp.cleanup()
