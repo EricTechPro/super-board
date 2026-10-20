@@ -5,7 +5,7 @@
 # merges the hook settings into .claude/settings.json (backed up first, never duplicated).
 #
 # Usage:
-#   ./install.sh [--no-hooks] [--protect-main] [--hosts claude,codex,opencode] [target-project-dir]
+#   ./install.sh [--no-hooks] [--protect-main] [--hosts claude,codex,pi,opencode] [target-project-dir]
 # Defaults to the current working directory. --no-hooks skips the guard hooks
 # and leaves settings.json untouched. --protect-main also wires the opt-in
 # guard that blocks direct and force pushes to main/master/base_branch; with
@@ -14,7 +14,7 @@
 # super-board onboard asks the questions (protect main is one of them).
 #
 # Layout: .agents/{skills/<skill>,bin,workflows,hooks} hold the files. Each host
-# folder (.claude/ always; .codex/ and .opencode/ when that folder already exists,
+# folder (.claude/ always; .codex/, .pi/ and .opencode/ when that folder already exists,
 # a config "host" key names it, super-board-host.sh reports it, or --hosts asks)
 # gets one link per skill under skills/ and one link per file under bin/,
 # workflows/ and hooks/. Nothing that is not super-board's is touched. Where a
@@ -63,7 +63,7 @@ if [ ! -d "$TARGET" ]; then
   exit 64
 fi
 
-# Hosts: claude always; codex/opencode when asked, configured or detected.
+# Hosts: claude always; codex/pi/opencode when asked, configured or detected.
 HOSTS="claude"
 add_host() { case " $HOSTS " in *" $1 "*) ;; *) HOSTS="$HOSTS $1" ;; esac; }
 for h in $(echo "$ASKED_HOSTS" | tr ',' ' '); do
