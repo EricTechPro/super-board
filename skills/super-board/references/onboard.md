@@ -13,10 +13,17 @@ Checks use `.claude/bin/super-board-skills-ready.py --profile setup --host
 optional skips and missing names. Setup checks the unconditional union; a
 selected card may need fewer helpers. Node or `skills-lock.json` never proves
 readiness. `check` and dispatch install nothing. Explicit `fix` retains helper
-installation, then re-resolves actual files; an installer exit of zero alone is
+installation for the selected host, then re-resolves actual files; an installer exit of zero alone is
 not success. `--no-helpers` suppresses that repair attempt, not missing evidence.
 A host plugin inventory may be supplied with `--catalog <active-skills.json>`;
 only enabled entries applying to this project count.
+
+`fix --host claude|codex|pi` installs only missing required helpers into the
+project with that host's `skills` agent ID (`claude-code`, `codex`, or `pi`).
+It uses Matt Pocock's engineering helpers, Superpowers'
+`verification-before-completion`, and Anthropic's `testing-strategy`.
+Sources and pinned revisions are listed in `skills-readiness.md`. Existing
+resolved skills remain in place. Failed downloads remain visible in `notes`.
 
 ## Design rules
 
@@ -152,7 +159,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    Fixes with NO question, backed up first to .claude/super-board/backup/<ts>/:
    │    skills, .claude/bin scripts, workflows, guard hooks + settings.json entries (runs the
    │    pack's install.sh), removes old skill folders (super-refine, cleanup-wt, arch-loop),
-   │    migrates every config to the v3 keys, git init, Matt Pocock's helper skills (Node present).
+   │    migrates every config to the v3 keys, git init, missing required helper skills for the selected host (Node present).
    ├─ Print its list exactly, one ✓ per line:
    │      ⏺ Fixed for you:
    │        ✓ super-board skills and scripts installed
@@ -164,7 +171,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    Code's permission prompt IS the question. No AskUserQuestion.
    │      Needs your machine: Node.js isn't installed. It's needed for the helper installer; actual coding
    │      skills (tests, code review, debugging) the board uses.
-   │      → Bash(brew install node && npx -y skills@latest add mattpocock/skills)
+   │      → Bash(brew install node && python3 $SB/super-board-setup.py fix --host <claude|codex|pi>)
    │    The command is per OS (brew / apt / dnf / winget) and comes from the script.
    │    Declined: node → report exact missing skills and keep readiness red; existing resolved
    │    helpers still count, but missing required helpers halt dispatch;

@@ -36,6 +36,20 @@ user/project scope, with project_root for project entries. They grant no
 fallback or mutation authority. Read-only checks and dispatch install nothing.
 Explicit onboard `fix` retains helper repair and re-resolves files afterward.
 
+Helper repair is project-local and host-specific. It requests only unresolved
+required names, preserving already-resolved skills and explicit disablement.
+The installer uses these inspected source revisions:
+
+| Source | Required skills | Revision | License |
+|---|---|---|---|
+| [mattpocock/skills](https://github.com/mattpocock/skills/tree/5beb35b040e3de97e54fa9e386d7e42d15c295c2) | `diagnosing-bugs`, `tdd`, `implement`, `codebase-design`, `code-review` | `5beb35b040e3de97e54fa9e386d7e42d15c295c2` | MIT |
+| [obra/superpowers](https://github.com/obra/superpowers/tree/bb92a77741419a4ab5f06e711a283343f1ada0c3) | `verification-before-completion` | `bb92a77741419a4ab5f06e711a283343f1ada0c3` | MIT |
+| [anthropics/knowledge-work-plugins](https://github.com/anthropics/knowledge-work-plugins/tree/a266ab8c3c754a3ccf7a634044fc1595fc06e50e/engineering/skills/testing-strategy) | `testing-strategy` | `a266ab8c3c754a3ccf7a634044fc1595fc06e50e` | Apache-2.0 |
+
+The selected installer agents are `claude-code`, `codex`, and `pi`. No global
+settings or plugin activation records are changed. A failed installation or a
+zero exit without readable host-visible files leaves readiness false.
+
 Codex native `[[skills.config]]` disabled paths also apply after symlink
 resolution. Unsupported activation syntax requires an authoritative active
 catalog; only its exact enabled paths may resolve until native syntax is

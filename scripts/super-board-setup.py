@@ -23,9 +23,10 @@ What `fix` does, with NO question (all of it backed up first to
     settings.json entries (runs the pack's install.sh) when any is missing or older
   - removes the folders of skills that no longer exist: super-refine, cleanup-wt, arch-loop
   - migrates every .claude/super-board/configs/*.json to the v3 keys (migrate-config), and
-    writes a missing top-level `host` from --host (check flags a host outside claude/codex/opencode)
+    writes a missing top-level `host` from --host (check flags a host outside claude/codex/pi/opencode)
   - `git init` when the folder is not a repo
-  - adds Matt Pocock's helper skills with npx when Node is present and they are missing
+  - adds missing required helpers from their pinned sources for the selected host
+    with npx when Node is present, then re-checks actual skill files
 It never installs a system tool or signs in: those come back in `needs` with the exact
 command for this OS, for onboard to ask about.
 
@@ -54,6 +55,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -79,7 +81,16 @@ BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-
        "super-board-settings.py", "super-board-setup.py", "super-board-usage.sh", "super-board-pr-body.sh",
        "super-review-file-refactor.sh", "super-qa-file-bug.sh", "super-board-stop.sh"]
 WORKFLOWS = ["super-board-wave.js", "ui-refine-loop.js"]
-HELPERS_CMD = "npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y"
+HELPER_AGENTS = {"claude": "claude-code", "codex": "codex", "pi": "pi"}
+HELPER_SOURCES = [
+    ("https://github.com/mattpocock/skills/tree/5beb35b040e3de97e54fa9e386d7e42d15c295c2",
+     {"mattpocock-skills:" + name: name for name in
+      ["diagnosing-bugs", "tdd", "implement", "codebase-design", "code-review"]}),
+    ("https://github.com/obra/superpowers/tree/bb92a77741419a4ab5f06e711a283343f1ada0c3",
+     {"verification-before-completion": "verification-before-completion"}),
+    ("https://github.com/anthropics/knowledge-work-plugins/tree/a266ab8c3c754a3ccf7a634044fc1595fc06e50e",
+     {"testing-strategy": "testing-strategy"}),
+]
 
 # System tools: why the board needs each, and the install command per OS family.
 TOOLS = {
@@ -184,6 +195,15 @@ def helper_readiness(root, host="claude", home=None, catalog=None):
     except ValueError:
         result = {"ready": False, "entries": [], "error": process.stderr.strip()}
     return result
+
+
+def helper_commands(readiness, host):
+    missing = {entry["name"] for entry in readiness.get("entries", []) if entry["status"] == "missing"}
+    for source, names in HELPER_SOURCES:
+        selected = [name for canonical, name in names.items() if canonical in missing]
+        if selected:
+            yield ["npx", "-y", "skills@latest", "add", source, "--skill", *selected,
+                   "--agent", HELPER_AGENTS[host], "-y"]
 
 
 def is_git_repo(root):
@@ -332,7 +352,8 @@ def check(root, pack, host="claude", home=None, catalog=None):
             why, cmds = TOOLS[t]
             cmd = cmds[fam]
             if t == "node":
-                cmd += " && " + HELPERS_CMD
+                cmd += " && " + shlex.join([sys.executable, os.path.abspath(__file__), "fix",
+                                             "--root", root, "--host", host])
             needs.append({"kind": "tool", "name": t, "why": why, "command": cmd})
     readiness = helper_readiness(root, host, home, catalog)
     helpers = readiness["ready"]
@@ -384,7 +405,7 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
         if not pack:
             return {**before, "fixed": [], "error": "pack-not-found"}
         if not dry:
-            r = run(["bash", os.path.join(pack, "install.sh"), root],
+            r = run(["bash", os.path.join(pack, "install.sh"), "--hosts", host, root],
                     input="", cwd=root)
             if r.returncode != 0:
                 return {**before, "fixed": fixed, "error": "install.sh failed: " + (r.stderr or r.stdout)[-300:]}
@@ -428,7 +449,11 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
 
     if helpers and not before["helper_skills"] and have("npx"):
         if not dry:
-            r = run(["bash", "-c", HELPERS_CMD], cwd=root, input="")
+            for command in helper_commands(before["helper_readiness"], host):
+                r = run(command, cwd=root, input="")
+                if r.returncode:
+                    detail = (r.stderr + "\n" + r.stdout).strip()[-1000:]
+                    notes.append(f"helper install failed (exit {r.returncode}): {command[4]}: {detail}")
             confirmed = helper_readiness(root, host, home, catalog)
             if confirmed["ready"]:
                 fixed.append("worker skills re-resolved after helper installation")
@@ -470,6 +495,7 @@ def text_report(res):
             lines.append(f"  ✗ missing {entry['name']} for {res['helper_readiness']['host']}; install it in that host and restart")
     if res.get("helper_readiness", {}).get("error"):
         lines.append("  ✗ " + res["helper_readiness"]["error"])
+    lines += ["  ✗ " + note for note in res.get("notes", []) if note.startswith("helper install failed")]
     for path, error in {**res.get("verification", {}), **res.get("host_errors", {})}.items():
         lines.append(f"  ✗ {path}: {error}")
     for n in res.get("needs", []):

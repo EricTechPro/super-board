@@ -326,6 +326,7 @@ else:sys.exit('unexpected gh call: '+str(args))
         self.assertFalse(any(c['args'][:3]==['issue','edit','2'] for c in self.calls()))
 
     def test_setup_fix_reports_missing_even_after_successful_installer(self):
+        self.tool('npx', "import json,os,sys\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'npx','args':sys.argv[1:]})+'\\n')\n")
         (self.root/'skills-lock.json').write_text('{"mattpocock/skills":true}')
         for command,extra in [('check',[]),('fix',['--no-helpers']),('fix',[])]:
             result=subprocess.run([sys.executable,str(KIT/'scripts/super-board-setup.py'),command,'--root',str(self.root),'--pack',str(KIT),'--home',str(self.home),*extra],env=self.env,text=True,capture_output=True)
@@ -334,6 +335,9 @@ else:sys.exit('unexpected gh call: '+str(args))
             self.assertFalse(output['helper_skills']);self.assertFalse(output['green'])
             self.assertTrue(any(e['status']=='missing' for e in output['helper_readiness']['entries']))
             self.assertNotIn("Matt Pocock's coding skills added",output.get('fixed',[]))
-        self.assertEqual(len([c for c in self.calls() if c['tool']=='npx']),1)
+        installs = [c['args'] for c in self.calls() if c['tool']=='npx']
+        self.assertEqual(len(installs),3,installs)
+        self.assertTrue(all(a[a.index('--agent')+1]=='claude-code' for a in installs),installs)
+        self.assertTrue(all('--global' not in a and '-g' not in a for a in installs),installs)
 
 if __name__=='__main__':unittest.main()

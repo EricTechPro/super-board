@@ -91,8 +91,8 @@ for t in git apt-get dnf; do p=$(command -v "$t" || true); [ -n "$p" ] && ln -sf
 OUT=$(PATH="$NOBIN" "$(command -v python3)" "$SETUP" check --root "$T" || true)
 echo "$OUT" | q '.needs | map(.name) | index("gh")' || fail "missing gh should be in needs: $OUT"
 case "$(uname)" in Darwin) echo "$OUT" | q '.needs[] | select(.name == "gh") | .command == "brew install gh"' || fail "mac command should be brew: $OUT" ;; esac
-echo "$OUT" | q '.needs[] | select(.name == "node") | .command | test("skills@latest add mattpocock/skills")' \
-  || fail "the node command should also add Matt Pocock's skills: $OUT"
+echo "$OUT" | q '.needs[] | select(.name == "node") | .command | test("super-board-setup.py fix.*--host claude")' \
+  || fail "the node command should retry host-specific helper repair: $OUT"
 
 # 5 — board names from package.json / README; an empty folder falls back to its name.
 T="$WORK/ledgerly"; mkdir -p "$T"
