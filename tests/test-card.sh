@@ -112,4 +112,19 @@ RC=0; card items >/dev/null 2>&1 || RC=$?
 [ "$RC" != 0 ] || fail "incomplete board read must fail"
 ok "incomplete board read refused"
 
+# 10 — a card number that is not one positive integer is a usage error (64):
+# no GitHub call, no halt file. zsh does not word-split `$pair`, so
+# `set -- $pair` once passed "26 53" here and halted a whole run (3 retries).
+for bad in "26 53" "#26" "abc" "0" ""; do
+  for verb in status item-id; do
+    reset_log; rm -f "$TMP/halt.json"; RC=0; card $verb "$bad" >/dev/null 2>&1 || RC=$?
+    [ "$RC" = 64 ] || fail "$verb '$bad' should exit 64 (rc=$RC)"
+    [ ! -s "$FAKE_LOG" ] || fail "$verb '$bad' must not call gh: $(cat "$FAKE_LOG")"
+    [ ! -e "$TMP/halt.json" ] || fail "$verb '$bad' must not write a halt file"
+  done
+  reset_log; RC=0; card move "$bad" QA >/dev/null 2>&1 || RC=$?
+  [ "$RC" = 64 ] && [ ! -s "$FAKE_LOG" ] || fail "move '$bad' should exit 64 with no gh call (rc=$RC)"
+done
+ok "bad card number → 64, no GitHub call, no halt"
+
 echo "PASS: $pass card-helper checks"

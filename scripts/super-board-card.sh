@@ -201,10 +201,18 @@ items() {  # whole board, gh item-list shape, ~1 point per 100 cards
     || { echo "board read incomplete" >&2; return 69; }
 }
 
+# The reads above run strict, so anything GitHub rejects halts the whole run.
+# A malformed issue is the caller's mistake, not GitHub's: refuse it here (64).
+# zsh does not word-split `set -- $pair`, which once passed "26 53" as one issue.
+issue_arg() {  # $1 = issue
+  [[ "$1" =~ ^[1-9][0-9]*$ ]] && return 0
+  echo "invalid issue: '$1' — pass one issue number per call" >&2; exit 64
+}
+
 case "$VERB" in
-  move)    [ $# -eq 2 ] || { echo "usage: move <issue> <Status>" >&2; exit 64; }; move "$1" "$2" ;;
-  status)  [ $# -eq 1 ] || { echo "usage: status <issue>" >&2; exit 64; }; read_card "$1"; echo "$STATUS_NAME" ;;
-  item-id) [ $# -eq 1 ] || { echo "usage: item-id <issue>" >&2; exit 64; }; item_id "$1"; echo "$ITEM_ID" ;;
+  move)    [ $# -eq 2 ] || { echo "usage: move <issue> <Status>" >&2; exit 64; }; issue_arg "$1"; move "$1" "$2" ;;
+  status)  [ $# -eq 1 ] || { echo "usage: status <issue>" >&2; exit 64; }; issue_arg "$1"; read_card "$1"; echo "$STATUS_NAME" ;;
+  item-id) [ $# -eq 1 ] || { echo "usage: item-id <issue>" >&2; exit 64; }; issue_arg "$1"; item_id "$1"; echo "$ITEM_ID" ;;
   ids)     load_ids; jq -n --arg p "$PROJECT_ID" --arg f "$FIELD_ID" --argjson o "$OPTIONS_JSON" '{projectId:$p, fieldId:$f, options:$o}' ;;
   items)   items ;;
   *) echo "unknown verb: $VERB" >&2; exit 64 ;;
