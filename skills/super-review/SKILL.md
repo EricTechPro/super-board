@@ -315,7 +315,7 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the 
    - Both open → bounce to whichever is older.
    - Clean up worktree, exit.
 3. Read PR + spot-check Tester evidence + read CLAUDE.md / AGENTS.md.
-   Check the Risk block against the diff: is the Door right (one-way: DROP, rename, data rewrite, public API) and the Blast radius honest? Fix it with `super-board-pr-body.sh --block risk`; a one-way door is never 🟢.
+   Check the Risk block against the diff: is the Door right (one-way: DROP, rename, data rewrite, public API, sent email) and the Blast radius honest? Fix it with `super-board-pr-body.sh --block risk`; a one-way door is never 🟢.
    **3b. Prior-report check** — load `prior_report` (see "Review remembers"); if present, round 1 checks each prior finding; any `not fixed` → re-open its thread, bounce by prefix, post the report, exit.
 4. Review code + tests.
 5. **Reviewer-side test rerun (always — closes Tester self-verification gap):**

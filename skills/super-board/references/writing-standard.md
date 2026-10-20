@@ -192,8 +192,8 @@ here too.
 
 Levels: 🟢 Low · 🟡 Medium · 🔴 High. **Door** is two-way (a revert undoes it) or one-way
 (hard to undo: DROP, rename, data rewrite, public API, sent email); a one-way door is never 🟢.
-**Blast radius** is one word (`none`, `page`, `billing`, `all users`) and one line on who breaks. A `needs-you: <command>` line (merge gate reads it) goes
-under Risk.
+**Blast radius** is a short label (`none`, `page`, `billing`, `all users`) and one line on who
+breaks. A `needs-you: <command>` line (merge gate reads it) goes under Risk.
 
 ## 3 · Ticket
 
