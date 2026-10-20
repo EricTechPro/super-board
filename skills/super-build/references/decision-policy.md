@@ -79,6 +79,29 @@ unchanged.
 Resolve this lane for the actual host, load the report's files/fallbacks, halt
 on missing requirements and recheck each conditional helper before use.
 
+## Trace before changing behavior
+
+For an uncertain bug or a change across modules, start with the affected entry point.
+Trace its callers, state owner and downstream effects through exact source references.
+Read the current validation, failure handling and tests before choosing an edit. Record
+what is observed, what is inferred and what remains unknown in the existing issue/PR
+handoff. A file list alone is not a traced flow.
+
+When history or a regression matters, inspect the relevant blame/log and linked issue,
+PR or recorded design. Separate documented intent from inferred motivation. Supplied
+specifications and ADRs remain constraints. Do not search unrelated systems merely to
+fill an evidence checklist.
+
+Before implementation, identify the affected callers, tests, fixtures, configuration
+and exports. Fix a shared cause at its owner and verify the accepted behavior on the
+actual changed artifact. Missing execution evidence is an unverified claim. Keep the
+existing QA verifier, test policy, independent Review truth gate and head-bound
+approval. These checks do not create another feature map or review panel.
+
+These tracing checks adapt pstack `how` and `why` at the pinned source in the
+[pstack notice](pstack-notice.md). They run inside the assigned lane, with its existing
+skills and ownership. Installing or invoking the full pstack pack is not required.
+
 ## Label routing
 
 A ticket already declares what kind of work it is. Reading that label is cheaper

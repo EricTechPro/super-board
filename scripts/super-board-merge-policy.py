@@ -30,8 +30,9 @@ Rules, from references/config-schema.json → merge_policy / migrations:
   lines are reported separately. Per-file counts come from `files[].additions/
   deletions`; without them the PR totals are used.
 - merge_policy.always_human.<category>: any label, path glob or added-line
-  keyword match → human. Categories ship as money, auth, schema; setting
-  always_human replaces them all (`{}` turns category gating off).
+  keyword match → human. Custom rules extend mandatory money, auth, schema
+  and external-sharing rules. Empty maps cannot disable mandatory categories.
+  Matches conservatively route review; they do not prove semantic safety.
 - migrations: a changed path matching migrations.globs makes this a migration
   PR. Every env in allowed_envs with a command runs (a command of "-" means the
   deploy pipeline applies it: nothing to run). target_env not in allowed_envs, or
@@ -54,14 +55,19 @@ DEFAULT_ALWAYS_HUMAN = {
         "keywords": ["stripe.", "payment_intent", "price_id", "invoice.create"],
     },
     "auth": {
-        "labels": ["auth", "security"],
+        "labels": ["auth", "security", "permissions"],
         "paths": ["**/auth/**", "**/authz/**", "**/permissions/**"],
-        "keywords": ["jwt.sign", "bcrypt", "password_hash", "service_role"],
+        "keywords": ["jwt.sign", "bcrypt", "password_hash", "service_role", "grant permission", "grant all"],
     },
     "schema": {
         "labels": ["schema", "destructive"],
         "paths": [],
         "keywords": ["drop table", "drop column", "truncate table", "rename column", "drop schema"],
+    },
+    "external-sharing": {
+        "labels": ["external-sharing", "data-sharing", "external-data-sharing"],
+        "paths": ["**/telemetry/**", "**/data-export/**"],
+        "keywords": ["sendbeacon(", "navigator.sendbeacon", "captureexception("],
     },
 }
 DEFAULT_MIGRATION_GLOBS = [
@@ -156,7 +162,12 @@ def main() -> int:
         extra = f" (+{mig_lines} migration lines counted separately)" if mig_lines else ""
         human.append({"category": "size",
                       "why": f"big PR — please review: {size} changed lines > auto_max_lines {cap}{extra}"})
-    always = policy["always_human"] if isinstance(policy.get("always_human"), dict) else DEFAULT_ALWAYS_HUMAN
+    always = {cat: {field: list(values) for field, values in rule.items()}
+              for cat, rule in DEFAULT_ALWAYS_HUMAN.items()}
+    for cat, rule in (policy.get("always_human") or {}).items():
+        target = always.setdefault(cat, {})
+        for field in ("labels", "paths", "keywords"):
+            target[field] = list(dict.fromkeys(target.get(field, []) + ((rule or {}).get(field) or [])))
     for cat, rule in always.items():
         rule = rule or {}
         hit = next((f"label {l}" for l in rule.get("labels") or [] if l.lower() in labels), None)

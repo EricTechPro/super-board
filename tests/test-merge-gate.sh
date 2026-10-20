@@ -407,12 +407,17 @@ grep -q '^pr merge' "$GH_LOG" && fail "revoked human approval must not reach mer
 unset STUB_APPROVAL STUB_COMMENTS
 teardown
 
-# 17 — custom categories replace the defaults: with always_human = {} a money
-#      label merges.
+# 17 — custom categories extend mandatory defaults, including same-category rules.
 head_setup
 cfgset '.merge_policy = {always_human: {}}'
 RC=0; STUB_OID="$SHA" STUB_META="$(meta money src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 0 ] || fail "always_human {} should let a money label merge, got $RC"
+[ "$RC" -eq 7 ] || fail "always_human {} must preserve the money approval rule, got $RC"
+cfgset '.merge_policy = {always_human: {auth: {labels: ["project-private"], paths: ["custom/private/**"]}, custom: {labels: ["legal-review"]}}}'
+for spec in 'money src/x.ts' 'auth src/x.ts' 'schema src/x.ts' 'permissions src/x.ts' 'external-sharing src/x.ts' 'project-private src/x.ts' 'legal-review src/x.ts' 'none custom/private/x.ts' 'none src/auth/x.ts'; do
+  read -r label path <<< "$spec"
+  RC=0; STUB_OID="$SHA" STUB_META="$(meta "$label" "$path")" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+  [ "$RC" -eq 7 ] || fail "mixed custom/default approval rule must hold for $spec, got $RC"
+done
 teardown
 
 # 18 — a migration whose target env is allowed: the gate runs the configured

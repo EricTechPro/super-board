@@ -21,6 +21,12 @@ Use `mattpocock-skills:codebase-design` for module depth and interfaces. Reach
 `mattpocock-skills:domain-modeling` only when terminology or an ADR needs work. Workers
 recheck [conditional skill readiness](skills-readiness.md) before activating either helper.
 
+Write a concrete caller usage example first: inputs, returned values, errors and state
+changes. Derive the smallest interface and ownership sketch from that usage, using
+signatures and pseudocode rather than building a second implementation. Trace the
+current caller flow before changing it. Existing specifications and ADRs constrain
+both sketches.
+
 Sketch two genuinely different arrangements of callers and modules. For each, record:
 
 - **Owner and interface:** who owns state/behavior, which callers use it, and what they pass/get.
@@ -47,3 +53,7 @@ Done means the applicable recorded design was followed, or both sketches and a j
 choice are available to the next worker/reviewer. An unresolved human choice stays blocked.
 Design quality remains agent judgment; format and installer checks do not prove the sketches
 are distinct or the selected design is good.
+
+Caller-first sketches adapt pstack `architect` at the pinned source in the
+[pstack notice](../../super-build/references/pstack-notice.md). Use the existing helpers
+above. Do not install another lifecycle wrapper or require additional review panels.
