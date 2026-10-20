@@ -203,7 +203,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 ## Risk
 🟢 **Low** · <one line: what could break and what limits it>
 - **Door:** <two-way | one-way> · <how to undo, or why it cannot be undone>
-- **Blast radius:** <one word> · <who breaks if this is wrong>
+- **Blast radius:** <short label> · <who breaks if this is wrong>
 <!-- /sb:risk -->
 ```
 
