@@ -297,6 +297,11 @@ def read(args, kind='json', meta=None, recovering=False):
         raise ValueError('retry helper accepts read-only GitHub commands only')
     if not recovering:
         check_halt()
+    if args[0] == 'api' and '--slurp' in args and any(
+            arg in ('--jq', '-q', '--template', '-t') or arg.startswith(('--jq=', '--template='))
+            for arg in args):
+        raise ValueError('gh api --slurp cannot be combined with --jq/-q or --template/-t; '
+                         'fetch paginated raw JSON with --paginate --slurp, then run jq locally')
     operation = {'args': args, 'kind': kind, 'meta': meta}
     last = 'GitHub read failed'
     shape_only = True  # every attempt reached GitHub and got a payload of the wrong shape

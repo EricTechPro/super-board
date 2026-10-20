@@ -60,6 +60,39 @@ sys.exit(r.get('rc', 0))
         self.assertEqual(self.log.read_text(), '5')
         self.assertFalse(self.halt.exists())
 
+    def test_incompatible_slurp_formatting_fails_before_gh_even_in_strict_mode(self):
+        for kind in ['json', 'array']:
+            for strict in ['', '1']:
+                self.env['SB_GITHUB_READ_STRICT'] = strict
+                for formatting in [['--jq', '.[]'], ['-q', '.[]'], ['--jq=.[]'],
+                                   ['--template', '{{.}}'], ['-t', '{{.}}'], ['--template={{.}}']]:
+                    with self.subTest(kind=kind, strict=strict, formatting=formatting):
+                        result = self.read([{'rc': 1, 'err': 'the --slurp option is not supported with --jq or --template'}],
+                                           kind, ['api', 'repos/acme/app/issues', '--paginate', '--slurp', *formatting])
+                        self.assertEqual(result.returncode, 64, result.stderr)
+                        self.assertIn('fetch paginated raw JSON', result.stderr)
+                        self.assertIn('jq locally', result.stderr)
+                        self.assertEqual(result.stdout, '')
+                        self.assertFalse(self.log.exists(), 'invalid CLI arguments must not invoke gh')
+                        self.assertFalse(self.halt.exists(), 'invalid CLI arguments must not halt other lanes')
+
+    def test_existing_halt_precedes_incompatible_arguments(self):
+        original = '{"reason":"saved network failure","attempts":3}'
+        self.halt.write_text(original)
+        result = self.read([{'out': '[]'}], 'array',
+                           ['api', 'repos/acme/app/issues', '--paginate', '--slurp', '--jq', '.[]'])
+        self.assertEqual(result.returncode, 79, result.stderr)
+        self.assertEqual(self.halt.read_text(), original)
+        self.assertFalse(self.log.exists())
+
+    def test_corrected_paginated_raw_read_remains_valid(self):
+        result = self.read([{'out': '[[]]'}], 'array',
+                           ['api', 'repos/acme/app/issues', '--paginate', '--slurp'])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, '[[]]')
+        self.assertEqual(self.log.read_text(), '1')
+        self.assertFalse(self.halt.exists())
+
     def test_permanent_graphql_error_is_not_retried(self):
         r = self.read([{'rc': 1, 'err': 'GraphQL: Cannot query field wrong on type Query'}],
                       command=['api', 'graphql', '-f', 'query=query { wrong }'])
