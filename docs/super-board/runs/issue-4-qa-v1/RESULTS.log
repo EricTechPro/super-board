@@ -1,0 +1,36 @@
+Pi QA issue #4, independent verification, 2026-10-20T12:53:06Z
+Tested head: 74b8d70037bfbd2121050548bdcd28058e8c8ad7
+Historical head: a2f109ffb57e9ca3904517d83dbec1930495a33e
+
+Historical command: python3 tests/test_checkout_identity.py
+Exit: 1 (expected pre-fix failure)
+FAIL: test_mismatches_refuse_before_any_startup_work (boundary=('pi', False, False), actual='b', verify=True)
+AssertionError: 0 == 0 : {"status": "advanced", "column": "QA", "detail": "fixture", "prUrl": null, "branch": null, "priorFindings": null}
+Ran 4 tests in 97.902s
+FAILED (failures=81)
+
+Current command: python3 tests/test_checkout_identity.py
+Exit: 0
+....
+----------------------------------------------------------------------
+Ran 4 tests in 59.348s
+OK
+
+Full command: bash tests/run-safety.sh
+Exit: 0
+::group::tests/test_checkout_identity.py
+....
+----------------------------------------------------------------------
+Ran 4 tests in 56.633s
+OK
+::endgroup::
+PASS: 69 safety suites
+Suite groups: 69. Suite-error markers: 0.
+
+Whitespace commands: git diff --check; git diff --check origin/codex/pi-pilot-20261020...HEAD
+Exit: 0 for both. No output.
+
+Full local log SHA-256:
+f774cd71e569a485f7133941d919b3a441522c55cec94005350260461fcb4187  /tmp/pi-issue-4-qa/regression-red.log
+1288743966ec4d676f97448ccd82b5945b1bf8d3a3181a38776656feb09ee6f1  /tmp/pi-issue-4-qa/regression-green.log
+f368a9326e81a6448ea1860b666247974fa2e074112e4d930793da16803c9000  /tmp/pi-issue-4-qa/safety-full.log
