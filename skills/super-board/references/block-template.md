@@ -172,3 +172,11 @@ A human can still merge a PR manually under the repository's normal rules.
 ## Hard rule
 
 **The bot is forbidden from moving any card to Blocked, or dropping it to Done, *without* this full template populated. A 1-line "needs creds" comment is a contract violation and fails Reviewer's thread gate.**
+
+## Exhausted repairs
+
+Use reason 🛡 and `blocked-by: -`. Link the canonical `<!-- super-board:repair -->`
+handoff and quote its repair count, diagnosis verdict and final repair result. Name the
+failed command and preserved branch/worktree. `Owner` names the person who must decide
+the next change. `To unblock` states the exact decision or independent investigation
+needed. Moving the card or changing the failure hash never replenishes attempts.

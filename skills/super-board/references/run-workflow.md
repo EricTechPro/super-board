@@ -8,6 +8,26 @@ workers. Lane lifecycles, branch/PR model, comment cadence, Block
 templates, halt gates, and done conditions are all inherited from `run.md`
 unchanged.
 
+## Pi runs
+
+`/super-board run --pi` selects Pi explicitly and overrides `worker_backend`.
+A host check returning `pi` selects the same path. Never infer Pi from missing
+Workflow tools, and never combine `--pi` with `--codex`.
+Require `pi` on PATH, configured non-empty `pi.provider` and `pi.model`, and
+`bash -n` on the wave and Pi lane scripts before claims. Run skills readiness
+with `--host pi`. Before claims, run
+`SUPER_BOARD_PI_ROOT="$PWD" python3 .claude/bin/super-board-pi-guards.py --check`
+and require `.claude/bin/super-board-pi-guards.ts` to exist.
+This reads installed guard and hook settings, never model credentials.
+Repair missing resources before claims or worktree writes.
+Launch the existing wave command below with `--pi` replacing `--codex`.
+It starts a fresh `super-board-pi-lane.sh` for each Build, QA and Review lane.
+No model ladder or Codex router is used. The same wave PID marker, stop,
+reconciliation, repair budget and reviewed-head merge gate apply.
+Pi's tool allowlist is not an OS sandbox. Keep required guard-script checks,
+and use an isolated environment if the project requires process confinement.
+Claude remains the default until the matched acceptance pilot passes.
+
 ## Codex runs
 
 `/super-board run --codex` uses headless Codex for every lane of every wave,
@@ -20,14 +40,14 @@ Ready takes its tier's medium cell. `--codex=<model>`, else optional `codex.mode
 pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
 
-**Inside Codex, plain `run` is `--codex`.** Your tool list has no Workflow tool, or
+**Inside Codex, plain `run` is `--codex`.** When
 `bash .claude/bin/super-board-host.sh --config <config-path>` prints `codex` → run as `--codex` (tier flags and
 `--codex=<model>` still apply); it counts as explicit `--codex`, Review included.
 Say so once, in the first wave report: `🔁 codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
 
 **Unknown host halts.** Run the host check before preconditions. Exit 65 (no host sign) or
 `opencode` (no OpenCode backend yet) halts before any claim, even with no Workflow tool, with one line:
-`⛔ unknown host — set SUPER_BOARD_HOST=claude|codex and re-run`. Never guess a backend.
+`⛔ unknown host — set SUPER_BOARD_HOST=claude|codex|pi and re-run`. Never guess a backend.
 
 After the same plan and claim steps, launch this command as a background task:
 `bash .claude/bin/super-board-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
@@ -116,7 +136,7 @@ Run the same preconditions as `run.md` §Preconditions, minus PID checks:
       dispatches with zero workers alive) and
       `pgrep -f 'claude -p .*super-board run'` are empty, AND `/workflows`
       shows no running super-board-wave, AND no `super-board-codex-wave.sh` or
-      `super-board-codex-lane.sh` process belongs to this repo. If a legacy run is detected,
+      `super-board-codex-lane.sh` or `super-board-pi-lane.sh` process belongs to this repo. If a legacy run is detected,
       remove the lock just created and stop — the legacy run won.
 6. Crash-recovery sweep (the workflow backend's equivalent of the legacy
    reaper): with no wave running, strip `bot_identity` from any
@@ -141,7 +161,7 @@ Repeat until a done condition or halt gate fires:
    quota: `gh api repos/<o>/<r>/issues/<n>/comments -f body=…` for a comment,
    `gh api -X DELETE repos/<o>/<r>/issues/<n>/assignees -f 'assignees[]=<bot>'`
    to release a claim. Board moves have no REST route; they wait for the reset.
-   **Usage guard** (Claude waves only; skip for `--codex`, explicit or host-switched) — `bash .claude/bin/super-board-usage.sh check --config <config-path>`
+   **Usage guard** (Claude waves only; skip for `--codex` and `--pi`, explicit or host-switched) — `bash .claude/bin/super-board-usage.sh check --config <config-path>`
    (Claude 5-hour and weekly plan usage; threshold `usage_pause_pct`, default 95):
    - exit 0 → launch.
    - exit 10 with `usage_fallback: "codex"` → resolve the selected remaining
@@ -152,7 +172,11 @@ Repeat until a done condition or halt gate fires:
      Plan as usual, take the `build` and `qa` cards (`review` cards wait), and for ONE
      card at a time claim it, run `bash .claude/bin/super-board-codex-lane.sh --config
      <config-path> --card '<card JSON>' --lane <build|qa>`, read its JSON exit like a lane
-     result, then reconcile (step 5). Re-run the usage check between cards; on exit 0
+     result, then reconcile (step 5). Direct usage-fallback calls use the coordinator
+     canonical prepare/completion protocol below, since no wave helper owns their record.
+     If prepare requires diagnosis, invoke a fresh `super-board-codex-lane.sh --diagnosis`
+     with the same fallback authorization and full evidence, validate its result, persist
+     `diagnosed`, and prepare the final attempt. Never wake Claude during its usage pause. Re-run the usage check between cards; on exit 0
      return to normal waves. The report line says `🔁 codex fallback`. Without
      `usage_fallback: "codex"` the launcher refuses (exit 78) unless `--codex` is given.
    - exit 10 otherwise (pause) → launch nothing new. A wave already running finishes —
@@ -185,7 +209,7 @@ Repeat until a done condition or halt gate fires:
    read-only with `.claude/bin/super-board-github-read.py --kind issue -- issue
    view <N> --json number,title,body`. Keep number, status, labels and literal body
    in a JSON array file. Run `python3 .claude/bin/super-board-skills-ready.py
-   --root <repo-root> --host <claude|codex> --cards <cards.json>` for the actual
+   --root <repo-root> --host <claude|codex|pi> --cards <cards.json>` for the actual
    worker host before sweep/resume/refresh/flag/stranded actions or Claim.
    Exit 10 names missing helpers: halt, preserve all state, repair the exact
    visible skill files and restart explicitly. Exit 64 means invalid input.
@@ -245,9 +269,25 @@ Repeat until a done condition or halt gate fires:
    bot_identity is unset — accepted single-orchestrator risk: without it
    there is no cross-session claim at all, so never run two orchestrators
    (or /loop re-entries) against the same board without bot_identity.
-4. **Launch** — With `--codex`, or no Workflow tool, or the host check printing `codex`, use
-   "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65 or
-   `opencode` never reaches Launch (see "Unknown host halts"). Workflow tool with
+   **Reserve before Claude dispatch.** For each claimed card on the Claude backend,
+   select its entry lane and a unique claim id. Run
+   `python3 .claude/bin/super-board-repair.py prepare --issue <N> --lane <lane>
+   --owner <claim-id> --labels <labels-JSON> --cap <rebuild_cap> --config <config-path>
+   --diagnose-claude`.
+   Use arguments as data, never interpolate an issue body into shell code.
+   Null means initial work or read-only verification. Pass a returned reservation as
+   `card.repairReservation`. The helper persists/read-backs before dispatch. It runs
+   the one fresh Read/Grep/Glob-only diagnosis when required, validates evidence and
+   reserves the final targeted repair only for a different testable cause.
+   An exhausted result has already moved the card to Blocked. Do not launch it.
+   A failure halts without releasing claims or resetting state. Reconcile interrupted
+   owners before the `interrupted` transition. Never refund attempts.
+   Pi/Codex waves perform the same boundary inside the wave helper. The coordinator
+   must not reserve or complete those a second time.
+4. **Launch** — With `--pi` or a `pi` host check, use "Pi runs" above. With `--codex`
+   or a `codex` host check, use "Codex runs" above. A `claude` host requires the Workflow
+   tool. A missing Workflow tool never selects another host. Exit 65 and `opencode`
+   halt before Launch (see "Unknown host halts"). Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
    `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
@@ -262,7 +302,16 @@ Repeat until a done condition or halt gate fires:
    fails, preserve claims and stop. For verification-readiness (exit 9), repair
    `verify_commands` and restart explicitly; do not invoke GitHub evidence recovery.
    For a GitHub read halt, follow "Required GitHub evidence" above. Otherwise,
-   for EVERY card in the wave, release the assignee
+   for each Claude card first complete the owned canonical record. Lanes write proof
+   but do not edit its machine state. With a reservation, call
+   `python3 .claude/bin/super-board-repair.py succeeded --issue <N> --owner <claim-id>`
+   after advanced, blocked or human-gate outcomes. For bounced/failed outcomes, including
+   initial work with no reservation, call `failed --issue <N> --owner <claim-id>
+   --cause <failure-detail> --pending-lane <build|qa> --pr-url <PR-URL> --config <config-path>`.
+   Use the returned column to select the failed repair's owner: QA → qa, Ready → build.
+   Completion retains counters and used phases. Persistence failure preserves the claim
+   and halts before another wave. An exhausted completion has already moved to Blocked.
+   Then, for EVERY card in the wave, release the assignee
    (`gh issue edit <n> --remove-assignee <bot_identity>`, idempotent).
    Append one line per card to the run manifest
    `docs/super-board/runs/<date>-<slug>.md`:
@@ -340,9 +389,13 @@ don't stall on prompts:
     "Bash(.claude/bin/super-board-github-read.py:*)",
     "Bash(python3 .claude/bin/super-board-verification-ready.py:*)",
     "Bash(python3 .claude/bin/super-board-skills-ready.py:*)",
+    "Bash(python3 .claude/bin/super-board-repair.py:*)",
+    "Bash(python3 .claude/bin/super-board-pi-guards.py:*)",
+    "Bash(python3 .claude/bin/super-board-repair.py:*)",
     "Bash(bash .claude/bin/super-board-usage.sh:*)",
     "Bash(bash .claude/bin/super-board-throttle.sh:*)",
     "Bash(bash .claude/bin/super-board-codex-lane.sh:*)",
+    "Bash(bash .claude/bin/super-board-pi-lane.sh:*)",
     "Bash(bash .claude/bin/super-board-codex-wave.sh:*)",
     "Bash(bash .claude/bin/super-board-host.sh:*)",
     "Bash(bash .claude/bin/super-board-pr-body.sh:*)", "Bash(gh pr edit:*)",

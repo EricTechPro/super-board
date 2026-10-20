@@ -24,6 +24,7 @@ def fail(message, code=64):
 
 parser = argparse.ArgumentParser(description='Run one Codex board lane (no Claude sub-agents).')
 parser.add_argument('--config', required=True)
+parser.add_argument('--diagnosis', action='store_true', help='fresh read-only diagnosis, no lifecycle mutations')
 parser.add_argument('--card', required=True, help='card JSON or a JSON file')
 parser.add_argument('--lane', required=True, choices=['build', 'qa', 'review'])
 parser.add_argument('--tier', choices=['low', 'medium', 'high'], help='run ladder (--low / default / --high)')
@@ -122,6 +123,7 @@ if not skills['ready']:
 skill = {'build': 'super-build', 'qa': 'super-qa', 'review': 'super-review'}[args.lane]
 section = {'build': 'Builder', 'qa': 'Tester', 'review': 'Reviewer'}[args.lane]
 prompt = f'''Run {skill} for issue #{card['number']} as a Codex lane worker.
+The dispatcher owns canonical repair-state transitions for this wave. It persisted Card.repairReservation before dispatch when present. Consume that attempt once, write normal failure proof on the issue/PR and return the outcome. Do not reserve again or modify the canonical machine state or repair-count/phase labels; the dispatcher records completion. Initial implementation and read-only verification are not repairs. A fresh independent diagnosis must precede any final targeted repair. For phase final, target diagnosis_cause only and use diagnosis_test to falsify that cause before changing code.
 First operation: recheck .claude/bin/super-board-skills-ready.py --root {root} --host codex --cards - --lane {args.lane} with the Card JSON below as a one-element stdin array, before worktree creation, classification or lifecycle writes. Exit 10 means status=halted, detail=skills-readiness:, preserve all state. Load resolved_path files and only declared fallback IDs from the report. Before activating any conditional helper, repeat with --require <exact-name>.
 Resolved skill report: {json.dumps(skills)}
 Config: {config_path}
@@ -144,30 +146,10 @@ Rerun the Tester's tests. When truth_gate triggers, apply super-review's fixed A
 Merge ONLY through the unchanged .claude/bin/super-board-merge-gate.sh, pinning the exact head you reviewed at review pass using --expect-head "$HEAD" --config <config> --pr <N> --subject <title> --body-file <msg.md>. Never run bare gh pr merge or bypass the gate. Follow run.md Merge protocol and route every gate exit exactly: 2/5 rebase pass, 3 Blocked, 4 stay Review, 6 fresh review, 7/8 human gate with pinned approval-request; 9 verification-readiness means halt and preserve card/worktree/approval/claims until config repair and explicit restart, never a Build bounce or rebase retry. Respect human_approves_merge and merge_policy. Confirm MERGED <sha>, fetch base and prove merge-base --is-ancestor <sha> origin/<base> before closing issue or moving Done.
 '''
 
-counts = {key: {'type': 'integer'} for key in ['fixed', 'notFixed', 'noLongerApplies']}
-properties = {
-    'status': {'type': 'string', 'enum': ['advanced', 'bounced', 'blocked', 'human-gate', 'failed', 'halted']},
-    'column': {'type': 'string'}, 'detail': {'type': 'string'},
-    'prUrl': {'type': ['string', 'null']}, 'branch': {'type': ['string', 'null']},
-    'priorFindings': {'anyOf': [{'type': 'null'}, {'type': 'object', 'properties': counts,
-                      'required': list(counts), 'additionalProperties': False}]},
-}
-schema = {'type': 'object', 'properties': properties, 'required': list(properties), 'additionalProperties': False}
-JSON_TYPES = {'object': dict, 'array': list, 'string': str, 'null': type(None)}
-def conforms(value, rule):
-    # The subset of JSON Schema the lane schema uses: type, enum, anyOf, properties/required/additionalProperties.
-    if 'anyOf' in rule:
-        return any(conforms(value, option) for option in rule['anyOf'])
-    kinds = rule['type'] if isinstance(rule['type'], list) else [rule['type']]
-    if not any(type(value) is int if kind == 'integer' else isinstance(value, JSON_TYPES[kind]) for kind in kinds):
-        return False
-    if 'enum' in rule and value not in rule['enum']:
-        return False
-    if isinstance(value, dict):
-        if set(value) - set(rule['properties']) or not set(rule['required']) <= set(value):
-            return False
-        return all(conforms(value[key], rule['properties'][key]) for key in value)
-    return True
+spec = importlib.util.spec_from_file_location('lane_result', script_path.with_name('super-board-lane-result.py'))
+lane_result = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lane_result)
+schema, conforms = lane_result.schema, lane_result.conforms
 child = None
 def interrupted(signum, frame):
     if child is not None:
@@ -185,16 +167,28 @@ with tempfile.TemporaryDirectory(prefix='super-board-codex-') as temporary:
     schema_path = Path(temporary) / 'schema.json'
     output = Path(temporary) / 'result.json'
     schema_path.write_text(json.dumps(schema))
+    if args.diagnosis:
+        prompt = f'''You are a fresh independent read-only diagnostician for issue #{card['number']}.
+Read accepted behavior, failing proof and prior attempted causes from the Card below.
+Inspect relevant local source only. Do not modify code, push, merge or write lifecycle state.
+Identify a different cause and a falsifying test command with expected result. A new hash alone is insufficient.
+Return the existing lane JSON, status advanced, column {column}, prUrl/branch/priorFindings null.
+Put a JSON string object with cause, test and expected in detail. Use empty strings if no different testable cause exists.
+The test must be a directly executable shell command. Use single quotes around Python code, without escaped outer quotes.
+Card: {json.dumps(card)}
+'''
     # A custom profile deliberately does NOT extend :workspace, which protects
     # .git as read-only. Explicit git/common-dir grants also cover submodules.
     # https://learn.chatgpt.com/docs/permissions → File access limited to workspace
     filesystem = {':root': 'read', ':slash_tmp': 'write', ':tmpdir': 'write',
                   str(root): 'write', str(git_dir): 'write', str(common_dir): 'write'}
+    if args.diagnosis:
+        filesystem = {':root': 'read'}
     grants = '{' + ', '.join(json.dumps(key) + '=' + json.dumps(value) for key, value in filesystem.items()) + '}'
     command = ['codex', 'exec', '-C', str(root), '-c', 'approval_policy="never"',
                '-c', 'default_permissions="super-board-lane"',
                '-c', 'permissions.super-board-lane.filesystem=' + grants,
-               '-c', 'permissions.super-board-lane.network.enabled=true',
+               '-c', 'permissions.super-board-lane.network.enabled=' + ('false' if args.diagnosis else 'true'),
                '--output-schema', str(schema_path), '--output-last-message', str(output), '-']
     if model and model.strip():
         command[2:2] = ['-m', model]

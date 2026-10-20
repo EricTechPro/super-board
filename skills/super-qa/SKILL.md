@@ -642,7 +642,7 @@ for affected selection, host readiness, real assertions and fresh proof.
 4. Run tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
 5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/super-board/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
 6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`super-board-pr-body.sh`) → `[qa] [report] ✅` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.
-7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → increment rebuild counter → move QA → Ready (label `loop:rebuild-N`). Clean up worktree.
+7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" → issue comment with the failure screenshots → record failure through `../super-board/references/run.md` → Repair protocol, then move QA → Ready only if permitted, otherwise Blocked. Clean up worktree.
 
 ### Optional project feature verifier
 
@@ -685,6 +685,8 @@ The Tester's issue comment is the user's primary visibility into "is this actual
 - Failure comments use the same format with broken-state screenshots (e.g., `before-fix-desktop.png`).
 
 ### Lifecycle (Tester, rebuild — when Reviewer bounced for [qa] thread fixes)
+
+Follow `../super-board/references/run.md` → Repair protocol. In managed waves the dispatcher reserves before this lane starts and owns the machine record and repair labels. Return outcomes and normal proof without reserving again. A standalone dispatcher must persist its owned reservation before launching repair work. Initial work is excluded. Two repairs lead to one fresh independent read-only diagnosis and at most one final targeted repair. Never reset for changed hashes, lanes or restarts.
 1. Read PR review threads; filter `[qa]` prefix.
 2. For each unresolved `[qa]` thread: apply fix to test files → resolve thread via `gh api graphql resolveReviewThread`.
 3. Re-run full test suite for the ticket.

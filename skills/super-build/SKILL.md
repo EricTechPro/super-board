@@ -261,6 +261,8 @@ slices (each thin end to end, under the cap, with its own ACs), which slice this
 split proposed in PR #<P>", `block-template.md`). Never pad past the cap to "finish" the ticket.
 
 ### Lifecycle (Builder, rebuild)
+
+Follow `../super-board/references/run.md` → Repair protocol. In managed waves the dispatcher reserves before this lane starts and owns the machine record and repair labels. Return outcomes and normal proof without reserving again. A standalone dispatcher must persist its owned reservation before launching repair work. Initial work is excluded. Two repairs lead to one fresh independent read-only diagnosis and at most one final targeted repair. Never reset for changed hashes, lanes or restarts.
 Triggered when card returns to Ready/Building with `loop:rebuild-N` label.
 1. Read PR review threads on this branch's PR; filter `[builder]` prefix.
 2. For each unresolved `[builder]` thread: read file:line + suggested fix → apply → resolve thread via:

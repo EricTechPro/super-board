@@ -10,14 +10,26 @@ python3 "$KIT/tests/fixtures/install_worker_skills.py" "$T/repo"
 export SUPER_BOARD_SKILLS_HOME="$T/home"; mkdir -p "$SUPER_BOARD_SKILLS_HOME"
 cat > "$T/bin/gh" <<'PYGH'
 #!/usr/bin/env python3
-import json,sys
+import json,sys,os,re
+from pathlib import Path
 args=sys.argv[1:]
-if args[:2]==['issue','view']:
+store=Path(os.environ['SB_REPAIR_FIXTURE_DIR'])
+if args and args[0]=='api' and '--slurp' in args:
+    issue=re.search(r'/issues/(\d+)/comments', ' '.join(args)).group(1)
+    file=store/('repair-'+issue+'.json')
+    print('['+(file.read_text() if file.exists() else '[]')+']')
+elif args[:2]==['api','-X']:
+    endpoint=args[3]; issue=endpoint.split('/')[-2] if args[2]=='POST' else endpoint.split('/')[-1]
+    body=json.load(sys.stdin)['body']
+    (store/('repair-'+issue+'.json')).write_text(json.dumps([{'id':int(issue),'body':body,'user':{'login':'fixture'},'created_at':'2026-10-20T00:00:00Z','updated_at':'2026-10-20T00:00:00Z'}]))
+elif args[:2] in (['label','create'],['issue','edit']): pass
+elif args[:2]==['issue','view']:
     print(json.dumps({'labels':[]} if args[args.index('--json')+1] == 'labels' else {'number':int(args[2]),'title':'fixture','body':''}))
 else:
     sys.exit('unexpected gh fixture call: '+str(args))
 PYGH
 chmod +x "$T/bin/gh"
+export SB_REPAIR_FIXTURE_DIR="$T"
 export SB_CODEX_TEST_LOG="$T/calls.jsonl"
 export PATH="$T/bin:$PATH"
 cp "$KIT/tests/fixtures/fake_codex.py" "$T/bin/codex"
@@ -182,10 +194,29 @@ jq -s -e 'all(.active == 1)' "$SB_CODEX_TEST_LOG" >/dev/null || fail 'max_worker
 : > "$SB_CODEX_TEST_LOG"
 SB_CODEX_TEST_STATUS=bounced wave --codex >"$T/out"
 jq -e '.cards[0].lanesRun == "build:bounced"' "$T/out" >/dev/null || fail 'non-advanced ends card chain'
+python3 - "$T/repair-1.json" <<'PYREPAIR'
+import json,sys
+body=json.load(open(sys.argv[1]))[0]['body']
+state=json.loads(next(line.removeprefix('repair-state: ') for line in body.splitlines() if line.startswith('repair-state: ')))
+assert state['repairs']==0 and state['phase']=='idle', state
+PYREPAIR
 : > "$SB_CODEX_TEST_LOG"
 RC=0; SB_CODEX_TEST_STATUS=halted wave --codex >"$T/out" || RC=$?
 [ "$RC" -eq 79 ] && [ "$(wc -l < "$SB_CODEX_TEST_LOG" | tr -d ' ')" -eq 1 ] || fail 'halt stops all new lane dispatch'
 jq -e '.halted and (.cards | length) == 4' "$T/out" >/dev/null || fail 'halt summary preserves all cards'
+cp .claude/super-board/inflight/1 "$T/claim-before"
+python3 - "$T/repair-1.json" <<'PYREPAIR'
+import json,sys
+body=json.load(open(sys.argv[1]))[0]['body']
+state=json.loads(next(line.removeprefix('repair-state: ') for line in body.splitlines() if line.startswith('repair-state: ')))
+assert state['repairs']==1 and state['phase']=='reserved', state
+PYREPAIR
+: > "$SB_CODEX_TEST_LOG"
+RC=0; wave --codex >"$T/out" || RC=$?
+[ "$RC" -eq 79 ] && [ ! -s "$SB_CODEX_TEST_LOG" ] || fail 'unreconciled claim prevents redispatch'
+cmp -s .claude/super-board/inflight/1 "$T/claim-before" || fail 'preserved claim was overwritten'
+rm -f "$T"/repair-*.json
+rm .claude/super-board/inflight/1  # explicit fixture recovery after process reconciliation
 
 # A readiness halt returned by a running lane stops dispatch and preserves its owned lock.
 : > "$SB_CODEX_TEST_LOG"
@@ -194,6 +225,7 @@ RC=0; SB_CODEX_TEST_EXIT=9 wave --codex >"$T/out" || RC=$?
 jq -e '.halted and .cards[0].finalStatus == "halted" and (.cards[0].detail | contains("verification-readiness"))' "$T/out" >/dev/null || fail 'readiness is a setup halt, not failed/rebase'
 [ -f .claude/super-board/inflight/1 ] || fail 'readiness halt preserves its lane lock for recovery'
 [ ! -e .claude/super-board/codex-wave.pid ] || fail 'ended wave releases only its PID marker'
+rm -f "$T"/repair-*.json
 rm .claude/super-board/inflight/1  # fixture recovery before unrelated concurrency tests
 
 # A normal Codex completion can also report gate exit 9 in its structured result.
@@ -218,8 +250,9 @@ PY
 # reaps the already-created launcher rather than losing the whole wave summary.
 mkdir .claude/super-board/inflight/1
 CARDS='[{"number":1,"status":"Review"}]'
-wave --codex >"$T/out"
-jq -e '.cards[0].finalStatus == "failed" and (.cards[0].detail | contains("could not start"))' "$T/out" >/dev/null || fail 'startup failure needs structured result'
+RC=0; wave --codex >"$T/out" || RC=$?
+[ "$RC" -eq 79 ] || fail "existing claim halts dispatch"
+jq -e '.cards[0].finalStatus == "halted" and (.cards[0].detail | contains("could not start"))' "$T/out" >/dev/null || fail 'startup failure needs structured result'
 rmdir .claude/super-board/inflight/1
 
 # TERM reaps the Codex process group and its descendants before lock cleanup.
@@ -234,5 +267,5 @@ RC=0; wait "$JOB" || RC=$?
 [ "$RC" -eq 79 ] || fail 'interrupted wave must halt'
 DESCENDANT=$(cat "$T/descendant.pid")
 ! kill -0 "$DESCENDANT" 2>/dev/null || fail 'descendant survived wave cancellation'
-[ ! -e .claude/super-board/codex-wave.pid ] && [ -z "$(ls -A .claude/super-board/inflight)" ] || fail 'interrupted wave leaves no live locks'
+[ ! -e .claude/super-board/codex-wave.pid ] && [ -f .claude/super-board/inflight/1 ] || fail 'interrupted wave preserves recovery claim and releases PID marker'
 echo 'PASS: test-codex-lane.sh (model/ladders/router/review/sandbox/results/wave/halt/cancellation)'

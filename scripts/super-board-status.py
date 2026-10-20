@@ -171,7 +171,7 @@ def parse_manifest(text: str, today_iso: str) -> dict[str, Any]:
             recents.append({
                 "epoch": ep, "verb": "dispatch", "glyph": LANE_GLYPH[lane],
                 "issue": f"#{issue}", "target": LANE_LABEL[lane],
-                # `attempt N/3` is filled in at render time from current
+                # repair phase is filled in at render time from current
                 # labels — the manifest doesn't encode it at dispatch time.
                 "detail": "",
             })
@@ -272,20 +272,22 @@ def rebuild_count(item: dict[str, Any] | None) -> int:
     """Read `loop:rebuild-N` from labels; 0 if absent."""
     if not item:
         return 0
-    for lab in item["labels"]:
-        if m := re.match(r"loop:rebuild-(\d+)", lab):
-            return int(m.group(1))
-    return 0
+    return max((int(m.group(1)) for lab in item.get("labels", [])
+                if (m := re.fullmatch(r"loop:rebuild-(\d+)", lab))), default=0)
 
 
 def attempt_str(item: dict[str, Any] | None) -> str:
-    """`attempt N/3` derived from the issue's current `loop:rebuild-N` label."""
-    return f"{min(rebuild_count(item) + 1, 3)}/3"
+    labels = (item or {}).get("labels", [])
+    for phase in ("exhausted", "final", "diagnosis"):
+        if f"loop:repair-{phase}" in labels:
+            return phase
+    count = rebuild_count(item)
+    return f"repair {count}/2" if count <= 2 and count else ("exhausted" if count else "initial")
 
 
 def rebuild_suffix(item: dict[str, Any]) -> str:
-    k = rebuild_count(item)
-    return f"↻ {min(k + 1, 3)}/3" if k else ""
+    phase = attempt_str(item)
+    return f"↻ {phase}" if phase != "initial" else ""
 
 
 REASON_TABLE: list[tuple[str, str]] = [
@@ -684,7 +686,7 @@ def main() -> int:
                     ]
                 extra = (" · " + ", ".join(extras)) if extras else ""
                 print(
-                    f"   {glyph} {role}  #{v['issue']}  attempt {attempt_str(item)} · "
+                    f"   {glyph} {role}  #{v['issue']}  {attempt_str(item)} · "
                     f"{worker_dur(v['ts'])}{extra}"
                 )
 
@@ -712,7 +714,7 @@ def main() -> int:
     else:
         for r in recents:
             t = t_minus(r["epoch"])
-            # Dispatch detail (`attempt N/3`) is filled in at render time
+            # Dispatch detail (repair phase) is filled in at render time
             # because the manifest doesn't encode the rebuild count at
             # dispatch time — the number shown reflects the issue's *current*
             # label. Live workers in the §Workers block above use the same
@@ -720,7 +722,7 @@ def main() -> int:
             detail = r["detail"]
             if r["verb"] == "dispatch" and not detail:
                 issue_num = int(r["issue"].lstrip("#"))
-                detail = f"attempt {attempt_str(item_by_number(issue_num))}"
+                detail = f"{attempt_str(item_by_number(issue_num))}"
             if r["target"]:
                 print(
                     f"   {t:<7} {r['glyph']} {r['verb']:<9} {r['issue']:<4} → "

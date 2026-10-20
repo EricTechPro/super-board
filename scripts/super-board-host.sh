@@ -26,7 +26,7 @@
 #        prints `claude`, `codex` or `opencode`, exit 0
 #        exit 65   no sign: nothing on stdout, how to choose on stderr
 #        exit 64   SUPER_BOARD_HOST or config `host` is not one of the three
-# SUPER_BOARD_HOST=claude|codex|opencode forces the answer (tests, or a host the check
+# SUPER_BOARD_HOST=claude|codex|pi|opencode forces the answer (tests, or a host the check
 # misreads).
 set -euo pipefail
 
@@ -38,9 +38,9 @@ case "${1:-}" in
 esac
 
 case "${SUPER_BOARD_HOST:-}" in
-  claude|codex|opencode) echo "$SUPER_BOARD_HOST"; exit 0 ;;
+  claude|codex|pi|opencode) echo "$SUPER_BOARD_HOST"; exit 0 ;;
   '') ;;
-  *) echo "super-board-host.sh: SUPER_BOARD_HOST must be claude, codex or opencode" >&2; exit 64 ;;
+  *) echo "super-board-host.sh: SUPER_BOARD_HOST must be claude, codex, pi or opencode" >&2; exit 64 ;;
 esac
 
 if [ -n "${CODEX_THREAD_ID:-}" ] || [ -n "${CODEX_SESSION_ID:-}" ]; then
@@ -51,10 +51,10 @@ elif [ -n "${CLAUDECODE:-}" ]; then
   echo claude
 elif saved=$( [ -f "$config" ] && jq -r '.host // empty' "$config" 2>/dev/null ) && [ -n "$saved" ]; then
   case "$saved" in
-    claude|codex|opencode) echo "$saved" ;;
-    *) echo "super-board-host.sh: config host must be claude, codex or opencode, got '$saved'" >&2; exit 64 ;;
+    claude|codex|pi|opencode) echo "$saved" ;;
+    *) echo "super-board-host.sh: config host must be claude, codex, pi or opencode, got '$saved'" >&2; exit 64 ;;
   esac
 else
-  echo "super-board-host.sh: unknown agent host. Pick one: SUPER_BOARD_HOST=claude|codex|opencode, or set \"host\" in the board config" >&2
+  echo "super-board-host.sh: unknown agent host. Pick one: SUPER_BOARD_HOST=claude|codex|pi|opencode, or set \"host\" in the board config" >&2
   exit 65
 fi

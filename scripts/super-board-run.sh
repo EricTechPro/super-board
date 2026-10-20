@@ -333,6 +333,17 @@ dispatch_lane() {
   if ! try_claim_assignee "$issue"; then
     return 0
   fi
+  local repair_state repair_labels repair_owner
+  repair_labels=$(printf '%s' "$card" | jq -c '.[0].labels // []')
+  repair_owner="legacy-$$-${issue}-${lane}"
+  # Canonical reservation/read-back must precede the first repair process.
+  if ! repair_state=$(python3 "$(dirname "$SB_GITHUB_READ")/super-board-repair.py" prepare \
+      --issue "$issue" --lane "$lane" --owner "$repair_owner" --labels "$repair_labels" \
+      --cap "${REBUILD_CAP:-2}" --config "$CONFIG_PATH" --diagnose-claude); then
+    log "repair handoff halted before dispatch #${issue}; preserve claim and worktree"
+    exit 79
+  fi
+  [ "$(printf '%s' "$repair_state" | jq -r '.phase // "initial"')" != exhausted ] || return 0
   case "$lane" in
     build)  prompt="Run super-build on issue #${issue} for super-board run. Read .claude/skills/super-board/references/run.md → Builder lifecycle. Config: ${CONFIG_PATH}." ;;
     qa)     prompt="Run super-qa on issue #${issue} for super-board run. Read .claude/skills/super-board/references/run.md → Tester lifecycle. Config: ${CONFIG_PATH}." ;;
@@ -340,6 +351,7 @@ dispatch_lane() {
     *) log "unknown lane: $lane"; return 1 ;;
   esac
   prompt="First operation: run .claude/bin/super-board-skills-ready.py --root '$PWD' --host claude --cards - --lane '$lane' --hydrate with $card as stdin. Halt on exit 10 before worktree creation or lifecycle writes; preserve claims and approval evidence. Load resolved paths and only declared fallbacks; recheck conditionals with --require before activation. $prompt"
+  prompt="$prompt Existing dispatcher reservation (consume this owner without reserving again): $repair_state. This legacy worker owns completion: if reservation is non-null, before exiting use python3 .claude/bin/super-board-repair.py succeeded/failed --issue $issue --owner $repair_owner --config $CONFIG_PATH. For failed, include --cause exact-failure-proof --pending-lane build or qa naming the repair owner lane. Use failed only for code/test failure, succeeded for successful work or a human gate. Initial failure without reservation must initialize canonical state via failed --issue $issue --owner $repair_owner --cause proof --pending-lane build (use --pending-lane qa for test-side repairs). Before any repair or failure bounce, follow run.md Repair protocol: canonical issue handoff, consume the already persisted reservation, reconcile interruptions, fresh read-only independent diagnosis after two repairs, at most one final targeted repair. Never reset on hash or lane changes."
   # Worker output goes to a per-worker log, not /dev/null (issue #13). Redirect at the
   # `claude` invocation itself — no wrapping subshell, no `exec` — so the wire to the
   # file survives and `$!` names the worker process rather than a bash stub.

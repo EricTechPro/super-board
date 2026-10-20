@@ -407,6 +407,16 @@ done
 echo "$OUT" | grep -q "copied" || fail "no-symlink install should say it copied, got: $OUT"
 rm -rf "$T" "$FAKE"
 
+# Pi host links the one-shot launcher and mandatory guard adapter from shared storage.
+T=$(mktemp -d)
+"$INSTALL" --no-hooks --hosts pi "$T" >/dev/null 2>&1 || fail "Pi install failed"
+resolves "$T" pi
+for script in super-board-pi-lane.sh super-board-pi-guards.py super-board-pi-guards.ts super-board-lane-result.py; do
+  [ -f "$T/.pi/bin/$script" ] || fail "Pi missing $script"
+  cmp -s "$T/.pi/bin/$script" "$T/.agents/bin/$script" || fail "Pi shared file differs: $script"
+done
+rm -rf "$T"
+
 # 9 — the snippet the installer merges is the one hooks/README.md documents.
 python3 - ../hooks/README.md ../hooks/settings-snippet.json <<'PY' || fail "hooks/README.md snippet and hooks/settings-snippet.json differ"
 import json, re, sys
@@ -414,4 +424,4 @@ doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
 sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
 PY
 
-echo "PASS: test-install.sh (24 scenarios)"
+echo "PASS: test-install.sh (25 scenarios)"

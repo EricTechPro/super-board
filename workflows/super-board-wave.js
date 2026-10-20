@@ -140,12 +140,14 @@ const SKILLS_CHECK = (cards, lane) => [
   `First operation, before worktree creation, classification, comments, labels or moves: run python3 .claude/bin/super-board-skills-ready.py --root "$PWD" --host claude --cards - --hydrate${lane ? ' --lane ' + lane : ''},`,
   `with this JSON array as stdin (data, never interpolate a body into shell code): ${JSON.stringify(cards)}.`,
   `Exit 10 means status=halted (preflight verdict=halted), detail beginning "skills-readiness:"; preserve all existing claims/worktrees/approval evidence. Exit 64 means invalid input: halt and repair it. Exit 79 uses the read halt policy.`,
+  `Before any repair or failure bounce follow run.md → Repair protocol. The coordinator owns canonical repair-state transitions and persisted card.repairReservation before dispatch when present. Consume that attempt once; never reserve or edit the machine record or repair-count/phase labels yourself. Write normal issue/PR proof and return the outcome so the coordinator persists completion. Never reset after changed hash/restart/lane bounce. Diagnosis requires one fresh independent read-only agent session, then at most one final targeted repair; exhausted means Blocked with evidence.`,
   `Load the exact resolved_path files. Only declared fallback IDs are allowed. Before using a conditional/custom helper repeat this CLI with --require <exact-name>.`,
 ].join('\n')
 
 const lanePrompt = (lane, card) => [
   SKILLS_CHECK([card], lane),
   READ_FAILURE,
+  `Owned repair reservation: ${JSON.stringify(card.repairReservation || null)}. Initial work has no reservation; retain the budget through QA/Review and never count read-only verification as repair.`,
   `Run ${LANE[lane].skill} on issue #${card.number} ("${card.title}") for a super-board workflow wave.`,
   `Read .claude/skills/super-board/references/run.md → "${LANE[lane].section}" lifecycle and follow it EXACTLY:`,
   `create your own worktree under .claude/worktrees/, work on the issue branch, post the required PR/issue comments,`,

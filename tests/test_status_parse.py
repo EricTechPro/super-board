@@ -181,14 +181,14 @@ def test_real_live_manifest_lines() -> None:
 
 
 def test_attempt_str_from_rebuild_label() -> None:
-    """`attempt N/3` is derived from the issue's `loop:rebuild-N` label."""
-    assert sbs.attempt_str(None) == "1/3"
-    assert sbs.attempt_str({"labels": []}) == "1/3"
-    assert sbs.attempt_str({"labels": ["loop:rebuild-1"]}) == "2/3"
-    assert sbs.attempt_str({"labels": ["loop:rebuild-2"]}) == "3/3"
-    # The dispatcher caps rebuilds at 2 in practice, but if a higher count
-    # ever appears we should clamp display to 3/3 rather than say 4/3.
-    assert sbs.attempt_str({"labels": ["loop:rebuild-5"]}) == "3/3"
+    assert sbs.attempt_str(None) == "initial"
+    assert sbs.attempt_str({"labels": []}) == "initial"
+    assert sbs.attempt_str({"labels": ["loop:rebuild-1"]}) == "repair 1/2"
+    assert sbs.attempt_str({"labels": ["loop:rebuild-2"]}) == "repair 2/2"
+    assert sbs.attempt_str({"labels": ["loop:rebuild-5"]}) == "exhausted"
+    assert sbs.rebuild_count({"labels": ["loop:rebuild-2", "loop:rebuild-1"]}) == 2
+    for phase in ("diagnosis", "final", "exhausted"):
+        assert sbs.attempt_str({"labels": ["loop:rebuild-2", f"loop:repair-{phase}"]}) == phase
 
 
 def test_field_status_picks_status_select() -> None:

@@ -341,7 +341,7 @@ Record uncovered/stale optional coverage alongside ordinary issue AC checks.
 4b. **Test-gap check** (super-qa → "Test-gap check (after build)"): map every AC to unit / component / e2e tests, hunt edge cases, write the High gaps red-first. A High gap that needs app code changed → Fail (step 7) with the gap list. Medium/Low go in the handoff under `Test gaps (not written)`.
 5. Run the tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. For UI/visual ACs, capture screenshots at the standard viewports (1920×1080 desktop, 1024×768 tablet, 375×667 mobile). Commit the screenshots to the issue branch BEFORE writing the comment (the markdown image URLs depend on the files being present on the branch).
 6. **Pass** → commit test files + screenshots to same branch + push → tick the `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` → `[qa] [report] ✅` PR comment with results + evidence path **+ inline screenshot embeds** (see "Screenshot embed format" below) → issue comment with the SAME inline screenshot embeds → move card QA → Review. Clean up worktree.
-7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → issue comment with the same inline screenshots (showing what's wrong) → increment rebuild counter → move card QA → Ready (label `loop:rebuild-N`). Clean up worktree.
+7. **Fail** → leave failing ACs unchecked with the reason, append a `history` row, rewrite `status` → `[qa] [report] ❌` PR comment with per-AC expected/actual + repro file:line + evidence path + "what fixed should look like" **+ inline screenshot embeds of the broken state** → issue comment with the same inline screenshots (showing what's wrong) → record failure through the repair protocol below → move card QA → Ready only when the protocol permits (otherwise Blocked). Clean up worktree.
 
 #### Screenshot embed format (mandatory on every QA exit — added 2026-05-22)
 
@@ -395,7 +395,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    ```
    - Empty → first review of this card. Skip to step 4; behave exactly as before.
    - Non-empty → the card was bounced and rebuilt. **Round 1** walks every finding in `prior_report` and marks each one `fixed` / `not fixed` / `no longer applies` (code it pointed at is gone or the AC changed), citing the file:line that proves it. A resolved thread is not proof — check the code.
-   - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[qa]` → QA, both → `[builder]` first), `loop:rebuild-N`, and update the Reviewer report: those rows go to `❌ not fixed`. Skip the fresh pass; it would review code that is about to change.
+   - Any `not fixed` → bounce again now: re-open one thread per unfixed finding with its original prefix (`[builder]` → Ready, `[qa]` → QA, both → `[builder]` first), the repair protocol below, and update the Reviewer report: those rows go to `❌ not fixed`. Skip the fresh pass; it would review code that is about to change.
    - An unfixed **Over-engineering** finding alone does not bounce; carry it into the new report's Findings.
    - All `fixed` / `no longer applies` → continue to step 4 for a fresh pass. Do not re-raise a prior finding marked `no longer applies`.
 4. Review the code (logic, conventions). Review the tests (right thing tested? testable assertions? meaningful coverage?).
@@ -403,7 +403,7 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
    - Pull `issue-<N>-<slug>` into the review worktree.
    - Re-run the test command Tester used (recorded in Tester's PR handoff comment as `Local tests:` line).
    - Tests green → continue to step 6.
-   - Tests red → open new `[qa]`-prefixed PR thread quoting the failure output, move card Review → QA with `loop:rebuild-N`, exit. Tester wrote a broken suite; QA owns the fix.
+   - Tests red → open new `[qa]`-prefixed PR thread quoting the failure output, follow the repair protocol below before moving card Review → QA, exit. Tester wrote a broken suite; QA owns the fix.
 6. **Adversarial mode** (per `truth_gate`): when triggered, spawn 2 sub-agents in parallel:
    - **Code-grounder** — verify cited file:line still exists and matches claims.
    - **Historian** — `git blame` the changed lines, check for ADRs / prior incidents.
@@ -416,10 +416,10 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
 7. Decide per finding. First re-apply the Over-engineering rule to every collected finding, whatever a sub-agent wrote: Should fix, never Blocker, never on its own a bounce or block. Then:
    - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** below. Do not move the card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
-   - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (label `loop:rebuild-N`).
-   - **Test-side new finding** → open new `[qa]`-prefixed PR thread, comment, move card Review → QA (label `loop:rebuild-N`).
+   - **Code-side new finding** → open new `[builder]`-prefixed PR thread, comment, move card Review → Ready (follow the repair protocol below before bouncing).
+   - **Test-side new finding** → open new `[qa]`-prefixed PR thread, comment, move card Review → QA (follow the repair protocol below before bouncing).
    - **CI-budget block (💳, added 2026-05-22)** — if remote CI jobs `failed_to_start` due to `Actions budget` AND `config.auto_merge_on_ci_budget_block` is true AND local-evidence is strong (truth ≥ threshold, Tester suite green on rerun in step 5, all `[builder]`/`[qa]` threads clean) → **squash-merge anyway** on local evidence; do NOT move to Blocked. Write the PR's `redcheck` block (`> [!WARNING]` · `🔴 Merged with a failing check: <check> · CI budget block`) and a `[reviewer] [report] ✅ merged · CI-budget bypass` comment on the PR and the issue citing: (a) the failed CI run ID, (b) the Tester pass-count, (c) the truth-gate score. Reason: CI failure-to-start ≠ test failure; with strong local evidence, parking the card wastes pipeline time. This bypass is ONLY for `💳` — never for `🛡` truth-fail, `🔐` missing creds, or `🧑` human-only decisions.
-   - **Human-gate / Blocker finding (destructive schema, API contract, money, auth, live-DB migration) / rebuild cap hit (config.rebuild_cap)** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
+   - **Human-gate / Blocker finding (destructive schema, API contract, money, auth, live-DB migration) / repair protocol exhausted** → write the full Block template (see §4), move card Review → Blocked. A clean PR that only *touches* money, auth or schema is not a blocker — run the merge protocol; the gate's `merge_policy` routes it to a human (exit 7 → 🙋 Blocked).
 8. Write the **Reviewer report** on every exit from step 3b on — bounce, block, human gate, merge (a Gate 1 thread bounce reviews nothing and writes none). It is ONE comment per PR, **edited in place** each round: find it by the marker (step 3b's lookup, plus `.url` — the number after `#issuecomment-` is its id) and `gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -F body=@<file>`; post a new comment only when none exists. It is what step 3b reads next time, so the first line is the stable marker and every finding keeps its id (writing-standard.md § 4):
 
    ```
@@ -440,6 +440,11 @@ If a screenshot file is >5MB, downscale to ≤1920px wide before committing; Git
 9. Clean up worktree.
 
 ### Merge protocol (Reviewer only — added 2026-08-06, issue #9)
+
+Apply super-review's semantic approval check before the gate. A matcher miss is not
+proof of safety. Restricted authentication/permissions, payment, destructive-schema
+or external-sharing behavior requires human approval bound to the reviewed head.
+Preserve stricter project policy. Production deployment requires separate approval.
 
 Builder opens every PR as a **draft**, and GitHub will not merge a draft: `gh pr merge --auto`
 on a draft queues forever and never fires. A run that skipped this step produced two
@@ -645,7 +650,7 @@ The three locks (assignee, in-flight file, lane PID) are defense in depth: any o
 
 | Gate | Action |
 |---|---|
-| `config.rebuild_cap` reached on same card + same root-cause hash | Move card to Blocked with full §4 template (reason 🛡), continue run |
+| Repair protocol exhausted (including failed or inconclusive diagnosis/final repair) | Move card to Blocked with full §4 template (reason 🛡), continue run |
 | No card progresses for 3 ticks AND no lane is idle | Halt, dump state |
 | Auth expires mid-run | Halt, ping user with refresh instruction |
 | Pre-flight check fails on re-validation | Halt with the specific missing item |
@@ -718,7 +723,7 @@ cards sat that way on a real board until a human opened it and noticed.
 
 ### Root-cause hash (used by the rebuild-cap gate)
 
-To detect "same root cause" without depending on a model classifier, each lane writes a deterministic hash to its failure handoff comment:
+To retain failure evidence, each lane writes a deterministic hash to its failure handoff comment:
 
 ```
 root-cause-hash: <sha256 first 12 hex chars>
@@ -730,9 +735,63 @@ The hash inputs (joined with `|`):
 2. Error class — first matched: `test_assertion`, `test_runtime`, `build_fail`, `lint_fail`, `merge_conflict`, `network`, `auth`, `quota`, `other`.
 3. First 3 unique `file:line` frames from the captured stack trace / test output (sorted, normalized — strip absolute paths to repo-relative).
 
-Two consecutive failures on the same card with **identical hash** AND **same lane** count as the same root cause. Hits `rebuild_cap` → Blocked.
+The hash is evidence, never a counter key. Changed hashes, moved frames, lane bounces,
+restarts and changed diagnoses never reset the unresolved card's repair budget.
 
-Different hash on the same card resets the counter — the bot recognizes that progress has been made even if the card hasn't reached Review yet.
+### Repair protocol (mandatory before any repair or failure bounce)
+
+The dispatcher that starts the next repair owns machine transitions. Pi/Codex waves
+persist them in the wave helper. The Claude workflow coordinator persists them before
+Launch and during Reconcile. Those lane workers return outcomes and normal proof,
+without editing the canonical machine line or reserving again. Legacy headless workers
+complete the explicit reservation supplied in their prompt through the canonical CLI.
+
+Keep one canonical failure handoff on the issue (`<!-- super-board:repair -->`), or on
+its PR only when no issue exists. Link it from other handoffs. Its machine line is
+`repair-state: <JSON object>`. Do not store another retry database. Initial implementation
+and read-only verification are not repairs. On the first failed verification, initialize
+`{"phase":"idle","repairs":0,"cause":"<testable cause>","diagnosis_used":false,"final_used":false}`.
+Legacy `loop:rebuild-N` labels establish a lower bound for `repairs`; never silently
+start at zero when old evidence exists. Unreadable or conflicting evidence halts dispatch.
+
+Under the existing exclusive card owner, read the canonical record and run
+`python3 .claude/bin/super-board-repair.py reserve --owner <claim-id> --cap <rebuild_cap>`
+with that JSON on stdin. Persist and read back the returned record BEFORE dispatching
+any repair or diagnosis worker. A failed persistence/read-back means no dispatch.
+Use the same owned handoff for completion updates. Two normal repairs are permitted
+(a stricter `rebuild_cap` is retained). The helper refuses an outstanding reservation.
+Before reusing interrupted work, prove the old worker stopped, preserve and inspect its
+branch/worktree and evidence, then record `interrupted --owner <original-claim-id>`.
+An interrupted reserved attempt is consumed, never refunded.
+
+A `reserved` phase permits exactly one repair. A failed result uses `failed` with the
+same owner and updated cause evidence. After the normal repairs, `reserve` returns
+`diagnosis`: dispatch one FRESH INDEPENDENT session, with no code mutation, push or
+merge permission. Supply accepted behavior, failing proof and prior attempted causes.
+It must identify a different testable cause and a command/expected result that can
+falsify it. Write its evidence and use `diagnosed --owner <claim-id> --cause <cause>
+--test <command-and-expected-result>` only after verifying those conditions. No different
+testable cause, failed diagnosis or interrupted diagnosis means `exhausted` → Blocked.
+A different hash alone is not a different cause.
+For Pi, invoke a new `.claude/bin/super-board-pi-lane.sh --pi --diagnosis --config <cfg>
+--card <JSON-file> --lane <current-lane>` process. Include accepted behavior, failure
+proof and prior causes in that card's body. This launcher exposes only `read`, disables
+ambient extensions/MCP and starts a fresh session. Its `detail` contains JSON strings
+`cause`, `test`, `expected`; the owning lane validates and persists the diagnosis.
+The diagnosis process never advances the board itself.
+ Compare against every prior attempted cause
+in the canonical `causes` array, not only the latest failure.
+
+After a valid diagnosis, one `reserve` returns `final`: permit ONE targeted repair of
+that cause only. Failed or interrupted final repair means `exhausted` → Blocked.
+Successful repairs use `succeeded --owner <claim-id>` to release the reservation while
+retaining counters, cause history and used flags through QA/Review until the card is merged.
+A new failure before merge belongs to the same unresolved card budget.
+Mirror the cumulative repair count as `loop:rebuild-N`, and phase as exactly one of
+`loop:repair-diagnosis`, `loop:repair-final`, `loop:repair-exhausted` when applicable.
+Labels are display projections, never the canonical reservation. Exhaustion writes the
+full Block template, `blocked-by: -`, evidence of each repair/diagnosis, named owner and
+exact next action. Keep the card in its current lane while active.
 
 ## Done conditions
 

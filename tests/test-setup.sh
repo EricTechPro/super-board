@@ -320,4 +320,11 @@ python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
 q '.host == "gemini"' "$H/b.json" || fail "fix must not guess over a set host: $(cat "$H/b.json")"
 rm "$H/b.json"
 
-echo "PASS: test-setup.sh (13 scenarios)"
+# 14 — Pi never receives a default provider/model from setup.
+printf '{"host":"pi"}' > "$H/pi.json"
+OUT=$(python3 "$SETUP" check --root "$WORK/bare" --host pi || true)
+echo "$OUT" | q '.host_errors | to_entries | any(.value | contains("pi.provider and pi.model"))' || fail "Pi missing explicit model must be flagged"
+printf '{"host":"pi","pi":{"provider":"fixture","model":"fixture"}}' > "$H/pi.json"
+OUT=$(python3 "$SETUP" check --root "$WORK/bare" --host pi || true)
+echo "$OUT" | q '.host_errors == {}' || fail "explicit Pi model must be accepted: $OUT"
+echo "PASS: test-setup.sh (14 scenarios)"

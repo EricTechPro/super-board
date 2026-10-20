@@ -9,7 +9,7 @@ Invoked as `/super-board onboard` (get.sh / install.sh) or `/super-board:super-b
 ## Host-visible skill checks
 
 Checks use `.claude/bin/super-board-skills-ready.py --profile setup --host
-<claude|codex>` and show `helper_readiness`: exact files, declared fallbacks,
+<claude|codex|pi>` and show `helper_readiness`: exact files, declared fallbacks,
 optional skips and missing names. Setup checks the unconditional union; a
 selected card may need fewer helpers. Node or `skills-lock.json` never proves
 readiness. `check` and dispatch install nothing. Explicit `fix` retains helper
@@ -287,7 +287,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
       • Yes, add <N> lines to settings.json (Recommended)
       • No, ask me each time
    Folded details = ONE dim line under each, never a table:
-      merge_policy.default auto · always_human: money, auth, schema · push guard on (main, master,
+      merge_policy.default auto · always_human: money, auth/permissions, schema, external-sharing · push guard on (main, master,
       <base>) · migrations.allowed_envs: test, staging
       + Bash(gh project:*) + Bash(gh issue:*) + Bash(gh pr:*) + … (the --dry-run output, joined)
    Review each → ONE more AskUserQuestion call, up to three questions:
@@ -295,8 +295,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
        (Recommended) / I merge everything]; production base: the order flips, and robot-merges
        sets merge_policy.allow_auto_on_production: true (run.md's guard needs it).
        → merge_policy.default "auto" | "human"; auto_max_lines 400 (lockfiles, generated,
-         snapshots, migration SQL not counted); always_human = schema defaults (money, auth,
-         destructive schema). A matching PR parks in Blocked with 🙋.
+         snapshots, migration SQL not counted); always_human extends mandatory defaults (money, auth/permissions,
+         destructive schema, external-sharing), preserving all stricter existing categories and matchers. A matching PR parks in Blocked with 🙋.
     b. "Push guard" — "Block pushing straight to main?" [Yes (Recommended for a repo with
        commits) / No]. Skipped when settings.json already wires guard-protected-push.py. Script
        missing (--no-hooks install) → record the answer and say: "Run ./install.sh --no-hooks
@@ -361,7 +361,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    {type: repo | repo+url}, repo, base_branch, timezone, columns (the seven), labels,
    │    │    paths, merge_policy, migrations, collect (incl. custom), notifications {channel:
    │    │    "session", bot_identity}, worker_backend "workflow", host (always: `bash $SB/super-board-host.sh`;
-   │    │    on exit 65 ask claude/codex/opencode), verify_commands (non-blank project checks). No `variant`.
+   │    │    on exit 65 ask claude/codex/pi/opencode; Pi also requires explicit
+   │    │    pi.provider and pi.model, with no inferred credentials or model), verify_commands (non-blank project checks). No `variant`.
    │    ├─ .claude/super-board/active ← <slug>
    │    ├─ .gitignore += .claude/super-board/active, onboard-answers.json, onboard-staged/,
    │    │    backup/, inflight/, migrations/, upgrade.json (all under .claude/super-board/)

@@ -320,7 +320,7 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the 
 5. **Reviewer-side test rerun (always — closes Tester self-verification gap):**
    - Pull `issue-<N>-<slug>` into review worktree.
    - Re-run the EXACT command from Tester's PR `Local tests:` line.
-   - Green → continue. Red → open new `[qa]`-prefixed thread quoting failure, move card Review → QA with `loop:rebuild-N`, exit.
+   - Green → continue. Red → open new `[qa]`-prefixed thread quoting failure, follow `../super-board/references/run.md` → Repair protocol before moving card Review → QA, exit.
    - If QA includes `Runtime checks:`, follow
      [optional runtime verification](../super-qa/references/runtime-verification.md):
      rerun the same scenario/config and pinned versions into new review evidence,
@@ -333,13 +333,22 @@ See `.claude/skills/super-board/references/run.md` → Reviewer. Summary of the 
    - **Deepening opportunity** → `scripts/super-review-file-refactor.sh`, then keep going. It is not a finding for merge purposes and never bounces a card.
    - **No findings (Over-engineering aside) + threads clean + truth ≥ threshold + tests green** → run the **merge protocol** (below). Never move a card to Done any other way.
    - **Over-engineering only** (from `ponytail:ponytail-review`, see super-review step 3) → list it in the report, open no thread, and carry on to the merge decision; it never bounces a card alone. When the card bounces for another finding anyway, open a `[builder]` thread for each Over-engineering finding too, so the rebuild trims it.
-   - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (`loop:rebuild-N`).
-   - **Test-side new finding** → new `[qa]`-prefixed thread, move card Review → QA (`loop:rebuild-N`).
-   - **Blocker finding (destructive schema, contract, money, auth, live-DB migration) or rebuild cap hit** → full §4 Block template, move card Review → Blocked. A *clean* PR that merely touches money, auth or schema is not a finding: run the merge protocol, and the gate's `merge_policy` hands it to a human (exit 7 → 🙋 Blocked).
+   - **Code-side new finding** → new `[builder]`-prefixed thread, move card Review → Ready (follow `../super-board/references/run.md` → Repair protocol before bouncing).
+   - **Test-side new finding** → new `[qa]`-prefixed thread, move card Review → QA (follow `../super-board/references/run.md` → Repair protocol before bouncing).
+   - **Blocker finding (destructive schema, contract, money, auth, live-DB migration) or repair protocol exhausted** → full §4 Block template, move card Review → Blocked. A *clean* PR that merely touches money, auth or schema is not a finding: run the merge protocol, and the gate's `merge_policy` hands it to a human (exit 7 → 🙋 Blocked).
 8. Write the Reviewer report (marker `<!-- super-review:report -->`, ids on every finding) — edit the existing report comment in place, post a new one only on the first review. It is the next re-review's `prior_report`.
 9. Clean up worktree.
 
 ### Merge protocol — Done means merged
+
+Read the issue and actual changed behavior for authentication/permissions, payments,
+destructive schema and external data-sharing boundaries. Labels, paths and keywords
+only route conservatively. If restricted behavior is present outside the configured
+matchers, add the corresponding restriction label to the PR before the existing gate.
+If its boundary or proof remains unresolved, use the existing human-gate Block template
+with the reviewed head, evidence, owner and exact next action. Missing evidence never
+authorizes automatic merge. Preserve stricter project rules. Production deployment
+requires separate approval.
 
 Builder opens PRs as **drafts**, and GitHub never auto-merges a draft. Skipping the
 `gh pr ready` step is why a six-hour run landed zero commits on `main` while producing
@@ -355,7 +364,7 @@ two complete builds. In order, no shortcuts:
    leave the card in **Review** with a `[reviewer]` comment naming both shas.
    The gate owns the merge decision (config `merge_policy`, `migrations`):
    - **Exit 9 — verification-readiness.** Halt the run; preserve card, approval, claims, and worktree. Configure `verify_commands` with the owning project's real checks and restart explicitly. No bounce to Build, rebase retry, approval request, or bare merge.
-   - **Exit 7 — a human merges.** `merge_policy` matched (money / auth / schema label,
+   - **Exit 7 — a human merges.** `merge_policy` matched (money / auth/permissions / schema / external-sharing label,
      path or added-line keyword; a diff over `auto_max_lines`, default 400 — "big PR — please
      review"; `default: "human"`). `schema` means destructive only (DROP / TRUNCATE / RENAME);
      an additive migration follows `migrations.allowed_envs`, and a live DB is always human.

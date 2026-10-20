@@ -39,6 +39,13 @@ class Readiness(unittest.TestCase):
         self.assertEqual(process.returncode, expected, process.stderr)
         return json.loads(process.stdout) if process.stdout else process.stderr
 
+    def test_pi_explicit_resources_do_not_read_codex_activation(self):
+        self.full('pi')
+        config = self.home / '.codex/config.toml'
+        config.parent.mkdir(exist_ok=True)
+        config.write_text('skills.config = "unsupported"')
+        self.run_cli(host='pi')
+
     def test_complete_partial_lock_and_grilling_are_distinct(self):
         (self.root / 'skills-lock.json').write_text('{"mattpocock/skills":true}')
         self.put('grilling'); self.put('tdd')

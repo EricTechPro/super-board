@@ -12,15 +12,27 @@ python3 "$KIT/tests/fixtures/install_worker_skills.py" "$T/repo"
 export SUPER_BOARD_SKILLS_HOME="$T/home"
 cat > "$T/bin/gh" <<'PYGH'
 #!/usr/bin/env python3
-import json,sys
+import json,sys,os,re
+from pathlib import Path
 args=sys.argv[1:]
-if args[:2]==['issue','view']:
+store=Path(os.environ['SB_REPAIR_FIXTURE_DIR'])
+if args and args[0]=='api' and '--slurp' in args:
+    issue=re.search(r'/issues/(\d+)/comments', ' '.join(args)).group(1)
+    file=store/('repair-'+issue+'.json')
+    print('['+(file.read_text() if file.exists() else '[]')+']')
+elif args[:2]==['api','-X']:
+    endpoint=args[3]; issue=endpoint.split('/')[-2] if args[2]=='POST' else endpoint.split('/')[-1]
+    body=json.load(sys.stdin)['body']
+    (store/('repair-'+issue+'.json')).write_text(json.dumps([{'id':int(issue),'body':body,'user':{'login':'fixture'},'created_at':'2026-10-20T00:00:00Z','updated_at':'2026-10-20T00:00:00Z'}]))
+elif args[:2] in (['label','create'],['issue','edit']): pass
+elif args[:2]==['issue','view']:
     print(json.dumps({'labels':[]} if args[args.index('--json')+1] == 'labels' else {'number':int(args[2]),'title':'fixture','body':''}))
 else:
     sys.exit('unexpected gh fixture call: '+str(args))
 PYGH
 cp "$KIT/tests/fixtures/fake_codex.py" "$T/bin/codex"
 chmod +x "$T/bin/gh" "$T/bin/codex"
+export SB_REPAIR_FIXTURE_DIR="$T"
 export SB_CODEX_TEST_LOG="$T/calls.jsonl"
 export PATH="$T/bin:$PATH"
 CARDS='[{"number":1,"status":"Ready","title":"one"},{"number":2,"status":"Review"}]'

@@ -264,6 +264,10 @@ class Inventory:
         if host == 'claude':
             self.roots = [self.root / '.claude/skills', self.home / '.claude/skills']
             self.claude_plugins()
+        elif host == 'pi':
+            # Pi lanes disable implicit discovery and receive these exact files.
+            self.roots = [self.root / '.agents/skills', self.home / '.agents/skills',
+                          self.root / '.pi/skills', self.home / '.pi/agent/skills']
         else:
             # Codex discovery stops at this independent repository's root.
             process = subprocess.run(['git', '-C', str(self.root), 'rev-parse', '--show-toplevel'],
@@ -454,7 +458,7 @@ class UsageParser(argparse.ArgumentParser):
 def main(argv=None):
     parser = UsageParser(description=__doc__)
     parser.add_argument('--root', required=True)
-    parser.add_argument('--host', required=True, choices=['claude', 'codex'])
+    parser.add_argument('--host', required=True, choices=['claude', 'codex', 'pi'])
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument('--cards')
     selection.add_argument('--profile', choices=['setup'])

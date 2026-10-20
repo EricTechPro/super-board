@@ -4,7 +4,6 @@
 Two hosts, one lane-result contract: the status enum and field names must match.
 Offline; reads both sources, runs nothing but node on the extracted object literal.
 """
-import ast
 import json
 from pathlib import Path
 import re
@@ -14,14 +13,8 @@ KIT = Path(__file__).resolve().parent.parent
 
 
 def lane_schema():
-    text = (KIT / 'scripts/super-board-codex-lane.sh').read_text()
-    source = text.split("<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
-    wanted = {'counts', 'properties', 'schema'}
-    nodes = [node for node in ast.parse(source).body if isinstance(node, ast.Assign)
-             and any(isinstance(t, ast.Name) and t.id in wanted for t in node.targets)]
-    namespace = {}
-    exec(compile(ast.Module(body=nodes, type_ignores=[]), 'codex-lane', 'exec'), namespace)
-    return namespace['schema']
+    import runpy
+    return runpy.run_path(str(KIT / 'scripts/super-board-lane-result.py'))['schema']
 
 
 def stage_schema():

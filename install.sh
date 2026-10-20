@@ -68,11 +68,11 @@ HOSTS="claude"
 add_host() { case " $HOSTS " in *" $1 "*) ;; *) HOSTS="$HOSTS $1" ;; esac; }
 for h in $(echo "$ASKED_HOSTS" | tr ',' ' '); do
   case "$h" in
-    claude|codex|opencode) add_host "$h" ;;
-    *) echo "unknown host: $h (use claude, codex or opencode)" >&2; exit 64 ;;
+    claude|codex|pi|opencode) add_host "$h" ;;
+    *) echo "unknown host: $h (use claude, codex, pi or opencode)" >&2; exit 64 ;;
   esac
 done
-for h in codex opencode; do [ ! -d "$TARGET/.$h" ] || add_host "$h"; done
+for h in codex pi opencode; do [ ! -d "$TARGET/.$h" ] || add_host "$h"; done
 for h in $(python3 - "$TARGET/.claude/super-board/configs" <<'PY'
 import glob, json, os, sys
 for p in sorted(glob.glob(os.path.join(sys.argv[1], "*.json"))):
@@ -80,11 +80,12 @@ for p in sorted(glob.glob(os.path.join(sys.argv[1], "*.json"))):
         h = json.load(open(p)).get("host")
     except Exception:
         continue
-    if h in ("codex", "opencode"):
+    if h in ("codex", "pi", "opencode"):
         print(h)
 PY
 ); do add_host "$h"; done
-[ "$(bash "$REPO_ROOT/scripts/super-board-host.sh" 2>/dev/null || true)" != codex ] || add_host codex
+detected_host=$(bash "$REPO_ROOT/scripts/super-board-host.sh" 2>/dev/null || true)
+case "$detected_host" in codex|pi|opencode) add_host "$detected_host" ;; esac
 
 QUIET="${SUPER_BOARD_QUIET_NEXT:-}"
 PACK_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/VERSION" 2>/dev/null || echo '?')"
@@ -226,7 +227,7 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   install_skill "$skill" "$SHARED/skills/$skill" || true
 done
 
-SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
+SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-codex-lane.sh super-board-pi-lane.sh super-board-pi-guards.py super-board-pi-guards.ts super-board-repair.py super-board-lane-result.py super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
 for script in $SCRIPTS; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$SHARED/bin/$script"

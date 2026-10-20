@@ -31,12 +31,16 @@
   // only; the dispatcher refuses to run (exit 78) unless set here.
   "worker_backend": "workflow",
 
-  // Agent host this project runs on: "claude" | "codex" | "opencode". Separate from
+  // Agent host this project runs on: "claude" | "codex" | "pi" | "opencode". Separate from
   // worker_backend. Onboard and setup's fix ALWAYS write it (setup fills a missing key
   // from --host and never replaces a set one); setup's check flags any other value.
   // `super-board-host.sh --config <this file>` uses it only when SUPER_BOARD_HOST and
   // every env sign (Codex ids, OPENCODE, CLAUDECODE) are absent. See docs/hosts.md.
   "host": "claude",
+
+  // Explicit --pi only. Pi is the execution program, separate from codex exec.
+  // Both non-empty values are required. No provider or model is inferred.
+  "pi": { "provider": null, "model": null },
 
   // Optional post-completion adapter; never bundles or installs the external skill.
   // Runs only after selected work is verified merged and no work/approvals remain.
@@ -153,23 +157,27 @@
     // ALWAYS human, whatever `default` says. A PR matching ANY label, path glob
     // or keyword (case-insensitive, searched in the diff's ADDED lines only) of
     // a category exits the gate 7: no merge, card → Blocked 🙋 (the human merges
-    // it, or comments "done" to approve and the next wave merges).
-    // Setting this key replaces the whole default set; {} turns it off.
+    // it, or supplies the existing canonical approval bound to the reviewed head).
+    // Project categories and matcher arrays extend mandatory defaults. {} keeps them.
+    // Preserve stricter project rules. Routing matches do not prove semantic safety.
     // Globs: `**/` = any dirs (incl. none), `**` = anything, `*` = one segment.
     "always_human": {
       "money":  { "labels": ["money", "payments", "billing", "pricing"],
                   "paths": ["**/billing/**", "**/payments/**", "**/stripe/**", "**/checkout/**"],
                   "keywords": ["stripe.", "payment_intent", "price_id", "invoice.create"] },
-      "auth":   { "labels": ["auth", "security"],
+      "auth":   { "labels": ["auth", "security", "permissions"],
                   "paths": ["**/auth/**", "**/authz/**", "**/permissions/**"],
-                  "keywords": ["jwt.sign", "bcrypt", "password_hash", "service_role"] },
+                  "keywords": ["jwt.sign", "bcrypt", "password_hash", "service_role", "grant permission", "grant all"] },
       // Destructive schema changes ONLY (DROP / TRUNCATE / RENAME, or the
       // `schema` label) need a human. Additive migrations (new table, new
       // column, new index) are not "schema": they follow the `migrations` DB-env
       // rule below. A live database is always human, whatever the change.
       "schema": { "labels": ["schema", "destructive"],
                   "paths": [],
-                  "keywords": ["drop table", "drop column", "truncate table", "rename column", "drop schema"] }
+                  "keywords": ["drop table", "drop column", "truncate table", "rename column", "drop schema"] },
+      "external-sharing": { "labels": ["external-sharing", "data-sharing", "external-data-sharing"],
+                            "paths": ["**/telemetry/**", "**/data-export/**"],
+                            "keywords": ["sendbeacon(", "navigator.sendbeacon", "captureexception("] }
     },
     // true only when the user explicitly chose auto-merge onto a
     // production-detected base in onboard. run.md's production-merge guard
@@ -310,9 +318,9 @@
   // hit their own preflight and park.
   "max_workers": 0,
 
-  // Max consecutive failures in the same lane on the same root-cause hash
-  // before the card auto-moves to Blocked. Default `2`. Root-cause hash
-  // defined in §7 Halt gates.
+  // Normal repair attempts per unresolved card, at most 2. A stricter cap is retained.
+  // Then one independent diagnosis and at most one final targeted repair.
+  // Hash changes and restarts never reset the budget. See run.md Repair protocol.
   "rebuild_cap": 2,
 
   // When the count of Blocked cards exceeds this percent of the initial Ready

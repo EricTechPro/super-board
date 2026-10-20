@@ -1,7 +1,7 @@
 # Skill readiness before dispatch
 
 Run `python3 .claude/bin/super-board-skills-ready.py --root <project> --host
-<claude|codex> --cards <cards.json>` before any claims or wave writes. The cards
+<claude|codex|pi> --cards <cards.json>` before any claims or wave writes. The cards
 array carries number, status, labels and literal issue body; hydrate absent
 bodies read-only with the guarded GitHub reader (`--hydrate` does this).
 For a worker boundary add `--lane build|qa|review`. Before using a conditional

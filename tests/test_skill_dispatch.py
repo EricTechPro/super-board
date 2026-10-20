@@ -30,7 +30,10 @@ class Dispatch(unittest.TestCase):
         self.tool('gh', '''import json,os,sys
 args=sys.argv[1:]
 with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'gh','args':args})+'\\n')
-if args[:2]==['issue','view']:
+if args and args[0]=='api' and '--slurp' in args:
+    if os.environ.get('HALT_COMMENTS'):sys.exit('fixture GitHub read failed')
+    print('[[]]')
+elif args[:2]==['issue','view']:
     fields=args[args.index('--json')+1] if '--json' in args else ''
     if fields=='state': print('OPEN')
     elif fields=='labels': print('{"labels":[]}')
@@ -51,6 +54,7 @@ else:
     result={'status':'advanced','column':{'build':'QA','qa':'Review','review':'Done'}[lane], 'detail':'fixture','prUrl':None,'branch':None,'priorFindings':None}
 output.write_text(json.dumps(result))
 ''')
+        self.tool('pi', "raise SystemExit('fixture Pi must not run in preflight checks')\n")
         self.tool('claude', "import json,os\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'claude'})+'\\n')\n")
         self.tool('npx', "import json,os\nwith open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'npx'})+'\\n')\n")
         self.state = self.root / '.claude/super-board'
@@ -66,7 +70,7 @@ output.write_text(json.dumps(result))
 
     def full(self,host='codex'):
         for name in NAMES:
-            for surface in ['.agents/skills'] if host=='codex' else ['.claude/skills']:
+            for surface in ['.agents/skills'] if host in ['codex','pi'] else ['.claude/skills']:
                 path=self.root/surface/name/'SKILL.md';path.parent.mkdir(parents=True,exist_ok=True);path.write_text('fixture skill instructions')
 
     def calls(self):
@@ -94,6 +98,50 @@ output.write_text(json.dumps(result))
                 self.assertTrue(all(c['args'][:2]==['issue','view'] for c in self.calls()))
                 self.assertEqual(sorted(p.name for p in (self.state/'inflight').iterdir()),['99'])
                 self.preserved()
+
+    def test_pi_requires_explicit_configuration_before_any_host_call(self):
+        result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[]','--pi')
+        self.assertEqual(result.returncode,2,result.stderr)
+        self.assertIn('pi.provider and pi.model',result.stderr)
+        self.assertEqual(self.calls(),[])
+
+    def test_pi_readiness_uses_pi_surface_without_codex_router(self):
+        config=json.loads(self.config.read_text());config['pi']={'provider':'fixture','model':'fixture'}
+        self.config.write_text(json.dumps(config))
+        result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready"}]','--pi')
+        self.assertEqual(result.returncode,10,result.stderr)
+        self.assertFalse(any(c['tool']=='codex' for c in self.calls()))
+        self.preserved()
+
+    def test_pi_guard_readiness_halts_before_claim_or_marker(self):
+        self.full('pi')
+        config=json.loads(self.config.read_text());config['pi']={'provider':'fixture','model':'fixture'}
+        self.config.write_text(json.dumps(config))
+        result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready"}]','--pi')
+        self.assertEqual(result.returncode,79,result.stderr)
+        self.assertIn('Pi guards unavailable',json.loads(result.stdout)['cards'][0]['detail'])
+        self.assertFalse((self.state/'inflight/1').exists())
+        self.assertFalse(any(c['tool']=='codex' for c in self.calls()))
+        self.preserved()
+
+    def test_existing_card_claim_is_never_overwritten(self):
+        self.full()
+        claim=self.state/'inflight/1';claim.write_text('PID=77777\nLANE=build\n')
+        result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Ready"}]','--codex=fixture')
+        self.assertEqual(result.returncode,79,result.stderr)
+        self.assertEqual(claim.read_text(),'PID=77777\nLANE=build\n')
+        self.assertFalse(any(c['tool']=='codex' for c in self.calls()))
+        self.assertTrue(json.loads(result.stdout)['halted'])
+
+    def test_repair_read_failure_retains_claim_before_any_worker(self):
+        self.full()
+        self.env['HALT_COMMENTS']='1'
+        result=self.invoke('super-board-codex-wave.sh','--config',str(self.config),'--cards','[{"number":1,"status":"Review","body":""}]','--codex=fixture')
+        self.assertEqual(result.returncode,79,result.stderr)
+        self.assertTrue(json.loads(result.stdout)['halted'])
+        self.assertTrue((self.state/'inflight/1').read_text().startswith('OWNER='))
+        self.assertFalse(any(c['tool']=='codex' for c in self.calls()))
+        self.preserved()
 
     def test_passing_wave_progresses_all_lanes_and_hydrates_body(self):
         self.full()
@@ -243,7 +291,8 @@ while True: time.sleep(.05)
 from pathlib import Path
 args=sys.argv[1:];root=Path(os.environ['ROOT_FIXTURE'])
 with open(os.environ['CALL_LOG'],'a') as f:f.write(json.dumps({'tool':'gh','args':args})+'\\n')
-if args[:2]==['api','rate_limit']:print('{"resources":{"graphql":{"remaining":5000,"reset":0},"core":{"remaining":5000,"reset":0}}}')
+if args and args[0]=='api' and '--slurp' in args and '/comments' in ' '.join(args):print('[[]]')
+elif args[:2]==['api','rate_limit']:print('{"resources":{"graphql":{"remaining":5000,"reset":0},"core":{"remaining":5000,"reset":0}}}')
 elif args[:2]==['api','graphql'] and '--paginate' in args:
     nodes=[dict(id='item'+str(number),fieldValueByName=dict(name=status),
                 content=dict(__typename='Issue',number=number,title='fixture',url='https://github.com/fixture/app/issues/'+str(number),

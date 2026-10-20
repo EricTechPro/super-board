@@ -59,7 +59,7 @@ import subprocess
 import sys
 
 COLUMNS = ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"]
-HOSTS = ("claude", "codex", "opencode")  # config `host`; super-board-host.sh accepts the same
+HOSTS = ("claude", "codex", "pi", "opencode")  # config `host`; super-board-host.sh accepts the same
 LABELS = {
     "qa": ("0e8a16", "Test what exists; skips Building (super-board)"),
     "bug": ("d73a4a", "Something is broken; built, tested, reviewed (super-board)"),
@@ -73,7 +73,7 @@ OLD_LABELS = {
 }
 SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
-BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-codex-lane.sh", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
+BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-codex-lane.sh", "super-board-pi-lane.sh", "super-board-repair.py", "super-board-lane-result.py", "super-board-pi-guards.py", "super-board-pi-guards.ts", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
        "super-board-deps.sh", "super-board-preflight.sh", "super-board-merge-gate.sh",
        "super-board-merge-policy.py", "super-board-approval.py", "super-board-env-check.sh", "super-board-agents-md.py",
        "super-board-settings.py", "super-board-setup.py", "super-board-usage.sh", "super-board-pr-body.sh",
@@ -313,6 +313,10 @@ def check(root, pack, host="claude", home=None, catalog=None):
             if "host" in cfg and cfg["host"] not in HOSTS:
                 host_errors[os.path.relpath(p, root)] = (
                     f"host \"{cfg['host']}\" must be one of {', '.join(HOSTS)}")
+            if cfg.get("host") == "pi":
+                pi = cfg.get("pi")
+                if not isinstance(pi, dict) or any(not isinstance(pi.get(k), str) or not pi[k].strip() for k in ("provider", "model")):
+                    host_errors[os.path.relpath(p, root)] = "Pi requires explicit pi.provider and pi.model"
             _, ch = migrate_config(cfg, host)
             if ch:
                 configs[os.path.relpath(p, root)] = ch
@@ -973,8 +977,8 @@ def main(argv):
         if cmd in ("check", "fix"):
             pack = find_pack(flag(rest, "--pack"))
             host, home, catalog = flag(rest, "--host", "claude"), flag(rest, "--home", os.environ.get("SUPER_BOARD_SKILLS_HOME")), flag(rest, "--catalog", os.environ.get("SUPER_BOARD_SKILLS_CATALOG"))
-            if host not in ("claude", "codex"):
-                raise ValueError("--host must be claude or codex")
+            if host not in ("claude", "codex", "pi"):
+                raise ValueError("--host must be claude, codex or pi")
             res = check(root, pack, host, home, catalog) if cmd == "check" else fix(root, pack, "--no-helpers" not in rest, dry, host, home, catalog)
             if res.get("error") == "pack-not-found":
                 print(json.dumps(res, indent=1))

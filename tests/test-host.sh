@@ -54,4 +54,7 @@ for f in none missing; do
 done
 rc=0; cfg "$T/bad.json" >/dev/null 2>&1 || rc=$?
 [ "$rc" = 64 ] || fail "a bad config host exits 64, got $rc"
+[ "$(host SUPER_BOARD_HOST=pi CODEX_THREAD_ID=parent)" = pi ] || fail "explicit Pi beats inherited Codex"
+printf '{"host":"pi"}' > "$T/pi.json"
+[ "$(cfg "$T/pi.json")" = pi ] || fail "config Pi host"
 echo "PASS: super-board-host"
