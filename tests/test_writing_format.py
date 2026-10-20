@@ -227,6 +227,17 @@ def test_pr_body_markers():
     assert "## Not verified" not in run_md and "**Status:**" not in run_md
 
 
+def test_risk_names_door_and_blast_radius():
+    """Risk carries the merge danger: a two-way or one-way door and a blast radius."""
+    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    std_risk = next(b for b in fenced(STANDARD) if b.startswith("## Risk\n🟢"))
+    run_risk = run_md[run_md.index("<!-- sb:risk -->\n## Risk"):run_md.index("<!-- /sb:risk -->")]
+    for name, risk in (("writing-standard.md", std_risk), ("run.md", run_risk)):
+        assert "**Door:**" in risk, f"{name} Risk lacks Door"
+        assert "**Blast radius:**" in risk, f"{name} Risk lacks Blast radius"
+    assert "one-way door is never 🟢" in STANDARD
+
+
 def test_status_alerts():
     for alert in ("> [!NOTE]", "> [!TIP]", "> [!WARNING]"):
         assert alert in STANDARD, f"writing-standard.md lacks {alert}"

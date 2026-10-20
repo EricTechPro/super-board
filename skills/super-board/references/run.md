@@ -158,7 +158,7 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 | `ac` (checklist + one proof line each) | writes all unchecked | ticks with proof, or leaves unchecked with the reason | unticks one it disproved |
 | `history` (Lane · Done · Time · Details) | appends a row | appends a row | appends a row |
 | `visual` (Before \| After, UI only) | — | writes | — |
-| `risk` (🟢/🟡/🔴 + one line) | writes | — | adjusts |
+| `risk` (🟢/🟡/🔴 + one line, Door, Blast radius) | writes | — | adjusts |
 | `redcheck` (only when merged with a failing check) | — | — | writes |
 
 ```markdown
@@ -202,6 +202,8 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 <!-- sb:risk -->
 ## Risk
 🟢 **Low** · <one line: what could break and what limits it>
+- **Door:** <two-way | one-way> · <how to undo, or why it cannot be undone>
+- **Blast radius:** <one word> · <who breaks if this is wrong>
 <!-- /sb:risk -->
 ```
 

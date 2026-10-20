@@ -133,7 +133,7 @@ handoff complete. Add file summaries and critical inline notes on the PR, not in
 
 **On dispatcher exit 0 (success):**
 - `git -C .claude/worktrees/issue-N push -u origin loop/issue-N`
-- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/super-board/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution
+- `gh pr create --draft --base <base-branch> --head loop/issue-N --title "<emoji> [<type>] <scope>: <subject>" --body-file <body.md>` — title in commit-subject format, body = the marker-block template from `skills/super-board/references/run.md` (writing-standard.md § 2), `Closes #N` in the status card, `Docs:` bullets in Solution, Door + Blast radius in Risk
 - `gh issue edit N --remove-label loop:in-progress`
 - `gh issue comment N --body "[builder] [report] ✅ built · PR <URL>"` (Next line: `qa`)
 - Move the project card to `QA`. The Tester and Reviewer take it from there; the issue closes when the Reviewer merges through the merge gate.
@@ -243,7 +243,7 @@ Follow spec `.claude/skills/super-board/references/run.md` → Builder (first pa
 3. Docs check (section below) — if the ticket touches a third-party surface, an upgrade, or auth/billing, read the current official docs first.
 4. Implement smallest safe change covering ACs — under the PR size cap (section below).
 5. Commit + push (always).
-6. Open **draft PR** with the PR description template from `run.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution.
+6. Open **draft PR** with the PR description template from `run.md` — title in commit-subject format, every marker block filled, `Docs:` bullets in Solution, Door + Blast radius in Risk.
 7. Follow [PR author notes](../super-board/references/pr-author-notes.md), then post the `[builder] [report]` PR comment + the short issue comment with the PR URL (writing-standard.md § 4).
 8. Move card Ready/Building → QA.
 

@@ -142,12 +142,14 @@ A partial PR writes `Refs #N`, never `Closes #N`.
 ```
 
 **Acceptance criteria** — a checklist, one proof line under each. Unchecked = not verified,
-and the proof line says why in one line.
+and the proof line says why in one line. A proof line shows before and after where it can:
+the test that failed before the change and passes now, or the output that changed. UI proof
+goes in Before | After.
 
 ```
 ## Acceptance criteria
 - [x] 12 MB file shows the size message in 1 s\
-  ↳ `e2e/upload-size.spec.ts:14`
+  ↳ `e2e/upload-size.spec.ts:14` · failed on `5a2363b`, passes on `3f9c2a1`
 - [x] No request over 10 MB\
   ↳ spec asserts 0 calls · HAR in `runs/issue-790-qa-v2/`
 - [ ] No new Sentry events after deploy\
@@ -178,14 +180,19 @@ committed on the branch; raw URLs are pinned to the commit that holds them.
 | Mobile | <img src="https://github.com/acme/app/raw/3f9c2a1/docs/ui/before-mobile.png" width="220"> | <img src="https://github.com/acme/app/raw/3f9c2a1/docs/ui/after-mobile.png" width="220"> |
 ```
 
-**Risk** — level plus one line. If it merged red, name the check here too.
+**Risk** — level plus one line, then Door and Blast radius. If it merged red, name the check
+here too.
 
 ```
 ## Risk
 🟢 **Low** · limit read from one constant; no plan differences.
+- **Door:** two-way · revert the PR and the old check returns
+- **Blast radius:** upload form · users with files over 10 MB see a new error
 ```
 
-Levels: 🟢 Low · 🟡 Medium · 🔴 High. A `needs-you: <command>` line (merge gate reads it) goes
+Levels: 🟢 Low · 🟡 Medium · 🔴 High. **Door** is two-way (a revert undoes it) or one-way
+(hard to undo: DROP, rename, data rewrite, public API, sent email); a one-way door is never 🟢.
+**Blast radius** is one word (`none`, `page`, `billing`, `all users`) and one line on who breaks. A `needs-you: <command>` line (merge gate reads it) goes
 under Risk.
 
 ## 3 · Ticket
