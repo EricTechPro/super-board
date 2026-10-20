@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+import runpy
 import signal
 import shutil
 import subprocess
@@ -57,6 +58,8 @@ try:
         raise ValueError('max_workers must be a non-negative integer')
     workers = workers or max(1, min(16, (os.cpu_count() or 2) - 2))
     root = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()).resolve()
+    require_checkout = runpy.run_path(str(launcher.with_name('super-board-checkout.py')))['require_checkout']
+    root = require_checkout(root, (config.get('repo') or {}).get('path'))
     pi_config = config.get('pi')
     if host == 'pi' and (not isinstance(pi_config, dict) or any(not isinstance(pi_config.get(key), str) or not pi_config[key].strip() or pi_config[key].startswith('-') for key in ['provider', 'model'])):
         raise ValueError('Pi requires explicit pi.provider and pi.model')

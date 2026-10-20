@@ -13,6 +13,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import runpy
 import signal
 import subprocess
 import sys
@@ -85,7 +86,6 @@ def require_verification_ready():
     if subprocess.run([sys.executable, str(readiness), '--config', str(config_path)]).returncode:
         result('halted', 'verification-readiness: repair verify_commands; preserve claims, worktrees and card state, then restart explicitly')
         sys.exit(9)
-require_verification_ready()
 
 def git_path(option):
     return Path(subprocess.check_output(['git', 'rev-parse', option], text=True).strip()).resolve()
@@ -94,8 +94,13 @@ try:
     root = git_path('--show-toplevel')
     git_dir = git_path('--git-dir')
     common_dir = git_path('--git-common-dir')
+    require_checkout = runpy.run_path(str(script_path.with_name('super-board-checkout.py')))['require_checkout']
+    root = require_checkout(root, (config.get('repo') or {}).get('path'))
 except subprocess.CalledProcessError:
     fail('Codex lane must start inside the target git repository')
+except (OSError, ValueError) as error:
+    fail(f'Invalid Codex lane input: {error}')
+require_verification_ready()
 os.chdir(root)
 helper = script_path.with_name('super-board-github-read.py')
 if not helper.exists() or subprocess.run([sys.executable, str(helper), '--check']).returncode:
