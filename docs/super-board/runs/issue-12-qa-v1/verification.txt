@@ -1,0 +1,93 @@
+Issue 12 QA evidence, source 0c127906c5ed6b9040e71a8310d456572051c920
+
+Historical command, c47c2a369e0b6920441c548b966acc7d6ed76295:
+python3 tests/test_repair_wave.py RepairWave.test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch
+Expected exit 1. Actual exit 1
+
+FF
+======================================================================
+FAIL: test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch (__main__.RepairWave.test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch) (host='codex')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/sb-issue12-qa-historical.mIEcOy/tests/test_repair_wave.py", line 126, in test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch
+    self.assertEqual(process.returncode,0,process.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 79 != 0 : 'loop:repair-diagnosis' not found
+
+
+======================================================================
+FAIL: test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch (__main__.RepairWave.test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch) (host='pi')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/tmp/sb-issue12-qa-historical.mIEcOy/tests/test_repair_wave.py", line 126, in test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch
+    self.assertEqual(process.returncode,0,process.stderr)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 79 != 0 : 'loop:repair-diagnosis' not found
+
+
+----------------------------------------------------------------------
+Ran 1 test in 4.454s
+
+FAILED (failures=2)
+
+Command: python3 tests/test_repair_wave.py
+Actual exit 0
+
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 68.662s
+
+OK
+
+Command: python3 tests/test_repair_budget.py
+Actual exit 0
+
+.......................
+----------------------------------------------------------------------
+Ran 23 tests in 8.993s
+
+OK
+
+Command: bash tests/run-safety.sh
+Actual exit 0
+69 complete suite groups, no ::error:: entries.
+
+PASS: 69 safety suites
+
+SHA-256 of complete raw logs:
+
+a1da42f44813a7c7533b469e5af3547fa8fc807eaf897254a15d705725311328  historical-red.log
+
+b44c9495e53ea188ace0608282b6d63882adf4ec200817d41af2d6fda5fc7540  qa-repair-wave.log
+
+c52726445ca9a7c26b1b2b4c3a35734aed16bfaccc481083f9062cf9b3c5fadc  qa-repair-budget.log
+
+25d934fb4d86ed5323cb4265c955870dbe3d9331d5ba28505d8dd9a5509a5cd3  qa-safety.log
+
+Raw evidence root: /Users/maxchan/Documents/Codex/2026-10-20/op/outputs/super-board-handoff/implementation-evidence/finish-20261021/issue-12-qa
+
+Read-only fixture reconciliation:
+{
+  "canonicalRecordCount": 1,
+  "canonicalState": {
+    "causes": [
+      "Initial assertion exited 1 on the operator-held health fault. Pushed fc10948 and posted actual failure proof on the issue and draft PR. No repair consumed or canonical repair state changed."
+    ],
+    "pending_lane": "build",
+    "phase": "idle",
+    "prUrl": "https://github.com/maxchangm/super-board/pull/11",
+    "repairs": 0
+  },
+  "commentId": 6305789024,
+  "commentUpdatedAt": "2026-10-21T01:32:18Z",
+  "labels": [
+    "tests",
+    "loop:rebuild-0"
+  ],
+  "assignees": [],
+  "prState": "open",
+  "prDraft": true,
+  "prHead": "fc109484c356e68b884447b25408740aa9879ea8",
+  "mutationsPerformed": false,
+  "resumePerformed": false
+}

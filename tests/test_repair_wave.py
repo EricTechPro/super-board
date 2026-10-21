@@ -30,12 +30,17 @@ elif a and a[0]=='api' and '--slurp' in a:print(json.dumps([s['comments']]))
 elif a[:2]==['issue','view']:
  fields=a[a.index('--json')+1];print(json.dumps({'labels':[{'name':x} for x in s['labels']]} if fields=='labels' else {'number':1,'title':'fixture','body':''}))
 elif a[:2]==['issue','edit']:
+ s['label_edits'].append(a);save()
  for i,x in enumerate(a[:-1]):
-  if x=='--add-label' and a[i+1] not in s['labels']:s['labels'].append(a[i+1])
-  if x=='--remove-label' and a[i+1] in s['labels']:s['labels'].remove(a[i+1])
+  if x=='--add-label' and a[i+1] not in s['labels']:s['labels'].append(a[i+1]);save()
+  if x=='--remove-label':
+   if a[i+1] not in s['repo_labels']:sys.exit("'"+a[i+1]+"' not found")
+   if a[i+1] in s['labels']:s['labels'].remove(a[i+1])
  save()
+ if os.environ.get('FIXTURE_LABEL_EDIT_UNKNOWN'):sys.exit('connection lost after label mutation')
 elif a[:2]==['issue','comment']:s['blocks'].append(a[a.index('--body')+1]);save()
-elif a[:2]==['label','create']:pass
+elif a[:2]==['label','create']:
+ if a[2] not in s['repo_labels']:s['repo_labels'].append(a[2]);save()
 else:sys.exit('unexpected gh '+str(a))
 '''
 HOST = r'''import json,os,re,sys
@@ -43,7 +48,7 @@ from pathlib import Path
 args=sys.argv[1:];prompt=sys.stdin.read();diag='fresh independent read-only diagnostician' in prompt
 comments=json.loads(Path(os.environ['FIXTURE_STATE']).read_text())['comments']
 reserved=json.loads(re.search(r'^repair-state: (.+)$',comments[0]['body'],re.M)[1]) if comments else {}
-with open(os.environ['FIXTURE_CALLS'],'a') as f:f.write(json.dumps({'host':Path(sys.argv[0]).name,'diagnosis':diag,'phase':reserved.get('phase'),'repairs':reserved.get('repairs')})+'\n')
+with open(os.environ['FIXTURE_CALLS'],'a') as f:f.write(json.dumps({'host':Path(sys.argv[0]).name,'diagnosis':diag,'phase':reserved.get('phase'),'repairs':reserved.get('repairs'),'labels':json.loads(Path(os.environ['FIXTURE_STATE']).read_text())['labels']})+'\n')
 card=json.loads(re.search(r'^Card: (.+)$',prompt,re.M)[1]);mode=os.environ.get('FIXTURE_DIAG','same')
 if diag:
  result=dict(status='advanced',column=card['status'],detail=json.dumps(dict(cause='new cause' if mode=='new' else 'failure',test='test -f proof',expected='fails')),prUrl=None,branch=None,priorFindings=None)
@@ -76,7 +81,7 @@ class RepairWave(unittest.TestCase):
         self.reset()
 
     def reset(self):
-        self.state.write_text(json.dumps(dict(comments=[],labels=['docs'],blocks=[],board='Ready')))
+        self.state.write_text(json.dumps(dict(comments=[],labels=['docs'],repo_labels=['docs'],label_edits=[],blocks=[],board='Ready')))
         self.calls.write_text('')
         lock=self.root/'.claude/super-board/inflight/1';lock.unlink(missing_ok=True)
 
@@ -97,6 +102,8 @@ class RepairWave(unittest.TestCase):
             self.wave(host)
             self.assertEqual(self.repair()['repairs'],expected)
             self.assertEqual(self.repair()['phase'],'idle')
+            self.assertEqual([x for x in self.data()['labels'] if x.startswith('loop:repair-')],[])
+            self.assertIn(f'loop:rebuild-{expected}',self.data()['labels'])
         self.assertEqual(len(self.call_log()),3)
         self.assertEqual([x['phase'] for x in self.call_log()],[None,'reserved','reserved'])
 
@@ -105,6 +112,71 @@ class RepairWave(unittest.TestCase):
         data=self.data();self.assertEqual(data['board'],'Blocked');self.assertEqual(self.repair()['phase'],'exhausted')
         self.assertEqual(len(data['comments']),1)
         self.assertIn('Owner: fixture',data['blocks'][-1]);self.assertIn('To unblock:',data['blocks'][-1])
+        self.assertEqual([x for x in data['labels'] if x.startswith('loop:repair-')],['loop:repair-exhausted'])
+        for call in self.call_log():
+            phase=call['phase']
+            self.assertEqual([x for x in call['labels'] if x.startswith('loop:repair-')],
+                             ['loop:repair-'+phase] if phase in ('diagnosis','final') else [])
+
+    def test_both_hosts_initial_failure_without_phase_labels_persists_zero_before_next_dispatch(self):
+        for host in ['codex','pi']:
+            with self.subTest(host=host):
+                self.reset()
+                process,result=self.wave(host)
+                self.assertEqual(process.returncode,0,process.stderr)
+                self.assertFalse(result['halted'])
+                self.assertEqual(result['cards'][0]['finalStatus'],'failed')
+                self.assertEqual(self.repair()['repairs'],0)
+                self.assertEqual(self.repair()['phase'],'idle')
+                self.assertEqual(len(self.data()['comments']),1)
+                self.assertEqual(self.data()['labels'],['docs','loop:rebuild-0'])
+                self.assertEqual(self.data()['repo_labels'],['docs','loop:rebuild-0'])
+                self.wave(host)
+                self.assertEqual([x['repairs'] for x in self.call_log()],[None,1])
+                self.assertEqual([x['phase'] for x in self.call_log()],[None,'reserved'])
+                self.assertEqual(len(self.data()['comments']),1)
+
+    def test_both_hosts_unknown_label_mutation_halts_without_replay(self):
+        for host in ['codex','pi']:
+            with self.subTest(host=host):
+                self.reset()
+                process,result=self.wave(host,FIXTURE_LABEL_EDIT_UNKNOWN='1')
+                self.assertIn('connection lost after label mutation',process.stderr)
+                self.assertEqual(process.returncode,79)
+                self.assertTrue(result['halted'])
+                self.assertEqual(result['cards'][0]['finalStatus'],'halted')
+                self.assertEqual(self.repair()['repairs'],0)
+                self.assertEqual(len(self.data()['comments']),1)
+                self.assertEqual(len(self.data()['label_edits']),1)
+                lock=self.root/'.claude/super-board/inflight/1';claim=lock.read_text()
+                self.wave(host)
+                self.assertEqual(len(self.call_log()),1)
+                self.assertEqual(len(self.data()['label_edits']),1)
+                self.assertEqual(lock.read_text(),claim)
+
+    def test_successful_completions_retain_counts_and_clear_phase_labels(self):
+        def event(name,**options):
+            command=[sys.executable,str(self.root/'.claude/bin/super-board-repair.py'),name,
+                     '--issue','1','--owner','owner']
+            for key,value in options.items():command.extend(['--'+key.replace('_','-'),value])
+            result=subprocess.run(command,cwd=self.root,env=self.env,capture_output=True,text=True,check=True)
+            return json.loads(result.stdout)
+        event('failed',cause='failure',pending_lane='build')
+        for count in (1,2):
+            reserved=event('reserve');self.assertEqual(reserved['repairs'],count)
+            completed=event('succeeded')
+            self.assertEqual((completed['phase'],completed['repairs']),('idle',count))
+            self.assertNotIn('owner',completed)
+            self.assertEqual([x for x in self.data()['labels'] if x.startswith('loop:repair-')],[])
+        self.assertEqual(event('reserve')['phase'],'diagnosis')
+        event('diagnosed',cause='new cause',test='test -f proof expects failure')
+        self.assertEqual(event('reserve')['phase'],'final')
+        self.assertEqual([x for x in self.data()['labels'] if x.startswith('loop:repair-')],['loop:repair-final'])
+        completed=event('succeeded')
+        self.assertEqual((completed['phase'],completed['repairs']),('idle',2))
+        self.assertTrue(completed['diagnosis_used']);self.assertTrue(completed['final_used'])
+        self.assertEqual([x for x in self.data()['labels'] if x.startswith('loop:repair-')],[])
+        self.assertIn('docs',self.data()['labels']);self.assertEqual(len(self.data()['comments']),1)
 
     def test_both_hosts_diagnosis_without_new_cause_blocks_without_final(self):
         for host in ['codex','pi']:

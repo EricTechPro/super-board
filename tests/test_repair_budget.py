@@ -92,7 +92,7 @@ class CanonicalHandoffTests(unittest.TestCase):
         self.file = self.root / 'comments.json'
         self.file.write_text('[]')
         reader = self.root / 'reader.py'
-        reader.write_text("import pathlib,sys\nif '--check' not in sys.argv: print('['+pathlib.Path(" + repr(str(self.file)) + ").read_text()+']')\n")
+        reader.write_text("import pathlib,sys\nif '--check' not in sys.argv: print('{\"labels\":[]}' if 'labels' in sys.argv else '['+pathlib.Path(" + repr(str(self.file)) + ").read_text()+']')\n")
         gh = self.root / 'gh'
         gh.write_text("#!/usr/bin/env python3\nimport json,pathlib,sys\np=pathlib.Path(" + repr(str(self.file)) + ")\nif sys.argv[1:3] in (['label','create'],['issue','edit']): raise SystemExit(0)\nbody=json.load(sys.stdin)['body']\np.write_text(json.dumps([{'id':1,'body':body}]))\n")
         gh.chmod(0o755)
@@ -125,7 +125,8 @@ class CanonicalHandoffTests(unittest.TestCase):
         labels = self.root / 'labels-mutated'
         self.handoff.reader.write_text(
             "import pathlib,sys\nh=pathlib.Path(" + repr(str(halted)) + ")\n"
-            "if '--check' in sys.argv: raise SystemExit(79 if h.exists() else 0)\n"
+            "if h.exists(): raise SystemExit(79)\n"
+            "if '--check' in sys.argv: raise SystemExit(0)\n"
             "value=pathlib.Path(" + repr(str(self.file)) + ").read_text()\n"
             "print('['+value+']')\nif value != '[]': h.touch()\n")
         gh = self.root / 'gh'

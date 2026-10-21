@@ -133,6 +133,9 @@ class CanonicalHandoff:
         self.read()
         if self.state != state:
             raise ValueError('canonical repair write could not be verified; preserve reservation')
+        current = json.loads(subprocess.check_output([sys.executable, str(self.reader), '--kind', 'object', '--',
+            'issue', 'view', str(self.issue), '--json', 'labels'], text=True))
+        current_labels = {label['name'] for label in current['labels']}
         labels = [f"loop:rebuild-{state.get('repairs', 0)}"]
         phase = state['phase']
         if phase in ('diagnosis', 'final', 'exhausted'):
@@ -144,7 +147,7 @@ class CanonicalHandoff:
         for label in labels:
             command.extend(['--add-label', label])
         for old in ('diagnosis', 'final', 'exhausted'):
-            if old != phase:
+            if old != phase and 'loop:repair-' + old in current_labels:
                 command.extend(['--remove-label', 'loop:repair-' + old])
         subprocess.run([sys.executable, str(self.reader), '--check'], check=True, stdout=subprocess.DEVNULL)
         subprocess.run(command, check=True, stdout=subprocess.DEVNULL)
