@@ -6,7 +6,7 @@ or the Read tool opening a dotenv file -- so a key never lands in the transcript
 `.env.example` and friends are deliberately allowed: that file is how an agent
 learns which keys exist. Its own errors never block a tool call.
 
-Adapted from ai-builder-starter-kit's .agents/hooks/guard-secrets.sh (Eric Tech).
+Adapted from ai-builder-starter-kit's .agents/hooks/guard-secrets.sh.
 """
 import json
 import re

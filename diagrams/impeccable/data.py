@@ -1,4 +1,4 @@
-# impeccable v4.0.4 (EricOS .agents/skills/impeccable) — command data, sourced from SKILL.md + reference/*.md
+# impeccable v4.0.4 (.agents/skills/impeccable) — command data, sourced from SKILL.md + reference/*.md
 # group: (id, region label, archify node type, legend label)
 GROUPS = [
  ("ctx",   "Setup",     "cloud",      "context / setup"),

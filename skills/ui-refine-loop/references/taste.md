@@ -16,7 +16,7 @@ One block per target, written by the grill. Until a block exists, the direction 
 - **Keep:** <what must not change>
 - **Avoid:** <what the fixers must not do>
 - **Users:** <who, how often>
-- **Reference:** <a product or page Eric likes, if any>
+- **Reference:** <a product or page the owner likes, if any>
 
 ## Taste rules
 

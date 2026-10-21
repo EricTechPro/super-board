@@ -244,7 +244,7 @@ def slug(s: str) -> str:
 def output_path(root: Path, data: dict) -> Path:
     name = f"{slug(data.get('slug') or data.get('title', 'visual'))}-{data.get('kind', 'explore')}.html"
     tmp = root / "_tmp"
-    # A repo with a gitignored _tmp/ (EricOS convention) keeps disposable output there.
+    # A repo with a gitignored _tmp/ keeps disposable output there.
     if subprocess.run(["git", "check-ignore", "-q", "_tmp/visual.html"], cwd=root,
                       capture_output=True).returncode == 0:
         d = tmp / f"{dt.date.today().isoformat()}-visual"

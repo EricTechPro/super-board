@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stop hook: a skill changed this session needs an eval run before the turn ends.
 
-For repos that AUTHOR skills — this pack and EricOS. install.sh never copies hooks/dev/
+For repos that AUTHOR skills — this pack and other skill-authoring repos. install.sh never copies hooks/dev/
 into a target project.
 
 Skills are prompts. Editing one with no eval is shipping a prompt change on vibes, and the

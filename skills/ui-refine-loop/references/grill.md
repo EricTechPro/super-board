@@ -7,7 +7,7 @@ It runs after you have read the target's code area (SKILL.md step 1) and before 
 - **At most 10 questions in total**, across all waves.
 - **Waves.** Wave 1 asks 3 questions. Ask a second wave (at most 4) only when the answers leave a decision open that would change what the fixers do. Ask a third (whatever is left of the 10) only when wave 2 opens something new. Most runs stop after wave 1 or 2.
 - **Every question accepts "you pick".** Each one ends with `➡️ <your recommended answer>`, grounded in what you read in the code. "You pick", "fine" or silence on a question means your recommendation stands.
-- **Facts are yours, decisions are Eric's.** Never ask what the code, `PRODUCT.md`, `DESIGN.md` or an existing taste file already answers. Look it up instead.
+- **Facts are yours, decisions are the owner's.** Never ask what the code, `PRODUCT.md`, `DESIGN.md` or an existing taste file already answers. Look it up instead.
 - **Taste file exists?** Ask only about this target's goal and direction, and anything the file leaves open. Don't re-ask its rules.
 
 ## Question bank (pick, don't recite)

@@ -95,7 +95,7 @@ The drill-down map takes its own file: shared nodes and edges, plus views that e
       "source": "skills/super-board/SKILL.md",      // string or array; `:line` suffixes are fine
       "sublabel": "optional line under the label",
       "opensView": "super-board",          // optional; otherwise a view with the node's id opens
-      "author": "EricTechPro",             // optional GitHub login; external skills show the author's avatar
+      "author": "tdatnguyengit",             // optional GitHub login; external skills show the author's avatar
       "origin": "mattpocock-skills",       // optional: where an external skill comes from
       "credits": ["BuilderIO"] }           // optional: further authors listed in the panel
   ],

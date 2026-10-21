@@ -18,7 +18,7 @@
       "label": "/super-board",
       "kind": "public",
       "what": "The autonomous GitHub-Project pipeline: five verbs (onboard, lint, status, run, stop) take one board shape (Backlog · Ready · Building · QA · Review · Blocked · Done) from empty to drained, with labels qa · bug · feature routing each card.",
-      "when": "Eric types /super-board <verb>, or says \"drain my GitHub project\" or \"stop super-board\"; with no verb it asks which one.",
+      "when": "You type /super-board <verb>, or says \"drain my GitHub project\" or \"stop super-board\"; with no verb it asks which one.",
       "how": "The session is an orchestrator only: it routes the verb to its reference file, dispatches lane agents, and never does product work itself. Board state is the only state, so `run` is also resume. Every commit, ticket, PR body and comment follows references/writing-standard.md.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/SKILL.md",
@@ -33,14 +33,14 @@
       ],
       "sublabel": "onboard · lint · status · run · stop",
       "opensView": "super-board",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "super-collect",
       "label": "/super-collect",
       "kind": "public",
       "what": "Finds problems in one project and files them as verified tickets into its super-board Backlog: five built-in sources plus any custom source added in onboard. It never builds, edits app code, or moves a card to Ready.",
-      "when": "Eric runs /super-collect (all enabled sources) or /super-collect <source…> with sentry, posthog, github, prs, architecture or a custom source's name; optional --since and --yes.",
+      "when": "You run /super-collect (all enabled sources) or /super-collect <source…> with sentry, posthog, github, prs, architecture or a custom source's name; optional --since and --yes.",
       "how": "Fetches each source for the window (default 14 days), sends every candidate to one fresh verifier sub-agent, then files through super-collect-file.sh. Dry-run by default: it shows a plan table and files on confirm.",
       "source": [
         "_skills/vendor/super-board/skills/super-collect/SKILL.md"
@@ -55,15 +55,15 @@
       ],
       "sublabel": "sentry · posthog · github · prs · architecture · custom",
       "opensView": "super-collect",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "ui-refine-loop",
       "label": "/ui-refine-loop",
       "kind": "public",
       "what": "Unattended Impeccable check-then-fix loop on one page or component that ends in a draft PR with a Before | After table. Standalone: no board lane ever starts it.",
-      "when": "Eric runs /ui-refine-loop <route | component | description> [\"what's wrong\"] [--rounds N], or says \"refine loop\" or \"polish this page with impeccable\".",
-      "how": "Reads the target's code, grills Eric (at most 10 questions) into a taste file, then runs the saved ui-refine-loop workflow: each round fresh checkers rank typed problems and a fresh fixer chains Impeccable verbs, polish last. Default 5 rounds; a finish reviewer grades every fix. Commits are `💄 [ui] <slug>: …` and the PR body uses super-board-pr-body.sh's marker blocks.",
+      "when": "You run /ui-refine-loop <route | component | description> [\"what's wrong\"] [--rounds N], or says \"refine loop\" or \"polish this page with impeccable\".",
+      "how": "Reads the target's code, grills you (at most 10 questions) into a taste file, then runs the saved ui-refine-loop workflow: each round fresh checkers rank typed problems and a fresh fixer chains Impeccable verbs, polish last. Default 5 rounds; a finish reviewer grades every fix. Commits are `💄 [ui] <slug>: …` and the PR body uses super-board-pr-body.sh's marker blocks.",
       "source": [
         "_skills/vendor/super-board/skills/ui-refine-loop/SKILL.md",
         "_skills/vendor/super-board/workflows/ui-refine-loop.js"
@@ -74,14 +74,14 @@
       ],
       "sublabel": "grill · check · fix · draft PR",
       "opensView": "ui-refine-loop",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "visual",
       "label": "/visual",
       "kind": "public",
       "what": "Turns the current work into one self-contained HTML page: a branch recap, a plan, or a map of a folder or architecture, with diagrams, a file map and annotated code.",
-      "when": "Eric runs /visual, /visual recap [base], /visual plan [file] or /visual <path>; with no argument visual.py detect picks the mode.",
+      "when": "You run /visual, /visual recap [base], /visual plan [file] or /visual <path>; with no argument visual.py detect picks the mode.",
       "how": "Writes a data.json from git facts or the plan, then visual.py render injects it into an inline template with no build step. It screenshots the page headless to check it, and offers to publish only on a yes.",
       "source": [
         "_skills/vendor/super-board/skills/visual/SKILL.md"
@@ -93,7 +93,7 @@
       ],
       "sublabel": "recap · plan · explore",
       "opensView": "visual",
-      "author": "EricTechPro",
+      "author": "tdatnguyengit",
       "credits": [
         "BuilderIO",
         "tt-a1i"
@@ -104,13 +104,13 @@
       "label": "/super-board onboard",
       "kind": "public",
       "what": "An 8-step setup wizard (Checks · GitHub · Board · Branch · AGENTS.md · Policies · Bug sources · Review) that installs or repairs what the board needs and writes the config once.",
-      "when": "Eric runs /super-board onboard (or /super-board:super-board onboard after a plugin install), on a new project, after an upgrade from 2.x, or to check and repair an existing setup.",
+      "when": "You run /super-board onboard (or /super-board:super-board onboard after a plugin install), on a new project, after an upgrade from 2.x, or to check and repair an existing setup.",
       "how": "One AskUserQuestion per step with the recommended option first; must-haves are fixed without asking by super-board-setup.py. Answers save to onboard-answers.json as they come, so a halt resumes, and repo files change only at step 8 after \"Write everything\". It ends by naming /super-board lint.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/onboard.md",
         "_skills/vendor/super-board/scripts/super-board-setup.py"
       ],
-      "author": "EricTechPro",
+      "author": "tdatnguyengit",
       "opensView": "sb-onboard"
     },
     {
@@ -118,33 +118,33 @@
       "label": "/super-board lint",
       "kind": "public",
       "what": "Pre-flight readiness check that walks Ready, Building, QA and Review, flags issues that fail any of 18 criteria, proposes a qa/bug/feature label, and dispatches a helper skill per flagged issue.",
-      "when": "Eric runs /super-board lint before a run, typically after /super-collect filed new Backlog cards.",
+      "when": "You run /super-board lint before a run, typically after /super-collect filed new Backlog cards.",
       "how": "Criteria 13–18 cover what the loop needs: a parseable `## Blocked by` line, a fake with no follow-up card, too big (over ~400 changed lines or many areas), the ticket sections, a checklist AC, and lettered Context steps. Phase 4 routes each flagged pattern to one skill sub-agent while Eric keeps the pace.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/lint.md"
       ],
       "opensView": "sb-lint",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "sb-status",
       "label": "/super-board status",
       "kind": "public",
       "what": "Read-only snapshot of the active config, every column in board order (Backlog included), and in-flight workers.",
-      "when": "Eric runs /super-board status to see where a run stands.",
+      "when": "You run /super-board status to see where a run stands.",
       "how": "super-board-status.py reads the board and local in-flight state and prints the columns in the board's own order; it changes nothing.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/status.md",
         "_skills/vendor/super-board/scripts/super-board-status.py"
       ],
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "sb-run",
       "label": "/super-board run",
       "kind": "public",
       "what": "The autonomous loop: repeated waves of the super-board-wave workflow from this session until the board drains or a halt gate fires. Also the resume command.",
-      "when": "Eric runs /super-board run [--low|--high] [<slug>]; the default worker_backend \"workflow\" stays in-session, \"claude-p\" opts into the legacy headless runner.",
+      "when": "You run /super-board run [--low|--high] [<slug>]; the default worker_backend \"workflow\" stays in-session, \"claude-p\" opts into the legacy headless runner.",
       "how": "Each wave: rate and usage guard, plan with super-board-wave-plan.sh (which refuses an old `variant: qa-only` config with exit 65), act on sweep/flag/stranded/resume, claim cards by assignee, launch the workflow, reconcile, report. Halts after 3 zero-progress waves, a high block rate, or a stop.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/run-workflow.md",
@@ -155,20 +155,20 @@
         "--high"
       ],
       "opensView": "super-board-run",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "sb-stop",
       "label": "/super-board stop",
       "kind": "public",
       "what": "Graceful shutdown: stops the wave, posts \"stopped mid-flight\" comments, releases assignee claims, and removes the wave lock so the next run resumes.",
-      "when": "Eric runs /super-board stop or says \"stop the run\" / \"pause the loop\".",
+      "when": "You run /super-board stop or says \"stop the run\" / \"pause the loop\".",
       "how": "Stops the workflow (or kills the legacy dispatcher via super-board-stop.sh), comments on every in-flight issue and PR, and strips bot_identity assignees. Resume is just `run` again.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/stop.md",
         "_skills/vendor/super-board/scripts/super-board-stop.sh"
       ],
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "super-build",
@@ -184,7 +184,7 @@
         "_skills/vendor/super-board/skills/super-board/references/run.md"
       ],
       "opensView": "super-build",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "super-qa",
@@ -199,20 +199,20 @@
         "_skills/vendor/super-board/skills/super-board/references/run.md"
       ],
       "opensView": "super-qa",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "super-review",
       "label": "super-review",
       "kind": "lane",
       "what": "Reviewer lane and standalone PR review: forms its own hypotheses first, remembers prior findings, classes every finding, and merges only through the merge gate.",
-      "when": "Started by the board for cards in Review (always on the session model). Also runnable standalone when Eric says \"review this branch\" or \"is this merge-ready\".",
+      "when": "Started by the board for cards in Review (always on the session model). Also runnable standalone when you say \"review this branch\" or \"is this merge-ready\".",
       "how": "Thread scan, prior-report round 1, own pass with code-review, codebase-design and ponytail-review, a rerun of the Tester's exact test command, then an adversarial truth-check on non-trivial diffs. One report comment is edited in place every round. A clean review merges through the gate pinned to the reviewed head SHA; exit 7 or 8 parks the card in Blocked with 🙋. Visual problems become a UI ticket, never a ui-refine-loop run. The truth-check sub-agents get a fixed verbatim brief, and Over-engineering is never a Blocker from any of them.",
       "source": [
         "_skills/vendor/super-board/skills/super-review/SKILL.md"
       ],
       "opensView": "super-review",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "gh-board",
@@ -415,7 +415,7 @@
       "label": "gate-skill-evals (dev)",
       "kind": "hook",
       "what": "Dev-only Stop hook that blocks ending a session when a skill changed and no `claude plugin eval` result is newer than the change.",
-      "when": "Stop event in the pack's own `.claude/settings.json` (and EricOS if added by hand); never installed into target projects.",
+      "when": "Stop event in the pack's own `.claude/settings.json` (and other skill-authoring repos if added by hand); never installed into target projects.",
       "how": "A changed SKILL.md always counts; a changed reference, script or workflow counts when the skill has an eval case. SKILL_EVAL_GATE=off, a running eval or `.claude/eval-gate-ignore` globs stand it down.",
       "source": [
         "_skills/vendor/super-board/hooks/dev/gate-skill-evals.py",
@@ -615,16 +615,16 @@
       "id": "tdd-v2",
       "label": "tdd-v2",
       "kind": "external",
-      "what": "The EricOS testing ladder: which rung a test belongs at (unit, isolated render, e2e) and the gate for climbing to the next.",
+      "what": "The testing ladder: which rung a test belongs at (unit, isolated render, e2e) and the gate for climbing to the next.",
       "when": "Reached by super-qa's test-gap check \"where the repo has it\", and by implement as its preferred test skill.",
       "how": "Building climbs bottom-up; chasing a defect walks down to the first rung that still reproduces. It owns the layer and defers red-green discipline to tdd.",
       "source": [
         ".agents/skills/tdd-v2/SKILL.md"
       ],
       "external": true,
-      "origin": "EricOS local skill",
+      "origin": "local skill",
       "opensView": "tdd-v2",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "implement",
@@ -637,7 +637,7 @@
         ".agents/skills/implement/SKILL.md"
       ],
       "external": true,
-      "origin": "mattpocock-skills (EricOS local override)",
+      "origin": "mattpocock-skills (local override)",
       "opensView": "implement",
       "author": "mattpocock"
     },
@@ -652,7 +652,7 @@
         ".agents/skills/code-review/SKILL.md"
       ],
       "external": true,
-      "origin": "mattpocock-skills (EricOS local override)",
+      "origin": "mattpocock-skills (local override)",
       "opensView": "code-review",
       "author": "mattpocock"
     },
@@ -704,7 +704,7 @@
       "id": "humanizer",
       "label": "humanizer",
       "kind": "external",
-      "what": "Strips AI writing tells from a finished draft so it reads like a person wrote it, with Eric Tech plain-words overrides.",
+      "what": "Strips AI writing tells from a finished draft so it reads like a person wrote it, with plain-words overrides.",
       "when": "Reached whenever a lane or ui-refine-loop writes prose: the writing standard says ALWAYS run commits, tickets, PR bodies and comments through it when installed.",
       "how": "Applies the vendored blader/humanizer rule set (32 patterns) as a silent pass; without it the writing standard's plain-words rules apply (short sentences, plain words, no hype).",
       "source": [
@@ -727,7 +727,7 @@
         ".agents/skills/verification-before-completion/SKILL.md"
       ],
       "external": true,
-      "origin": "EricOS .agents/skills (origin not recorded)",
+      "origin": ".agents/skills (origin not recorded)",
       "author": "obra"
     },
     {
@@ -850,13 +850,13 @@
       "kind": "external",
       "what": "Coverage judgment per component type: what is worth testing and what to skip.",
       "when": "Listed by super-build's skill map and super-qa's dependencies for deciding which kind of test a change needs.",
-      "how": "Informs coverage only; the localisation ladder, not this skill, picks the test layer. Not installed in EricOS.",
+      "how": "Informs coverage only; the localisation ladder, not this skill, picks the test layer. Not installed by default.",
       "source": [
         "_skills/vendor/super-board/skills/super-qa/SKILL.md",
         "_skills/vendor/super-board/skills/super-build/references/decision-policy.md"
       ],
       "external": true,
-      "origin": "not installed in EricOS"
+      "origin": "not installed by default"
     },
     {
       "id": "vitest",
@@ -864,12 +864,12 @@
       "kind": "external",
       "what": "Mechanics for unit and integration tests in a TS/JS repo.",
       "when": "Listed by super-qa and super-build when the localisation ladder stops at unit or integration in a TS/JS repo.",
-      "how": "Its references (core-expect, features-mocking, features-coverage, core-hooks, advanced-vi) guide test code. Not installed in EricOS.",
+      "how": "Its references (core-expect, features-mocking, features-coverage, core-hooks, advanced-vi) guide test code. Not installed by default.",
       "source": [
         "_skills/vendor/super-board/skills/super-qa/SKILL.md"
       ],
       "external": true,
-      "origin": "not installed in EricOS"
+      "origin": "not installed by default"
     },
     {
       "id": "playwright-bp",
@@ -877,12 +877,12 @@
       "kind": "external",
       "what": "Mechanics for browser e2e specs: locators, fixtures, test data factories, page objects.",
       "when": "Listed by super-qa when writing or refactoring a Playwright spec.",
-      "how": "data-testid first with getByRole fallback, custom fixtures for auth and seeding, POM for reusable interactions. Not installed in EricOS.",
+      "how": "data-testid first with getByRole fallback, custom fixtures for auth and seeding, POM for reusable interactions. Not installed by default.",
       "source": [
         "_skills/vendor/super-board/skills/super-qa/SKILL.md"
       ],
       "external": true,
-      "origin": "not installed in EricOS"
+      "origin": "not installed by default"
     },
     {
       "id": "qa-test-planner",
@@ -890,12 +890,12 @@
       "kind": "external",
       "what": "Test-plan helper lint dispatches for QA tickets with a vague test surface.",
       "when": "Reached by /super-board lint Phase 4 for QA tickets whose test surface is vague.",
-      "how": "One sub-agent per flagged issue drafts a concrete test plan. Not installed in EricOS.",
+      "how": "One sub-agent per flagged issue drafts a concrete test plan. Not installed by default.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/lint.md"
       ],
       "external": true,
-      "origin": "not installed in EricOS"
+      "origin": "not installed by default"
     },
     {
       "id": "setup-matt-pocock-skills",
@@ -925,7 +925,7 @@
       "external": true,
       "origin": "erictech-skills (override of mattpocock grill-with-docs)",
       "opensView": "grill-with-docs",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     },
     {
       "id": "prototype",
@@ -1394,7 +1394,7 @@
       "label": "AGENTS.md + CLAUDE.md",
       "kind": "board",
       "what": "The project's instruction files: AGENTS.md as the single source of truth with a managed super-board block, and CLAUDE.md as `@AGENTS.md` plus Claude-only rules.",
-      "when": "Written at onboard step 8 when Eric chose to move his rules (or only add the section); the block is rewritten on re-install.",
+      "when": "Written at onboard step 8 when you chose to move your rules (or only add the section); the block is rewritten on re-install.",
       "how": "The block sits between `<!-- super-board:begin -->` and `<!-- super-board:end -->`, rendered from agents-md-block.md with a Writing table that links the writing standard; nothing outside the markers is touched.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/agents-md-block.md",
@@ -1440,7 +1440,7 @@
       "label": "get.sh",
       "kind": "script",
       "what": "One-line installer: `curl -fsSL …/get.sh | bash` fetches the latest super-board release and runs install.sh.",
-      "when": "Eric (or a user) runs it in a project folder to install or upgrade; options --target, --ref, --no-helper-skills, and --no-hooks / --protect-main passed through.",
+      "when": "You run it in a project folder to install or upgrade; options --target, --ref, --no-helper-skills, and --no-hooks / --protect-main passed through.",
       "how": "Downloads the release tarball, runs install.sh, adds Matt Pocock's skills via `npx skills@latest add mattpocock/skills` unless told not to, and prints the next step once.",
       "source": [
         "_skills/vendor/super-board/get.sh"
@@ -1486,14 +1486,14 @@
       "label": "/git-sync",
       "kind": "public",
       "what": "Commits the working tree as one commit per logical change, merge-pulls, pushes the current branch without force, and reports what it did.",
-      "when": "Eric runs /git-sync or says \"sync\", \"commit and push\" or \"pull and push\", usually at the end of a piece of work.",
+      "when": "You run /git-sync or says \"sync\", \"commit and push\" or \"pull and push\", usually at the end of a piece of work.",
       "how": "Stages each group by path (never `git add -A`), refuses secrets, writes the host's commit format or the writing standard, gates `supabase/` changes on a migration file and advisors, then `git pull --no-rebase` and `git push`. The default or a protected branch needs a yes.",
       "source": [
         "_skills/vendor/super-board/skills/git-sync/SKILL.md"
       ],
       "sublabel": "commit · pull · push",
       "opensView": "git-sync",
-      "author": "EricTechPro"
+      "author": "tdatnguyengit"
     }
   ],
   "edges": [
@@ -1614,35 +1614,35 @@
       "from": "super-board",
       "to": "sb-onboard",
       "label": "routes onboard",
-      "when": "Eric runs /super-board onboard"
+      "when": "You run /super-board onboard"
     },
     {
       "id": "sb-v-lint",
       "from": "super-board",
       "to": "sb-lint",
       "label": "routes lint",
-      "when": "Eric runs /super-board lint"
+      "when": "You run /super-board lint"
     },
     {
       "id": "sb-v-status",
       "from": "super-board",
       "to": "sb-status",
       "label": "routes status",
-      "when": "Eric runs /super-board status"
+      "when": "You run /super-board status"
     },
     {
       "id": "sb-v-run",
       "from": "super-board",
       "to": "sb-run",
       "label": "routes run",
-      "when": "Eric runs /super-board run, or asks to resume"
+      "when": "You run /super-board run, or asks to resume"
     },
     {
       "id": "sb-v-stop",
       "from": "super-board",
       "to": "sb-stop",
       "label": "routes stop",
-      "when": "Eric runs /super-board stop or says pause"
+      "when": "You run /super-board stop or says pause"
     },
     {
       "id": "sb-onb-config",
@@ -1683,7 +1683,7 @@
       "id": "lint-grill",
       "from": "sb-lint",
       "to": "grilling",
-      "label": "grills Eric",
+      "label": "grills you",
       "when": "an issue needs a rethink (criteria 10, 11) or has several readings (12)"
     },
     {
@@ -2033,7 +2033,7 @@
       "id": "u-grill",
       "from": "ui-refine-loop",
       "to": "grilling",
-      "label": "grills Eric",
+      "label": "grills you",
       "when": "after reading the target's code; at most 10 questions in waves"
     },
     {
@@ -2391,7 +2391,7 @@
       "from": "hooks",
       "to": "gate-skill-evals",
       "label": "dev-only Stop",
-      "when": "only in the pack repo or EricOS; a skill changed without a newer eval"
+      "when": "only in the pack repo or another skill-authoring repo; a skill changed without a newer eval"
     },
     {
       "id": "h-readme",
@@ -3999,7 +3999,7 @@
       "id": "implement",
       "parent": "super-build",
       "title": "implement · build then review",
-      "caption": "EricOS local override of the mattpocock skill.",
+      "caption": "Local override of the mattpocock skill.",
       "nodeIds": [
         "implement",
         "tdd-v2",
@@ -5360,12 +5360,12 @@
     "Also since 88c27812: super-review truth-check sub-agents get a fixed verbatim brief (Over-engineering never blocks), and status lists columns in board order with Backlog. Disagreement: the coordinator listed 'labels qa/bug/feature routing'. That matches, with one addition: no label is also built (treated as feature).",
     "Kept as-is but stale in the files: the merge protocol and the wave.js `humanApprovesMerge` arg still mention human_approves_merge, which onboard now migrates into merge_policy. super-qa standalone still files onto the separate Super Ultimate QA board.",
     "The Builder only proposes a /to-tickets split in a PR comment when a build outgrows the cap; it does not run to-tickets, so there is no super-build → to-tickets edge. lint does dispatch it.",
-    "Unchanged from v2: ui-refine-loop is standalone, now stated in super-review and super-qa as 'file a UI ticket; a human can run /ui-refine-loop'. cleanup-wt still runs at SessionStart and post-merge. qa-test-planner, testing-strategy, vitest and playwright-best-practices are still not installed in EricOS."
+    "Unchanged from v2: ui-refine-loop is standalone, now stated in super-review and super-qa as 'file a UI ticket; a human can run /ui-refine-loop'. cleanup-wt still runs at SessionStart and post-merge. qa-test-planner, testing-strategy, vitest and playwright-best-practices are still not installed by default."
   ],
   "authors": {
-    "EricTechPro": {
-      "name": "Eric Tech",
-      "url": "https://github.com/EricTechPro"
+    "tdatnguyengit": {
+      "name": "tdatnguyen",
+      "url": "https://github.com/tdatnguyengit"
     },
     "mattpocock": {
       "name": "Matt Pocock",

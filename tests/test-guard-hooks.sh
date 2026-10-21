@@ -139,7 +139,7 @@ dd allow 'T=$(mktemp -d); rm -rf "$T/x"'           "unknowable value is allowed"
 dd allow 'echo "rm -rf /"'                         "quoted text is not a command"
 dd allow 'ls -la ~ && git status'                  "no deletion"
 
-# ---- dev/gate-skill-evals (Stop; pack + EricOS only) -------------------------
+# ---- dev/gate-skill-evals (Stop; pack + skill-authoring repos only) -------------------------
 G=$(mktemp -d); G=$(cd "$G" && pwd -P)
 git -C "$G" init -q -b main; git -C "$G" config user.email t@t; git -C "$G" config user.name t
 mkdir -p "$G/skills/a/references" "$G/skills/b/references" "$G/workflows" "$G/evals/case1" "$G/evals/results"

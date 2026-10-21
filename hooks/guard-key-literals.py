@@ -10,7 +10,7 @@ getting IN: a key pasted into source, a config file, or a script. Wired on two e
 It never prints the matched value -- that would put the key in the transcript, the
 thing both guards exist to prevent. Line numbers only. Its own errors never block.
 
-Adapted from ai-builder-starter-kit's .agents/hooks/guard-key-literals.sh (Eric Tech).
+Adapted from ai-builder-starter-kit's .agents/hooks/guard-key-literals.sh.
 """
 import json
 import re

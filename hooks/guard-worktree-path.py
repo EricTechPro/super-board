@@ -10,7 +10,7 @@ resolves its target (honouring `cd X &&` and `git -C X`) and denies the call whe
 target is outside `.claude/worktrees/` of the repo git will run in. Its own errors
 never block a tool call: anything unexpected exits 0 with no output.
 
-Adapted from BookKeepingApp's .claude/hooks/guard-worktree-path.js (Eric Tech).
+Adapted from BookKeepingApp's .claude/hooks/guard-worktree-path.js.
 """
 import json
 import os

@@ -103,7 +103,7 @@ entry is `settings-protect-main.json`:
 
 ## For repos that author skills: `dev/gate-skill-evals.py`
 
-A Stop hook for this pack and for EricOS, **never installed into a target project** (`install.sh`
+A Stop hook for this pack and for other skill-authoring repos, **never installed into a target project** (`install.sh`
 copies `hooks/*.py` only). When a skill changed this session — uncommitted, untracked, or committed
 but not pushed — and no `claude plugin eval` result is newer than the change, it blocks the stop and
 names the command to run. A changed `SKILL.md` always counts; a changed reference, script or the
@@ -118,22 +118,22 @@ context to read the result. A pre-commit gate fires later, in whoever commits (a
 another agent), and cannot run a paid eval itself, so it gets bypassed with `--no-verify`. The Stop
 hook still covers commits made during the session, via the unpushed-commits check.
 
-Wired in this pack's `.claude/settings.json`. For EricOS, add to its `.claude/settings.json`:
+Wired in this pack's `.claude/settings.json`. For another repo, add to its `.claude/settings.json`:
 
 ```
 "Stop": [ { "hooks": [ { "type": "command", "timeout": 30,
   "command": "python3 \"$CLAUDE_PROJECT_DIR\"/_skills/vendor/super-board/hooks/dev/gate-skill-evals.py" } ] } ]
 ```
 
-Adapted from `gate-skill-evals.sh` in Eric Tech's ai-builder-starter-kit.
+Adapted from `gate-skill-evals.sh` in ai-builder-starter-kit.
 
 Tests: `tests/test-guard-hooks.sh` (all guards and the eval gate), `tests/test-cleanup-wt.sh`.
 
 ## Credit
 
-- `cleanup-wt.py` — ported from the `cleanup-wt` skill in Eric Tech's BookKeepingApp (Node), generalised.
-- `guard-worktree-path.py` — ported from `.claude/hooks/guard-worktree-path.js` in Eric
-  Tech's BookKeepingApp.
-- `guard-secrets.py`, `guard-key-literals.py` — ported from `.agents/hooks/` in Eric
-  Tech's [ai-builder-starter-kit](https://github.com/EricTechPro/ai-builder-starter-kit)
+- `cleanup-wt.py` — ported from the `cleanup-wt` skill in BookKeepingApp (Node), generalised.
+- `guard-worktree-path.py` — ported from `.claude/hooks/guard-worktree-path.js` in
+  BookKeepingApp.
+- `guard-secrets.py`, `guard-key-literals.py` — ported from `.agents/hooks/` in
+  [ai-builder-starter-kit](https://github.com/EricTechPro/ai-builder-starter-kit)
   (same author as this pack; the kit has no top-level licence file, and this pack is MIT).

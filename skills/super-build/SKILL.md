@@ -28,7 +28,7 @@ The orchestrator needs to know which project board to read.
 Reads `Ready` from the repo's feature project. Resolution order:
 
 1. **`BUILD_LOOP_PROJECT`** env var — project number (e.g. `2`)
-2. **`BUILD_LOOP_OWNER`** env var — project owner (e.g. `EricTechPro`)
+2. **`BUILD_LOOP_OWNER`** env var — project owner (e.g. `tdatnguyengit`)
 3. **Auto-discovery fallback:** if env vars unset, run `gh project list --owner $(gh repo view --json owner -q .owner.login) --format json` and pick the project whose `title` matches the repo name, or the only open project if there's exactly one.
 
 Surface: `🎯 Reading project: <owner>/<title> (#<n>), column "Ready"`.
@@ -145,13 +145,13 @@ handoff complete. Add file summaries and critical inline notes on the PR, not in
 - `git -C .claude/worktrees/issue-N push -u origin loop/issue-N`
 - `gh pr create --draft --base <base-branch> --head loop/issue-N --title "🚧 [wip] <scope>: <slice from worker's final message>"` — the status card says `Refs #N`, never `Closes`, so the merge does not close the issue.
 - `gh issue edit N --remove-label loop:in-progress --add-label human-gated`
-- `gh issue comment N --body "[builder] [report] ⚠️ partial · PR <URL>\nDid: <slice>\n❌ Not done: <worker's reason for stopping>\nNext: Eric"` — the issue stays open with `human-gated` until the rest lands.
+- `gh issue comment N --body "[builder] [report] ⚠️ partial · PR <URL>\nDid: <slice>\n❌ Not done: <worker's reason for stopping>\nNext: owner"` — the issue stays open with `human-gated` until the rest lands.
 - Report: `🟡 Issue #N partial PR opened — issue stays open (human-gated)`
 - **Continue dispatching the next issue in the wave.** A WIP-PARTIAL is NOT a halt. The worker did intentional, scoped work and the orchestrator advances.
 
 **On dispatcher exit 2 or 3 (worker failed or no done-commit):**
 - `gh issue edit N --remove-label loop:in-progress`
-- `gh issue comment N --body "[builder] [report] ❌ failed · exit <X>\nDid: worker ran; worktree \`.claude/worktrees/issue-N\` kept\n❌ Not done: <one line from the log>\nNext: Eric\n\n<details><summary>log tail</summary>\n\n\`\`\`\n$(tail -50 .planning/super-build-logs/issue-N.log)\n\`\`\`\n</details>"`
+- `gh issue comment N --body "[builder] [report] ❌ failed · exit <X>\nDid: worker ran; worktree \`.claude/worktrees/issue-N\` kept\n❌ Not done: <one line from the log>\nNext: owner\n\n<details><summary>log tail</summary>\n\n\`\`\`\n$(tail -50 .planning/super-build-logs/issue-N.log)\n\`\`\`\n</details>"`
 - Report to the user with `tail -50` of `.planning/super-build-logs/issue-N.log`
 - Do NOT open a PR; leave the worktree intact for human inspection
 - Halt the loop

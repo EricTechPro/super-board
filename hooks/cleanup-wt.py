@@ -31,7 +31,7 @@ Every run writes <git-common-dir>/cleanup-wt/<timestamp>.tsv before acting:
 when, kind, name, sha, path, action, reason. Restore with
   git branch <name> <sha>   |   git push origin <sha>:refs/heads/<name>
 
-Adapted from BookKeepingApp's cleanup-wt (Eric Tech), generalised for any repo.
+Adapted from BookKeepingApp's cleanup-wt, generalised for any repo.
 """
 import datetime
 import json

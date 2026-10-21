@@ -277,7 +277,7 @@ Repeat until a done condition or halt gate fires:
 
    ```
    Wave 3 · 5 cards → 2 merged · 1 bounced · 1 blocked · 1 failed · usage 5h 62%
-     🛡 #15 Blocked 🔐 missing STRIPE_TEST_KEY — owner: Eric
+     🛡 #15 Blocked 🔐 missing STRIPE_TEST_KEY — owner: repo owner
      ❌ #18 failed: build lane returned no result — retried next wave
    Next: wave 4 (3 cards)   |   ⏸ paused until 14:05   |   ✅ board drained
    ```

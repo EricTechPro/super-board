@@ -340,7 +340,7 @@
       "external": true,
       "origin": "repo skills",
       "verbs": [],
-      "what": "The EricOS testing ladder — which rung a test belongs at and what must be true before climbing to the next.",
+      "what": "The testing ladder — which rung a test belongs at and what must be true before climbing to the next.",
       "when": "Use when writing any test, building a feature test-first, or choosing between a unit test, a component test, and a browser end-to-end spec. Supersedes any other TDD skill here; pairs with `tdd`, which owns the red-green discipline.",
       "how": "",
       "source": ".agents/skills/tdd-v2/SKILL.md"
@@ -405,7 +405,7 @@
       "origin": "repo skills",
       "verbs": [],
       "what": "Strip AI writing tells from any draft so it reads like a person wrote it.",
-      "when": "Use when writing or rewriting emails, Skool posts, lessons, scripts, docs, or any prose Eric will publish or send, and when he says humanize, make this sound human, less AI, remove the AI tells, or de-slop this. Runs as a pass over a finished draft, with Eric Tech overrides so bold, bullets and emoji survive.",
+      "when": "Use when writing or rewriting emails, Skool posts, lessons, scripts, docs, or any prose you will publish or send, and when you say humanize, make this sound human, less AI, remove the AI tells, or de-slop this. Runs as a pass over a finished draft with overrides so bold, bullets and emoji survive.",
       "how": "",
       "source": ".agents/skills/humanizer/SKILL.md"
     },
