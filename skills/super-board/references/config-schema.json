@@ -69,6 +69,28 @@
     "model": null
   },
 
+  // Optional Google Antigravity lane settings. Used by explicit `run --agy` and usage
+  // fallback "agy"; never selects the backend or grants Review/merge ownership on a
+  // fallback. See scripts/super-board-agy-lane.sh.
+  "agy": {
+    // Model slug passed to `agy -p --model` for every card (list them: `agy models`). A
+    // slug that already names an effort (gemini-3.8-flash-low) gets no --effort: agy
+    // refuses the pair. `--agy=<model>` wins; absent/null leaves the ladder below, then
+    // the CLI default.
+    "model": null,
+    // Optional run tier x card grade -> model slug, e.g.
+    // {"medium": {"low": "gemini-3.8-flash", "medium": "gemini-3.8-flash", "high": "gemini-4-argon"}}.
+    // A missing cell uses the CLI default model.
+    "ladder": null,
+    // Pins `--effort` (low|medium|high|xhigh|max) for every lane. Absent: review high,
+    // otherwise low/medium/high by tier x grade (AGY_EFFORT in the lane launcher).
+    "effort": null,
+    // Per-lane `--print-timeout`. agy's own default waits forever; a build lane needs a cap.
+    "timeout": "120m",
+    // Router that grades Ready cards (read only, --effort low). Absent: the CLI default model.
+    "router_model": null
+  },
+
   "target": {
     // "repo" | "repo+url". A board always drives a repo; `url` is the live or
     // preview site the Tester may also hit. Testing a live site with no repo is
@@ -280,6 +302,7 @@
   //             (super-board-codex-lane.sh without --codex). Review stays on
   //             Claude: cards that reach Review wait there for the next Claude
   //             wave. The launcher refuses a fallback lane without this value.
+  //   "agy"   — the same on Google Antigravity (super-board-agy-lane.sh without --agy).
   "usage_fallback": "none",
 
   // Required for Board dispatch and Board-controlled merges: at least one non-blank
