@@ -23,7 +23,7 @@ Once per machine, on a throwaway board, before an unattended run:
 | 3 | Guards fire headless | in the project: `agy -p 'Use run_command to run exactly: git worktree add ../x -b x' --output-format json` → `BLOCKED: tool call denied by pre-tool hook: Blocked: worktree path …` and no worktree | the hook command in `.agents/hooks.json` does not resolve (cwd is `.agents/`; `python` not `python3` on Windows) |
 | 4 | An allowed command runs | `agy -p 'Use run_command to run exactly: git status' --output-format json` prints the status | a `denied_actions` entry means step 2 was skipped |
 | 5 | Worker skills resolve | `python3 .claude/bin/super-board-skills-ready.py --root . --host agy --profile setup` exits 0 | onboard's 🔍 Checks installs the helpers |
-| 6 | Quota reaches the guard | set `statusLine.command` to `bash <repo>/.claude/bin/super-board-usage.sh record`, open `agy` once, then `bash .claude/bin/super-board-usage.sh check --host agy` prints `ok` | the status line only runs in an interactive session |
+| 6 | Quota reaches the guard | set `statusLine.command` to `bash <repo>/.claude/bin/super-board-usage.sh record`, open `agy` once, then `bash .claude/bin/super-board-usage.sh check --host agy --config <config>` prints `ok` with the buckets of `agy.model` (`gemini-5h` / `gemini-weekly` for a Gemini slug, `3p-*` for Claude or GPT) | the status line only runs in an interactive session |
 | 7 | One card end to end | `/super-board run --agy` on a Ready card with acceptance criteria | read `.claude/super-board/inflight/agy-<n>-<lane>.last.json` for the raw run of a lane that returned no result |
 
 Observed on 1.4.6: model slugs carry an effort (`gemini-3.8-flash-low`) and refuse `--effort`; the

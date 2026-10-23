@@ -97,4 +97,21 @@ rm -f "$SB_USAGE_FILE_AGY"; check --host agy
 [ "$RC" -eq 3 ] || fail "no agy snapshot should exit 3, got $RC"
 check --host gemini; [ "$RC" -eq 64 ] || fail "unknown host should exit 64, got $RC"
 
-echo "PASS: test-usage.sh (13 scenarios)"
+# 14 — quota is per model family: with the five buckets agy 1.4.6 reports, a gemini-3.8-flash
+#      run ignores the exhausted Argon bucket and the third-party ones; an Argon run pauses on
+#      it; a Claude slug reads the 3p buckets; agy.model in the config stands in for --model;
+#      no model known weighs every bucket.
+printf '{"quota":{"3p-5h":{"remaining_fraction":1,"reset_time":"%s"},"3p-weekly":{"remaining_fraction":0.446,"reset_time":"%s"},"gemini-5h":{"remaining_fraction":0.874,"reset_time":"%s"},"gemini-argon-wtu-weekly":{"remaining_fraction":0,"reset_time":"%s"},"gemini-weekly":{"remaining_fraction":0.13,"reset_time":"%s"}}}' \
+  "$RESET" "$RESET" "$RESET" "$RESET" "$RESET" | "$U" record
+check --host agy --model gemini-3.8-flash
+[ "$RC" -eq 0 ] || fail "a flash run must ignore the Argon bucket, got $RC: $OUT"
+echo "$OUT" | jq -e '.window == "gemini-weekly" and .used == 87' >/dev/null || fail "a flash run weighs the gemini buckets: $OUT"
+check --host agy --model gemini-4-argon-high
+[ "$RC" -eq 10 ] && echo "$OUT" | jq -e '.window == "gemini-argon-wtu-weekly"' >/dev/null || fail "an Argon run must pause on its bucket, got $RC: $OUT"
+check --host agy --model claude-opus-5-5
+[ "$RC" -eq 0 ] && echo "$OUT" | jq -e '.window == "3p-weekly" and .used == 55.4' >/dev/null || fail "a Claude slug reads the 3p buckets, got $RC: $OUT"
+echo '{"agy":{"model":"gemini-3.8-flash"}}' > "$TMP/m.json"
+check --host agy --config "$TMP/m.json"; [ "$RC" -eq 0 ] || fail "agy.model from the config must select the family, got $RC: $OUT"
+check --host agy; [ "$RC" -eq 10 ] || fail "with no model every bucket counts, got $RC: $OUT"
+
+echo "PASS: test-usage.sh (14 scenarios)"

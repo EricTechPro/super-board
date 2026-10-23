@@ -19,10 +19,15 @@
 # The Antigravity CLI (agy) does the same with its own status line
 # (antigravity.google/docs/cli/statusline): `quota.<bucket>.{remaining_fraction 0-1,
 # reset_time ISO-8601, reset_in_seconds}`, one bucket per plan window or model
-# (`gemini-weekly`, …). `record` recognises that shape by itself, converts every bucket to
-# {used_percentage, resets_at} and saves it to the agy snapshot; `check --host agy`
-# reads it and weighs every bucket, since the names are not fixed. Only an interactive
-# agy session renders a status line; headless `agy -p` lanes do not.
+# (observed on 1.4.6: `gemini-5h`, `gemini-weekly`, `gemini-argon-wtu-weekly`, `3p-5h`,
+# `3p-weekly`; "3p" is the third-party models, Claude and GPT). `record` recognises that
+# shape by itself, converts every bucket to {used_percentage, resets_at} and saves it to
+# the agy snapshot. Quota is per model family, so `check --host agy` weighs only the
+# buckets of the model the lanes use (`--model <slug>`, else the config's `agy.model`):
+# the family's own buckets (`gemini-5h`, `gemini-weekly` for a `gemini-*` slug; `3p-*`
+# for `claude-*` / `gpt-*`) plus a model-specific one (`gemini-argon-…`) only when the
+# slug names that model. No model known → every bucket counts. Only an interactive agy
+# session renders a status line; headless `agy -p` lanes do not.
 #
 # So this script has two halves:
 #
@@ -45,7 +50,7 @@
 #
 # Usage:
 #   <status-line json> | super-board-usage.sh record
-#   super-board-usage.sh check [--host claude|agy] [--config <cfg.json>] [--threshold 95] [--max-age 900]
+#   super-board-usage.sh check [--host claude|agy] [--model <agy slug>] [--config <cfg.json>] [--threshold 95] [--max-age 900]
 #
 # Snapshots: $SB_USAGE_FILE, default ~/.claude/super-board/usage.json (Claude) and
 # $SB_USAGE_FILE_AGY, default ~/.gemini/super-board/usage.json (agy). Usage is per
@@ -83,13 +88,14 @@ case "$MODE" in
     jq -n --argjson rl "$RL" '{recorded_at: now | floor, rate_limits: $rl}' > "$TMP" && mv "$TMP" "$FILE"
     exit 0 ;;
   check) ;;
-  *) echo "usage: super-board-usage.sh record | check [--host claude|agy] [--config f] [--threshold N] [--max-age S]" >&2; exit 64 ;;
+  *) echo "usage: super-board-usage.sh record | check [--host claude|agy] [--model slug] [--config f] [--threshold N] [--max-age S]" >&2; exit 64 ;;
 esac
 
-THRESHOLD=""; MAX_AGE=900; CONFIG=""; HOST=claude
+THRESHOLD=""; MAX_AGE=900; CONFIG=""; HOST=claude; MODEL=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --host)      HOST="$2"; shift 2 ;;
+    --model)     MODEL="$2"; shift 2 ;;
     --config)    CONFIG="$2"; shift 2 ;;
     --threshold) THRESHOLD="$2"; shift 2 ;;
     --max-age)   MAX_AGE="$2"; shift 2 ;;
@@ -105,19 +111,38 @@ if [ -z "$THRESHOLD" ] && [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
   THRESHOLD=$(jq -r '.usage_pause_pct // empty' "$CONFIG")
 fi
 THRESHOLD="${THRESHOLD:-95}"
+if [ "$HOST" = agy ] && [ -z "$MODEL" ] && [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
+  MODEL=$(jq -r '.agy.model // empty' "$CONFIG")
+fi
+# The bucket family of the model in use: gemini-* slugs draw on the gemini buckets, every
+# other slug (claude-*, gpt-*) on the third-party ones. Empty = weigh every bucket.
+FAMILY=""
+case "$MODEL" in
+  '') ;;
+  gemini-*) FAMILY=gemini ;;
+  *) FAMILY=3p ;;
+esac
 
 if [ ! -f "$FILE" ]; then
   echo '{"state":"unknown","window":null,"used":null,"resets_at":null,"age":null,"reason":"no usage snapshot — add the record line to your status-line script (run-workflow.md)"}'
   exit 3
 fi
 
-OUT=$(jq -c --argjson th "$THRESHOLD" --argjson maxage "$MAX_AGE" --argjson any "$ANY_WINDOW" '
+OUT=$(jq -c --argjson th "$THRESHOLD" --argjson maxage "$MAX_AGE" --argjson any "$ANY_WINDOW" \
+         --arg family "$FAMILY" --arg model "$MODEL" '
   (now | floor) as $now
   | ($now - (.recorded_at // 0)) as $age
   # A window whose reset time has passed is a fresh window: drop it. Claude has two
-  # fixed windows; an agy snapshot names its buckets, so every one counts there.
+  # fixed windows; an agy snapshot names its buckets: the family'"'"'s own (<family>-5h,
+  # <family>-weekly) always count, a model-specific one (<family>-<model>-…) only when
+  # the slug names that model, and with no known family every bucket counts.
   | [ (.rate_limits // {}) | to_entries[]
       | select($any or .key == "five_hour" or .key == "seven_day")
+      | select($family == ""
+               or ((.key | startswith($family + "-"))
+                   and ((.key | test("^" + $family + "-(5h|weekly)$"))
+                        or ((.key | capture("^" + $family + "-(?<m>[a-z0-9.]+)-") | .m) as $m
+                            | ($model | ascii_downcase | contains($m))))))
       | select((.value.used_percentage // null) != null)
       | select((.value.resets_at // 0) > $now)
       | { window: .key, used: .value.used_percentage, resets_at: .value.resets_at } ] as $w
