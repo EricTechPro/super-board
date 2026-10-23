@@ -46,7 +46,8 @@ grep -q 'invoke_subagent' "$SB_AGY_TEST_LOG" || fail 'the brief must forbid Anti
 [ "$(last_opt --print-timeout)" = 120m ] || fail 'default timeout is 120m'
 [ "$(last_opt --output-format)" = json ] || fail 'agy must print json'
 tail -1 "$SB_AGY_TEST_LOG" | jq -e '.schema.properties.status.enum | index("advanced")' >/dev/null || fail 'the lane schema must reach --json-schema'
-[ ! -e .claude/super-board/inflight/agy-1-review.prompt.md ] || fail 'the brief file must be removed after the run'
+grep -q -- '--cards .claude/super-board/inflight/agy-1-review.card.json' "$SB_AGY_TEST_LOG" || fail 'the brief must point the first skills check at the card file, not stdin'
+[ ! -e .claude/super-board/inflight/agy-1-review.prompt.md ] && [ ! -e .claude/super-board/inflight/agy-1-review.card.json ] || fail 'the brief and card files must be removed after the run'
 
 # Model precedence: flag > agy.model > ladder > CLI default; fallback needs usage_fallback "agy".
 lane build --agy=flag-model >"$T/out"

@@ -14,7 +14,10 @@
 #   agy -p <pointer> --output-format json --json-schema <file> --print-timeout <agy.timeout>
 #       [--model <slug>] [--effort low|medium|high|xhigh|max]
 # The brief is a file under .claude/super-board/inflight/ (the pointer prompt names it:
-# a Windows command line caps at 8 KB). agy has no working-directory flag, so this script
+# a Windows command line caps at 8 KB), and so is the card JSON, so the lane's first
+# operation is a plain command with a file argument rather than a here-string or a pipe
+# the shell may mangle (on 1.4.6 a PowerShell here-string was the one form a lane kept
+# reaching for and the permission check kept refusing). agy has no working-directory flag, so this script
 # chdirs to the repo root first. The run prints one JSON line: {status, response,
 # structured_output?, denied_actions?, error?, ...}; the lane result is `structured_output`,
 # checked against the lane schema like the Codex lane does. Anything else fails closed and
@@ -148,11 +151,16 @@ if not skills['ready']:
     result('halted', 'skills-readiness: missing ' + ', '.join(dict.fromkeys(e['name'] for e in skills['entries'] if e['status'] == 'missing')))
     sys.exit(10)
 
+inflight = root / '.claude/super-board/inflight'
+inflight.mkdir(parents=True, exist_ok=True)
+brief = inflight / f"agy-{card['number']}-{args.lane}.prompt.md"
+card_file = inflight / f"agy-{card['number']}-{args.lane}.card.json"
+last = inflight / f"agy-{card['number']}-{args.lane}.last.json"
 skill = {'build': 'super-build', 'qa': 'super-qa', 'review': 'super-review'}[args.lane]
 section = {'build': 'Builder', 'qa': 'Tester', 'review': 'Reviewer'}[args.lane]
 py = 'python' if os.name == 'nt' else 'python3'
 prompt = f'''Run {skill} for issue #{card['number']} as an Antigravity lane worker.
-First operation: recheck .claude/bin/super-board-skills-ready.py --root {root} --host agy --cards - --lane {args.lane} with the Card JSON below as a one-element stdin array, before worktree creation, classification or lifecycle writes. Exit 10 means status=halted, detail=skills-readiness:, preserve all state. Load resolved_path files and only declared fallback IDs from the report. Before activating any conditional helper, repeat with --require <exact-name>.
+First operation: recheck .claude/bin/super-board-skills-ready.py --root {root} --host agy --cards {card_file.relative_to(root).as_posix()} --lane {args.lane} (that file holds the Card JSON below as a one-element array; pass the path, do not pipe or paste the JSON), before worktree creation, classification or lifecycle writes. Exit 10 means status=halted, detail=skills-readiness:, preserve all state. Load resolved_path files and only declared fallback IDs from the report. Before activating any conditional helper, repeat with --require <exact-name>.
 Resolved skill report: {json.dumps(skills)}
 Config: {config_path}
 Card: {json.dumps(card)}
@@ -202,10 +210,6 @@ def conforms(value, rule):
 # The Antigravity CLI. SB_AGY_BIN overrides it with a full command line (tests: an
 # interpreter plus a stub); shutil.which resolves agy.exe / agy.cmd on Windows.
 AGY = shlex.split(os.environ.get('SB_AGY_BIN', '')) or [shutil.which('agy') or 'agy']
-inflight = root / '.claude/super-board/inflight'
-inflight.mkdir(parents=True, exist_ok=True)
-brief = inflight / f"agy-{card['number']}-{args.lane}.prompt.md"
-last = inflight / f"agy-{card['number']}-{args.lane}.last.json"
 child = None
 def interrupted(signum, frame):
     if child is not None:
@@ -230,6 +234,7 @@ with tempfile.TemporaryDirectory(prefix='super-board-agy-') as temporary:
     schema_path = Path(temporary) / 'schema.json'
     schema_path.write_text(json.dumps(schema))
     brief.write_text(prompt, encoding='utf-8')
+    card_file.write_text(json.dumps([card]), encoding='utf-8')
     pointer = (f"Read {brief.relative_to(root).as_posix()} and follow it exactly; it is your whole task. "
                "Return only the JSON the brief asks for, matching the schema.")
     command = AGY + ['-p', pointer, '--output-format', 'json', '--json-schema', str(schema_path), '--print-timeout', timeout]
@@ -273,8 +278,9 @@ with tempfile.TemporaryDirectory(prefix='super-board-agy-') as temporary:
         result('failed', f'Antigravity returned no valid lane result: {error} (raw run: {last.relative_to(root).as_posix()})')
         sys.exit(1)
     finally:
-        try:
-            brief.unlink()
-        except OSError:
-            pass
+        for scratch in (brief, card_file):
+            try:
+                scratch.unlink()
+            except OSError:
+                pass
 PY
