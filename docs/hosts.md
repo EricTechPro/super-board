@@ -8,6 +8,7 @@ super-board runs inside an agent host: the CLI whose session types `/super-board
 | `claude` | Claude Code 2.1.302 | `/super-board run` (Workflow backend) | `claude` then `/login`; `gh auth login` | None. The reference host. |
 | `codex` | codex-cli 0.160.0 | `/super-board run` inside Codex runs as `--codex`; from Claude, `/super-board run --codex` | `codex login`; `gh auth login` | No Workflow tool, so every lane is headless `codex exec`. Review runs only with explicit `--codex` (a host-switched plain `run` counts). No Claude usage guard. |
 | `opencode` | OpenCode v2.0.22 | Not supported yet: the run halts with a host-selection request | `opencode auth login`; `gh auth login` | No OpenCode lane backend yet. `permission.external_directory: deny` is not enforced in v2.0.22 (`patch` still writes outside the repo), so OpenCode runs stay attended-only once a backend lands. |
+| `agy` | Google Antigravity CLI 1.4.6 (`agy`) | Not supported yet: the run halts with a host-selection request | interactive `agy` once (headless runs use the cached sign-in); `gh auth login` | No Antigravity lane backend yet. Headless `agy -p` auto-denies every shell command and non-workspace file write that `permissions.allow` in `~/.gemini/antigravity-cli/settings.json` does not cover, and on Windows those rules match exactly unless written as `command(regex:…)`. |
 
 Every host also needs `gh`, `jq`, bash 3.2+ and Python 3.9+.
 
@@ -19,9 +20,12 @@ Every host also needs `gh`, `jq`, bash 3.2+ and Python 3.9+.
 2. `CODEX_THREAD_ID` or `CODEX_SESSION_ID` → `codex`.
 3. `OPENCODE=1` → `opencode`. Checked before `CLAUDECODE`, which leaks into an OpenCode
    session started from Claude Code. `AGENT=1` is ignored: other tools set it too.
-4. `CLAUDECODE` → `claude`.
-5. The board config's top-level `host` key, when `--config` is given.
-6. Nothing matched: empty stdout, a hint on stderr, exit 65. The run halts and asks for a
+4. `ANTIGRAVITY_AGENT=1` → `agy`. Also checked before `CLAUDECODE`, which leaks into an
+   Antigravity lane started from a Claude session. The other `ANTIGRAVITY_*` variables are
+   per-conversation ids or session secrets and are not used.
+5. `CLAUDECODE` → `claude`.
+6. The board config's top-level `host` key, when `--config` is given.
+7. Nothing matched: empty stdout, a hint on stderr, exit 65. The run halts and asks for a
    host. It never guesses Claude.
 
 A live env sign beats the saved config, so a Codex lane started from a Claude-configured
@@ -35,3 +39,9 @@ Onboard always writes `host` into `.claude/super-board/configs/<slug>.json`.
 - Codex: env of `codex exec -s read-only`, 2026-10-04 (recorded in the script header).
 - OpenCode: env diff of an `opencode run` shell, 2026-10-19: `OPENCODE=1`,
   `OPENCODE_SESSION_ID`, `OPENCODE_TERMINAL=1`, `AGENT=1`.
+- Antigravity: `cmd /c set` run by `run_command` inside a headless `agy -p` on agy 1.4.6,
+  Windows 11, 2026-10-23: `ANTIGRAVITY_AGENT=1`, `ANTIGRAVITY_CONVERSATION_ID`,
+  `ANTIGRAVITY_LS_VERSION=cli-1.4.6`, `ANTIGRAVITY_APP_DATA_DIR`, `ANTIGRAVITY_PROJECT_ID`,
+  `ANTIGRAVITY_TRAJECTORY_ID`, `ANTIGRAVITY_AGENTAPI_EXE`, `ANTIGRAVITY_LS_ADDRESS`,
+  `ANTIGRAVITY_CSRF_TOKEN`, `ANTIGRAVITY_SOURCE_METADATA`. No `AGENT`, `GEMINI_*` or
+  `CLAUDECODE`. The hooks and permissions docs name none of them.

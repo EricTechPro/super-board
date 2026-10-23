@@ -15,6 +15,7 @@ host() { env -i PATH="$PATH" "$@" bash "$S"; }
 [ "$(host SUPER_BOARD_HOST=codex)" = codex ] || fail 'override forces codex'
 [ "$(host SUPER_BOARD_HOST=claude CODEX_THREAD_ID=01a1)" = claude ] || fail 'override beats the env'
 [ "$(host SUPER_BOARD_HOST=opencode)" = opencode ] || fail 'override accepts opencode'
+[ "$(host SUPER_BOARD_HOST=agy)" = agy ] || fail 'override accepts agy'
 rc=0; host SUPER_BOARD_HOST=gemini >/dev/null 2>&1 || rc=$?
 [ "$rc" = 64 ] || fail "bad override exits 64, got $rc"
 
@@ -31,6 +32,8 @@ nohost
 nohost CODEX_HOME=/x CODEX_SANDBOX=seatbelt   # not host signs
 nohost CODEX_THREAD_ID= CLAUDECODE=            # empty values are not signs
 nohost AGENT=1                                 # OpenCode sets it, but so do other tools
+nohost ANTIGRAVITY_CONVERSATION_ID=fe3b ANTIGRAVITY_LS_VERSION=cli-1.4.6   # ids are not the sign
+nohost ANTIGRAVITY_AGENT=                      # empty is not a sign
 
 # OpenCode v2.0.22 exports OPENCODE=1. It wins over a CLAUDECODE leaked from a parent Claude
 # session; the override and a Codex id still win over it.
@@ -39,15 +42,26 @@ nohost AGENT=1                                 # OpenCode sets it, but so do oth
 [ "$(host SUPER_BOARD_HOST=claude OPENCODE=1)" = claude ] || fail 'override beats the OpenCode sign'
 [ "$(host CODEX_THREAD_ID=01a1 OPENCODE=1)" = codex ] || fail 'a Codex id beats the OpenCode sign'
 
+# Antigravity (agy 1.4.6) exports ANTIGRAVITY_AGENT=1 into the shells its run_command tool
+# runs. It wins over a CLAUDECODE leaked from the Claude session that launched the lane; the
+# override and a Codex id still win over it.
+[ "$(host ANTIGRAVITY_AGENT=1)" = agy ] || fail 'ANTIGRAVITY_AGENT=1 means agy'
+[ "$(host ANTIGRAVITY_AGENT=1 CLAUDECODE=1)" = agy ] || fail 'an agy lane under a Claude parent is agy'
+[ "$(host SUPER_BOARD_HOST=claude ANTIGRAVITY_AGENT=1)" = claude ] || fail 'override beats the agy sign'
+[ "$(host CODEX_THREAD_ID=01a1 ANTIGRAVITY_AGENT=1)" = codex ] || fail 'a Codex id beats the agy sign'
+
 # Config `host` (top-level key): used only when no override and no env sign is present.
 T=$(mktemp -d); trap 'rm -f "$ERR"; rm -rf "$T"' EXIT
 printf '{"host":"codex"}' > "$T/codex.json"
+printf '{"host":"agy"}' > "$T/agy.json"
 printf '{"worker_backend":"workflow"}' > "$T/none.json"
 printf '{"host":"gemini"}' > "$T/bad.json"
 cfg() { local f=$1; shift; env -i PATH="$PATH" "$@" bash "$S" --config "$f"; }
 [ "$(cfg "$T/codex.json")" = codex ] || fail 'config host codex prints codex'
 [ "$(cfg "$T/codex.json" CLAUDECODE=1)" = claude ] || fail 'an env sign beats config host'
 [ "$(cfg "$T/codex.json" SUPER_BOARD_HOST=opencode)" = opencode ] || fail 'override beats config host'
+[ "$(cfg "$T/agy.json")" = agy ] || fail 'config host agy prints agy'
+[ "$(cfg "$T/agy.json" CODEX_THREAD_ID=01a1)" = codex ] || fail 'an env sign beats config host agy'
 for f in none missing; do
   rc=0; out=$(cfg "$T/$f.json" 2>/dev/null) || rc=$?
   [ "$rc" = 65 ] && [ -z "$out" ] || fail "config $f without host should exit 65, got $rc '$out'"
