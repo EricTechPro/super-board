@@ -265,7 +265,7 @@ class Inventory:
             self.roots = [self.root / '.claude/skills', self.home / '.claude/skills']
             self.claude_plugins()
         else:
-            # Codex discovery stops at this independent repository's root.
+            # Codex and Antigravity discovery stops at this independent repository's root.
             process = subprocess.run(['git', '-C', str(self.root), 'rev-parse', '--show-toplevel'],
                                      text=True, capture_output=True)
             boundary = Path(process.stdout.strip()).resolve() if process.returncode == 0 else self.root
@@ -276,6 +276,13 @@ class Inventory:
                     if parent == boundary:
                         break
             self.roots = [parent / '.agents/skills' for parent in scoped]
+        if host == 'agy':
+            # Google Antigravity reads .agents/skills/ (cwd up to the repository root; its bundled
+            # docs: agy-customizations/SKILL.md) and ~/.agents/skills. Its lanes also read
+            # .claude/skills/<name>/SKILL.md on instruction (super-board-agy-lane.sh), so that
+            # project surface counts too. No Codex config.toml semantics apply.
+            self.roots += [self.root / '.claude/skills', self.home / '.agents/skills']
+        elif host == 'codex':
             codex_home = (self.home / '.codex') if home else Path(os.environ.get('CODEX_HOME', self.home / '.codex'))
             self.roots += [self.home / '.agents/skills', codex_home / 'skills']
             try:
@@ -454,7 +461,7 @@ class UsageParser(argparse.ArgumentParser):
 def main(argv=None):
     parser = UsageParser(description=__doc__)
     parser.add_argument('--root', required=True)
-    parser.add_argument('--host', required=True, choices=['claude', 'codex'])
+    parser.add_argument('--host', required=True, choices=['claude', 'codex', 'agy'])
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument('--cards')
     selection.add_argument('--profile', choices=['setup'])

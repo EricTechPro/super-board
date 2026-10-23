@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Dispatch an explicitly selected Codex wave; stdout/--output matches the
-# Claude workflow's {cards:[summary...], halted} reconciliation contract.
-# Usage: --config f --cards '<JSON array>' --codex[=model] [--tier low|medium|high] [--output f]
-# Unless one model is pinned (--codex=<model> or codex.model), a cheap router
-# (ROUTER_MODEL) grades each Ready card low/medium/high; the lane launcher maps
-# tier x grade to a model through its CODEX_LADDERS table.
+# Dispatch an explicitly selected headless wave (Codex or Antigravity); stdout/--output
+# matches the Claude workflow's {cards:[summary...], halted} reconciliation contract.
+# Usage: --config f --cards '<JSON array>' (--codex[=model] | --agy[=model])
+#        [--tier low|medium|high] [--output f]
+# The host flag picks the lane launcher: super-board-codex-lane.sh or
+# super-board-agy-lane.sh (super-board-agy-wave.sh is the entry point that adds --agy).
+# Unless one model is pinned (--<host>=<model> or <host>.model), a cheap router grades
+# each Ready card low/medium/high; the lane launcher maps tier x grade to a model
+# (CODEX_LADDERS) or to a model + effort (AGY_EFFORT / agy.ladder).
 set -euo pipefail
 exec python3 - "${BASH_SOURCE[0]}" "$@" <<'PY'
 import argparse
@@ -13,6 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
+import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -20,18 +25,38 @@ import tempfile
 import threading
 import time
 
-parser = argparse.ArgumentParser(description='Dispatch one explicitly opted-in Codex wave.')
+parser = argparse.ArgumentParser(description='Dispatch one explicitly opted-in Codex or Antigravity wave.')
 parser.add_argument('--config', required=True)
 parser.add_argument('--cards', required=True, help='planner card array JSON or JSON file')
 parser.add_argument('--output')
 parser.add_argument('--tier', default='medium', choices=['low', 'medium', 'high'])
 raw = sys.argv[2:]
-codex = [arg for arg in raw if arg == '--codex' or arg.startswith('--codex=')]
-if len(codex) != 1 or (codex[0].startswith('--codex=') and not codex[0].partition('=')[2].strip()):
-    parser.error('exactly one explicit --codex[=<non-empty-model>] is required')
+codex = [arg for arg in raw if arg in ('--codex', '--agy') or arg.startswith(('--codex=', '--agy='))]
+if len(codex) != 1 or ('=' in codex[0] and not codex[0].partition('=')[2].strip()):
+    parser.error('exactly one explicit --codex[=<non-empty-model>] or --agy[=<non-empty-model>] is required')
+HOST = codex[0][2:].partition('=')[0]          # 'codex' | 'agy'
 args = parser.parse_args([arg for arg in raw if arg not in codex])
 output_path = Path(args.output).resolve() if args.output else None
-launcher = Path(sys.argv[1]).resolve().with_name('super-board-codex-lane.sh')
+launcher = Path(sys.argv[1]).resolve().with_name(f'super-board-{HOST}-lane.sh')
+# The Antigravity CLI: SB_AGY_BIN overrides it with a full command line (tests);
+# shutil.which resolves agy.exe / agy.cmd on Windows.
+AGY = shlex.split(os.environ.get('SB_AGY_BIN', '')) or [shutil.which('agy') or 'agy']
+# The PATH bash. On Windows a bare 'bash' resolves to System32ash.exe (WSL) before PATH,
+# which would run the lane launcher in another filesystem (exit 127 from here).
+BASH = shutil.which('bash') or 'bash'
+# Lanes run in their own process group so cancellation reaches the CLI and its shells:
+# POSIX start_new_session + killpg; Windows a new process group + `taskkill /T`.
+GROUP = ({'start_new_session': True} if hasattr(os, 'killpg')
+         else {'creationflags': getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)})
+def kill_group(process, hard=False):
+    try:
+        if hasattr(os, 'killpg'):
+            os.killpg(process.pid, signal.SIGKILL if hard else signal.SIGTERM)
+        else:
+            subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (ProcessLookupError, OSError):
+        pass
 try:
     config_path = Path(args.config).resolve()
     config = json.loads(config_path.read_text())
@@ -55,8 +80,14 @@ try:
         raise ValueError('max_workers must be a non-negative integer')
     workers = workers or max(1, min(16, (os.cpu_count() or 2) - 2))
     root = Path(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip()).resolve()
-    configured = (config.get('codex') or {}).get('model')
-    pinned = codex[0].startswith('--codex=') or (isinstance(configured, str) and configured.strip())
+    host_config = config.get(HOST) or {}
+    if not isinstance(host_config, dict):
+        raise ValueError(f'{HOST} must be an object')
+    configured = host_config.get('model')
+    pinned = '=' in codex[0] or (isinstance(configured, str) and configured.strip())
+    router_model = host_config.get('router_model') if HOST == 'agy' else None
+    if router_model is not None and not isinstance(router_model, str):
+        raise ValueError('agy.router_model must be a string')
 except (OSError, ValueError, subprocess.CalledProcessError) as error:
     parser.error(str(error))
 readiness = launcher.with_name('super-board-verification-ready.py')
@@ -75,7 +106,7 @@ try:
     resolver = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(resolver)
     resolver.hydrate(cards, root)
-    skills = resolver.report(root, 'codex', cards, home=os.environ.get('SUPER_BOARD_SKILLS_HOME'),
+    skills = resolver.report(root, HOST, cards, home=os.environ.get('SUPER_BOARD_SKILLS_HOME'),
                              catalog=os.environ.get('SUPER_BOARD_SKILLS_CATALOG'))
 except SystemExit as error:
     code, detail = error.code, 'required GitHub reads halted while hydrating skills; preserve claims and worktrees'
@@ -106,18 +137,12 @@ def cancel(signum, frame):
     with mutex:
         processes = list(active)
         for process in processes:
-            try:
-                os.killpg(process.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-    # Process groups include the launcher, Codex, and shell descendants. Kill
+            kill_group(process)
+    # Process groups include the launcher, the CLI, and shell descendants. Kill
     # lingering descendants too, even when their launcher already exited.
     time.sleep(2)
     for process in processes:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+        kill_group(process, hard=True)
 
 signal.signal(signal.SIGTERM, cancel)
 signal.signal(signal.SIGINT, cancel)
@@ -125,10 +150,11 @@ try:
     with marker.open('x') as stream:
         stream.write(owner + '\n')
 except FileExistsError:
-    parser.error('Codex wave PID marker exists; reconcile the previous wave before starting another')
+    parser.error('headless wave PID marker exists; reconcile the previous wave before starting another')
 
 # The router only grades scope; it writes nothing. A Codex-only run grades with
-# the cheapest Codex model rather than waking Claude.
+# the cheapest Codex model rather than waking Claude; an Antigravity run grades
+# with agy.router_model (else the CLI default) at --effort low.
 ROUTER_MODEL = 'gpt-6-luna'
 GRADE_SCHEMA = {'type': 'object', 'additionalProperties': False, 'required': ['complexity'],
                 'properties': {'complexity': {'type': 'string', 'enum': ['low', 'medium', 'high']}}}
@@ -144,32 +170,43 @@ def grade(card):
               f"--kind comments -- api repos/{{owner}}/{{repo}}/issues/{card['number']}/comments --paginate --slurp. "
               'Grade complexity (low|medium|high) by the scope of change required. Read only: change no file, '
               'label, comment or board state. Exit 79 from the read helper means stop and return nothing.\n')
-    with tempfile.TemporaryDirectory(prefix='super-board-codex-grade-') as temporary:
+    with tempfile.TemporaryDirectory(prefix=f'super-board-{HOST}-grade-') as temporary:
         schema_path, output = Path(temporary) / 'schema.json', Path(temporary) / 'grade.json'
         schema_path.write_text(json.dumps(GRADE_SCHEMA))
-        command = ['codex', 'exec', '-m', ROUTER_MODEL, '-C', str(root), '-c', 'approval_policy="never"',
-                   '-c', 'default_permissions="super-board-grade"',
-                   '-c', 'permissions.super-board-grade.filesystem={":root"="read", ":slash_tmp"="write", ":tmpdir"="write"}',
-                   '-c', 'permissions.super-board-grade.network.enabled=true',
-                   '--output-schema', str(schema_path), '--output-last-message', str(output), '-']
+        if HOST == 'agy':
+            # agy takes the prompt as an argument and prints one JSON line; the grade is its structured_output.
+            command = AGY + ['-p', prompt, '--output-format', 'json', '--json-schema', str(schema_path),
+                             '--print-timeout', '10m', '--effort', 'low'] + (['--model', router_model] if router_model else [])
+        else:
+            command = ['codex', 'exec', '-m', ROUTER_MODEL, '-C', str(root), '-c', 'approval_policy="never"',
+                       '-c', 'default_permissions="super-board-grade"',
+                       '-c', 'permissions.super-board-grade.filesystem={":root"="read", ":slash_tmp"="write", ":tmpdir"="write"}',
+                       '-c', 'permissions.super-board-grade.network.enabled=true',
+                       '--output-schema', str(schema_path), '--output-last-message', str(output), '-']
         with mutex:
             if halted.is_set():
                 return None, True
             try:
-                process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                                           text=True, start_new_session=True)
+                process = subprocess.Popen(command, stdin=subprocess.PIPE,
+                                           stdout=subprocess.PIPE if HOST == 'agy' else subprocess.DEVNULL,
+                                           text=True, **GROUP)
             except OSError:
                 return None, False
             active.add(process)
         try:
-            process.communicate(prompt)
+            stdout, _ = process.communicate(None if HOST == 'agy' else prompt)
         finally:
             with mutex:
                 active.discard(process)
         if process.returncode == 79:
             return None, True
         try:
-            value = json.loads(output.read_text()).get('complexity')
+            if HOST == 'agy':
+                lines = [line for line in (stdout or '').splitlines() if line.strip()]
+                run = json.loads(lines[-1]) if lines else {}
+                value = (run.get('structured_output') or {}).get('complexity') if run.get('status') == 'SUCCESS' else None
+            else:
+                value = json.loads(output.read_text()).get('complexity')
         except (OSError, ValueError, AttributeError):
             return None, False
         return (value if value in ['low', 'medium', 'high'] else None), False
@@ -192,7 +229,7 @@ def run_card(card):
             if halted.is_set():
                 history.append(dict(lane='none', status='halted', column=current['status'], detail='run halted; preserve claims and worktrees'))
                 break
-            boundary = resolver.report(root, 'codex', [current], lane=lane,
+            boundary = resolver.report(root, HOST, [current], lane=lane,
                                        home=os.environ.get('SUPER_BOARD_SKILLS_HOME'), catalog=os.environ.get('SUPER_BOARD_SKILLS_CATALOG'))
             if not boundary['ready']:
                 skills_halted.set()
@@ -203,18 +240,15 @@ def run_card(card):
             process = None
             lock = inflight / str(card['number'])
             try:
-                process = subprocess.Popen(['bash', str(launcher), '--config', str(config_path),
+                process = subprocess.Popen([BASH, str(launcher), '--config', str(config_path),
                                             '--card', json.dumps(current), '--lane', lane, codex[0],
                                             '--tier', args.tier] + (['--complexity', complexity] if complexity else []),
-                                           stdout=subprocess.PIPE, text=True, start_new_session=True)
+                                           stdout=subprocess.PIPE, text=True, **GROUP)
                 active.add(process)
                 lock.write_text(f'PID={process.pid}\nLANE={lane}\nSTARTED={time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\n')
             except OSError as error:
                 if process is not None:
-                    try:
-                        os.killpg(process.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
+                    kill_group(process, hard=True)
                     process.wait()
                     active.discard(process)
                 history.append(dict(lane=lane, status='failed', column=current['status'],

@@ -302,10 +302,10 @@ cmp -s "$GH_STATE" "$WORK/before.json" || fail "dry-run changed board state: $(c
 [ ! -e "$WORK/dry/.claude" ] || fail "dry-run must not write a backup file"
 echo "$OUT" | q '.status_backup == null and .restored == 0 and .added_columns != []' || fail "dry-run report wrong: $OUT"
 
-# 13 — config `host`: check accepts claude / codex / opencode, flags anything else, and
+# 13 — config `host`: check accepts claude / codex / opencode / agy, flags anything else, and
 #      fix never overwrites a host that is already set.
 H="$WORK/bare/.claude/super-board/configs"; mkdir -p "$H"
-for h in claude codex opencode; do
+for h in claude codex opencode agy; do
   printf '{"host":"%s"}' "$h" > "$H/b.json"
   OUT=$(python3 "$SETUP" check --root "$WORK/bare" || true)
   echo "$OUT" | q '.host_errors == {}' || fail "host $h must be accepted: $OUT"
