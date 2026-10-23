@@ -41,13 +41,16 @@ See `skills/super-board/references/rate-limit-etiquette.md` for the full discipl
 
 ## Installation contract
 
-`install.sh [--no-hooks] [--protect-main] [--hosts claude,codex,opencode] <target>` copies the pack
+`install.sh [--no-hooks] [--protect-main] [--hosts claude,codex,opencode,agy] <target>` copies the pack
 once into the target project's shared `.agents/` tree, then links each host folder into it: one
 link per skill under `skills/`, one per file under `bin/`, `workflows/`, `hooks/`. `.claude/` is
 always linked; `.codex/` and `.opencode/` only when that folder already exists, a config `host`
 key names it, `super-board-host.sh` reports it, or `--hosts` asks. A real-directory `.claude/`
 install is replaced by links on upgrade; a user's own links and anything not super-board's are
 left alone; where no symlink can be made the file is copied. Settings and run state stay in `.claude/`.
+Host `agy` (Google Antigravity) reads `.agents/` itself and gets no links: it gets a
+`super-board-guards` entry in `.agents/hooks.json` that runs `hooks/agy-hook-adapter.py`, the
+same guards translated, plus a pointer to `super-board-agy-permissions.py` for headless lanes.
 
 ```
 .agents/

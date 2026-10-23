@@ -25,8 +25,9 @@ Keep this run choice in each wave and resume command; skip only the Claude usage
 `--codex=<model>` still apply); it counts as explicit `--codex`, Review included.
 Say so once, in the first wave report: `🔁 codex host — running as --codex`. Never improvise a Claude workflow wave in Codex.
 
-**Unknown host halts.** Run the host check before preconditions. Exit 65 (no host sign) or
-`opencode` (no OpenCode backend yet) halts before any claim, even with no Workflow tool, with one line:
+**Unknown host halts.** Run the host check before preconditions. Exit 65 (no host sign),
+`opencode` (no OpenCode backend yet) or `agy` (no Antigravity backend yet) halts before any claim,
+even with no Workflow tool, with one line:
 `⛔ unknown host — set SUPER_BOARD_HOST=claude|codex and re-run`. Never guess a backend.
 
 After the same plan and claim steps, launch this command as a background task:
@@ -246,8 +247,8 @@ Repeat until a done condition or halt gate fires:
    there is no cross-session claim at all, so never run two orchestrators
    (or /loop re-entries) against the same board without bot_identity.
 4. **Launch** — With `--codex`, or no Workflow tool, or the host check printing `codex`, use
-   "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65 or
-   `opencode` never reaches Launch (see "Unknown host halts"). Workflow tool with
+   "Codex runs" above. The host check printing `claude` uses the Workflow tool; exit 65,
+   `opencode` or `agy` never reaches Launch (see "Unknown host halts"). Workflow tool with
    `scriptPath: .claude/workflows/super-board-wave.js` and
    `args: { configPath, cards, humanApprovesMerge, tier }` (`cards` hydrated after the planner: each
    carries `lane` and `labels`, and a `qa` card skips the Builder). Runs in the background; the
