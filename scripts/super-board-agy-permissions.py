@@ -28,7 +28,10 @@ That is the default profile. `--from-allowlist` instead converts the board's Cla
 sooner or later hit a form it does not cover. `--add RULE` appends any rule as written
 (platform tools: `command(./gradlew)`). Default is a dry run; `--apply` merges into the
 settings file (other keys untouched, no duplicates) after copying it to <file>.bak-<ts>.
-An invalid settings file is left untouched (exit 2).
+An invalid settings file is left untouched (exit 2). agy 1.4.6 itself rewrites the file
+with a UTF-8 BOM (seen one minute into a lane) and then loads `permissions=<nil>` from it,
+so every tool call is denied: this script reads the file BOM-tolerant and `--apply`
+rewrites it without one, even when it has no new rule to add.
 
 Usage:
   super-board-agy-permissions.py [--repo .] [--settings ~/.gemini/antigravity-cli/settings.json]
@@ -92,7 +95,7 @@ def main():
     if args.from_allowlist:
         claude = Path(args.repo) / ".claude/settings.json"
         try:
-            allow = (json.loads(claude.read_text()).get("permissions") or {}).get("allow") or [] if claude.exists() else []
+            allow = (json.loads(claude.read_text(encoding="utf-8-sig")).get("permissions") or {}).get("allow") or [] if claude.exists() else []
         except ValueError:
             print(f"✋ {claude} is not valid JSON; fix it first", file=sys.stderr)
             return 2
@@ -110,8 +113,9 @@ def main():
     wanted_deny = DENY_COMMANDS + deny_paths(Path.home())
 
     target = Path(args.settings).expanduser()
+    bom = target.exists() and target.read_bytes().startswith(b"\xef\xbb\xbf")
     try:
-        current = json.loads(target.read_text()) if target.exists() else {}
+        current = json.loads(target.read_text(encoding="utf-8-sig")) if target.exists() else {}
         if not isinstance(current, dict):
             raise ValueError
     except ValueError:
@@ -130,7 +134,9 @@ def main():
     if args.verbose:
         for rule in skipped:
             print(f"  skipped (no Antigravity twin): {rule}")
-    if not new_allow and not new_deny:
+    if bom:
+        print(f"! {target} starts with a UTF-8 BOM: agy loads no permissions from it until it is rewritten")
+    if not new_allow and not new_deny and not (bom and args.apply):
         print(f"✓ {target}: every board rule already present")
         return 0
     if not args.apply:
@@ -141,9 +147,9 @@ def main():
         shutil.copy2(target, target.with_name(target.name + time.strftime(".bak-%Y%m%d%H%M%S")))
     current["permissions"] = dict(permissions, allow=existing_allow + new_allow, deny=existing_deny + new_deny)
     temporary = target.with_name(target.name + ".tmp")
-    temporary.write_text(json.dumps(current, indent=2) + "\n")
+    temporary.write_text(json.dumps(current, indent=2) + "\n", encoding="utf-8")
     temporary.replace(target)
-    print(f"✓ {len(new_allow)} allow and {len(new_deny)} deny rule(s) added to {target}")
+    print(f"✓ {len(new_allow)} allow and {len(new_deny)} deny rule(s) added to {target}" + (" (BOM stripped)" if bom else ""))
     return 0
 
 

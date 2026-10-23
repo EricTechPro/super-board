@@ -59,4 +59,13 @@ rc=0; python3 "$P" --repo "$T/repo" --settings "$T/bad.json" --apply >/dev/null 
 [ "$(cat "$T/bad.json")" = '{not json' ] || fail "invalid settings must be left untouched"
 PASS=$((PASS + 1))
 
+# 7 — a settings file agy rewrote with a UTF-8 BOM is read all the same and rewritten clean by --apply.
+printf '\xef\xbb\xbf{"permissions":{"allow":["command(*)"]}}\n' > "$T/bom.json"
+OUT=$(python3 "$P" --repo "$T/repo" --settings "$T/bom.json")
+echo "$OUT" | grep -q 'starts with a UTF-8 BOM' || fail "dry run must warn about the BOM: $OUT"
+python3 "$P" --repo "$T/repo" --settings "$T/bom.json" --apply | grep -q 'BOM stripped' || fail "apply must say it stripped the BOM"
+[ "$(head -c 1 "$T/bom.json")" = "{" ] || fail "apply must rewrite the file without a BOM"
+jq -e '.permissions.allow | index("command(*)") != null' "$T/bom.json" >/dev/null || fail "the rules must survive the rewrite"
+PASS=$((PASS + 1))
+
 echo "PASS: test-agy-permissions.sh ($PASS scenarios)"
