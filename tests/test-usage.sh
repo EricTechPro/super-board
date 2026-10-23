@@ -68,4 +68,33 @@ check; [ "$RC" -eq 10 ] || fail "stale over-threshold must still pause, got $RC:
 echo 'not json' > "$SB_USAGE_FILE"; check
 [ "$RC" -eq 3 ] || fail "unreadable snapshot should exit 3, got $RC"
 
-echo "PASS: test-usage.sh (10 scenarios)"
+# 11 — Antigravity: record recognises the agy status line (quota buckets as remaining
+#      fractions + ISO reset times), keeps it in the agy snapshot, and leaves the Claude one alone.
+export SB_USAGE_FILE_AGY="$TMP/agy.json"
+feed 40 70
+RESET=$(date -u -d "@$WEEK" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$WEEK" +%Y-%m-%dT%H:%M:%SZ)
+agy_feed() {  # $1 = gemini-weekly remaining fraction, $2 = gemini-3.8-flash remaining fraction
+  printf '{"model":{"id":"auto"},"quota":{"gemini-weekly":{"remaining_fraction":%s,"reset_time":"%s","reset_in_seconds":1000},"gemini-3.8-flash":{"remaining_fraction":%s,"reset_time":"%s"}}}' \
+    "$1" "$RESET" "$2" "$RESET" | "$U" record
+}
+[ -z "$(agy_feed 0.938 0.5)" ] || fail "agy record must print nothing"
+jq -e '.rate_limits["gemini-weekly"].used_percentage == 6.2 and .rate_limits["gemini-3.8-flash"].used_percentage == 50' "$SB_USAGE_FILE_AGY" >/dev/null || fail "agy record must convert fractions to used_percentage: $(cat "$SB_USAGE_FILE_AGY")"
+check; [ "$RC" -eq 0 ] || fail "an agy record must not touch the Claude snapshot, got $RC: $OUT"
+
+# 12 — check --host agy weighs every bucket by name: ok under threshold, pause over it.
+check --host agy
+[ "$RC" -eq 0 ] || fail "agy 6.2/50 should be ok, got $RC: $OUT"
+echo "$OUT" | jq -e '.window == "gemini-3.8-flash" and .used == 50' >/dev/null || fail "agy check must report the highest bucket: $OUT"
+agy_feed 0.03 0.5; check --host agy
+[ "$RC" -eq 10 ] || fail "gemini-weekly at 97% should pause, got $RC: $OUT"
+echo "$OUT" | jq -e '.window == "gemini-weekly" and .used == 97' >/dev/null || fail "agy pause must name the bucket: $OUT"
+echo '{"usage_pause_pct":40}' > "$TMP/a.json"
+agy_feed 0.9 0.5; check --host agy --config "$TMP/a.json"
+[ "$RC" -eq 10 ] || fail "usage_pause_pct applies to the agy check too, got $RC"
+
+# 13 — no agy snapshot reads unknown (3); a bad --host is a usage error (64).
+rm -f "$SB_USAGE_FILE_AGY"; check --host agy
+[ "$RC" -eq 3 ] || fail "no agy snapshot should exit 3, got $RC"
+check --host gemini; [ "$RC" -eq 64 ] || fail "unknown host should exit 64, got $RC"
+
+echo "PASS: test-usage.sh (13 scenarios)"

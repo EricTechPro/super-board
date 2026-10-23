@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-usage.sh — Claude plan-usage guard for the run loop.
+# super-board-usage.sh — plan-usage guard for the run loop (Claude Code, or Antigravity).
 #
 # WHERE THE NUMBER COMES FROM
 #
@@ -16,19 +16,28 @@
 # transcripts and reports tokens/cost per 5-hour block, but not a percentage of
 # the plan limit, so it cannot answer "are we at 95%".
 #
+# The Antigravity CLI (agy) does the same with its own status line
+# (antigravity.google/docs/cli/statusline): `quota.<bucket>.{remaining_fraction 0-1,
+# reset_time ISO-8601, reset_in_seconds}`, one bucket per plan window or model
+# (`gemini-weekly`, …). `record` recognises that shape by itself, converts every bucket to
+# {used_percentage, resets_at} and saves it to the agy snapshot; `check --host agy`
+# reads it and weighs every bucket, since the names are not fixed. Only an interactive
+# agy session renders a status line; headless `agy -p` lanes do not.
+#
 # So this script has two halves:
 #
 #   record — called from the status-line script with the status-line JSON on
-#            stdin. Saves `rate_limits` plus a timestamp to the snapshot file.
-#            Prints nothing, so it never disturbs the status line.
+#            stdin. Saves `rate_limits` (Claude) or the converted `quota` (agy)
+#            plus a timestamp to that host's snapshot file. Prints nothing, so it
+#            never disturbs the status line.
 #   check  — reads the snapshot and says ok / pause / unknown.
 #
 # LIMITS, STATED PLAINLY
 #
-# - The snapshot refreshes only while some interactive Claude Code session with
-#   the record line is rendering its status line (after each API response).
-#   Headless `claude -p` workers do not render one. The workflow backend's
-#   orchestrator IS an interactive session, so its own turns keep it fresh.
+# - The snapshot refreshes only while some interactive session with the record
+#   line is rendering its status line (after each API response). Headless
+#   workers do not render one. The workflow backend's orchestrator IS an
+#   interactive session, so its own turns keep it fresh.
 # - API-key and Bedrock/Vertex users get no `rate_limits` at all → `unknown`.
 # - Usage only grows inside a window until it resets. A stale reading at or
 #   over the threshold is therefore still a valid "pause" until its resets_at;
@@ -36,44 +45,62 @@
 #
 # Usage:
 #   <status-line json> | super-board-usage.sh record
-#   super-board-usage.sh check [--config <cfg.json>] [--threshold 95] [--max-age 900]
+#   super-board-usage.sh check [--host claude|agy] [--config <cfg.json>] [--threshold 95] [--max-age 900]
 #
-# Snapshot: $SB_USAGE_FILE, default ~/.claude/super-board/usage.json (usage is
-# per account, not per repo, so one file serves every board).
+# Snapshots: $SB_USAGE_FILE, default ~/.claude/super-board/usage.json (Claude) and
+# $SB_USAGE_FILE_AGY, default ~/.gemini/super-board/usage.json (agy). Usage is per
+# account, not per repo, so one file per host serves every board.
 #
 # check prints one JSON line:
-#   {"state":"ok|pause|unknown","window":"five_hour|seven_day|null",
+#   {"state":"ok|pause|unknown","window":"five_hour|seven_day|<agy bucket>|null",
 #    "used":96,"resets_at":1738425600,"age":42,"reason":"…"}
 # Exit: 0 ok, 10 pause, 3 unknown, 64 usage error.
 set -euo pipefail
 
 FILE="${SB_USAGE_FILE:-$HOME/.claude/super-board/usage.json}"
+AGY_FILE="${SB_USAGE_FILE_AGY:-$HOME/.gemini/super-board/usage.json}"
 MODE="${1:-}"; [ $# -gt 0 ] && shift
 
 case "$MODE" in
   record)
     IN=$(cat)
     RL=$(printf '%s' "$IN" | jq -c '.rate_limits // empty' 2>/dev/null || true)
-    # No rate_limits (API-key user, or before the session's first response):
-    # keep the last good snapshot rather than overwrite it with nothing.
+    if [ -z "$RL" ]; then
+      # Antigravity status line: quota buckets as remaining fractions + ISO reset times.
+      RL=$(printf '%s' "$IN" | jq -c '
+        (.quota // empty) | select(type == "object" and length > 0)
+        | with_entries(select(.value.remaining_fraction != null and .value.reset_time != null)
+            | .value = { used_percentage: (((1 - .value.remaining_fraction) * 1000 | round) / 10),
+                         resets_at: (.value.reset_time | sub("\\.[0-9]+"; "") | fromdateiso8601) })
+        | select(length > 0)' 2>/dev/null || true)
+      [ -n "$RL" ] && FILE="$AGY_FILE"
+    fi
+    # No rate_limits and no quota (API-key user, or before the session's first
+    # response): keep the last good snapshot rather than overwrite it with nothing.
     [ -n "$RL" ] || exit 0
     mkdir -p "$(dirname "$FILE")"
     TMP="$FILE.$$"
     jq -n --argjson rl "$RL" '{recorded_at: now | floor, rate_limits: $rl}' > "$TMP" && mv "$TMP" "$FILE"
     exit 0 ;;
   check) ;;
-  *) echo "usage: super-board-usage.sh record | check [--config f] [--threshold N] [--max-age S]" >&2; exit 64 ;;
+  *) echo "usage: super-board-usage.sh record | check [--host claude|agy] [--config f] [--threshold N] [--max-age S]" >&2; exit 64 ;;
 esac
 
-THRESHOLD=""; MAX_AGE=900; CONFIG=""
+THRESHOLD=""; MAX_AGE=900; CONFIG=""; HOST=claude
 while [ $# -gt 0 ]; do
   case "$1" in
+    --host)      HOST="$2"; shift 2 ;;
     --config)    CONFIG="$2"; shift 2 ;;
     --threshold) THRESHOLD="$2"; shift 2 ;;
     --max-age)   MAX_AGE="$2"; shift 2 ;;
     *) echo "unknown arg: $1" >&2; exit 64 ;;
   esac
 done
+case "$HOST" in
+  claude) ANY_WINDOW=false ;;
+  agy) FILE="$AGY_FILE"; ANY_WINDOW=true ;;
+  *) echo "--host must be claude or agy" >&2; exit 64 ;;
+esac
 if [ -z "$THRESHOLD" ] && [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
   THRESHOLD=$(jq -r '.usage_pause_pct // empty' "$CONFIG")
 fi
@@ -84,12 +111,13 @@ if [ ! -f "$FILE" ]; then
   exit 3
 fi
 
-OUT=$(jq -c --argjson th "$THRESHOLD" --argjson maxage "$MAX_AGE" '
+OUT=$(jq -c --argjson th "$THRESHOLD" --argjson maxage "$MAX_AGE" --argjson any "$ANY_WINDOW" '
   (now | floor) as $now
   | ($now - (.recorded_at // 0)) as $age
-  # A window whose reset time has passed is a fresh window: drop it.
+  # A window whose reset time has passed is a fresh window: drop it. Claude has two
+  # fixed windows; an agy snapshot names its buckets, so every one counts there.
   | [ (.rate_limits // {}) | to_entries[]
-      | select(.key == "five_hour" or .key == "seven_day")
+      | select($any or .key == "five_hour" or .key == "seven_day")
       | select((.value.used_percentage // null) != null)
       | select((.value.resets_at // 0) > $now)
       | { window: .key, used: .value.used_percentage, resets_at: .value.resets_at } ] as $w

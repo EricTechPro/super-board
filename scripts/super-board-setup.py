@@ -973,8 +973,8 @@ def main(argv):
         if cmd in ("check", "fix"):
             pack = find_pack(flag(rest, "--pack"))
             host, home, catalog = flag(rest, "--host", "claude"), flag(rest, "--home", os.environ.get("SUPER_BOARD_SKILLS_HOME")), flag(rest, "--catalog", os.environ.get("SUPER_BOARD_SKILLS_CATALOG"))
-            if host not in ("claude", "codex"):
-                raise ValueError("--host must be claude or codex")
+            if host not in ("claude", "codex", "agy"):
+                raise ValueError("--host must be claude, codex or agy")
             res = check(root, pack, host, home, catalog) if cmd == "check" else fix(root, pack, "--no-helpers" not in rest, dry, host, home, catalog)
             if res.get("error") == "pack-not-found":
                 print(json.dumps(res, indent=1))

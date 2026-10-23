@@ -9,7 +9,7 @@ Invoked as `/super-board onboard` (get.sh / install.sh) or `/super-board:super-b
 ## Host-visible skill checks
 
 Checks use `.claude/bin/super-board-skills-ready.py --profile setup --host
-<claude|codex>` and show `helper_readiness`: exact files, declared fallbacks,
+<claude|codex|agy>` and show `helper_readiness`: exact files, declared fallbacks,
 optional skips and missing names. Setup checks the unconditional union; a
 selected card may need fewer helpers. Node or `skills-lock.json` never proves
 readiness. `check` and dispatch install nothing. Explicit `fix` retains helper
@@ -144,8 +144,10 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    For creation or upkeep read `../../super-qa/references/project-verifier.md`;
    │    stage real project checks only when source names accepted features. Optional
    │    verifier gaps never replace or block the required verification commands.
-   └─ machine time zone for config `timezone`: $TZ, else readlink /etc/localtime | sed
-      's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 8.
+   ├─ machine time zone for config `timezone`: $TZ, else readlink /etc/localtime | sed
+   │    's#.*zoneinfo/##', else timedatectl show -p Timezone --value, else "UTC". Shown at step 8.
+   └─ host: bash $SB/super-board-host.sh (exit 65 → the step-8 question); `agy` adds the
+      Antigravity extras at step 8.
 
 1. 🔍 CHECKS — nothing asked except system tools and sign-ins
    ├─ python3 $SB/super-board-setup.py fix --host <actual-worker-host> --text
@@ -371,8 +373,14 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    │    --dest AGENTS.md, pointer --tail <staged tail> --force, block, check
    │    ├─ staged project verifier skill/map/scenarios/runner, if source-backed; then
    │    │    inspect the saved map and resolve the local skill for the actual host.
-   │    └─ docs/agents/issue-tracker.md; docs/super-board/PROJECT.md (a sub-agent drafts it from
-   │       manifests + README + tree, no question; listed in the table as "PROJECT.md drafted")
+   │    ├─ docs/agents/issue-tracker.md; docs/super-board/PROJECT.md (a sub-agent drafts it from
+   │    │    manifests + README + tree, no question; listed in the table as "PROJECT.md drafted")
+   │    └─ host `agy`: `install.sh --hosts agy` has written `.agents/hooks.json` (if not, say
+   │       "re-run ./install.sh --hosts agy <this-dir>"). Then show `python3
+   │       $SB/super-board-agy-permissions.py` (dry run) and run it with `--apply` only after
+   │       "Write everything": it edits the user's ~/.gemini/antigravity-cli/settings.json
+   │       (backup kept). Remind once: set the agy status line to
+   │       `bash <repo>/.claude/bin/super-board-usage.sh record` so the quota guard has a snapshot.
    └─ Delete onboard-staged/; keep the answers file (re-runs use it).
 
 DONE — run `python3 $SB/super-board-verification-ready.py --config <saved config>`;

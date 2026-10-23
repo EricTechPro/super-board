@@ -293,7 +293,8 @@
   // orchestrator runs super-board-usage.sh check; if the 5-hour or weekly
   // window is at or above this percentage, no new wave launches until it
   // resets. Default 95. See references/run-workflow.md → wave loop step 1.
-  // Explicit `run --codex` skips this Claude-only guard.
+  // Explicit `run --codex` skips this Claude-only guard; `run --agy` checks the
+  // Antigravity quota instead (`super-board-usage.sh check --host agy`).
   "usage_pause_pct": 95,
 
   // What the orchestrator does while the usage guard pauses (exit 10).
