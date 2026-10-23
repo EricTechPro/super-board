@@ -1,0 +1,16 @@
+{
+  "super-board-guards": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command|view_file|.*(command|shell|terminal|read|grep|search|find|write|create|replace|edit|patch).*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 hooks/agy-hook-adapter.py --event PreToolUse",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

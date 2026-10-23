@@ -5,7 +5,7 @@
 # merges the hook settings into .claude/settings.json (backed up first, never duplicated).
 #
 # Usage:
-#   ./install.sh [--no-hooks] [--protect-main] [--hosts claude,codex,opencode] [target-project-dir]
+#   ./install.sh [--no-hooks] [--protect-main] [--hosts claude,codex,opencode,agy] [target-project-dir]
 # Defaults to the current working directory. --no-hooks skips the guard hooks
 # and leaves settings.json untouched. --protect-main also wires the opt-in
 # guard that blocks direct and force pushes to main/master/base_branch; with
@@ -20,6 +20,14 @@
 # workflows/ and hooks/. Nothing that is not super-board's is touched. Where a
 # link cannot be made (Windows without symlink rights) the file is copied.
 # Settings and run state (.claude/settings.json, .claude/super-board/) stay put.
+#
+# Google Antigravity (host `agy`) reads .agents/ itself, so it gets no folder of
+# links. It gets the guard hooks instead: a "super-board-guards" entry in
+# .agents/hooks.json that runs hooks/agy-hook-adapter.py (the same guard-*.py,
+# translated); other entries in that file are kept, --protect-main adds the push
+# guard. Asked with --hosts agy, a config "host" key, super-board-host.sh, or an
+# existing entry. Headless lanes also need permission rules:
+# .claude/bin/super-board-agy-permissions.py writes them (the install names it).
 #
 # Output is grouped with emojis, one line per group of files (failures still name
 # the file). Environment: SUPER_BOARD_QUIET_NEXT=1 prints only the "🔧 installing"
@@ -68,8 +76,8 @@ HOSTS="claude"
 add_host() { case " $HOSTS " in *" $1 "*) ;; *) HOSTS="$HOSTS $1" ;; esac; }
 for h in $(echo "$ASKED_HOSTS" | tr ',' ' '); do
   case "$h" in
-    claude|codex|opencode) add_host "$h" ;;
-    *) echo "unknown host: $h (use claude, codex or opencode)" >&2; exit 64 ;;
+    claude|codex|opencode|agy) add_host "$h" ;;
+    *) echo "unknown host: $h (use claude, codex, opencode or agy)" >&2; exit 64 ;;
   esac
 done
 for h in codex opencode; do [ ! -d "$TARGET/.$h" ] || add_host "$h"; done
@@ -80,11 +88,18 @@ for p in sorted(glob.glob(os.path.join(sys.argv[1], "*.json"))):
         h = json.load(open(p)).get("host")
     except Exception:
         continue
-    if h in ("codex", "opencode"):
+    if h in ("codex", "opencode", "agy"):
         print(h)
 PY
 ); do add_host "$h"; done
-[ "$(bash "$REPO_ROOT/scripts/super-board-host.sh" 2>/dev/null || true)" != codex ] || add_host codex
+case "$(bash "$REPO_ROOT/scripts/super-board-host.sh" 2>/dev/null || true)" in
+  codex) add_host codex ;;
+  agy) add_host agy ;;
+esac
+# An Antigravity entry written by an earlier install keeps the host on re-install.
+if [ -f "$TARGET/.agents/hooks.json" ] && grep -q '"super-board-guards"' "$TARGET/.agents/hooks.json" 2>/dev/null; then
+  add_host agy
+fi
 
 QUIET="${SUPER_BOARD_QUIET_NEXT:-}"
 PACK_VERSION="$(tr -d '[:space:]' < "$REPO_ROOT/VERSION" 2>/dev/null || echo '?')"
@@ -259,6 +274,7 @@ GROUPS_="skills bin workflows"
 [ -z "$HOOK_FILES" ] || GROUPS_="$GROUPS_ hooks"
 LINKED=""
 for host in $HOSTS; do
+  [ "$host" != agy ] || continue   # Antigravity reads .agents/ directly: nothing to link
   LINKED="${LINKED:+$LINKED, }.$host"
   for group in $GROUPS_; do
     mkdir -p "$TARGET/.$host/$group"
@@ -295,7 +311,8 @@ merge_settings() {
 }
 
 if [ "$HOOKS" -eq 1 ]; then
-  set -- $HOOK_FILES; n=$#
+  # The Antigravity adapter is plumbing that runs the guards, not a guard itself.
+  n=0; for h in $HOOK_FILES; do [ "$h" = agy-hook-adapter.py ] || n=$((n + 1)); done
   SNIPPETS="$REPO_ROOT/hooks/settings-snippet.json"
   if [ "$PROTECT" -eq 1 ]; then SNIPPETS="$SNIPPETS $REPO_ROOT/hooks/settings-protect-main.json"; fi
   # shellcheck disable=SC2086
@@ -307,6 +324,44 @@ elif [ "$PROTECT" -eq 1 ]; then
 else
   echo "   ⏭️  guard hooks skipped (--no-hooks)"
 fi
+
+# Antigravity: the guards reach agy lanes through .agents/hooks.json. Its hooks run
+# with .agents/ as cwd (so the command is relative to it) via `cmd /c` on Windows,
+# where `python3` is a Store alias that prints "Python was not found": write `python`.
+case " $HOSTS " in *" agy "*)
+  if [ -n "$HOOK_FILES" ]; then
+    PY_CMD=python3
+    case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) PY_CMD=python ;; esac
+    python3 - "$REPO_ROOT/hooks/agy-hooks.json" "$TARGET/.agents/hooks.json" "$PROTECT" "$PY_CMD" <<'PY'
+import json, sys
+snippet, path, protect, py = json.load(open(sys.argv[1])), sys.argv[2], sys.argv[3] == "1", sys.argv[4]
+try:
+    current = json.load(open(path))
+    if not isinstance(current, dict):
+        raise ValueError
+except FileNotFoundError:
+    current = {}
+except ValueError:
+    sys.exit(f"    ! {path} is not valid JSON; left untouched")
+entry = snippet["super-board-guards"]
+# --protect-main adds the push guard; a later install without the flag keeps it.
+old = current.get("super-board-guards") or {}
+had_push = any("--protect-push" in h.get("command", "") for g in old.get("PreToolUse", []) for h in g.get("hooks", []))
+for group in entry["PreToolUse"]:
+    for hook in group["hooks"]:
+        hook["command"] = hook["command"].replace("python3 ", py + " ", 1)
+        if (protect or had_push) and "--protect-push" not in hook["command"]:
+            hook["command"] += " --protect-push"
+current["super-board-guards"] = entry
+with open(path, "w") as f:
+    json.dump(current, f, indent=2)
+    f.write("\n")
+PY
+    echo "   🪐 Antigravity guards → .agents/hooks.json (via hooks/agy-hook-adapter.py)"
+  fi
+  echo "   👉 Antigravity: headless lanes need permission rules once — python3 .claude/bin/super-board-agy-permissions.py --apply"
+  ;;
+esac
 
 # AGENTS.md: a re-install refreshes the managed super-board block and touches
 # nothing outside its markers. No block yet → onboard writes it (with consent).
