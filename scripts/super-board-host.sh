@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# super-board-host.sh — which agent host is this shell inside: `claude`, `codex` or `opencode`.
+# super-board-host.sh — which agent host is this shell inside: `claude`, `codex`, `opencode` or `agy`.
 #
 # WHY. `/super-board run` launched from a Codex CLI session has no Claude Workflow tool, so the
 # workflow backend cannot start. The orchestrator checks its own tool list first; this is the
@@ -17,16 +17,23 @@
 #   shells it runs. Observed 2026-10-19 on opencode v2.0.22 (env diff of a `run` shell).
 #   Checked before CLAUDECODE, which leaks into OpenCode started from a Claude session.
 #   Not used: AGENT=1 (a generic name other tools set too).
+# - Google Antigravity (the `agy` CLI) sets ANTIGRAVITY_AGENT=1 in every shell its
+#   run_command tool runs, plus ANTIGRAVITY_CONVERSATION_ID, ANTIGRAVITY_LS_VERSION
+#   (e.g. cli-1.4.6), ANTIGRAVITY_PROJECT_ID and ANTIGRAVITY_TRAJECTORY_ID. Observed
+#   2026-10-23 on agy 1.4.6 (`cmd /c set` inside a headless `agy -p` run on Windows 11).
+#   Checked before CLAUDECODE, which leaks into an agy lane started from a Claude session.
+#   Not used: the ids (one per conversation) and ANTIGRAVITY_CSRF_TOKEN (a session secret).
 # - Claude Code sets CLAUDECODE=1.
 #
-# ORDER. SUPER_BOARD_HOST, Codex ids, OPENCODE, CLAUDECODE, then the config's top-level
-# `host` key (--config <file>), else exit 65. A live env sign beats the saved config.
+# ORDER. SUPER_BOARD_HOST, Codex ids, OPENCODE, ANTIGRAVITY_AGENT, CLAUDECODE, then the
+# config's top-level `host` key (--config <file>), else exit 65. A live env sign beats the
+# saved config.
 #
 # Usage: super-board-host.sh [--config <config.json>]
-#        prints `claude`, `codex` or `opencode`, exit 0
+#        prints `claude`, `codex`, `opencode` or `agy`, exit 0
 #        exit 65   no sign: nothing on stdout, how to choose on stderr
-#        exit 64   SUPER_BOARD_HOST or config `host` is not one of the three
-# SUPER_BOARD_HOST=claude|codex|opencode forces the answer (tests, or a host the check
+#        exit 64   SUPER_BOARD_HOST or config `host` is not one of the four
+# SUPER_BOARD_HOST=claude|codex|opencode|agy forces the answer (tests, or a host the check
 # misreads).
 set -euo pipefail
 
@@ -38,23 +45,25 @@ case "${1:-}" in
 esac
 
 case "${SUPER_BOARD_HOST:-}" in
-  claude|codex|opencode) echo "$SUPER_BOARD_HOST"; exit 0 ;;
+  claude|codex|opencode|agy) echo "$SUPER_BOARD_HOST"; exit 0 ;;
   '') ;;
-  *) echo "super-board-host.sh: SUPER_BOARD_HOST must be claude, codex or opencode" >&2; exit 64 ;;
+  *) echo "super-board-host.sh: SUPER_BOARD_HOST must be claude, codex, opencode or agy" >&2; exit 64 ;;
 esac
 
 if [ -n "${CODEX_THREAD_ID:-}" ] || [ -n "${CODEX_SESSION_ID:-}" ]; then
   echo codex
 elif [ -n "${OPENCODE:-}" ]; then
   echo opencode
+elif [ -n "${ANTIGRAVITY_AGENT:-}" ]; then
+  echo agy
 elif [ -n "${CLAUDECODE:-}" ]; then
   echo claude
 elif saved=$( [ -f "$config" ] && jq -r '.host // empty' "$config" 2>/dev/null ) && [ -n "$saved" ]; then
   case "$saved" in
-    claude|codex|opencode) echo "$saved" ;;
-    *) echo "super-board-host.sh: config host must be claude, codex or opencode, got '$saved'" >&2; exit 64 ;;
+    claude|codex|opencode|agy) echo "$saved" ;;
+    *) echo "super-board-host.sh: config host must be claude, codex, opencode or agy, got '$saved'" >&2; exit 64 ;;
   esac
 else
-  echo "super-board-host.sh: unknown agent host. Pick one: SUPER_BOARD_HOST=claude|codex|opencode, or set \"host\" in the board config" >&2
+  echo "super-board-host.sh: unknown agent host. Pick one: SUPER_BOARD_HOST=claude|codex|opencode|agy, or set \"host\" in the board config" >&2
   exit 65
 fi

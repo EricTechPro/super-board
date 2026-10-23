@@ -414,4 +414,29 @@ doc = re.search(r"```json\n(.*?)```", open(sys.argv[1]).read(), re.S).group(1)
 sys.exit(0 if json.loads(doc) == json.load(open(sys.argv[2])) else 1)
 PY
 
-echo "PASS: test-install.sh (24 scenarios)"
+# 25 — --hosts agy: Antigravity reads .agents/ itself, so no .agy/ folder of links. The guards
+#      reach agy lanes through .agents/hooks.json: a super-board-guards entry that runs the
+#      adapter relative to .agents/, other entries in that file kept, --protect-main adds the
+#      push guard and a later install without the flag keeps it, the host is detected again
+#      from the entry, the permissions step is named, and a plain install writes no hooks.json.
+T=$(mktemp -d); mkdir -p "$T/.agents"
+echo '{"my-hook":{"Stop":[{"type":"command","command":"true"}]}}' > "$T/.agents/hooks.json"
+OUT=$("$INSTALL" --hosts agy --protect-main "$T" 2>&1)
+[ ! -e "$T/.agy" ] || fail "--hosts agy must not create .agy/"
+[ -f "$T/.agents/hooks/agy-hook-adapter.py" ] || fail "--hosts agy: the adapter was not installed next to the guards"
+jq -e '."my-hook".Stop and (."super-board-guards".PreToolUse[0].hooks[0].command | test("^python3? hooks/agy-hook-adapter.py --event PreToolUse --protect-push$"))' \
+  "$T/.agents/hooks.json" >/dev/null || fail "--hosts agy hooks.json wrong: $(cat "$T/.agents/hooks.json")"
+echo "$OUT" | grep -q "Antigravity guards → .agents/hooks.json" || fail "--hosts agy must report the hooks line: $OUT"
+echo "$OUT" | grep -q "super-board-agy-permissions.py --apply" || fail "--hosts agy must name the permissions step"
+echo "$OUT" | grep -q " 6 guard hooks" || fail "the adapter must not count as a guard: $OUT"
+"$INSTALL" "$T" >/dev/null 2>&1 || fail "re-install on an agy project failed"
+jq -e '."super-board-guards".PreToolUse[0].hooks[0].command | contains("--protect-push")' "$T/.agents/hooks.json" >/dev/null \
+  || fail "a re-install without --protect-main dropped the Antigravity push guard"
+T2=$(mktemp -d); "$INSTALL" "$T2" >/dev/null 2>&1
+[ ! -e "$T2/.agents/hooks.json" ] || fail "a plain install must not write .agents/hooks.json"
+T3=$(mktemp -d); mkdir -p "$T3/.claude/super-board/configs"
+echo '{"host": "agy"}' > "$T3/.claude/super-board/configs/app.json"
+"$INSTALL" "$T3" >/dev/null 2>&1; [ -f "$T3/.agents/hooks.json" ] || fail "a config host agy must wire the hooks"
+rm -rf "$T" "$T2" "$T3"
+
+echo "PASS: test-install.sh (25 scenarios)"
