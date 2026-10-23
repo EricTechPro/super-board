@@ -25,6 +25,7 @@ Once per machine, on a throwaway board, before an unattended run:
 | 5 | Worker skills resolve | `python3 .claude/bin/super-board-skills-ready.py --root . --host agy --profile setup` exits 0 | onboard's 🔍 Checks installs the helpers |
 | 6 | Quota reaches the guard | set `statusLine.command` to `bash <repo>/.claude/bin/super-board-usage.sh record`, open `agy` once, then `bash .claude/bin/super-board-usage.sh check --host agy --config <config>` prints `ok` with the buckets of `agy.model` (`gemini-5h` / `gemini-weekly` for a Gemini slug, `3p-*` for Claude or GPT) | the status line only runs in an interactive session |
 | 7 | One card end to end | `/super-board run --agy` on a Ready card with acceptance criteria | read `.claude/super-board/inflight/agy-<n>-<lane>.last.json` for the raw run of a lane that returned no result |
+| 8 | A lane denied on its very first command, after earlier lanes ran | `head -c 3 ~/.gemini/antigravity-cli/settings.json`: agy 1.4.6 rewrites its settings with a UTF-8 BOM (seen one minute into a lane) and then loads `permissions=<nil>` from it | `python3 .claude/bin/super-board-agy-permissions.py --apply` rewrites the file without the BOM |
 
 Observed on 1.4.6: model slugs carry an effort (`gemini-3.8-flash-low`) and refuse `--effort`; the
 lane passes the base slug. Lanes run in PowerShell 5.1 on Windows and hooks under `cmd /c`.
