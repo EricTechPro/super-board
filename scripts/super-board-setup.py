@@ -23,7 +23,7 @@ What `fix` does, with NO question (all of it backed up first to
     settings.json entries (runs the pack's install.sh) when any is missing or older
   - removes the folders of skills that no longer exist: super-refine, cleanup-wt, arch-loop
   - migrates every .claude/super-board/configs/*.json to the v3 keys (migrate-config), and
-    writes a missing top-level `host` from --host (check flags a host outside claude/codex/opencode)
+    writes a missing top-level `host` from --host (check flags a host outside claude/codex/opencode/agy)
   - `git init` when the folder is not a repo
   - adds Matt Pocock's helper skills with npx when Node is present and they are missing
 It never installs a system tool or signs in: those come back in `needs` with the exact
@@ -59,7 +59,7 @@ import subprocess
 import sys
 
 COLUMNS = ["Backlog", "Ready", "Building", "QA", "Review", "Blocked", "Done"]
-HOSTS = ("claude", "codex", "opencode")  # config `host`; super-board-host.sh accepts the same
+HOSTS = ("claude", "codex", "opencode", "agy")  # config `host`; super-board-host.sh accepts the same
 LABELS = {
     "qa": ("0e8a16", "Test what exists; skips Building (super-board)"),
     "bug": ("d73a4a", "Something is broken; built, tested, reviewed (super-board)"),
