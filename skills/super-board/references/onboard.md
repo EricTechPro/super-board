@@ -294,7 +294,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
     a. "Merge" — "Who merges a change that passes review?" [Robot merges normal changes
        (Recommended) / I merge everything]; production base: the order flips, and robot-merges
        sets merge_policy.allow_auto_on_production: true (run.md's guard needs it).
-       → merge_policy.default "auto" | "human"; auto_max_lines 400 (lockfiles, generated,
+       → merge_policy.default "auto" | "human"; auto_max_lines 0 (no size gate; lockfiles, generated,
          snapshots, migration SQL not counted); always_human = schema defaults (money, auth,
          destructive schema). A matching PR parks in Blocked with 🙋.
     b. "Push guard" — "Block pushing straight to main?" [Yes (Recommended for a repo with

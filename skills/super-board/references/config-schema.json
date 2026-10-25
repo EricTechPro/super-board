@@ -133,13 +133,12 @@
     // A human can merge it or approve the pinned request for the next wave.
     // Onboard recommends "human" when base_branch is production-detected.
     "default": "auto",
-    // Small PRs by design. A PR with more changed lines (additions +
-    // deletions) than this waits for a human: Blocked 🙋 "big PR — please
-    // review". Default 400; 0 = no size cap. Files matching size_exclude and
-    // migration files (migrations.globs) do not count; migration lines are
-    // reported separately. Builders keep PRs under this cap and lint flags
-    // tickets likely to exceed it (references/lint.md → "Too big").
-    "auto_max_lines": 400,
+    // A PR with more changed lines (additions + deletions) than this waits
+    // for a human: Blocked 🙋 "big PR — please review". Default 0 disables
+    // the size gate, so any size can proceed to review and automatic merge
+    // when the other policy checks pass. Set a positive value to re-enable it.
+    // Files matching size_exclude and migration files do not count.
+    "auto_max_lines": 0,
     // Globs left out of the size count. Setting this replaces the defaults
     // below; [] counts every file.
     "size_exclude": [

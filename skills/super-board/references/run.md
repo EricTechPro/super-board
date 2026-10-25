@@ -270,7 +270,7 @@ The script asks four questions and the agent adds a fifth; the agent owns the ju
 | 2 | Already in progress? | open PR on another branch closes `#N` or has the same title; a card in Building/QA/Review (or a lower-numbered Ready peer) with the same title | same feature, different words — not merely the same files |
 | 3 | File overlap? | open PR touches files the card names; a lower-numbered card in the same `--issues` batch names the same files | expected files from reading the issue (`--files`); the same overlap with a Ready peer in another batch |
 | 4 | Unclear? | no `## Acceptance Criteria` bullets | AC that contradicts the current code (cite `file:line`) |
-| 5 | Too big? | — | likely over ~400 changed lines (`merge_policy.auto_max_lines`; lockfiles, generated, snapshots, migration SQL excluded) or spans many areas (UI + API + DB + jobs …) — lint.md criterion 15 |
+| 5 | Too big? | — | spans many areas (UI + API + DB + jobs …) or cannot be reviewed safely as one change — lint.md criterion 15 |
 
 **Two Ready cards that overlap each other, neither with an open PR, go one at a time.** The
 lower-numbered card proceeds; only the other is sequenced, with `blocked-by: #<lower>`, and the
@@ -308,10 +308,9 @@ column), never built unchecked. `qa` cards are not pre-flighted: nothing is buil
 3. Read issue body + ALL comments + PROJECT.md.
 3b. Touches a third-party API/SDK, an upgrade, or auth/billing? Read the current official docs
     for the installed version first (super-build → "Docs before outside-tool code").
-4. Implement smallest safe change covering ACs, under the PR size cap
-   (`merge_policy.auto_max_lines`, default 400 changed lines). Growing past it mid-build → stop,
-   push what you have, propose the split (vertical slices via `/to-tickets`) in a PR comment and
-   move the card to Blocked `❓` — never push on past the cap (super-build → "Keep each PR small").
+4. Implement the smallest safe change covering ACs. There is no default PR line cap
+   (`merge_policy.auto_max_lines: 0`); split work when scope or reviewability requires it,
+   not just because a diff is large (super-build → "Keep each PR small").
 5. Commit + push (always). Commits follow writing-standard.md § 1 (`✨ [feat] chat: stream replies` + short bullets).
 6. Open draft PR linked to the issue with the PR description template (title in commit-subject format, every block filled).
 7. Follow [PR author notes](pr-author-notes.md), then post the `[builder] [report]` PR comment (see "Commenting cadence").

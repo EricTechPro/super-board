@@ -376,7 +376,7 @@ up front (onboard → Permissions), so the first overnight run does not stall:
 
 Without them every Reviewer merge pauses for one interactive approval, so the
 backend is **attended-only**. With them, the gate still enforces
-`merge_policy` (money / auth / destructive schema / over `auto_max_lines` → human, exit 7) and `migrations`
+`merge_policy` (money / auth / destructive schema / over a configured positive `auto_max_lines` → human, exit 7; default 0 disables size gating) and `migrations`
 (live DB → 🙋 needs you, exit 8), so the allowlist removes the prompt, not
 the policy. Pair auto-merge with a non-production `base_branch`.
 

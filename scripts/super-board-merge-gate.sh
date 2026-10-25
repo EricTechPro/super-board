@@ -76,7 +76,7 @@
 #   6  the PR head is not the commit that was reviewed — review evidence is void,
 #      the card goes back to Review (not Blocked, not a rebase pass)
 #   7  merge policy says a human merges this one (money / auth / destructive
-#      schema, a diff over auto_max_lines — default 400, "big PR — please
+#      schema, a diff over auto_max_lines — default 0 (disabled), "big PR — please
 #      review" — or merge_policy.default "human"). Stdout lists each
 #      `human-gate: <category> — <evidence>`. Nothing ran, nothing merged; the
 #      card → Blocked with the 🙋 template: the human reviews and merges it, or
@@ -97,7 +97,7 @@
 # MERGE POLICY AND MIGRATIONS (config, all optional — defaults shown in
 # references/config-schema.json)
 #
-#   merge_policy: { default: "auto"|"human", auto_max_lines: 400, size_exclude,
+#   merge_policy: { default: "auto"|"human", auto_max_lines: 0, size_exclude,
 #                   always_human: { <category>: {labels, paths, keywords} } }
 #   migrations:   { globs, allowed_envs, target_env, commands: {<env>: cmd},
 #                   human_steps }

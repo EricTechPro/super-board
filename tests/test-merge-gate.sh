@@ -284,17 +284,15 @@ RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect
 echo "$OUT" | grep -q "human-gate: size" || fail "the size gate must say so, got: $OUT"
 teardown
 
-# 15b — the size cap defaults to 400 changed lines: 401 gates ("big PR"), 400
-#       merges, and auto_max_lines 0 turns the cap off.
+# 15b — no default size cap: large PRs proceed to the normal review and
+#       policy gates. A project can opt back into a positive threshold.
 head_setup
-RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 401)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
-[ "$RC" -eq 7 ] || fail "401 lines over the default cap 400 should exit 7, got $RC"
-echo "$OUT" | grep -q "human-gate: size — big PR — please review" || fail "the size gate must say big PR, got: $OUT"
-RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 400)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 0 ] || fail "400 lines is at the default cap and should merge, got $RC"
-cfgset '.merge_policy = {auto_max_lines: 0}'
 RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 5000)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
-[ "$RC" -eq 0 ] || fail "auto_max_lines 0 should turn the size cap off, got $RC"
+[ "$RC" -eq 0 ] || fail "a large PR should pass the default size policy, got $RC"
+cfgset '.merge_policy = {auto_max_lines: 100}'
+RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 401)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+[ "$RC" -eq 7 ] || fail "a positive cap should still gate oversized PRs, got $RC"
+echo "$OUT" | grep -q "human-gate: size — big PR — please review" || fail "the size gate must say big PR, got: $OUT"
 teardown
 
 # 15c — lockfiles, snapshots and generated files do not count toward the cap;
@@ -307,7 +305,7 @@ BIG=$(jq -cn '{labels: [], body: "", additions: 2300, deletions: 0, files: [
   {path: "src/__snapshots__/x.test.ts.snap", additions: 500, deletions: 0},
   {path: "src/api/__generated__/types.ts", additions: 400, deletions: 0},
   {path: "db/migrations/001_add.sql", additions: 200, deletions: 0}], changedFiles: 5}')
-cfgset '.migrations = {allowed_envs: ["test"], target_env: "test", commands: {test: "true"}}'
+cfgset '.migrations = {allowed_envs: ["test"], target_env: "test", commands: {test: "true"}} | .merge_policy = {auto_max_lines: 1000}'
 RC=0; STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 0 ] || fail "300 counted lines (rest excluded) should merge, got $RC"
 cfgset '.merge_policy = {auto_max_lines: 250}'
@@ -315,7 +313,7 @@ RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" 2>/dev/nu
 [ "$RC" -eq 7 ] || fail "300 counted lines over cap 250 should exit 7, got $RC"
 echo "$OUT" | grep -q "300 changed lines > auto_max_lines 250 (+200 migration lines counted separately)" \
   || fail "size gate should count 300 and report migration lines separately, got: $OUT"
-cfgset '.merge_policy = {size_exclude: []}'
+cfgset '.merge_policy = {auto_max_lines: 1000, size_exclude: []}'
 RC=0; STUB_OID="$SHA" STUB_META="$BIG" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
 [ "$RC" -eq 7 ] || fail "size_exclude [] should count the lockfile and exit 7, got $RC"
 teardown

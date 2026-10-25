@@ -99,7 +99,7 @@ An issue is flagged if any of these apply. An issue can fail multiple criteria; 
 | 12 | Sub-agent ambiguity flag | "this could mean ≥2 different things" | Surface both interpretations |
 | 13 | `## Blocked by` missing, empty, or unparseable | No section; or `- None — but #26 must merge first` | Rewrite to `- #N — why` bullets, or a bare `- None.` |
 | 14 | An AC proves behaviour against a fake, and no card owns the real thing | "proven with a fake repository, no database" | Name the ticket that builds it, or offer to file one |
-| 15 | Too big: likely over ~400 changed lines (`merge_policy.auto_max_lines`), or spans many areas | "Add billing page, webhook handler, admin UI and email templates" | Hold with ❓ and split via `/to-tickets` into vertical slices |
+| 15 | Too broad to review or deliver safely as one change, or spans many areas | "Add billing page, webhook handler, admin UI and email templates" | Hold with ❓ and split via `/to-tickets` into vertical slices |
 | 16 | Ticket sections missing (writing-standard.md § 3): `## Problem`, `## Context`, `## Fix`, `## Risk` — and `## Evidence` (the folded 12-row table) on a bug | Body has "What to build" and ACs only | Rewrite into the ticket format; draft Problem/Fix from the body, ask for Who and Risk |
 | 17 | Acceptance Criteria not a checklist | ACs as prose or plain `-` bullets | Rewrite as `- [ ] <checkable outcome>`, one per line |
 | 18 | Context steps not lettered under Where, more than one step per line, or chained with arrows | "Where: /x — sign in → open Receipts → drop file" | Rewrite as `- **Where:** …` then `  - a. Sign in` / `  - b. …`, one per line; embed the screenshot (raw URL pinned to a sha), never link it |
@@ -146,7 +146,7 @@ is not.
 ## Criterion 15 — too big (small PRs by design)
 
 Small pull requests are a design goal: each ticket should land as one PR under the merge size cap
-(`merge_policy.auto_max_lines`, default 400 changed lines; lockfiles, generated files, snapshots and
+(`merge_policy.auto_max_lines`, default 0 (no size gate); lockfiles, generated files, snapshots and
 migration SQL do not count). A PR over the cap is never auto-merged — it parks in Blocked 🙋 as a
 "big PR". Catching it at lint time is cheaper than splitting a finished branch.
 

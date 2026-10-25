@@ -23,7 +23,7 @@ unreadable metadata, so the gate fails safe to "human".
 
 Rules, from references/config-schema.json → merge_policy / migrations:
 - merge_policy.default "human" → everything waits for a human.
-- merge_policy.auto_max_lines (default 400; 0 = no cap): changed lines
+- merge_policy.auto_max_lines (default 0; 0 = no cap): changed lines
   (additions + deletions) above it → human ("big PR — please review"). Files
   matching merge_policy.size_exclude (default: lockfiles, generated output,
   snapshots) and migration files (migrations.globs) do not count; migration
@@ -69,7 +69,7 @@ DEFAULT_MIGRATION_GLOBS = [
     "**/migrations/*.sql", "db/migrate/**", "alembic/versions/**",
 ]
 DEFAULT_ALLOWED_ENVS = ["test", "staging"]
-DEFAULT_AUTO_MAX_LINES = 400
+DEFAULT_AUTO_MAX_LINES = 0
 DEFAULT_SIZE_EXCLUDE = [
     # lockfiles
     "**/package-lock.json", "**/yarn.lock", "**/pnpm-lock.yaml", "**/bun.lockb", "**/bun.lock",

@@ -357,8 +357,8 @@ two complete builds. In order, no shortcuts:
    The gate owns the merge decision (config `merge_policy`, `migrations`):
    - **Exit 9 — verification-readiness.** Halt the run; preserve card, approval, claims, and worktree. Configure `verify_commands` with the owning project's real checks and restart explicitly. No bounce to Build, rebase retry, approval request, or bare merge.
    - **Exit 7 — a human merges.** `merge_policy` matched (money / auth / schema label,
-     path or added-line keyword; a diff over `auto_max_lines`, default 400 — "big PR — please
-     review"; `default: "human"`). `schema` means destructive only (DROP / TRUNCATE / RENAME);
+     path or added-line keyword; a diff over `auto_max_lines` (default 0, no size gate) —
+     "big PR — please review"; `default: "human"`). `schema` means destructive only (DROP / TRUNCATE / RENAME);
      an additive migration follows `migrations.allowed_envs`, and a live DB is always human.
      Card → **Blocked** with the 🙋 template: `Why blocked` quotes the gate's
      `human-gate:` lines; `To unblock` = review PR #<P> and merge it yourself, OR comment

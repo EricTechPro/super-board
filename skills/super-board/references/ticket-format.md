@@ -40,7 +40,7 @@ it into the target's `docs/agents/issue-tracker.md` under `## Ticket format` (th
 | Blocked by | `- #N — why` bullets, or a bare `- None.` · NEVER "None — but #N first" |
 | Labels | `money`, `auth`, `schema` route the merge to a human (merge_policy) · `schema` = destructive only (DROP/TRUNCATE/RENAME); additive migrations need no label |
 | Human-only step | a `needs-you: <command>` line in the PR body → 🙋 Blocked until done |
-| Size | one card = one PR under 400 changed lines (`merge_policy.auto_max_lines`) · bigger → split with `/to-tickets` |
+| Size | one card = one reviewable PR; no default line cap (`merge_policy.auto_max_lines: 0`) · split only when needed for scope/reviewability |
 
 For recurring PR fixes, keep these sections. Context names the permitting shared boundary
 and prior failing input/action; Evidence cites the prior PRs/findings. Fix names the intended

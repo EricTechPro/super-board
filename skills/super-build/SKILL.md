@@ -247,11 +247,10 @@ Follow spec `.claude/skills/super-board/references/run.md` → Builder (first pa
 7. Follow [PR author notes](../super-board/references/pr-author-notes.md), then post the `[builder] [report]` PR comment + the short issue comment with the PR URL (writing-standard.md § 4).
 8. Move card Ready/Building → QA.
 
-### Keep each PR small (every ticket)
-Each PR stays under the merge size cap: `merge_policy.auto_max_lines` (default 400 changed lines,
-additions + deletions; lockfiles, generated files, snapshots and migration SQL do not count — see
-`merge_policy.size_exclude`). A PR over the cap is never auto-merged: the merge gate parks it in
-Blocked 🙋 "big PR — please review".
+### Keep each PR reviewable (every ticket)
+There is no default merge size cap (`merge_policy.auto_max_lines: 0`). Split a PR when its scope
+is difficult to review or safely deliver, not simply because it is large. A configured positive
+`auto_max_lines` still parks oversized PRs in Blocked 🙋 "big PR — please review".
 
 Check `git diff --shortstat origin/<base>...HEAD` (minus excluded files) before each push. If the
 change grows past the cap mid-build, **stop — do not push on**. Commit and push what you have on
