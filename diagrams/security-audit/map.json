@@ -1,0 +1,2772 @@
+{
+ "meta": {
+  "id": "security-audit",
+  "name": "security-audit map",
+  "nav": "security-audit",
+  "logo": "assets/logos/cloudflare.png",
+  "version": "commit c1c8a8c (2026-09-14)",
+  "tagline": "Cloudflare's security-audit skill, step by step: recon, coverage-led hunting, adversarial validation, schema-checked findings, fresh-eyes verification, then reports.",
+  "authors": "Cloudflare",
+  "labels": {
+   "stage": "Phase",
+   "anytime": "Every phase",
+   "item": "part",
+   "items": "parts",
+   "stageNote": "**This is a phase, not a skill.** The parent agent runs the parts inside it, in order.",
+   "anyNote": "**Not tied to one phase.** These modes, rails and blocks apply across the run."
+  },
+  "sources": [
+   {
+    "label": "cloudflare/security-audit-skill",
+    "url": "https://github.com/cloudflare/security-audit-skill"
+   },
+   {
+    "label": "SKILL.md",
+    "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md"
+   },
+   {
+    "label": "README",
+    "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md"
+   },
+   {
+    "label": "Cloudflare blog: Build your own vulnerability harness",
+    "url": "https://blog.cloudflare.com/build-your-own-vulnerability-harness"
+   }
+  ]
+ },
+ "stages": [
+  {
+   "id": "plan",
+   "name": "Reconnaissance",
+   "icon": "plan",
+   "principle": "Map the target **from source only**, then turn it into a ==deterministic coverage ledger==: the list of everything that must be checked.",
+   "when": [
+    "When you ask for a full audit → setup and the budget gate run first",
+    "When prior runs exist → they are read so this run targets the gaps",
+    "When the four recon agents report → the parent writes architecture.md and the ledger"
+   ],
+   "sources": [
+    {
+     "label": "SKILL.md full audit setup (L44-86)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L44-L86"
+    },
+    {
+     "label": "RECONNAISSANCE.md (L1-156)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L1-L156"
+    }
+   ]
+  },
+  {
+   "id": "design",
+   "name": "Hunting",
+   "icon": "crosshair",
+   "principle": "Isolated hunters work **from the ledger, unit by unit**, and critics look for gaps after every wave. ==No unit is silently skipped==.",
+   "when": [
+    "When units are planned → rank them and brief one hunter per group",
+    "When a wave ends → a fresh critic proposes missing or reopened units",
+    "When two critic passes come back clean → hunting ends"
+   ],
+   "sources": [
+    {
+     "label": "HUNTING.md (L1-251)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L1-L251"
+    },
+    {
+     "label": "ATTACK-CLASSES.md (L1-130)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L1-L130"
+    }
+   ]
+  },
+  {
+   "id": "build",
+   "name": "Validation",
+   "icon": "test",
+   "principle": "Every unique candidate goes to a **fresh verifier that did not find it** and tries to ==disprove it==.",
+   "when": [
+    "When hunting ends → merge candidates by fingerprint",
+    "When a candidate is unique → one fresh general verifier",
+    "When it decides → confirmed, needs_validation or rejected"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 3 (L3-93)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L3-L93"
+    }
+   ]
+  },
+  {
+   "id": "test",
+   "name": "Structured output",
+   "icon": "braces",
+   "principle": "All final records go into **findings.json**, checked against a JSON schema. ==JSON first, prose later==.",
+   "when": [
+    "When verifiers have decided → write findings.json sorted by fingerprint",
+    "Before moving on → both validators must pass"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 4 (L95-118)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L95-L118"
+    },
+    {
+     "label": "report-schema.json",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/report-schema.json"
+    }
+   ]
+  },
+  {
+   "id": "deploy",
+   "name": "Verification",
+   "icon": "maintain",
+   "principle": "**Fresh agents re-check the final records** themselves. A material change gets ==yet another independent verifier==.",
+   "when": [
+    "When findings.json validates → one fresh research verifier per confirmed and needs_validation record",
+    "When a replacement changes meaning → a brand-new verifier checks it",
+    "When everything has passed → the run can be marked complete"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 5 (L120-149)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L120-L149"
+    }
+   ]
+  },
+  {
+   "id": "maintain",
+   "name": "Reporting",
+   "icon": "filetext",
+   "principle": "Reports are **derived from the verified records and the ledger**, ==written last==, with no live-probe instructions.",
+   "when": [
+    "Only after Phase 5 passes → write REPORT.md, FINDINGS-DETAIL.md and NEEDS-VALIDATION.md"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 6 (L151-186)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L151-L186"
+    }
+   ]
+  }
+ ],
+ "categories": [
+  {
+   "id": "setup",
+   "stage": "plan",
+   "name": "Set up the run",
+   "blurb": "Write the run facts, then check the budget can pay.",
+   "principle": "Nothing launches until the run is **written down** and ==the budget covers the minimum==.",
+   "when": [
+    "When full audit mode starts → run-metadata first",
+    "When a budget is set → budget-gate before any agent"
+   ],
+   "chain": [
+    "run-metadata",
+    "budget-gate"
+   ],
+   "chainWhy": "RECONNAISSANCE.md:5 says the parent initializes run-metadata.json, applies the pre-reconnaissance budget gate, then creates scratch roots and the ledger.",
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md Phase 1 (L5)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L5"
+    },
+    {
+     "label": "SKILL.md setup and budget (L44-134)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L44-L134"
+    }
+   ],
+   "nodeCount": 2,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "map-target",
+   "stage": "plan",
+   "name": "Map the target (4 agents)",
+   "blurb": "Four read-only research agents, launched together.",
+   "principle": "Four **read-only `research` agents** run ==in parallel== and return facts; they write no files.",
+   "when": [
+    "When recon starts → all four launch together",
+    "When a deployment mode or subsystem is not covered → add a focused recon agent (if the budget allows)"
+   ],
+   "chain": [
+    "agent-1a-stack",
+    "agent-1b-trust",
+    "agent-1c-inputs",
+    "agent-1d-sandbox"
+   ],
+   "chainWhy": "RECONNAISSANCE.md:7 says to launch several research agents in parallel. No arrows: none waits for another.",
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md Phase 1 agents (L7-57)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L7-L57"
+    }
+   ],
+   "nodeCount": 4,
+   "chainInferred": "sourced",
+   "parallel": true
+  },
+  {
+   "id": "plan-coverage",
+   "stage": "plan",
+   "name": "Plan the coverage",
+   "blurb": "Reuse prior runs, summarize, seed and validate the ledger.",
+   "principle": "Turn the facts into **work units** and ==validate them before anyone hunts==.",
+   "when": [
+    "When prior runs exist → prior-runs first",
+    "When the summary is done → seed the ledger, then run the validator"
+   ],
+   "chain": [
+    "prior-runs",
+    "architecture-md",
+    "coverage-ledger",
+    "validate-ledger"
+   ],
+   "chainWhy": "SKILL.md:96 reads prior runs before planning; RECONNAISSANCE.md:73-156 writes architecture.md, then the ledger, and runs the validator after seeding.",
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md prior runs to validator (L59-156)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L59-L156"
+    }
+   ],
+   "nodeCount": 4,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "assign",
+   "stage": "design",
+   "name": "Assign the work",
+   "blurb": "Rank units, then build each hunter's brief.",
+   "principle": "**Highest-risk units first**, and every brief ==copies the blocks verbatim==.",
+   "when": [
+    "When hunters are capped → rank-units decides the order",
+    "When a unit is assigned → build its hunter-prompt"
+   ],
+   "chain": [
+    "rank-units",
+    "hunter-prompt"
+   ],
+   "chainWhy": "HUNTING.md:7-9 ranks and marks units in_progress before launch; HUNTING.md:11-23 then defines the prompt parts.",
+   "sources": [
+    {
+     "label": "HUNTING.md assignment and prompt (L5-25)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L5-L25"
+    }
+   ],
+   "nodeCount": 2,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "hunt",
+   "stage": "design",
+   "name": "Hunt",
+   "blurb": "One isolated hunter per unit group, one JSON result.",
+   "principle": "Hunters **read deep, run little**, and return ==structured results the parent can dedupe==.",
+   "when": [
+    "When a unit is in progress → a hunter owns it",
+    "When it finishes → hunter-result updates the ledger"
+   ],
+   "chain": [
+    "hunter",
+    "hunter-result"
+   ],
+   "chainWhy": "HUNTING.md:27-97 is the method; HUNTING.md:168-219 is the result contract and the parent's ledger update.",
+   "sources": [
+    {
+     "label": "HUNTING.md method and result (L27-219)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L27-L219"
+    }
+   ],
+   "nodeCount": 2,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "critics",
+   "stage": "design",
+   "name": "Find the gaps",
+   "blurb": "Critic after each wave, then a final-clean critic.",
+   "principle": "Coverage is complete only when ==two critic passes in a row find nothing== (standard and deep).",
+   "when": [
+    "After every wave → post-wave-critic",
+    "When it is clean and nothing is planned → final-clean-critic"
+   ],
+   "chain": [
+    "post-wave-critic",
+    "final-clean-critic"
+   ],
+   "chainWhy": "HUNTING.md:223 runs a critic immediately after each wave; HUNTING.md:247 spends the separate final-clean reserve only after a clean pass.",
+   "sources": [
+    {
+     "label": "HUNTING.md coverage-critic waves (L221-251)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L221-L251"
+    }
+   ],
+   "nodeCount": 2,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "disprove",
+   "stage": "build",
+   "name": "Try to disprove it",
+   "blurb": "Merge, verify independently, pick the verdict.",
+   "principle": "**The agent that checks a finding is never the agent that found it.** ==Adversarial by design==.",
+   "when": [
+    "When hunting ends → consolidate",
+    "For each unique candidate → candidate-verifier",
+    "When it decides → verdict-rules"
+   ],
+   "chain": [
+    "consolidate",
+    "candidate-verifier",
+    "verdict-rules"
+   ],
+   "chainWhy": "VALIDATION-AND-REPORTING.md:5 consolidates first, then gives each unique candidate to a fresh verifier; L87 sets the verdict rules.",
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 3 (L3-93)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L3-L93"
+    },
+    {
+     "label": "README adversarial validation (L95)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md#L95"
+    }
+   ],
+   "nodeCount": 3,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "write-records",
+   "stage": "test",
+   "name": "Write and validate",
+   "blurb": "findings.json, then both validators.",
+   "principle": "The schema uses `additionalProperties: false`, so ==the JSON stays exact==.",
+   "when": [
+    "When decisions are in → findings.json",
+    "Right after → validate-findings plus the ledger validator"
+   ],
+   "chain": [
+    "findings-json",
+    "validate-findings"
+   ],
+   "chainWhy": "VALIDATION-AND-REPORTING.md:97-116 writes the file, then runs both validators.",
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 4 (L95-118)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L95-L118"
+    }
+   ],
+   "nodeCount": 2,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "verdicts",
+   "stage": "test",
+   "name": "Three verdicts",
+   "blurb": "Each record is exactly one of these.",
+   "principle": "Three **separate contracts**: ==only confirmed gets a severity==.",
+   "when": [
+    "When proven → confirmed-record",
+    "When one outside fact is missing → needs-validation-record",
+    "When disproved → rejected-record"
+   ],
+   "chain": [
+    "confirmed-record",
+    "needs-validation-record",
+    "rejected-record"
+   ],
+   "chainWhy": "These are the three oneOf branches of report-schema.json; a record is one of them, not a step in a sequence.",
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md verdict contracts (L103-109)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L103-L109"
+    },
+    {
+     "label": "report-schema.json",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/report-schema.json"
+    }
+   ],
+   "nodeCount": 3,
+   "chainInferred": "sourced",
+   "parallel": true
+  },
+  {
+   "id": "recheck",
+   "stage": "deploy",
+   "name": "Re-check the records",
+   "blurb": "Fresh verifier per record; another for big changes.",
+   "principle": "**Never skip independent review of a confirmed record**, ==in any profile==.",
+   "when": [
+    "For each final record → record-verifier",
+    "When a replacement is material → fresh-re-verifier"
+   ],
+   "chain": [
+    "record-verifier",
+    "fresh-re-verifier"
+   ],
+   "chainWhy": "VALIDATION-AND-REPORTING.md:122 launches the record verifiers; L145 sends material replacements to a new independent verifier.",
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 5 (L120-147)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L120-L147"
+    }
+   ],
+   "nodeCount": 2,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "finish",
+   "stage": "deploy",
+   "name": "Finish line",
+   "blurb": "Complete or incomplete, never mid-phase.",
+   "principle": "Two terminal states only. ==Gaps are disclosed, not hidden==.",
+   "when": [
+    "When all records pass → complete",
+    "When a budget or critic ran out → incomplete + reason"
+   ],
+   "chain": [
+    "run-status"
+   ],
+   "chainWhy": "SKILL.md:179 names exactly two terminal states.",
+   "sources": [
+    {
+     "label": "SKILL.md terminal states (L179)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L179"
+    }
+   ],
+   "nodeCount": 1,
+   "chainInferred": "sourced"
+  },
+  {
+   "id": "reports",
+   "stage": "maintain",
+   "name": "Write the reports",
+   "blurb": "Three files, all derived from the final records.",
+   "principle": "**Prose comes last** and ==never changes a verdict, severity or blocker==.",
+   "when": [
+    "Only after Phase 5 passes → all three reports"
+   ],
+   "chain": [
+    "report-md",
+    "findings-detail-md",
+    "needs-validation-md"
+   ],
+   "chainWhy": "VALIDATION-AND-REPORTING.md:153 derives all three from the same final records and ledger; none depends on another.",
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 6 (L151-186)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L151-L186"
+    }
+   ],
+   "nodeCount": 3,
+   "chainInferred": "sourced",
+   "parallel": true
+  }
+ ],
+ "anytime": [
+  {
+   "id": "modes",
+   "name": "Pick the mode",
+   "blurb": "Guidance by default; the full workflow only when you explicitly ask for an audit.",
+   "items": [
+    "guidance-mode",
+    "full-audit-mode"
+   ]
+  },
+  {
+   "id": "profiles",
+   "name": "Run size",
+   "blurb": "Profiles change breadth and redundancy, never the evidence bar.",
+   "items": [
+    "quick-profile",
+    "standard-profile",
+    "deep-profile",
+    "scoped-run"
+   ]
+  },
+  {
+   "id": "safety",
+   "name": "Safety rails",
+   "blurb": "Where code may run, who may write, how evidence is copied, and how spend is reserved.",
+   "items": [
+    "os-sandbox",
+    "write-isolation",
+    "artifact-promotion",
+    "cost-budget"
+   ]
+  },
+  {
+   "id": "rules",
+   "name": "Proof and severity rules",
+   "blurb": "What counts as a finding, how it is scored and fixed, and what the skill refuses to do.",
+   "items": [
+    "boundary-and-result",
+    "severity-anchors",
+    "smallest-fix",
+    "anti-patterns"
+   ]
+  },
+  {
+   "id": "classes-core",
+   "name": "Attack classes: core",
+   "blurb": "Ordinary attack-class blocks from ATTACK-CLASSES.md, picked per unit in Phase 1.",
+   "items": [
+    "ac-injection",
+    "ac-access-control",
+    "ac-resource-file",
+    "ac-crypto",
+    "ac-business-logic"
+   ]
+  },
+  {
+   "id": "classes-wide",
+   "name": "Attack classes: wider net",
+   "blurb": "Design abuse, chains, a no-category hunter and a literal basics check.",
+   "items": [
+    "ac-feature-abuse",
+    "ac-chained",
+    "ac-wildcard",
+    "ac-obvious"
+   ]
+  },
+  {
+   "id": "comp-code",
+   "name": "Companions: code and protocols",
+   "blurb": "Domain files selected when recon finds the matching boundary.",
+   "items": [
+    "co-memory",
+    "co-web",
+    "co-client",
+    "co-protocols",
+    "co-ai"
+   ]
+  },
+  {
+   "id": "comp-platform",
+   "name": "Companions: platform and data",
+   "blurb": "Domain files selected when recon finds the matching boundary.",
+   "items": [
+    "co-supply",
+    "co-cloud",
+    "co-resource",
+    "co-data",
+    "co-desktop"
+   ]
+  }
+ ],
+ "skills": {
+  "run-metadata": {
+   "name": "run-metadata.json",
+   "trigger": "parent writes run facts",
+   "when": [
+    "When **full audit mode** starts → the parent resolves the run values and writes [[run-metadata]] first",
+    "When you did not name an output folder → it uses ==`~/security-audit-skill/<repo>/run-<N>`=="
+   ],
+   "whatItIs": "The **run's fact sheet**. The parent agent writes it ==before it hands work to any other agent==.",
+   "howItWorks": [
+    "The parent resolves the **skill folder, target repo, repo name, output folder and source ref** (commit, and whether the tree is dirty)",
+    "The output folder sits **outside the target**. Inside it only if you pick it and Git ignores it",
+    "It writes `run_id`, `target`, `profile`, `scope_paths`, `budget`, companion files, prior-run paths and ==`run_status: \"in_progress\"`==",
+    "It is updated only when those facts change. Candidate state lives in the ledger and `findings.json`"
+   ],
+   "behindTheScenes": [
+    [
+     "full audit request",
+     "resolve target + output dir",
+     "run-metadata.json"
+    ],
+    [
+     "parent",
+     "only writer of shared run files"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "budget-gate"
+   ],
+   "sources": [
+    {
+     "label": "SKILL.md full audit setup (L44-52)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L44-L52"
+    },
+    {
+     "label": "SKILL.md run-metadata.json (L86)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L86"
+    },
+    {
+     "label": "RECONNAISSANCE.md Phase 1 (L3-5)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L3-L5"
+    }
+   ],
+   "kind": "part"
+  },
+  "budget-gate": {
+   "name": "budget-gate",
+   "trigger": "can the budget pay?",
+   "when": [
+    "When you set a **budget** (or the parent proposes one for a big target) → the gate runs before any recon agent",
+    "When the budget **cannot fund the minimum** → no agent launches and the run is marked incomplete"
+   ],
+   "whatItIs": "A **spend check before any agent starts**. A budget is counted as ==a maximum number of agent calls== across all phases.",
+   "howItWorks": [
+    "It reserves the **four baseline recon calls**",
+    "It reserves the **critics**: one final critic for `quick`, a post-wave plus a separate final-clean critic for `standard` and `deep`",
+    "It reserves **at least one verifier** call",
+    "Too small? It asks for a bigger budget or a narrower scope. Unchanged, it records ==`incomplete_reason: budget_cannot_fund_reconnaissance_and_reserves`=="
+   ],
+   "behindTheScenes": [
+    [
+     "budget set?",
+     "reserve recon + critics + verifier",
+     "launch recon"
+    ],
+    [
+     "cannot fund",
+     "no agent",
+     "run_status: incomplete"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "agent-1a-stack"
+   ],
+   "sources": [
+    {
+     "label": "SKILL.md cost budget (L119-134)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L119-L134"
+    },
+    {
+     "label": "RECONNAISSANCE.md budget gate (L5)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L5"
+    }
+   ],
+   "kind": "part"
+  },
+  "agent-1a-stack": {
+   "name": "agent-1a-stack",
+   "trigger": "product, stack, build",
+   "when": [
+    "When recon starts → [[agent-1a-stack]] runs **in parallel** with the other three recon agents"
+   ],
+   "whatItIs": "A read-only **`research` agent** that learns ==what the product is and how it builds==, with no network.",
+   "howItWorks": [
+    "Product type, users, operators and **trust-sensitive actions**",
+    "Languages, frameworks, build system, runtimes and **deployment models** it can see",
+    "Entry points and subsystem boundaries, with `file:line` refs",
+    "Offline **build and test commands** (listed, ==not run== during recon), a comparable product if one is source-grounded, and missing toolchains"
+   ],
+   "behindTheScenes": [
+    [
+     "target repo",
+     "agent-1a (research, read-only)",
+     "facts back to parent"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "architecture-md"
+   ],
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md Agent 1a (L9-20)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L9-L20"
+    },
+    {
+     "label": "RECONNAISSANCE.md Phase 1 agents (L7-57)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L7-L57"
+    }
+   ],
+   "kind": "part"
+  },
+  "agent-1b-trust": {
+   "name": "agent-1b-trust",
+   "trigger": "principals and controls",
+   "when": [
+    "When recon starts → [[agent-1b-trust]] maps who may do what, alongside the other recon agents"
+   ],
+   "whatItIs": "A read-only **`research` agent** that maps ==every principal, permission and control==.",
+   "howItWorks": [
+    "Each **lower-trust principal** and the actions it has by design",
+    "Authentication at each entry, **per-resource authorization** and tenant or owner scope",
+    "Process, CI, plugin, model/tool, device or local-IPC **authority**, plus privilege changes, revocation and fallback paths",
+    "Which controls are **visible in source** and which depend on ==a deployment fact it cannot see=="
+   ],
+   "behindTheScenes": [
+    [
+     "identity + authz source",
+     "agent-1b (research)",
+     "trust boundaries with file:line"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "architecture-md"
+   ],
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md Agent 1b (L22-33)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L22-L33"
+    },
+    {
+     "label": "RECONNAISSANCE.md Phase 1 agents (L7-57)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L7-L57"
+    }
+   ],
+   "kind": "part"
+  },
+  "agent-1c-inputs": {
+   "name": "agent-1c-inputs",
+   "trigger": "entry points to sinks",
+   "when": [
+    "When recon starts → [[agent-1c-inputs]] inventories every way input gets in"
+   ],
+   "whatItIs": "A read-only **`research` agent** that lists ==every place outside input enters== and follows it to the dangerous spots.",
+   "howItWorks": [
+    "Covers HTTP/browser, RPC/messages, files and archives, CLI/env/config, plugins/CI, cloud events, **model context and tool arguments**, mobile/deep links and local IPC",
+    "Follows **transformations, stored copies and security-relevant sinks** for each surface",
+    "Records limits and **parallel paths to the same effect**",
+    "Returns paths and line numbers. It ==does not execute or send inputs=="
+   ],
+   "behindTheScenes": [
+    [
+     "entry surfaces",
+     "transformations + copies",
+     "sinks"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "architecture-md"
+   ],
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md Agent 1c (L35-42)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L35-L42"
+    },
+    {
+     "label": "RECONNAISSANCE.md Phase 1 agents (L7-57)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L7-L57"
+    }
+   ],
+   "kind": "part"
+  },
+  "agent-1d-sandbox": {
+   "name": "agent-1d-sandbox",
+   "trigger": "what can run locally",
+   "when": [
+    "When recon starts → [[agent-1d-sandbox]] decides what can be safely run later"
+   ],
+   "whatItIs": "A read-only **`research` agent** that works out ==what may be executed, and what must never be==.",
+   "howItWorks": [
+    "Small **offline tests and fixtures** that could check a trust boundary with dummy data",
+    "Commands that would **fetch dependencies, publish, call paid APIs or touch shared state**: marked prohibited",
+    "Deployed controls that source cannot prove → **needs_validation** if decisive",
+    "Whether the machine can enforce the **sandbox** (no network, empty env, read-only target, scratch-only writes, limits) and safe artifact promotion. ==Missing controls block execution=="
+   ],
+   "behindTheScenes": [
+    [
+     "tests + manifests + packaging",
+     "agent-1d (research)",
+     "allowed vs prohibited commands"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "architecture-md"
+   ],
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md Agent 1d (L44-55)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L44-L55"
+    },
+    {
+     "label": "RECONNAISSANCE.md Phase 1 agents (L7-57)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L7-L57"
+    }
+   ],
+   "kind": "part"
+  },
+  "prior-runs": {
+   "name": "prior-runs",
+   "trigger": "reuse past ledgers",
+   "when": [
+    "When **earlier runs exist** for the same repo → the parent reads every prior ledger and `findings.json` before planning",
+    "When there is no prior ledger → the final report says so"
+   ],
+   "whatItIs": "How runs **add up**. Each new run ==targets the gaps the last runs left==, and nothing old counts as covered by default.",
+   "howItWorks": [
+    "Compares each prior record and unit with the **current source**. A matching commit alone is not proof",
+    "An unchanged prior **confirmed** record is carried in with the same fingerprint, excluded from hunters, and **re-verified**",
+    "Changed source becomes a **revalidation unit**. Prior needs-validation, deferred, blocked and out-of-scope work becomes current work",
+    "A prior rejection suppresses only ==that exact unchanged claim==, not the coverage unit"
+   ],
+   "behindTheScenes": [
+    [
+     "prior coverage-ledger.json + findings.json",
+     "compare with current source",
+     "planned units"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "architecture-md"
+   ],
+   "sources": [
+    {
+     "label": "SKILL.md coverage and prior runs (L92-105)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L92-L105"
+    },
+    {
+     "label": "RECONNAISSANCE.md prior-run input (L59-71)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L59-L71"
+    },
+    {
+     "label": "README multiple runs are additive (L22)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md#L22"
+    }
+   ],
+   "kind": "part"
+  },
+  "architecture-md": {
+   "name": "architecture.md",
+   "trigger": "one-page map of the target",
+   "when": [
+    "When the recon agents report back → the parent writes [[architecture-md]]",
+    "When a domain boundary is found → the matching **companion file** is selected here"
+   ],
+   "whatItIs": "The parent's **~1,000-word summary** of the target. Every hunter gets it ==verbatim== in its prompt.",
+   "howItWorks": [
+    "Product, principals, normal authority and **protected resources**",
+    "A **comparable-software baseline** when one is source-grounded, used to calibrate, never to dismiss a finding",
+    "Stack, entry surfaces, **source-to-sink paths**, trust boundaries and the strongest control on each",
+    "Prior-run gaps, and ==which companion files apply and why==. A file is chosen for a boundary, not because a dependency name appears"
+   ],
+   "behindTheScenes": [
+    [
+     "agents 1a-1d",
+     "parent synthesizes",
+     "architecture.md"
+    ],
+    [
+     "boundary found",
+     "pick companion file"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "coverage-ledger"
+   ],
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md architecture summary (L73-88)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L73-L88"
+    }
+   ],
+   "kind": "part"
+  },
+  "coverage-ledger": {
+   "name": "coverage-ledger.json",
+   "trigger": "the list of work units",
+   "when": [
+    "When `architecture.md` is done → the parent seeds [[coverage-ledger]]",
+    "After **every agent result** → the parent alone updates it"
+   ],
+   "whatItIs": "The **coverage claim** itself. One unit per ==entry surface × trust boundary × subsystem × attack class==.",
+   "howItWorks": [
+    "Each unit has **stable canonical refs** and a `coverage_id` built from them (percent-encoded, joined with `::`), never from line numbers or agent names",
+    "Each unit lists starting paths, its **attack-class block**, selected and excluded companion blocks with reasons",
+    "States follow a strict table: `planned`, `in_progress`, `covered`, `candidate`, `blocked`, `deferred`, `not_applicable`, `out_of_scope`",
+    "A summary or an agent count is **not coverage evidence**. ==Only paths and checks in a structured result close a unit=="
+   ],
+   "behindTheScenes": [
+    [
+     "surface",
+     "boundary",
+     "subsystem",
+     "attack class",
+     "coverage_id"
+    ],
+    [
+     "unit",
+     "planned → in_progress → covered | candidate | blocked"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "validate-ledger"
+   ],
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md deterministic coverage ledger (L90-154)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L90-L154"
+    }
+   ],
+   "kind": "part"
+  },
+  "validate-ledger": {
+   "name": "validate-coverage-ledger",
+   "trigger": "node script, no deps",
+   "when": [
+    "After **seeding**, after **every parent update**, and **before Phase 6** → run [[validate-ledger]]",
+    "When it reports errors → fix every one before assigning work"
+   ],
+   "whatItIs": "A **zero-dependency Node validator** for `coverage-ledger.json`. ==An invalid ledger cannot drive another assignment==.",
+   "howItWorks": [
+    "Checks required fields, the **state table**, canonical lowercase agent IDs and coverage-ID derivation",
+    "Rejects duplicate IDs and **one tuple written with different refs**",
+    "Caps input at **5 MiB**, 64 nesting levels and 10,000 units, and reports at most 100 errors"
+   ],
+   "behindTheScenes": [
+    [
+     "node validate-coverage-ledger.cjs coverage-ledger.json",
+     "pass",
+     "assign work"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "rank-units"
+   ],
+   "sources": [
+    {
+     "label": "RECONNAISSANCE.md run the validator (L156)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md#L156"
+    },
+    {
+     "label": "validate-coverage-ledger.cjs (L1-21)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/validate-coverage-ledger.cjs#L1-L21"
+    }
+   ],
+   "kind": "part"
+  },
+  "rank-units": {
+   "name": "rank-units",
+   "trigger": "who gets hunted first",
+   "when": [
+    "When a budget or profile **caps the hunter count** → units are taken in this order",
+    "When a unit cannot be reached → it is marked `deferred` with a reason, never silently dropped"
+   ],
+   "whatItIs": "The **priority order** for planned units. Ties break by `coverage_id` so ==runs stay deterministic==.",
+   "howItWorks": [
+    "**Unauthenticated** or lowest-trust entry surfaces first",
+    "Boundaries guarding the **most valuable resources**: credentials, cross-tenant data, code execution, release authority",
+    "**Prior-run gaps**, revalidation targets and changed source before same-source re-passes",
+    "Classes that ==historically yield confirmed findings== for this kind of target"
+   ],
+   "behindTheScenes": [
+    [
+     "planned units",
+     "rank",
+     "in_progress + agent_id + scratch/"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "hunter-prompt"
+   ],
+   "sources": [
+    {
+     "label": "HUNTING.md assignment and ranking (L5-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L5-L9"
+    }
+   ],
+   "kind": "part"
+  },
+  "hunter-prompt": {
+   "name": "hunter-prompt",
+   "trigger": "9 parts, fixed order",
+   "when": [
+    "When a unit is assigned → the parent builds one [[hunter-prompt]] per hunter"
+   ],
+   "whatItIs": "The **exact brief** every hunter gets. Blocks are ==copied verbatim, never named==.",
+   "howItWorks": [
+    "Role preamble, then `architecture.md` **verbatim**, then the assigned coverage IDs and paths",
+    "The selected **attack-class block** plus each companion's Core discipline, chosen classes, Universal moves and Validation rules",
+    "**Excluded blocks** with reasons, the core hunting method, the promotion procedure and the candidate gate",
+    "Carried prior exclusions, peer-owned IDs not to duplicate, scratch paths and the ==structured-result contract=="
+   ],
+   "behindTheScenes": [
+    [
+     "architecture.md",
+     "ledger unit",
+     "attack-class + companion blocks",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "hunter"
+   ],
+   "sources": [
+    {
+     "label": "HUNTING.md required hunter prompt (L11-25)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L11-L25"
+    }
+   ],
+   "kind": "part"
+  },
+  "hunter": {
+   "name": "hunter",
+   "trigger": "general agent, one unit set",
+   "when": [
+    "When a unit is `in_progress` → one isolated [[hunter]] owns it",
+    "When it spots a different boundary → it returns it as `uncovered` instead of chasing it"
+   ],
+   "whatItIs": "An isolated **`general` agent** that reads code ==at depth== to find a broken security rule in its own units.",
+   "howItWorks": [
+    "Follows each input through **parsing, identity, authorization, state, copies and the final sink**, including retry, legacy and error paths",
+    "Works from a **concrete invariant**: lower-trust principal, accepted value, the control that should stop it, the path after it, the smallest effect, the fix",
+    "Tests **sad paths**: empty, negative, duplicate, stale, revoked, reordered, concurrent, mid-migration",
+    "Runs only the **narrowest local check**, inside the sandbox, and ==stops at the minimum effect=="
+   ],
+   "behindTheScenes": [
+    [
+     "hunter",
+     "reads source",
+     "sandboxed local check (optional)",
+     "writes only its scratch/"
+    ],
+    [
+     "missing sandbox control",
+     "needs_validation blocker"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "hunter-result"
+   ],
+   "sources": [
+    {
+     "label": "HUNTING.md core hunting method (L27-97)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L27-L97"
+    },
+    {
+     "label": "HUNTING.md local validation boundaries (L159-166)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L159-L166"
+    }
+   ],
+   "kind": "part"
+  },
+  "hunter-result": {
+   "name": "hunter-result",
+   "trigger": "one JSON object",
+   "when": [
+    "When a hunter finishes → it returns exactly one JSON object, no prose",
+    "When the parent receives it → it updates only the matching ledger units"
+   ],
+   "whatItIs": "The hunter's **structured report**: ==every assigned unit appears exactly once==.",
+   "howItWorks": [
+    "`units`: each with a disposition `covered`, `candidate` or `blocked`, reviewed paths and **checks**",
+    "`candidates`: schema-shaped records with `proposed_verdict` confirmed or needs_validation, passed through the **candidate gate**",
+    "`hardening`: non-finding notes kept for the report. `uncovered`: new boundaries for a new unit",
+    "The parent **dedupes by fingerprint, then root cause**. A malformed result leaves the unit `planned`"
+   ],
+   "behindTheScenes": [
+    [
+     "hunter JSON",
+     "parent validates",
+     "ledger update",
+     "validate-coverage-ledger"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "post-wave-critic"
+   ],
+   "sources": [
+    {
+     "label": "HUNTING.md candidate gate (L138-157)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L138-L157"
+    },
+    {
+     "label": "HUNTING.md structured hunter result (L168-213)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L168-L213"
+    },
+    {
+     "label": "HUNTING.md parent consolidation (L215-219)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L215-L219"
+    }
+   ],
+   "kind": "part"
+  },
+  "post-wave-critic": {
+   "name": "post-wave-critic",
+   "trigger": "what did the wave miss?",
+   "when": [
+    "Right **after every hunter wave** → one fresh critic runs, paid from the reserve"
+   ],
+   "whatItIs": "A fresh read-only **`research` agent** that proposes ==coverage, not findings==.",
+   "howItWorks": [
+    "Gets `architecture.md`, the **full ledger** and current candidate fingerprints",
+    "Looks for unmapped entry points, unchecked parallel paths, missing lifecycle modes, **unjustified exclusions** and units closed without checks",
+    "Returns `missing_units`, `reassign_ids`, `resolved_prior_leads` and `stop`",
+    "Reopened units keep their old attempt in `attempts`; the ==next hunter is always a fresh owner=="
+   ],
+   "behindTheScenes": [
+    [
+     "wave done",
+     "post-wave critic",
+     "missing_units / reassign_ids",
+     "next wave"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "final-clean-critic"
+   ],
+   "sources": [
+    {
+     "label": "HUNTING.md coverage-critic waves (L221-247)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L221-L247"
+    }
+   ],
+   "kind": "part"
+  },
+  "final-clean-critic": {
+   "name": "final-clean-critic",
+   "trigger": "the second clean pass",
+   "when": [
+    "In `standard` and `deep` → when the post-wave critic finds no work and nothing is planned",
+    "In `quick` → there is no second critic; leftover work is marked `deferred`"
+   ],
+   "whatItIs": "A **separate, reserved critic**. Coverage counts as complete ==only when this one also finds nothing==.",
+   "howItWorks": [
+    "Runs only after a clean post-wave pass with **no planned units left**",
+    "If it finds work, the loop repeats: **wave → post-wave critic → final-clean critic**",
+    "An early stop marks untouched units `deferred` and the gap is disclosed",
+    "A silent wave or agent cap is ==never evidence of complete coverage=="
+   ],
+   "behindTheScenes": [
+    [
+     "clean post-wave pass",
+     "final-clean critic",
+     "no work → hunting ends"
+    ],
+    [
+     "work found",
+     "another wave"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "consolidate"
+   ],
+   "sources": [
+    {
+     "label": "HUNTING.md final-clean critic (L247-251)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L247-L251"
+    }
+   ],
+   "kind": "part"
+  },
+  "consolidate": {
+   "name": "consolidate",
+   "trigger": "one candidate per root cause",
+   "when": [
+    "After the clean critic pass (or a recorded early stop) → the parent merges all candidates"
+   ],
+   "whatItIs": "The parent **merges candidates by fingerprint and root cause**, so ==each real issue is checked once==.",
+   "howItWorks": [
+    "Merges Phase 2 candidates and **carried prior confirmations**",
+    "One root cause with several entry paths is **one candidate** with the strongest trace",
+    "Related but independent missing controls keep **separate fingerprints**"
+   ],
+   "behindTheScenes": [
+    [
+     "hunter candidates + carried priors",
+     "dedupe by fingerprint",
+     "unique candidates"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "candidate-verifier"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 3 (L3-5)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L3-L5"
+    },
+    {
+     "label": "HUNTING.md consolidation (L219)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L219"
+    }
+   ],
+   "kind": "part"
+  },
+  "candidate-verifier": {
+   "name": "candidate-verifier",
+   "trigger": "tries to refute it",
+   "when": [
+    "For **every unique candidate** → a fresh `general` verifier that did not hunt it"
+   ],
+   "whatItIs": "An independent agent told: ==\"You did not write this candidate. Try to refute it.\"==",
+   "howItWorks": [
+    "Gets only the candidate, its unit checks, needed architecture facts, the companion validation blocks and the schema. **Never another verifier's conclusion**",
+    "**Re-reads every cited line** and confirms the first trace step is a real lower-trust entry",
+    "Rebuilds the strongest controls on the path and **independently reproduces** the minimum result in the sandbox when it can",
+    "Checks likelihood, impact, confidence and fix match only the evidence, then returns one JSON `decision` + `record`"
+   ],
+   "behindTheScenes": [
+    [
+     "candidate",
+     "fresh verifier (did not hunt it)",
+     "decision + record"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "verdict-rules"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md candidate-verifier prompt (L5-46)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L5-L46"
+    }
+   ],
+   "kind": "part"
+  },
+  "verdict-rules": {
+   "name": "verdict-rules",
+   "trigger": "confirm, park or reject",
+   "when": [
+    "When a verifier decides → these rules pick the verdict"
+   ],
+   "whatItIs": "Three **distinct outcomes**. `needs_validation` is ==never a parking place for a speculative idea==.",
+   "howItWorks": [
+    "**Confirmed** only after the full path and a bounded observed result are independently established",
+    "**Needs validation** when one specific deployment or runtime fact is still unknown",
+    "**Rejected** when source, local behavior, a visible control, no real impact or an impossible prerequisite refutes it",
+    "A malformed verifier answer is discarded and re-run; if the budget runs out, the candidate stays in the ledger only"
+   ],
+   "behindTheScenes": [
+    [
+     "decision",
+     "confirmed | needs_validation | rejected"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "findings-json"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md decision rules (L87-93)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L87-L93"
+    }
+   ],
+   "kind": "part"
+  },
+  "findings-json": {
+   "name": "findings.json",
+   "trigger": "every final record",
+   "when": [
+    "After Phase 3 → the parent writes all independently decided records, **sorted by fingerprint**"
+   ],
+   "whatItIs": "The **machine-readable result**. The reports are derived from it, ==never the other way round==.",
+   "howItWorks": [
+    "Holds `confirmed`, `needs_validation` and `rejected` records",
+    "The parent reads `report-schema.json` **right before writing**; `additionalProperties: false`, so no hunter wrapper fields",
+    "Each record has a stable fingerprint, title, description and **repository-relative** source paths",
+    "Traces start at `entrypoint`, end at `sink`, with `propagation` between"
+   ],
+   "behindTheScenes": [
+    [
+     "verifier decisions",
+     "parent writes",
+     "findings.json"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "validate-findings"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 4 (L95-109)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L95-L109"
+    },
+    {
+     "label": "report-schema.json",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/report-schema.json"
+    }
+   ],
+   "kind": "part"
+  },
+  "validate-findings": {
+   "name": "validate-findings",
+   "trigger": "schema + semantic checks",
+   "when": [
+    "In **Phase 4**, and again after **every Phase 5 replacement** → run it together with the ledger validator"
+   ],
+   "whatItIs": "A **zero-dependency Node validator** for `findings.json` against `report-schema.json`. ==Passing proves format, not truth==.",
+   "howItWorks": [
+    "Interprets the schema directly and adds checks like **duplicate and unsorted fingerprints** and safe repo-relative paths",
+    "Rejects input over **5 MiB**, 1,000 findings or 64 nesting levels",
+    "Runs next to `validate-coverage-ledger.cjs`; fix every error before continuing"
+   ],
+   "behindTheScenes": [
+    [
+     "node validate-findings.cjs findings.json",
+     "node validate-coverage-ledger.cjs coverage-ledger.json",
+     "Phase 5"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "record-verifier"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md run both validators (L111-118)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L111-L118"
+    },
+    {
+     "label": "validate-findings.cjs (L1-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/validate-findings.cjs#L1-L9"
+    }
+   ],
+   "kind": "part"
+  },
+  "confirmed-record": {
+   "name": "confirmed-record",
+   "trigger": "proven, with severity",
+   "when": [
+    "When the trace is complete **and** a bounded local result was observed → [[confirmed-record]]"
+   ],
+   "whatItIs": "A **proven vulnerability**. The only verdict that ==gets a severity==.",
+   "howItWorks": [
+    "Fields: `root_cause`, `intended_behavior`, `trace`, `evidence`, `conditions`, `execution`, `remediation`, `severity`, `confidence`",
+    "`execution` is **target-neutral**: an HTTP input, CLI call, library call, fixture or rendered policy, whatever the target natively uses",
+    "Severity is likelihood × impact, and **overall cannot exceed the demonstrated impact**"
+   ],
+   "behindTheScenes": [
+    [
+     "trace + observed_result",
+     "severity",
+     "remediation"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "report-md"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md confirmed contract (L99-105)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L99-L105"
+    },
+    {
+     "label": "SKILL.md severity (L150-162)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L150-L162"
+    }
+   ],
+   "kind": "part"
+  },
+  "needs-validation-record": {
+   "name": "needs_validation",
+   "trigger": "blocked lead, no severity",
+   "when": [
+    "When a source-grounded lead hits **one fact outside source** (deployment, provider, identity) → [[needs-validation-record]]"
+   ],
+   "whatItIs": "A **specific, blocked hypothesis**, not a low-confidence finding. It ==never gets a severity==.",
+   "howItWorks": [
+    "Fields: `claimed_root_cause`, `trace`, `evidence`, nonempty `blockers` and a `validation_plan`",
+    "The plan has a bounded **`local`** step, an owner-observed **`deployment`** check, or both when both resolve distinct facts",
+    "A deployment check asks the owner to look. It is ==never audit traffic sent to a live system=="
+   ],
+   "behindTheScenes": [
+    [
+     "blocked fact",
+     "validation_plan.local | deployment",
+     "NEEDS-VALIDATION.md"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "needs-validation-md"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md needs_validation contract (L100-106)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L100-L106"
+    },
+    {
+     "label": "SKILL.md respect source visibility (L146-152)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L146-L152"
+    }
+   ],
+   "kind": "part"
+  },
+  "rejected-record": {
+   "name": "rejected-record",
+   "trigger": "disproved, kept on file",
+   "when": [
+    "When validation **disproves** a candidate → [[rejected-record]]"
+   ],
+   "whatItIs": "A **disproved claim kept on record**, so ==future runs do not repeat it== without new evidence.",
+   "howItWorks": [
+    "Fields: `claimed_root_cause`, `trace`, `evidence` and `reason`",
+    "No severity, execution, remediation, blockers or plan",
+    "Never described as a finding; mentioned only to explain a **prior disagreement or coverage decision**"
+   ],
+   "behindTheScenes": [
+    [
+     "refuted candidate",
+     "rejected record",
+     "next run skips the unchanged claim"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md rejected contract (L101-107)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L101-L107"
+    },
+    {
+     "label": "VALIDATION-AND-REPORTING.md rejected in reports (L167)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L167"
+    }
+   ],
+   "kind": "part"
+  },
+  "record-verifier": {
+   "name": "record-verifier",
+   "trigger": "fresh eyes on each record",
+   "when": [
+    "For **every final confirmed and needs_validation record** → one fresh `research` verifier, all in parallel",
+    "In a `quick` run → Phase 3 and Phase 5 merge into one fresh reviewer per candidate"
+   ],
+   "whatItIs": "A second, independent check of ==the structured record itself==, not the hunter's write-up.",
+   "howItWorks": [
+    "For **confirmed**: every path and line, the real entry interface, every condition and preventing layer, impact, severity split and the fix",
+    "For **needs_validation**: the path is real, every blocker is decisive, the plan is exact, the fingerprint matches",
+    "Returns `{\"decision\":\"verified\", \"fingerprint\": …}` or `{\"decision\":\"replace\", \"record\": …}`",
+    "Both kinds are checked: ==a misleading needs_validation handoff wastes owner time=="
+   ],
+   "behindTheScenes": [
+    [
+     "final record",
+     "fresh research verifier",
+     "verified | replace"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "fresh-re-verifier"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 5 (L120-143)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L120-L143"
+    },
+    {
+     "label": "VALIDATION-AND-REPORTING.md verify both kinds (L149)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L149"
+    }
+   ],
+   "kind": "part"
+  },
+  "fresh-re-verifier": {
+   "name": "fresh-re-verifier",
+   "trigger": "checks a big replacement",
+   "when": [
+    "When a Phase 5 replacement **promotes a verdict** or materially changes root cause, trace, input, result, impact or severity"
+   ],
+   "whatItIs": "Another **brand-new verifier** that did not hunt, validate or propose the change. ==A material change is never applied unchecked==.",
+   "howItWorks": [
+    "Re-checks current source and **independently reproduces** any decisive local result",
+    "Returns `verified` or another replacement; repeat with a fresh verifier each time",
+    "No budget or independence left? The record is **removed**, its unit stays an unresolved candidate, and the run is `incomplete`",
+    "Small wording or line-number fixes are applied directly, then **both validators run again**"
+   ],
+   "behindTheScenes": [
+    [
+     "material replacement",
+     "new independent verifier",
+     "apply",
+     "re-run both validators"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "run-status"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md material replacements (L145-147)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L145-L147"
+    }
+   ],
+   "kind": "part"
+  },
+  "run-status": {
+   "name": "run-status",
+   "trigger": "complete or incomplete",
+   "when": [
+    "When every ledger candidate has a final disposition and every record passed Phase 5 → `complete`",
+    "When budget, validation or a critic ran out → `incomplete` with an exact reason"
+   ],
+   "whatItIs": "The run ends in ==exactly one of two terminal states==. It never stops mid-phase.",
+   "howItWorks": [
+    "**(a)** All Phase 6 files are written and **both validators pass**",
+    "**(b)** `run_status: \"incomplete\"` is recorded with its exact reason, e.g. `validation_budget_exhausted` or `critic_budget_exhausted`, and the gap is disclosed in the report",
+    "A user-set strict budget is **never exceeded silently**"
+   ],
+   "behindTheScenes": [
+    [
+     "Phase 5 passes",
+     "run_status: complete"
+    ],
+    [
+     "budget or independence runs out",
+     "run_status: incomplete + reason"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "report-md"
+   ],
+   "sources": [
+    {
+     "label": "SKILL.md terminal states (L179)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L179"
+    },
+    {
+     "label": "VALIDATION-AND-REPORTING.md complete status (L147)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L147"
+    },
+    {
+     "label": "SKILL.md budget exhaustion (L132-134)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L132-L134"
+    }
+   ],
+   "kind": "part"
+  },
+  "report-md": {
+   "name": "REPORT.md",
+   "trigger": "the main write-up",
+   "when": [
+    "Only **after Phase 5 passes** for every retained record → the parent writes [[report-md]]"
+   ],
+   "whatItIs": "The **owner-facing report**, derived from the final records and the ledger. ==Prose never changes a verdict or severity==.",
+   "howItWorks": [
+    "Run profile, scope, budget spent vs planned, source ref, **sandboxed source-and-local-only** statement, prior-run use, and deferred or out-of-scope coverage",
+    "A short **posture summary** and a confirmed-findings table: severity, title, boundary, one-line result",
+    "Each confirmed finding with **bounded reproduction**, impact, priority and the smallest source fix, then a separate NEEDS VALIDATION table",
+    "Hardening notes, positive patterns and a **coverage summary**. A clean run can have ==zero findings== and says so"
+   ],
+   "behindTheScenes": [
+    [
+     "findings.json + coverage-ledger.json + hardening notes",
+     "REPORT.md"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "findings-detail-md"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md Phase 6 REPORT.md (L151-167)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L151-L167"
+    },
+    {
+     "label": "VALIDATION-AND-REPORTING.md zero findings (L186)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L186"
+    }
+   ],
+   "kind": "part"
+  },
+  "findings-detail-md": {
+   "name": "FINDINGS-DETAIL.md",
+   "trigger": "medium and up, in full",
+   "when": [
+    "For each **confirmed `medium`, `high` or `critical`** record → a full detail entry"
+   ],
+   "whatItIs": "The **full reproduction file** for serious findings, written ==in the target's own interface==.",
+   "howItWorks": [
+    "Ordered trace and evidence, the **dummy attacker** and the affected dummy resource",
+    "The native input, invocation or fixture, with exact **bounded** instructions and the observed output",
+    "Conditions, containment, the **source-level fix** and a regression case"
+   ],
+   "behindTheScenes": [
+    [
+     "confirmed ≥ medium",
+     "FINDINGS-DETAIL.md"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "needs-validation-md"
+   ],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md FINDINGS-DETAIL.md (L169-178)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L169-L178"
+    },
+    {
+     "label": "VALIDATION-AND-REPORTING.md native interface (L184)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L184"
+    }
+   ],
+   "kind": "part"
+  },
+  "needs-validation-md": {
+   "name": "NEEDS-VALIDATION.md",
+   "trigger": "leads for the owner",
+   "when": [
+    "For **every unresolved record** → one entry the owner can act on"
+   ],
+   "whatItIs": "The **open-leads file**: prioritized, ==with no severity== and no live test guidance.",
+   "howItWorks": [
+    "Source trace, verified evidence, the **exact blocker** and the affected boundary",
+    "Each applicable **bounded local** or **owner-observed** resolution plan",
+    "Never assumes the missing deployment fact"
+   ],
+   "behindTheScenes": [
+    [
+     "needs_validation records",
+     "NEEDS-VALIDATION.md",
+     "owner checks the fact"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "VALIDATION-AND-REPORTING.md NEEDS-VALIDATION.md (L180-182)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md#L180-L182"
+    }
+   ],
+   "kind": "part"
+  },
+  "guidance-mode": {
+   "name": "guidance-mode",
+   "trigger": "default: answer, no files",
+   "when": [
+    "When you ask a **security question**, a focused review or triage of one finding → [[guidance-mode]]",
+    "When a request could mean either mode → it asks **one focused question** first"
+   ],
+   "whatItIs": "The **default mode**. Loading the skill ==does not authorize the full audit or any file writes==.",
+   "howItWorks": [
+    "Uses only the **relevant parts** of the skill",
+    "Does **not** run all six phases, create an output folder or write audit artifacts",
+    "May launch focused agents; their results go back to your current task",
+    "The execution-safety rules still apply"
+   ],
+   "example": {
+    "situation": "you want a second opinion on one auth check.",
+    "youType": "is this JWT check in src/auth.ts safe?",
+    "whatHappens": [
+     "It reads only the relevant code.",
+     "It may launch a focused agent.",
+     "No files are written."
+    ],
+    "youGet": "**An answer in the chat**, no audit folder."
+   },
+   "behindTheScenes": [
+    [
+     "security question",
+     "guidance mode",
+     "answer in chat"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "full-audit-mode"
+   ],
+   "sources": [
+    {
+     "label": "SKILL.md operating modes (L10-17)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L10-L17"
+    },
+    {
+     "label": "README usage (L68-84)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md#L68-L84"
+    }
+   ],
+   "kind": "part"
+  },
+  "full-audit-mode": {
+   "name": "full-audit-mode",
+   "trigger": "all six phases + files",
+   "when": [
+    "When you **explicitly** ask to audit or pen-test a codebase, ask for a full/comprehensive/end-to-end review, or ask for report files → [[full-audit-mode]]"
+   ],
+   "whatItIs": "The **complete workflow**: ==all six phases, in order==, writing the run files to the output folder.",
+   "howItWorks": [
+    "Resolves setup, writes `run-metadata.json` and runs the **budget gate**",
+    "Runs **Reconnaissance → Hunting → Validation → Structured output → Record verification → Report**",
+    "Ends only when every Phase 6 file is written and **both validators pass**, or the run is recorded `incomplete`"
+   ],
+   "example": {
+    "situation": "you want a real audit of a repo before launch.",
+    "youType": "security audit this codebase",
+    "whatHappens": [
+     "Recon agents map the code.",
+     "Hunters work through the ledger.",
+     "Fresh verifiers try to disprove every candidate."
+    ],
+    "youGet": "**REPORT.md, FINDINGS-DETAIL.md, NEEDS-VALIDATION.md** plus `findings.json` and the ledger."
+   },
+   "behindTheScenes": [
+    [
+     "\"security audit this codebase\"",
+     "full audit mode",
+     "~/security-audit-skill/<repo>/run-<N>/"
+    ]
+   ],
+   "calls": [],
+   "next": [
+    "run-metadata"
+   ],
+   "sources": [
+    {
+     "label": "SKILL.md operating modes (L10-17)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L10-L17"
+    },
+    {
+     "label": "SKILL.md full audit workflow (L168-179)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L168-L179"
+    },
+    {
+     "label": "README usage (L68-84)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md#L68-L84"
+    }
+   ],
+   "kind": "part"
+  },
+  "quick-profile": {
+   "name": "quick-profile",
+   "trigger": "small or fast first look",
+   "when": [
+    "When the target is **small**, it is a **re-run**, or you want a fast first look → [[quick-profile]]"
+   ],
+   "whatItIs": "A **bounded pass**. It always reports itself as ==partial coverage==.",
+   "howItWorks": [
+    "Coarser units: surface × boundary × attack class, one all-in-scope subsystem",
+    "**Exactly one hunter wave** and one final critic; no follow-up wave",
+    "One fresh verifier per candidate does both Phase 3 and Phase 5"
+   ],
+   "behindTheScenes": [
+    [
+     "quick",
+     "1 wave",
+     "1 critic",
+     "1 verifier each"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md run profiles (L107-117)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L107-L117"
+    }
+   ],
+   "kind": "part"
+  },
+  "standard-profile": {
+   "name": "standard-profile",
+   "trigger": "the default",
+   "when": [
+    "When nothing else is asked for → [[standard-profile]]"
+   ],
+   "whatItIs": "**The workflow as written.** ==This is the default profile==.",
+   "howItWorks": [
+    "Critic waves until a post-wave pass and a separate final-clean pass both find nothing",
+    "Candidate validation and record verification stay **separate fresh agents**"
+   ],
+   "behindTheScenes": [
+    [
+     "standard",
+     "waves until clean",
+     "2 verifier passes"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md run profiles (L107-117)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L107-L117"
+    }
+   ],
+   "kind": "part"
+  },
+  "deep-profile": {
+   "name": "deep-profile",
+   "trigger": "high stakes or large",
+   "when": [
+    "When the target is **high-stakes or large** → [[deep-profile]]"
+   ],
+   "whatItIs": "The **most redundant** profile. Profiles change breadth, ==never the evidence bar==.",
+   "howItWorks": [
+    "Units split per **subsystem and lifecycle mode**",
+    "Critic waves to a clean pass, separate validation and verification agents",
+    "Prior same-source covered units get an **independent second pass**"
+   ],
+   "behindTheScenes": [
+    [
+     "deep",
+     "finer units",
+     "second pass on covered units"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md run profiles (L107-117)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L107-L117"
+    }
+   ],
+   "kind": "part"
+  },
+  "scoped-run": {
+   "name": "scoped-run",
+   "trigger": "paths, subsystem or diff",
+   "when": [
+    "When you name **paths, one subsystem, one companion domain, or a diff** between two refs → [[scoped-run]]"
+   ],
+   "whatItIs": "An audit of **a subset**. Everything else is recorded `out_of_scope`, ==never `covered`==.",
+   "howItWorks": [
+    "Seeds units only for in-scope surfaces",
+    "Critics still note out-of-scope gaps, recorded as `out_of_scope` for later runs",
+    "Presents itself as **partial coverage**"
+   ],
+   "behindTheScenes": [
+    [
+     "scope",
+     "in-scope units",
+     "rest = out_of_scope"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md scoped run (L115-117)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L115-L117"
+    },
+    {
+     "label": "HUNTING.md scoped critics (L249)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L249"
+    }
+   ],
+   "kind": "part"
+  },
+  "os-sandbox": {
+   "name": "os-sandbox",
+   "trigger": "where target code may run",
+   "when": [
+    "Whenever the target's own builds, tests, browsers, fuzzers or fixtures would run → only inside [[os-sandbox]]",
+    "When any control is missing → it **does not run** target code"
+   ],
+   "whatItIs": "The **execution boundary**. Source reading is read-only; target code runs ==only in an OS-enforced sandbox==.",
+   "howItWorks": [
+    "**No external network**; an isolated loopback only for a local fixture",
+    "An **empty environment** from an allowlist, scratch-local `HOME`, temp and caches",
+    "**Read-only target and toolchain**; writes only to the agent's `scratch/`",
+    "Low CPU, memory, process, file-size, disk and wall-clock **limits**. No installs, no live endpoints, no real credentials"
+   ],
+   "behindTheScenes": [
+    [
+     "target code",
+     "sandbox (no net, empty env, read-only, limits)",
+     "minimum result"
+    ],
+    [
+     "control missing",
+     "needs_validation + safe plan"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md universal execution safety (L31-42)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L31-L42"
+    },
+    {
+     "label": "README requirements (L86-90)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md#L86-L90"
+    }
+   ],
+   "kind": "part"
+  },
+  "write-isolation": {
+   "name": "write-isolation",
+   "trigger": "one writer per file",
+   "when": [
+    "Throughout a full audit → the **parent is the only writer** of shared run files"
+   ],
+   "whatItIs": "Who may write where. ==Agents never touch shared files, target source or each other's folders==.",
+   "howItWorks": [
+    "The parent alone writes `run-metadata.json`, `architecture.md`, `coverage-ledger.json`, `findings.json` and the three reports",
+    "Each hunter or verifier gets `agents/<agent-id>/` with **`scratch/`** and parent-owned **`artifacts/`**",
+    "Agent IDs are **lowercase** and never a Windows device name; `/tmp` and home are never a fallback"
+   ],
+   "behindTheScenes": [
+    [
+     "parent",
+     "shared run files"
+    ],
+    [
+     "agent",
+     "agents/<id>/scratch/ only"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md write isolation (L54-66)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L54-L66"
+    }
+   ],
+   "kind": "part"
+  },
+  "artifact-promotion": {
+   "name": "artifact-promotion",
+   "trigger": "scratch → artifacts, safely",
+   "when": [
+    "After the sandbox and **all its processes end** → trusted parent-side code promotes allowlisted files"
+   ],
+   "whatItIs": "An **11-step race-safe copy** from scratch to artifacts. Only promoted files ==count as local evidence==.",
+   "howItWorks": [
+    "Allowlist and **byte limits** set before execution; descriptors are never passed to the sandbox",
+    "No-follow, directory-relative walks; `fstat` checks for a **regular file with one link** and the size limit",
+    "Never globs scratch, extracts archives, or promotes symlinks, FIFOs, sockets, devices or hard links",
+    "Any failed check discards the entry; decisive evidence becomes a **needs_validation** blocker"
+   ],
+   "behindTheScenes": [
+    [
+     "scratch/ file",
+     "11 checks",
+     "artifacts/ file"
+    ],
+    [
+     "any check fails",
+     "discard"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md promotion procedure (L68-82)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L68-L82"
+    },
+    {
+     "label": "HUNTING.md verbatim promotion block (L99-136)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L99-L136"
+    }
+   ],
+   "kind": "part"
+  },
+  "cost-budget": {
+   "name": "cost-budget",
+   "trigger": "spend in a fixed order",
+   "when": [
+    "When a **budget** is set → hunters are funded only after critics and validation are reserved"
+   ],
+   "whatItIs": "The ledger makes spend countable: ==one unit ≈ one hunter, one candidate ≈ one or two verifiers==.",
+   "howItWorks": [
+    "Count recon, every critic and the final-clean critic as agent calls",
+    "**Reserve critics and validation before hunting** (about 30% of the balance when unsure)",
+    "Assign hunters by priority until the hunting allowance is spent",
+    "Before each later wave, reserve its critic again; if it does not fit, the wave's units become `deferred`"
+   ],
+   "behindTheScenes": [
+    [
+     "budget",
+     "reserve critics + verifiers",
+     "fund hunters by priority"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md cost budget (L119-134)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L119-L134"
+    },
+    {
+     "label": "HUNTING.md budget bounds the loop (L251)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md#L251"
+    }
+   ],
+   "kind": "part"
+  },
+  "boundary-and-result": {
+   "name": "boundary-and-result",
+   "trigger": "no boundary, no finding",
+   "when": [
+    "For **every candidate** → name the boundary and the concrete result first"
+   ],
+   "whatItIs": "The first rule: a finding needs ==a real trust boundary and a concrete result==.",
+   "howItWorks": [
+    "Name the **lower-trust principal**, the accepted input, the intended control and the crossed boundary",
+    "Name the **affected principal or resource** and the observed result",
+    "A missing best practice, guessed deployment behavior, generic crash or **self-impact** is not a finding",
+    "Defense-in-depth gaps are **hardening notes**: if Layer A stops the attack, missing Layer B is not a vulnerability"
+   ],
+   "behindTheScenes": [
+    [
+     "principal",
+     "input",
+     "control",
+     "boundary",
+     "result"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md require a boundary and result (L138-140)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L138-L140"
+    },
+    {
+     "label": "README design principles (L92-98)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md#L92-L98"
+    }
+   ],
+   "kind": "part"
+  },
+  "severity-anchors": {
+   "name": "severity-anchors",
+   "trigger": "critical to informational",
+   "when": [
+    "When a **confirmed** record is scored → use these anchors"
+   ],
+   "whatItIs": "Severity is **likelihood × impact** of what was shown. ==It cannot exceed the demonstrated impact==.",
+   "howItWorks": [
+    "**Critical**: an unauthenticated actor gets code execution, full data-store access or arbitrary account takeover",
+    "**High**: an explicit control is fully defeated (auth bypass, cross-tenant read/write, stored script, authenticated RCE)",
+    "**Medium**: a real violation with limited blast radius. **Low**: non-secret internals. **Informational**: minimal impact",
+    "High vs medium: does it **fully defeat** a control, or only weaken it?"
+   ],
+   "behindTheScenes": [
+    [
+     "likelihood",
+     "impact",
+     "overall ≤ impact"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md separate priority from certainty (L150-162)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L150-L162"
+    }
+   ],
+   "kind": "part"
+  },
+  "smallest-fix": {
+   "name": "smallest-fix",
+   "trigger": "fix at the last trusted check",
+   "when": [
+    "For **each confirmed finding** → describe the narrowest source change"
+   ],
+   "whatItIs": "The audit **describes fixes, it never edits the target**. Prefer ==specific repo-relative changes plus a regression test==.",
+   "howItWorks": [
+    "Name the **invariant** the code must enforce",
+    "Change it at the **last trusted decision point**",
+    "Avoid generic hardening advice"
+   ],
+   "behindTheScenes": [
+    [
+     "invariant",
+     "last trusted decision point",
+     "fix + regression test"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md smallest effective source fix (L164-166)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L164-L166"
+    }
+   ],
+   "kind": "part"
+  },
+  "anti-patterns": {
+   "name": "anti-patterns",
+   "trigger": "10 things it refuses",
+   "when": [
+    "When reviewing any output → check it against the 10 anti-patterns"
+   ],
+   "whatItIs": "The **ten mistakes** the skill is built to avoid. ==Checklist deviations are not vulnerabilities==.",
+   "howItWorks": [
+    "No **defense-in-depth advice** without a reachable violation, no live or shared-environment testing",
+    "No **guessing** provider, proxy, browser, identity or deployment behavior; no self-impact as cross-boundary",
+    "No **prose-only** hunter results, no re-reporting carried priors, no severity on needs_validation",
+    "**Never write the report before independent verification**, and never let prose and JSON disagree"
+   ],
+   "behindTheScenes": [
+    [
+     "output",
+     "10 anti-pattern checks"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SKILL.md anti-patterns (L181-192)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md#L181-L192"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-injection": {
+   "name": "injection",
+   "trigger": "untrusted input to a sink",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "Traces **untrusted input to a dangerous sink**: SQL, HTML, shell, templates, file paths, redirects, deserialization.",
+   "howItWorks": [
+    "Looks for **indirect injection**: data stored safely, then used dangerously by other code",
+    "Checks field names, keys, headers and metadata, **not just values**",
+    "Includes secondary systems: logs, caches, search indexes, analytics"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Injection",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md injection (L29-37)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L29-L37"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-access-control": {
+   "name": "access-control",
+   "trigger": "right check, right resource",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "Verifies a caller **cannot act outside its authority**: the ==right permission, for the right resource, by the right mechanism==.",
+   "howItWorks": [
+    "A weaker path to the same state change? A body field that **overrides** the permission?",
+    "Authentication without **authorization**? Several access paths with inconsistent checks?",
+    "Do **bulk, batch, export and import** enforce per-item permissions?"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Access control",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md access-control (L39-47)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L39-L47"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-resource-file": {
+   "name": "resource-and-file",
+   "trigger": "traversal, SSRF, archives",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "**Resource and file handling**: path traversal, SSRF, unsafe deserialization, zip slip, temp files.",
+   "howItWorks": [
+    "Traversal through **symlinks, encoded sequences and null bytes**",
+    "SSRF through redirects, DNS rebinding and **URL parser differentials**",
+    "File **TOCTOU** races; memory safety where it applies"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Resource and file handling",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md resource-and-file (L49-54)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L49-L54"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-crypto": {
+   "name": "crypto-and-secrets",
+   "trigger": "keys, randomness, timing",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "**Cryptography and secrets**: weak randomness, hardcoded or leaked secrets, broken primitives.",
+   "howItWorks": [
+    "Weak randomness for **tokens, keys and nonces**",
+    "Missing HMAC checks, nonce reuse, **timing side-channels** on secret comparison",
+    "Does a crypto **error path fall back** to no crypto?"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Cryptography and secrets",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md crypto-and-secrets (L56-62)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L56-L62"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-business-logic": {
+   "name": "business-logic",
+   "trigger": "hunted by hand",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "**Business logic** flaws that scanners cannot find and that ==yield high-impact findings==.",
+   "howItWorks": [
+    "**State machine** skips, replays and partial-failure rollbacks; check-then-act **races**",
+    "Negative, zero or overflowing **quantities**; the right check for the business rule",
+    "Implicit trust in stored data, **time boundaries**, and the posture when config or a dependency is missing"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Business logic",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md business-logic (L64-72)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L64-L72"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-feature-abuse": {
+   "name": "feature-abuse",
+   "trigger": "features used as weapons",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "**Feature abuse and data leakage**: legitimate features used for unintended purposes.",
+   "howItWorks": [
+    "**Export or backup** as exfiltration; **import or restore** as injection",
+    "Search, filter and sort as an **oracle**; enumeration through errors, timing or sizes",
+    "Preview and draft leaks; **webhook or notification URLs** as SSRF"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Feature abuse and data leakage",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md feature-abuse (L74-81)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L74-L81"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-chained": {
+   "name": "chained-trust",
+   "trigger": "safe parts, unsafe whole",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "**Chained vulnerabilities and trust boundaries**: allowed behavior that breaks when another part relies on a stronger guarantee.",
+   "howItWorks": [
+    "**Multi-step** failures, confirming each prerequisite",
+    "What component A guarantees vs what **component B assumes**; second-order use of stored data",
+    "Scope growth after delegation or refresh; **timing windows**; rollback and restore"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Chained vulnerabilities and trust boundaries",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md chained-trust (L83-90)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L83-L90"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-wildcard": {
+   "name": "wildcard",
+   "trigger": "no category on purpose",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "The **wildcard** hunter gets ==no category== and looks outside the standard classes.",
+   "howItWorks": [
+    "The **strangest** code, half-finished or experimental features, hidden endpoints",
+    "API calls the frontend never makes; features **mixed** that were not designed together",
+    "Git history (reverted fixes, removed secrets) and **what the tests do not test**"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Wildcard",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md wildcard (L92-109)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L92-L109"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "ac-obvious": {
+   "name": "obvious-things",
+   "trigger": "the basics nobody checks",
+   "when": [
+    "When Phase 1 finds a matching boundary → a ledger unit points at this block and a hunter gets it **verbatim**"
+   ],
+   "whatItIs": "The **obvious things** hunter checks basic exposures literally. It needs to be thorough, ==not creative==.",
+   "howItWorks": [
+    "Hardcoded secrets, security **TODO/FIXME**s, debug mode, seed credentials, unprotected `/debug` or `/admin`",
+    "Checked-in `.env` or keys, `.gitignore` gaps, **unpinned or CVE dependencies**, dynamic `eval`",
+    "Permissive **CORS**, cookie flags, open redirects, TLS, stack traces. A flag is not a finding until the impact is traced"
+   ],
+   "behindTheScenes": [
+    [
+     "coverage unit",
+     "ATTACK-CLASSES.md#Obvious things",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "ATTACK-CLASSES.md obvious-things (L111-130)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L111-L130"
+    },
+    {
+     "label": "ATTACK-CLASSES.md choose classes from Phase 1 (L3-7)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L3-L7"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-memory": {
+   "name": "MEMORY-SAFETY-AND-BINARY.md",
+   "trigger": "native, parsers, kernels",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for C/C++, Rust `unsafe`, FFI, kernel modules, parsers, firmware, loaders, runtimes and JITs. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: bounds and integers, lifetime and races, FFI/ABI, binary loading, kernel interfaces",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "MEMORY-SAFETY-AND-BINARY.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "MEMORY-SAFETY-AND-BINARY.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/MEMORY-SAFETY-AND-BINARY.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-web": {
+   "name": "WEB-PROTOCOL-AND-AUTH.md",
+   "trigger": "HTTP, sessions, identity",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for web apps, APIs, proxies, CDNs, gateways, sessions, JWT, OAuth/OIDC, SAML, MFA, passkeys, API keys and mTLS. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: request framing and cache, browser sessions and CSRF, federated identity, MFA and recovery, API keys and mTLS",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "WEB-PROTOCOL-AND-AUTH.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "WEB-PROTOCOL-AND-AUTH.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/WEB-PROTOCOL-AND-AUTH.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-client": {
+   "name": "CLIENT-SIDE.md",
+   "trigger": "browser trust decisions",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for SPAs, browser extensions, webviews, service workers, browser storage and cross-window messaging. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: DOM XSS and prototype pollution, `postMessage` and CORS, service workers and storage, XS-Leaks, clickjacking",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "CLIENT-SIDE.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "CLIENT-SIDE.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/CLIENT-SIDE.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-protocols": {
+   "name": "PROTOCOLS-RPC-AND-MESSAGING.md",
+   "trigger": "RPC, queues, webhooks",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for gRPC, GraphQL transports, Protobuf, Thrift, custom protocols, queues, brokers, pub/sub and webhooks. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: framing and schema, RPC identity, broker isolation, replay and ordering",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "PROTOCOLS-RPC-AND-MESSAGING.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "PROTOCOLS-RPC-AND-MESSAGING.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/PROTOCOLS-RPC-AND-MESSAGING.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-ai": {
+   "name": "AI-AND-LLM.md",
+   "trigger": "models with authority",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for chatbots, RAG, agent memory, tool-calling loops, MCP servers and clients, and code that acts on model output. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: context and memory poisoning, tool and action binding, MCP and sub-agent trust, output handling. Prompt injection alone is not a finding",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "AI-AND-LLM.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "AI-AND-LLM.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/AI-AND-LLM.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-supply": {
+   "name": "SUPPLY-CHAIN-AND-RELEASE.md",
+   "trigger": "deps, CI, release",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for dependency resolution, untrusted contributions, CI, release artifacts, signing, plugins and updates. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: dependency and build inputs, CI and automation, release and update trust",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "SUPPLY-CHAIN-AND-RELEASE.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "SUPPLY-CHAIN-AND-RELEASE.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SUPPLY-CHAIN-AND-RELEASE.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-cloud": {
+   "name": "CLOUD-AND-DEPLOYMENT.md",
+   "trigger": "IAM, IaC, containers",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for cloud identity, infrastructure as code, containers, Kubernetes, service mesh, serverless, edge workers and ingress. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: workload identity and IAM, ingress and control plane, containers, config and secrets, storage, events and edge",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "CLOUD-AND-DEPLOYMENT.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "CLOUD-AND-DEPLOYMENT.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/CLOUD-AND-DEPLOYMENT.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-resource": {
+   "name": "RESOURCE-EXHAUSTION-AND-AVAILABILITY.md",
+   "trigger": "shared CPU, queues, spend",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for untrusted work that can use shared CPU, memory, disk, connections, workers, paid APIs or queue capacity. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: amplification, accumulation, quotas and scheduling, failure and recovery. Never validated by stressing a live service",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "RESOURCE-EXHAUSTION-AND-AVAILABILITY.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "RESOURCE-EXHAUSTION-AND-AVAILABILITY.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RESOURCE-EXHAUSTION-AND-AVAILABILITY.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-data": {
+   "name": "DATA-ISOLATION-AND-LIFECYCLE.md",
+   "trigger": "tenants, copies, deletion",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for multi-tenant stores, caches and search, object links, export, backup, migration, deletion and restore. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: tenant isolation, derived-data disclosure, export/restore/migration, deletion and revocation",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "DATA-ISOLATION-AND-LIFECYCLE.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "DATA-ISOLATION-AND-LIFECYCLE.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/DATA-ISOLATION-AND-LIFECYCLE.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  },
+  "co-desktop": {
+   "name": "DESKTOP-MOBILE-AND-LOCAL-IPC.md",
+   "trigger": "apps, deep links, IPC",
+   "when": [
+    "When recon finds a boundary its **When to use this file** section describes → `architecture.md` selects it",
+    "Chosen for a **real boundary**, never just because a dependency name appears"
+   ],
+   "whatItIs": "A **domain companion** for desktop and mobile apps, privileged helpers, local daemons, webview hosts, deep links and local IPC. It adds classes that ==the ordinary list does not cover==.",
+   "howItWorks": [
+    "Opens with **When to use this file**, then a **Core discipline** block included in every prompt for the domain",
+    "Classes: deep links, webview bridges, IPC and exported components, privileged helpers, app state on logout or restore",
+    "Ends with **Universal moves** and **Validation rules**, both copied into the hunter prompt with the chosen classes"
+   ],
+   "behindTheScenes": [
+    [
+     "recon boundary",
+     "DESKTOP-MOBILE-AND-LOCAL-IPC.md",
+     "Core discipline + classes + Universal moves + Validation rules",
+     "hunter prompt"
+    ]
+   ],
+   "calls": [],
+   "next": [],
+   "sources": [
+    {
+     "label": "DESKTOP-MOBILE-AND-LOCAL-IPC.md when to use (L3-9)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/DESKTOP-MOBILE-AND-LOCAL-IPC.md#L3-L9"
+    },
+    {
+     "label": "ATTACK-CLASSES.md companion list (L9-27)",
+     "url": "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/ATTACK-CLASSES.md#L9-L27"
+    }
+   ],
+   "kind": "part"
+  }
+ }
+}
