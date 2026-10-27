@@ -99,7 +99,7 @@ Add cards to `Ready`. The board drains on its own.
 | Skill | What it does |
 |---|---|
 | [`/super-board`](skills/super-board/README.md) | Orchestrator: plans waves, runs Build → QA → Review, merges when green. |
-| [`/super-collect`](skills/super-collect/README.md) | Finds problems (Sentry, PostHog, issues, PRs, architecture) and files verified Backlog cards. |
+| [`/super-collect`](skills/super-collect/README.md) | Finds problems, verifies them, writes a findings doc for /to-spec and /to-tickets. |
 | [`/ui-refine-loop`](skills/ui-refine-loop/README.md) | Critique → refine loop that polishes one page or component. |
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 | [`/git-sync`](skills/git-sync/README.md) | Commit per logical change, merge-pull, push without force, report. |
@@ -124,7 +124,7 @@ Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and
 /super-board status           # read-only snapshot
 /super-board run <slug>       # drain the board
 /super-board stop             # stop workers
-/super-collect [source]       # file problems to Backlog
+/super-collect [source]       # find problems → findings doc → /to-spec
 /ui-refine-loop <route>       # polish one page
 /visual [recap|plan|path]     # one HTML page
 /git-sync                     # commit, pull, push

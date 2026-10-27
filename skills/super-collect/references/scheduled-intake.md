@@ -15,7 +15,7 @@ Confirm the active config matches the intended repo/board, then test a dry run.
 ## Copyable agent-job prompt
 
 > In the configured project repository, use the existing super-collect skill with
-> --yes and only this project's configured sources. Confirm the active config's
+> --yes --direct and only this project's configured sources. Confirm the active config's
 > repo and board before writes. Verify candidates and deduplicate before filing.
 > File verified new findings or recurrences into Backlog or its holding-column
 > alias, never Ready; preserve cards already on the board. Do not build, merge,
@@ -25,8 +25,9 @@ Confirm the active config matches the intended repo/board, then test a dry run.
 > sources honestly. If reads or a write outcome are halted, preserve the reason
 > and stop; do not clear the halt or blindly retry create/comment.
 
-Adapt invocation to the host: Claude uses `/super-collect --yes`; Codex uses
-`$super-collect --yes`. A local timer can start that host's normal agent runner
+Adapt invocation to the host: Claude uses `/super-collect --yes --direct`; Codex uses
+`$super-collect --yes --direct`. `--direct` skips the `/to-spec` → `/to-tickets` hand-off,
+which asks questions no one is there to answer. A local timer can start that host's normal agent runner
 with this prompt. A cloud job needs equivalent repo, tool, skill and credential
 access. No universal scheduler service is bundled.
 
