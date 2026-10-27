@@ -546,11 +546,12 @@
       "id": "collect-file",
       "label": "super-collect-file.sh",
       "kind": "script",
-      "what": "Single filing entry point for /super-collect that routes each verified ticket to the pack's filers.",
-      "when": "Called once per candidate the verifier marked file or needs-triage (dry-run without --yes, real filing with it), or with --adopt <n>.",
-      "how": "bug/feature/fix go to super-qa-file-bug.sh, refactor to super-review-file-refactor.sh, every body in the writing-standard ticket format. It enforces per-source fingerprints (custom `custom|<name>|<key>`), exact-fingerprint dedupe and the board's holding column.",
+      "what": "The **one script** that puts super-collect tickets on the board. It ==never builds anything==.",
+      "when": "Used for 6+ tickets from /to-tickets (`--adopt <n>`), and for the **direct path**: `--direct`, scheduled runs, or a project with no /to-spec or /to-tickets. A **GitHub issue** is always adopted directly.",
+      "how": "bug, feature and fix go to super-qa-file-bug.sh, refactor to super-review-file-refactor.sh. It checks each finding's fingerprint, comments \"Seen again\" on a duplicate and files into the board's ==holding column== (Backlog). Without `--yes` it only shows what it would do.",
       "source": [
-        "_skills/vendor/super-board/skills/super-collect/scripts/super-collect-file.sh"
+        "_skills/vendor/super-board/skills/super-collect/scripts/super-collect-file.sh",
+        "_skills/vendor/super-board/skills/super-collect/SKILL.md"
       ]
     },
     {
@@ -1646,7 +1647,7 @@
       "from": "super-collect",
       "to": "gh-board",
       "label": "files to Backlog",
-      "when": "the verifier says file or needs-triage and the run is confirmed"
+      "when": "6+ tickets after /to-tickets, or the direct path (--direct, scheduled runs, no /to-spec or /to-tickets)"
     },
     {
       "id": "r-collect-config",
@@ -2135,15 +2136,15 @@
       "id": "c-file",
       "from": "super-collect",
       "to": "collect-file",
-      "label": "files if verified",
-      "when": "one fresh verifier per candidate says file or needs-triage (duplicate gets a comment)"
+      "label": "adopts or files",
+      "when": "6+ tickets from /to-tickets, a GitHub issue, or the direct path; a duplicate gets a comment"
     },
     {
       "id": "file-gh",
       "from": "collect-file",
       "to": "gh-board",
       "label": "files to Backlog",
-      "when": "--yes or confirmed dry-run; dedupe by exact fingerprint"
+      "when": "--yes or a confirmed dry run; dedupe by exact fingerprint"
     },
     {
       "id": "u-grill",
@@ -5380,10 +5381,15 @@
     {
       "id": "collect-submit",
       "parent": "super-collect",
-      "title": "File · one entry point and dedupe",
-      "caption": "",
+      "title": "Hand-off · findings doc, spec, tickets",
+      "caption": "Verified problems go into one findings doc, then /to-spec and /to-tickets. 1–5 tickets go to /implement-spec once you say yes; 6 or more go to Backlog. --direct, scheduled runs and a missing /to-spec or /to-tickets file straight to Backlog. GitHub issues are adopted as they are.",
       "nodeIds": [
         "collect-submit",
+        "findings-doc",
+        "to-spec",
+        "to-tickets",
+        "collect-fork",
+        "implement-spec",
         "collect-file",
         "file-bug",
         "file-refactor",
@@ -5392,26 +5398,86 @@
       "edges": [
         {
           "from": "collect-submit",
+          "to": "findings-doc",
+          "label": "verified problems"
+        },
+        {
+          "from": "findings-doc",
+          "to": "to-spec",
+          "label": "one spec"
+        },
+        {
+          "from": "to-spec",
+          "to": "to-tickets",
+          "label": "spec"
+        },
+        {
+          "from": "to-tickets",
+          "to": "collect-fork",
+          "label": "count tickets"
+        },
+        {
+          "from": "collect-fork",
+          "to": "implement-spec",
+          "label": "1–5, on yes"
+        },
+        {
+          "from": "collect-fork",
           "to": "collect-file",
-          "label": "single entry point"
+          "label": "6+, adopted"
         },
         {
           "from": "collect-submit",
+          "to": "collect-file",
+          "label": "--direct · scheduled · GitHub issue",
+          "style": "dashed"
+        },
+        {
+          "from": "collect-file",
           "to": "file-bug",
           "label": "bug / feature / fix"
         },
         {
-          "from": "collect-submit",
+          "from": "collect-file",
           "to": "file-refactor",
           "label": "refactor"
         },
         {
-          "from": "collect-submit",
+          "from": "collect-file",
           "to": "gh-board",
           "label": "Backlog"
         }
       ],
-      "node": "collect-submit"
+      "node": "collect-submit",
+      "nodes": [
+        {
+          "id": "findings-doc",
+          "label": "Findings doc",
+          "kind": "board",
+          "sublabel": "collect-<date>.md",
+          "what": "**One file** for the whole run: `docs/super-board/findings/collect-<date>.md`. Findings with the same cause ==share one group==.",
+          "when": "Written after you confirm. Only problems the verifier marked **file** or **needs-triage** go in. Drops and duplicates are listed under \"Not in this doc\".",
+          "how": "`collect_handoff.py doc` shows it first and writes it with `--yes`. It never overwrites: a second run that day gets `-2`. A duplicate still gets its \"Seen again\" comment, and a **GitHub issue** is ==adopted as it is==, not copied into the doc.",
+          "source": [
+            "_skills/vendor/super-board/skills/super-collect/SKILL.md",
+            "_skills/vendor/super-board/skills/super-collect/scripts/collect_handoff.py"
+          ]
+        },
+        {
+          "id": "collect-fork",
+          "label": "How many tickets?",
+          "kind": "step",
+          "sublabel": "1–5 fast · 6+ board",
+          "what": "The **fork** after /to-tickets. The ticket count ==picks who builds==.",
+          "when": "Right after /to-tickets publishes the tickets. `collect_handoff.py fork --tickets <n>` makes the call.",
+          "how": "With **1 to 5 tickets**, super-collect prints `/implement-spec <spec>` and ==starts it only after you say yes==. One session, no QA lane. With **6 or more**, each ticket is adopted into **Backlog**; then run /super-board lint. No /implement-spec installed? The tickets go to Backlog too.",
+          "source": [
+            "_skills/vendor/super-board/skills/super-collect/SKILL.md",
+            "_skills/vendor/super-board/skills/super-collect/scripts/collect_handoff.py",
+            "_skills/vendor/super-board/docs/super-board/routing.md"
+          ]
+        }
+      ]
     },
     {
       "id": "refine-brief",
