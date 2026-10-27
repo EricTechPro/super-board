@@ -9,7 +9,7 @@
 <p>9 skills (5 you type, 4 the board runs) · 9 commands · 6 guard hooks</p>
 
 <p>
-<img alt="Version" src="https://img.shields.io/badge/version-3.2.0-1f883d?style=flat-square">
+<img alt="Version" src="https://img.shields.io/badge/version-3.3.0-1f883d?style=flat-square">
 <img alt="Host" src="https://img.shields.io/badge/Claude%20Code-skills-d97757?style=flat-square">
 <img alt="License" src="https://img.shields.io/badge/license-MIT-0969da?style=flat-square">
 </p>

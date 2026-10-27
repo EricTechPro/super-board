@@ -1,5 +1,28 @@
 # Release notes
 
+## v3.3.0 — 2026-10-27
+
+The security check moves to QA, and `/super-collect` hands its findings to Matt Pocock's planning chain.
+
+- 🔒 **super-qa runs `pr-security-review` on every PR.** It is QA's one security check and
+  replaces the old call to Claude Code's built-in `/security-review`. Each kept finding fails QA
+  like any failing check: a `❌` line, a `[builder]` thread on its file:line, card QA → Ready.
+  A missing skill blocks the card. The skills-ready registry now requires it in QA; Cloudflare's
+  `security-audit` stays optional and no lane runs it.
+- ♻️ **super-review no longer runs the security step.** The rest of the Review lane is unchanged.
+- ✨ **`/super-collect` → findings doc → `/to-spec` → `/to-tickets`.** After the fresh verifier,
+  super-collect writes one findings doc grouped by root cause at
+  `docs/super-board/findings/collect-<YYYY-MM-DD>.md`, then hands it to `/to-spec` and
+  `/to-tickets`. Build fork: 1–5 tickets → `/implement-spec`; 6+ → super-board Backlog.
+  Dry-run stays the default. No `/to-spec` or `/to-tickets` installed, or `--direct`, files
+  straight into Backlog as before and prints why. Scheduled intake uses `--direct`.
+- ✨ `skills/super-collect/scripts/collect_handoff.py` (`route`, `doc`, `fork`); `implement-spec`
+  joins the registry's Matt Pocock aliases.
+- 📝 **Routing rule in plain words**: [`docs/super-board/routing.md`](docs/super-board/routing.md),
+  linked from the README and the super-board skill.
+- 🧪 `test_collect_handoff.py` (route, findings doc, fork boundaries) and
+  `test_skills_readiness.py` (security check required in QA, not in Review).
+
 ## v3.2.0 — 2026-10-26
 
 Every PR gets a security pass, and every install gets a whole-repo security audit to run on demand.
