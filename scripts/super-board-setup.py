@@ -191,7 +191,7 @@ def helper_readiness(root, host="claude", home=None, catalog=None):
 
 def security_audit_present(root, readiness):
     """Cloudflare's security-audit counts as installed when skills-lock.json lists it or the
-    resolver found its SKILL.md (it is an optional Review entry in the registry)."""
+    resolver found its SKILL.md (it is an optional QA entry in the registry)."""
     if "cloudflare/security-audit-skill" in read(os.path.join(root, "skills-lock.json")):
         return True
     return any(e.get("name") == "security-audit" and e.get("status") == "resolved"

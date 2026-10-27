@@ -51,18 +51,22 @@ class Readiness(unittest.TestCase):
         (self.root / '.claude/skills/code-review/SKILL.md').unlink()
         self.assertIn('mattpocock-skills:code-review', [e['name'] for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing'])
 
-    def test_review_requires_pr_security_review_and_security_audit_is_optional(self):
+    def test_qa_requires_pr_security_review_and_review_does_not(self):
         self.full()
         entries = self.run_cli()['entries']
+        qa = {e['name']: e for e in entries if e['lane'] == 'qa'}
         review = {e['name']: e for e in entries if e['lane'] == 'review'}
-        self.assertEqual(review['pr-security-review']['requirement'], 'required')
-        self.assertEqual(review['pr-security-review']['status'], 'resolved')
-        self.assertEqual(review['security-audit']['requirement'], 'optional')
-        self.assertEqual(review['security-audit']['status'], 'skipped')
+        self.assertEqual(qa['pr-security-review']['requirement'], 'required')
+        self.assertEqual(qa['pr-security-review']['status'], 'resolved')
+        self.assertNotIn('pr-security-review', review)
+        self.assertEqual(qa['security-audit']['requirement'], 'optional')
+        self.assertEqual(qa['security-audit']['status'], 'skipped')
+        self.assertNotIn('security-audit', review)
         self.put('security-audit')
         self.assertEqual(next(e for e in self.run_cli()['entries'] if e['name'] == 'security-audit')['status'], 'resolved')
         (self.root / '.claude/skills/pr-security-review/SKILL.md').unlink()
-        self.assertIn('pr-security-review', [e['name'] for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing'])
+        missing = [e for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing']
+        self.assertEqual([('qa', 'pr-security-review')], [(e['lane'], e['name']) for e in missing if e['name'] == 'pr-security-review'])
 
     def test_wrong_host_core_direct_read_and_links(self):
         self.full()

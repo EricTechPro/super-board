@@ -320,7 +320,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 - The usage guard reads only what an interactive status line recorded; headless runs see no usage.
 - `verify_commands` are only as good as your test suite. Without them the gate says it proved nothing.
 - Lanes call [mattpocock/skills](https://github.com/mattpocock/skills) by name; without that pack a worker fails when it reaches for one.
-- The Reviewer runs the bundled `pr-security-review` on every PR; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by get.sh and onboard) covers the whole repo, and only runs when you ask.
+- The Tester (QA lane) runs the bundled `pr-security-review` on every PR, and a finding fails QA; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by get.sh and onboard) covers the whole repo, and only runs when you ask.
 - `bash` 3.2+ (stock macOS is fine), `jq` and Python 3 are required on the machine running the loop.
 
 ## Pack layout and tests

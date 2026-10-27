@@ -7,6 +7,7 @@ The Tester: proves a card's acceptance criteria with tests and evidence, or send
 - **One observable test per AC**, written at the layer the defect lives (unit or integration in Vitest, e2e in Playwright only when the browser is what broke).
 - **Test-gap check after build**: maps every AC to tests, hunts edge cases with exact values, names weak tests. High gaps are written red-first; Medium/Low are listed and never block.
 - **Captures evidence**: screenshots at desktop, tablet and mobile, logs and HARs, committed to the branch and embedded inline in the PR comment.
+- **Runs `pr-security-review` on every PR diff.** Each finding fails QA and goes back to Build, like any failing check. For a whole-repo audit it points you at `security-audit`.
 - **Files what it finds** off-ticket as `source:qa` cards instead of fixing them silently.
 
 ## When To Use It

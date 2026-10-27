@@ -15,7 +15,7 @@
       "super-build": "Builder lane: worktree, smallest safe change, tests, draft PR.",
       "super-qa": "Tester lane: evidence, test-gap check, screenshots, or bounce to Build.",
       "super-review": "Reviewer lane: own hypotheses, remembers prior findings, merge gate.",
-      "pr-security-review": "Security pass on every PR diff; super-review runs it, findings block merge."
+      "pr-security-review": "Security pass on every PR diff; super-qa runs it, findings fail QA."
     }
   }
 }

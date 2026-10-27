@@ -2,7 +2,7 @@
 
 This repo ships nine skills under `skills/`: five you type (`super-board`, `super-collect`,
 `ui-refine-loop`, `visual`, `git-sync`) and four the board runs (the lane workers `super-build`, `super-qa`,
-`super-review`, plus `pr-security-review`, which super-review runs on every PR). Cloudflare's
+`super-review`, plus `pr-security-review`, which super-qa runs on every PR). Cloudflare's
 `security-audit` is not shipped: get.sh and onboard fetch it with `npx skills`, and no lane runs it. Architecture findings come from `/super-collect architecture`.
 Worktree cleanup (`hooks/cleanup-wt.py`) is a hook, not a skill. README skill tables are generated
 by `scripts/super-board-readme-sync.py` from SKILL.md frontmatter and `skills/families.json`.

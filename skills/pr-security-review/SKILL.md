@@ -1,6 +1,6 @@
 ---
 name: pr-security-review
-description: Security review of one PR's diff against its base branch — high-confidence, exploitable vulnerabilities only (injection, auth bypass, crypto and secrets, code execution, data exposure), each false-positive-filtered by a parallel sub-task. The super-review Reviewer lane runs it on every PR; findings become Blocker Bugs. Use when the user says "pr security review", "/pr-security-review", or wants a security pass on a branch or PR diff. Not Claude Code's built-in /security-review; for a deep whole-repo audit use security-audit.
+description: Security review of one PR's diff against its base branch — high-confidence, exploitable vulnerabilities only (injection, auth bypass, crypto and secrets, code execution, data exposure), each false-positive-filtered by a parallel sub-task. The super-qa Tester lane runs it on every PR; each finding fails QA and goes back to Build. Use when the user says "pr security review", "/pr-security-review", or wants a security pass on a branch or PR diff. Not Claude Code's built-in /security-review; for a deep whole-repo audit use security-audit.
 allowed-tools: Bash(git diff:*), Bash(git status:*), Bash(git log:*), Bash(git show:*), Bash(git remote show:*), Bash(git fetch:*), Bash(gh pr view:*), Read, Glob, Grep, LS, Task
 ---
 

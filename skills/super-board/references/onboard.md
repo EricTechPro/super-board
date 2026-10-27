@@ -15,11 +15,11 @@ selected card may need fewer helpers. Node or `skills-lock.json` never proves
 readiness. `check` and dispatch install nothing. Explicit `fix` retains helper
 installation, then re-resolves actual files; an installer exit of zero alone is
 not success. `--no-helpers` suppresses that repair attempt, not missing evidence.
-Cloudflare's `security-audit` is an optional Review entry: when `security_audit` is false,
+Cloudflare's `security-audit` is an optional QA entry (no lane runs it): when `security_audit` is false,
 `fix` runs `npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit`
 (same `--no-helpers` rule); `skills-lock.json` listing it, or a resolved file, skips that.
 A failed download is a note, never a red check. The bundled `pr-security-review` is a pack
-skill: install.sh ships it and the Review lane requires it.
+skill: install.sh ships it and the QA lane requires it.
 A host plugin inventory may be supplied with `--catalog <active-skills.json>`;
 only enabled entries applying to this project count.
 
