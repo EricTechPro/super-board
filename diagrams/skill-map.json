@@ -1494,6 +1494,34 @@
       "sublabel": "commit · pull · push",
       "opensView": "git-sync",
       "author": "EricTechPro"
+    },
+    {
+      "id": "pr-security-review",
+      "label": "pr-security-review",
+      "kind": "external",
+      "what": "Security review of one PR's diff against its base: only high-confidence, exploitable vulnerabilities the PR adds.",
+      "when": "Reached by super-review on every PR, as a standard step, not only for security labels. Also runnable standalone as /pr-security-review.",
+      "how": "One sub-task finds candidates (injection, auth bypass, crypto and secrets, code execution, data exposure); a parallel sub-task per candidate filters false positives and anything under 8/10 is dropped. Each kept finding becomes a Bug · blocker row in super-review's report, routed to Super Build. Ported from Anthropic's local /security-review command; only the diff target changed (PR base instead of origin/HEAD).",
+      "source": [
+        "_skills/vendor/super-board/skills/pr-security-review/SKILL.md"
+      ],
+      "external": true,
+      "origin": "anthropics/claude-code-security-review (bundled port, MIT)",
+      "author": "anthropics"
+    },
+    {
+      "id": "security-audit",
+      "label": "security-audit",
+      "kind": "external",
+      "what": "Deep security audit of a whole repository: reconnaissance, attack-class hunting, validated findings and a coverage ledger.",
+      "when": "Only when you run /security-audit. No lane runs it; super-review may point you at it for a whole-repo pass.",
+      "how": "Installed by get.sh and onboard's Checks with `npx skills add cloudflare/security-audit-skill --skill security-audit` (skipped by --no-helper-skills; skills-lock.json marks it present). Optional in the skills-ready registry, so a missing copy never halts a run.",
+      "source": [
+        "https://github.com/cloudflare/security-audit-skill"
+      ],
+      "external": true,
+      "origin": "cloudflare/security-audit-skill (installed via npx skills, MIT)",
+      "author": "cloudflare"
     }
   ],
   "edges": [
@@ -2910,6 +2938,20 @@
       "to": "guard-protected-push",
       "label": "push checked by",
       "when": "the opt-in push guard is installed"
+    },
+    {
+      "id": "v-secrev",
+      "from": "super-review",
+      "to": "pr-security-review",
+      "label": "security pass on the PR diff",
+      "when": "every PR; findings are Bug · blocker"
+    },
+    {
+      "id": "v-audit",
+      "from": "super-review",
+      "to": "security-audit",
+      "label": "mentions for a whole-repo audit",
+      "when": "never run by the lane; the user runs it on demand"
     }
   ],
   "views": [
@@ -3442,6 +3484,8 @@
         "code-review",
         "codebase-design",
         "ponytail-review",
+        "pr-security-review",
+        "security-audit",
         "file-refactor",
         "merge-gate",
         "gh-board",
@@ -3453,6 +3497,8 @@
         "v-cr",
         "v-design",
         "v-pony",
+        "v-secrev",
+        "v-audit",
         "v-refactor",
         "review-gate",
         "v-gh",
@@ -5398,6 +5444,14 @@
     "tt-a1i": {
       "name": "tt-a1i (archify)",
       "url": "https://github.com/tt-a1i"
+    },
+    "anthropics": {
+      "name": "Anthropic",
+      "url": "https://github.com/anthropics"
+    },
+    "cloudflare": {
+      "name": "Cloudflare",
+      "url": "https://github.com/cloudflare"
     }
   },
   "version": "3.0.0"

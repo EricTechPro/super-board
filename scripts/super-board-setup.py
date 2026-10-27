@@ -71,7 +71,7 @@ OLD_LABELS = {
     "bug-fix": "bug", "bugfix": "bug", "type:bug": "bug", "kind:bug": "bug",
     "qa-only": "qa", "type:qa": "qa", "kind:qa": "qa",
 }
-SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop"]
+SKILLS = ["super-board", "super-build", "super-qa", "super-review", "super-collect", "visual", "git-sync", "ui-refine-loop", "pr-security-review"]
 OLD_SKILL_DIRS = ["super-refine", "cleanup-wt", "arch-loop"]
 BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-board-host.sh", "super-board-codex-wave.sh", "super-board-codex-lane.sh", "super-board-calibration.py", "super-board-verification-ready.py", "super-board-github-read.py", "super-board-collect-state.py", "super-board-run.sh", "super-board-gh-guard.sh", "super-board-card.sh", "super-board-status.py", "super-board-wave-plan.sh",
        "super-board-deps.sh", "super-board-preflight.sh", "super-board-merge-gate.sh",
@@ -80,6 +80,9 @@ BIN = ["super-board-project-verifier.py", "super-board-skills-ready.py", "super-
        "super-review-file-refactor.sh", "super-qa-file-bug.sh", "super-board-stop.sh"]
 WORKFLOWS = ["super-board-wave.js", "ui-refine-loop.js"]
 HELPERS_CMD = "npx -y skills@latest add mattpocock/skills --skill '*' -a claude-code -y"
+# Cloudflare's standalone whole-repo audit. Optional: installed by default, never
+# required by a lane, so a missing copy is a note, not a red check.
+SECURITY_AUDIT_CMD = "npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit -a claude-code -y"
 
 # System tools: why the board needs each, and the install command per OS family.
 TOOLS = {
@@ -184,6 +187,15 @@ def helper_readiness(root, host="claude", home=None, catalog=None):
     except ValueError:
         result = {"ready": False, "entries": [], "error": process.stderr.strip()}
     return result
+
+
+def security_audit_present(root, readiness):
+    """Cloudflare's security-audit counts as installed when skills-lock.json lists it or the
+    resolver found its SKILL.md (it is an optional Review entry in the registry)."""
+    if "cloudflare/security-audit-skill" in read(os.path.join(root, "skills-lock.json")):
+        return True
+    return any(e.get("name") == "security-audit" and e.get("status") == "resolved"
+               for e in (readiness or {}).get("entries", []))
 
 
 def is_git_repo(root):
@@ -328,10 +340,11 @@ def check(root, pack, host="claude", home=None, catalog=None):
             why, cmds = TOOLS[t]
             cmd = cmds[fam]
             if t == "node":
-                cmd += " && " + HELPERS_CMD
+                cmd += " && " + HELPERS_CMD + " && " + SECURITY_AUDIT_CMD
             needs.append({"kind": "tool", "name": t, "why": why, "command": cmd})
     readiness = helper_readiness(root, host, home, catalog)
     helpers = readiness["ready"]
+    security_audit = security_audit_present(root, readiness)
     git = is_git_repo(root)
     ok = []
     if not missing:
@@ -342,6 +355,8 @@ def check(root, pack, host="claude", home=None, catalog=None):
         ok.append("git repo found")
     if helpers:
         ok.append("required worker skills resolved for " + host)
+    if security_audit:
+        ok.append("security-audit skill installed (optional, run on demand)")
     red = bool(missing or old_dirs or configs or verification or host_errors or not git or needs or not helpers)
     return {
         "root": root, "pack": pack, "pack_version": pack_version, "installed_version": have_v,
@@ -349,7 +364,7 @@ def check(root, pack, host="claude", home=None, catalog=None):
         "added_skills": upgrade_rec.get("added_skills", []),
         "missing": missing, "old_dirs": old_dirs, "configs": configs, "verification": verification,
         "host_errors": host_errors, "git": git,
-        "helper_skills": helpers, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
+        "helper_skills": helpers, "security_audit": security_audit, "helper_readiness": readiness, "needs": needs, "os": fam, "ok": ok, "green": not red,
     }
 
 
@@ -433,6 +448,16 @@ def fix(root, pack, helpers=True, dry=False, host="claude", home=None, catalog=N
                              ", ".join(e["name"] for e in confirmed.get("entries", []) if e["status"] == "missing"))
         else:
             notes.append("would attempt helper installation, then re-resolve actual host-visible files")
+
+    if helpers and not before["security_audit"] and have("npx"):
+        if not dry:
+            run(["bash", "-c", SECURITY_AUDIT_CMD], cwd=root, input="")
+            if security_audit_present(root, helper_readiness(root, host, home, catalog)):
+                fixed.append("security-audit skill installed (Cloudflare, optional)")
+            else:
+                notes.append("security-audit install attempted and not found; optional, retry: " + SECURITY_AUDIT_CMD)
+        else:
+            notes.append("would install the optional security-audit skill")
 
     if not dry:
         up = os.path.join(claude, "super-board", "upgrade.json")

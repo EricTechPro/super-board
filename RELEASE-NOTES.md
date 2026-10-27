@@ -1,5 +1,28 @@
 # Release notes
 
+## v3.2.0 — 2026-10-26
+
+Every PR gets a security pass, and every install gets a whole-repo security audit to run on demand.
+
+- 🔒 **`pr-security-review`, a new bundled skill.** A port of the local `/security-review` command
+  from [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review)
+  (commit `0c6a49f`, MIT © 2025 Anthropic, `skills/pr-security-review/LICENSE`). The prompt is
+  verbatim; only the diff target changed, from `origin/HEAD` to the PR's base branch. The name
+  leaves Claude Code's built-in `/security-review` alone.
+- 🔒 **super-review runs it on every PR**, not only on `security`/`auth`/`payments` labels. Each
+  finding is a `Bug` · `blocker` row routed to Super Build; a missing skill makes the review
+  `⚠️ unverified`. The skills-ready registry lists it as a required Review boundary.
+- 🔒 **Cloudflare's `security-audit`, installed by default.** `get.sh` and onboard's 🔍 Checks
+  run `npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit -a claude-code -y`,
+  skip it when `skills-lock.json` lists it or its `SKILL.md` is present, and honour
+  `--no-helper-skills`. It is optional in the registry and no lane runs it.
+- 🔧 **super-qa no longer calls `/security-review`**; the Review lane covers it.
+- 📝 README Security section and credits, main page, skill map (two new nodes), setup
+  simulator, plugin manifests and onboard.md list the two skills.
+- 🧪 `test-get.sh` (security-audit fetched, skipped, deferred), `test_skill_dispatch.py`
+  (onboard repair order, lock detection) and `test_skills_readiness.py` (required review
+  entry, optional audit).
+
 ## v3.1.2 — 2026-10-11
 
 `/super-collect` dedupes on the exact fingerprint and says when Sentry or PostHog is down.

@@ -9,7 +9,7 @@ import unittest
 
 KIT = Path(__file__).resolve().parents[1]
 CLI = KIT / 'scripts/super-board-skills-ready.py'
-CORE = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop']
+CORE = ['super-board','super-build','super-qa','super-review','super-collect','visual','git-sync','ui-refine-loop','pr-security-review']
 
 class Readiness(unittest.TestCase):
     def setUp(self):
@@ -50,6 +50,19 @@ class Readiness(unittest.TestCase):
         self.assertEqual(next(e for e in result['entries'] if e['name'] == 'vitest')['status'], 'skipped')
         (self.root / '.claude/skills/code-review/SKILL.md').unlink()
         self.assertIn('mattpocock-skills:code-review', [e['name'] for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing'])
+
+    def test_review_requires_pr_security_review_and_security_audit_is_optional(self):
+        self.full()
+        entries = self.run_cli()['entries']
+        review = {e['name']: e for e in entries if e['lane'] == 'review'}
+        self.assertEqual(review['pr-security-review']['requirement'], 'required')
+        self.assertEqual(review['pr-security-review']['status'], 'resolved')
+        self.assertEqual(review['security-audit']['requirement'], 'optional')
+        self.assertEqual(review['security-audit']['status'], 'skipped')
+        self.put('security-audit')
+        self.assertEqual(next(e for e in self.run_cli()['entries'] if e['name'] == 'security-audit')['status'], 'resolved')
+        (self.root / '.claude/skills/pr-security-review/SKILL.md').unlink()
+        self.assertIn('pr-security-review', [e['name'] for e in self.run_cli(expected=10)['entries'] if e['status'] == 'missing'])
 
     def test_wrong_host_core_direct_read_and_links(self):
         self.full()

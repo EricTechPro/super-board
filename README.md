@@ -6,10 +6,10 @@
 
 <p><strong>Add tasks, walk away, get merged PRs with proof.</strong></p>
 
-<p>8 skills (5 you type, 3 the board runs) · 9 commands · 6 guard hooks</p>
+<p>9 skills (5 you type, 4 the board runs) · 9 commands · 6 guard hooks</p>
 
 <p>
-<img alt="Version" src="https://img.shields.io/badge/version-3.1.2-1f883d?style=flat-square">
+<img alt="Version" src="https://img.shields.io/badge/version-3.2.0-1f883d?style=flat-square">
 <img alt="Host" src="https://img.shields.io/badge/Claude%20Code-skills-d97757?style=flat-square">
 <img alt="License" src="https://img.shields.io/badge/license-MIT-0969da?style=flat-square">
 </p>
@@ -40,6 +40,18 @@ Or as a Claude Code plugin:
 
 > [!NOTE]
 > The plugin ships the skills only. Run `/super-board:super-board onboard` and its 🔍 Checks step adds the guard hooks, scripts and workflows. Needs Claude Code, `gh`, `jq`, bash 3.2+ and Python 3.9+; the installer checks.
+
+### Security
+
+Two security skills come with every install, and they stay separate:
+
+| Skill | Runs | Covers |
+|---|---|---|
+| [`pr-security-review`](skills/pr-security-review/README.md) | **On every PR**, inside the Review lane. Each finding is a blocker routed back to Build. | The PR's diff against its base: high-confidence, exploitable bugs only. From Anthropic's [claude-code-security-review](https://github.com/anthropics/claude-code-security-review). |
+| `security-audit` | **Only when you ask** (`/security-audit`). The board never runs it. | The whole repository, in depth. From Cloudflare's [security-audit-skill](https://github.com/cloudflare/security-audit-skill), fetched at install with `npx skills`. |
+
+`--no-helper-skills` skips the `security-audit` download; `/super-board onboard` adds it later.
+Claude Code's built-in `/security-review` is left as it is.
 
 Running from Codex or OpenCode? See [supported hosts](docs/hosts.md) for tested versions, sign-in and gaps.
 
@@ -79,7 +91,7 @@ Add cards to `Ready`. The board drains on its own.
 
 ## Skills
 
-**8 skills (5 you type, 3 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable and humanizer.
+**9 skills (5 you type, 4 the board runs).** Uses [Matt Pocock skills](https://github.com/mattpocock/skills), ponytail, impeccable, humanizer, [Anthropic's security review](https://github.com/anthropics/claude-code-security-review) and [Cloudflare's security-audit](https://github.com/cloudflare/security-audit-skill).
 
 <!-- skills:start -->
 **You type — 5 skills**
@@ -92,13 +104,14 @@ Add cards to `Ready`. The board drains on its own.
 | [`/visual`](skills/visual/README.md) | One HTML page: branch recap, plan, or codebase map with diagrams. |
 | [`/git-sync`](skills/git-sync/README.md) | Commit per logical change, merge-pull, push without force, report. |
 
-**The board runs — 3 lanes**
+**The board runs — 4 skills**
 
 | Skill | What it does |
 |---|---|
 | [`/super-build`](skills/super-build/README.md) | Builder lane: worktree, smallest safe change, tests, draft PR. |
 | [`/super-qa`](skills/super-qa/README.md) | Tester lane: evidence, test-gap check, screenshots, or bounce to Build. |
 | [`/super-review`](skills/super-review/README.md) | Reviewer lane: own hypotheses, remembers prior findings, merge gate. |
+| [`/pr-security-review`](skills/pr-security-review/README.md) | Security pass on every PR diff; super-review runs it, findings block merge. |
 <!-- skills:end -->
 
 Each name links to that skill's README. Adding a skill? Write its `SKILL.md` and `README.md`, add a line to `skills/families.json`, and this table updates itself.
@@ -170,7 +183,7 @@ Commits, tickets, PR bodies and comments all follow [one writing standard](https
 
 ## Credits
 
-MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://github.com/obra/superpowers), [mattpocock/skills](https://github.com/mattpocock/skills), [BuilderIO/skills](https://github.com/BuilderIO/skills) and [tt-a1i/archify](https://github.com/tt-a1i/archify).
+MIT © Eric Tech ([LICENSE](LICENSE)). Built on [obra/superpowers](https://github.com/obra/superpowers), [mattpocock/skills](https://github.com/mattpocock/skills), [BuilderIO/skills](https://github.com/BuilderIO/skills) and [tt-a1i/archify](https://github.com/tt-a1i/archify). `pr-security-review` is ported from [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review) (MIT © 2025 Anthropic, [notice](skills/pr-security-review/LICENSE)); `security-audit` is [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT © 2025-2026 Cloudflare, Inc.), installed from its own repo, not bundled.
 
 ---
 
@@ -193,7 +206,9 @@ Setup and dispatch resolve real, nonempty `SKILL.md` files for the actual
 Claude or Codex host. Missing required skills halt before claims or workers;
 lockfiles and arbitrary plugin caches do not count. The shared registry in
 `scripts/super-board-skills-ready.py` owns lane dependencies, overrides and the
-two declared ponytail fallbacks. Setup's full helper union may be red while a
+two declared ponytail fallbacks. The Review lane requires the bundled
+`pr-security-review`; Cloudflare's `security-audit` is an optional Review entry,
+so a missing copy never halts a run. Setup's full helper union may be red while a
 selected card is runnable. Read-only checks never install; explicit onboard
 repair rechecks files after installation.
 
