@@ -418,7 +418,7 @@
   .pal .none button { border: 0; background: none; color: var(--accent); font: 600 13px var(--sans); cursor: pointer; }
   .pal .pft { display: flex; gap: 14px; padding: 8px 14px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); }
 
-  /* details: a short strip under the map — compact header, then What · When · How · Links tabs */
+  /* details: a short strip under the map — compact header, then When to use · What it is · How it works · Example · Behind the scenes tabs */
   .panel { flex: none; height: 234px; max-height: 44%; overflow: auto; border-top: 1px solid var(--border-2); background: var(--panel); z-index: 5; animation: rise .2s ease; }
   .panel[hidden] { display: none; }
   @keyframes rise { from { transform: translateY(12px); opacity: 0; } }
@@ -468,6 +468,28 @@
   .rel-l { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rel-e { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
   .rel-none { color: var(--dim); font-size: 12.5px; padding: 2px 0; }
+  /* one yellow highlighter phrase per section (==text== in the model) */
+  .pbody mark { background: #fff1a6; color: inherit; padding: 0 3px; border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  :root[data-theme="dark"] .pbody mark { background: rgba(250, 204, 21, .32); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pbody mark { background: rgba(250, 204, 21, .32); } }
+  /* Example tab: a data-driven gallery (node.examples = [{title, caption, thumb, full, href}]) */
+  .exs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin: 4px 0 0; padding: 0; list-style: none; max-width: 1100px; }
+  .ex { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .ex-thumb { display: block; padding: 0; border: 1px solid var(--border-2); border-radius: 8px; background: var(--panel-2); overflow: hidden; cursor: zoom-in; aspect-ratio: 16 / 10; }
+  .ex-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top left; }
+  .ex-thumb:hover, .ex-thumb:focus-visible { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .ex b { font: 650 13px var(--sans); }
+  .ex small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+  .ex a { color: var(--accent); font: 600 12px var(--sans); text-decoration: none; }
+  .ex a:hover { text-decoration: underline; }
+  .lightbox { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: rgba(15, 18, 22, .72); }
+  .lightbox[hidden] { display: none; }
+  .lightbox figure { margin: 0; max-width: min(1280px, 100%); max-height: 100%; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border-radius: 12px; padding: 12px; box-shadow: var(--shadow); }
+  .lightbox img { max-width: 100%; max-height: calc(100dvh - 140px); object-fit: contain; border-radius: 6px; border: 1px solid var(--border); background: #fff; }
+  .lightbox figcaption { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font: 600 14px var(--sans); }
+  .lightbox figcaption span { flex: 1; min-width: 0; }
+  .lightbox figcaption a { color: var(--accent); text-decoration: none; font-size: 13px; }
+  svg .node.planned .n-body, svg .node.planned .n-label, svg .node.planned .n-sub, svg .node.planned .n-sigil { opacity: .58; }
   .pviews { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
   .pview { font: 500 12px var(--sans); color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; cursor: pointer; }
   .pview:hover { color: var(--text); border-color: var(--accent); }
@@ -484,6 +506,9 @@
     .panel::before { content: ""; display: block; width: 38px; height: 4px; border-radius: 2px; background: var(--border-2); margin: 8px auto 0; }
     .ph { padding-top: 6px; } .ph .obtn span { display: none; }
     .links { grid-template-columns: 1fr; }
+    .ptabs { flex-wrap: wrap; } .pnav { display: none; } .ptab { padding: 7px 8px; }
+    .detail-bullets li { white-space: normal; overflow: visible; }
+    .exs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .minimap, .m-legend, .hint { display: none; }
     .mctl { bottom: 14px; right: 12px; }
     .vpop ol { columns: 1; }
@@ -571,6 +596,7 @@
   const inline = s => esc(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/==([^=]+)==/g, '<mark>$1</mark>')
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
   const md = s => String(s ?? '').trim().split(/\n{2,}/).map(b => /^\s*[-*] /.test(b)
       ? '<ul>' + b.split(/\n/).map(l => '<li>' + inline(l.replace(/^\s*[-*] /, '')) + '</li>').join('') + '</ul>'
@@ -819,7 +845,8 @@
     // frame and card it would cut through, left along the bottom, and up into the target's bottom
     const inFam = n => families.filter(f => n.x >= f.x && n.x + n.w <= f.x + f.w && n.y >= f.y && n.y + n.h <= f.y + f.h);
     edges.filter(e => map && e.back && !e.fixed && (inFam(e.s).length || inFam(e.t).length)).forEach((e, k) => {
-      const { s, t } = e, sy = s.y + s.h / 2;
+      // the source's other outgoing wires keep its middle port; the loop leaves lower down
+      const { s, t } = e, sy = s.y + s.h / 2 + (edges.some(o => o !== e && o.from === s.id && !o.back) ? s.h / 4 : 0);
       const xr = Math.max(s.x + s.w + 22, ...inFam(s).map(f => f.x + f.w + 14)) + k * 10;
       const tx = t.tag ? Math.max(t.x + 12, (t.x + t.tag.x - 2) / 2) : t.x + t.w / 2, ty = t.y + t.h + (t.kids ? 8 : 0);
       const span = nodes.filter(n => n.x < xr && n.x + n.w > tx), yb = Math.max(...[...inFam(s), ...inFam(t)].map(f => f.y + f.h), ...span.map(n => n.y + n.h + (n.tag ? 22 : 8))) + 24 + k * 10;
@@ -1138,7 +1165,7 @@
     });
     s += '</g><g class="nodes">';
     nodes.forEach(n => {
-      const c = col(n.k), f = fill(n.k), removed = n.change === 'removed';
+      const c = col(n.k), f = fill(n.k), removed = n.change === 'removed', planned = n.change === 'planned';
       const pub = map && n.k === 'm-public', priv = map && n.k === 'm-script', ext = map && n.k === 'm-ext', verb = map && n.k === 'm-verb', hook = map && n.k === 'm-hook';
       const rx = verb ? n.h / 2 : map ? 10 : 9;
       const kids = n.kids != null ? n.kids : opts.childCount ? opts.childCount(n.id) : 0;
@@ -1149,14 +1176,14 @@
       const labelPx = n.emphasis ? 15 : 13;
       const lpx = textW(n.label, labelPx) > n.w - 30 ? Math.max(11, (n.w - 30) / (String(n.label).length * 0.6)) : labelPx;
       const ly = n.y + n.h / 2 + (sub || verbs ? -3 : 4);
-      s += `<g class="node${pub ? ' pub' : ''}${priv ? ' priv' : ''}${kids ? ' has-child' : ''}${subject ? ' subject' : ''}${n.emphasis ? ' main-step' : ''}${tour && n.id in tour.at ? ' tour-stop' : ''}"${tour && n.id in tour.at ? ` style="animation-delay:${(tour.at[n.id] * TOUR - .32).toFixed(2)}s"` : ''} data-id="${esc(n.id)}" tabindex="${map ? 0 : -1}" role="${map ? 'button' : 'img'}" aria-label="${esc(n.label)}${kids ? ' (opens inner view)' : ''}">
+      s += `<g class="node${pub ? ' pub' : ''}${priv ? ' priv' : ''}${kids ? ' has-child' : ''}${subject ? ' subject' : ''}${n.emphasis ? ' main-step' : ''}${planned ? ' planned' : ''}${tour && n.id in tour.at ? ' tour-stop' : ''}"${tour && n.id in tour.at ? ` style="animation-delay:${(tour.at[n.id] * TOUR - .32).toFixed(2)}s"` : ''} data-id="${esc(n.id)}" tabindex="${map ? 0 : -1}" role="${map ? 'button' : 'img'}" aria-label="${esc(n.label)}${kids ? ' (opens inner view)' : ''}">
         <title>${esc(n.label)}${subTxt ? ' · ' + esc(subTxt) : ''}${n.note ? '\n' + esc(n.note) : ''}${kids ? '\nDouble-click to open' : ''}</title>`;
       if (kids) s += `<rect x="${n.x + 8}" y="${n.y + 8}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-stack" stroke="${c}"/><rect x="${n.x + 4}" y="${n.y + 4}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-stack" stroke="${c}"/>`;
       if (pub) s += `<rect x="${n.x - 4}" y="${n.y - 4}" width="${n.w + 8}" height="${n.h + 8}" rx="14" class="n-ring" stroke="${c}"/>`;
       if (hook) { const hx = Math.min(16, n.h / 3), pts = `${n.x + hx},${n.y} ${n.x + n.w - hx},${n.y} ${n.x + n.w},${n.y + n.h / 2} ${n.x + n.w - hx},${n.y + n.h} ${n.x + hx},${n.y + n.h} ${n.x},${n.y + n.h / 2}`;
         s += `<polygon points="${pts}" class="n-mask"/><polygon points="${pts}" class="n-body" fill="${f}" stroke="${c}" stroke-linejoin="round"/>`; }
       else s += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-mask"/>
-        <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-body" fill="${f}" stroke="${c}" ${removed || ext ? 'stroke-dasharray="6 4"' : ''} ${removed ? 'opacity=".6"' : ''}/>`;
+        <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-body" fill="${f}" stroke="${c}" ${removed || ext || planned ? 'stroke-dasharray="6 4"' : ''} ${removed ? 'opacity=".6"' : ''}/>`;
       s += `
 <g transform="translate(${n.x + (verb ? 14 : hook ? 17 : 9)} ${n.y + (priv ? 6 : 9)}) scale(.8)" class="n-sigil" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[n.k]}</g>
         <text x="${n.x + n.w / 2}" y="${ly}" text-anchor="middle" class="n-label" data-o="${esc(n.id)}" data-t="nl" style="font-size:${lpx.toFixed(1)}px" ${removed ? 'text-decoration="line-through"' : ''}>${esc(fit(n.label, lpx, n.w - 30))}</text>`;
@@ -1798,7 +1825,7 @@
     const $ = id => document.getElementById(id);
     const stage = $('m-stage'), panel = $('m-panel');
     let cam = null, geo = null, svg = null, cur = null, sel = null, stack = [], busy = false;
-    let tab = 'what'; try { tab = localStorage.getItem('visual-tab') || 'what'; } catch (_) {}
+    let tab = 'when'; try { tab = localStorage.getItem('visual-tab') || 'when'; } catch (_) {}
     const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches || window.__instant;
     const sleep = ms => new Promise(r => setTimeout(r, reduce() ? 0 : ms));
     const status = (t, ms = 1800) => { const el = $('m-hint'); el.textContent = t; el.classList.add('msg'); clearTimeout(status.t); status.t = setTimeout(() => { el.innerHTML = HINT; el.classList.remove('msg'); }, ms); };
@@ -1819,8 +1846,9 @@
     const isState = id => (N[id] || {}).kind === 'board';
     function loopsOf(v) { // edges that close a cycle, found depth-first in run order from the roots
       const ids = (v.nodeIds || []).filter(i => N[i]), edges = viewEdges(v), back = new Set(), st = {};
-      const dfs = u => { st[u] = 1; edges.forEach((e, k) => { if (e.from !== u || e.from === e.to) return; if (st[e.to] === 1) back.add(k); else if (!st[e.to]) dfs(e.to); }); st[u] = 2; };
-      [...ids.filter(i => !edges.some(e => e.to === i && e.from !== i)), ...ids].forEach(i => { if (!st[i]) dfs(i); });
+      edges.forEach((e, k) => { if (e.loop) back.add(k); }); // an edge marked `loop: true` is the view's loop back
+      const dfs = u => { st[u] = 1; edges.forEach((e, k) => { if (e.from !== u || e.from === e.to || e.loop) return; if (st[e.to] === 1) back.add(k); else if (!st[e.to]) dfs(e.to); }); st[u] = 2; };
+      [...ids.filter(i => !edges.some(e => e.to === i && e.from !== i && !e.loop)), ...ids].forEach(i => { if (!st[i]) dfs(i); });
       if (v.render === 'sequence') { // run order: a step back to a part an earlier step already reached loops back (state may be written again later)
         const first = {}; edges.forEach((e, k) => { if (first[e.from] == null && !edges.some((x, j) => j < k && x.to === e.from)) first[e.from] = -1; if (first[e.to] == null) first[e.to] = k; });
         edges.forEach((e, k) => { if (first[e.to] < k && !isState(e.to) && e.from !== e.to) back.add(k); });
@@ -2234,17 +2262,20 @@
       const child = childOf(nid), canOpen = child && child !== cur;
       const vIn = viewsWith(nid).filter(v => v.id !== cur);
       const by = n.author ? `<span>·</span>${authorChip(n.author)}` : ext ? '<span class="origin">· author unknown</span>' : '';
-      const tabs = [['what', 'What'], ['when', 'When'], ['how', 'How'], ['links', 'Links', ups.length + downs.length]];
-      if (!tabs.some(t => t[0] === tab)) tab = 'what';
+      const exs = Array.isArray(n.examples) ? n.examples.filter(x => x && (x.thumb || x.href)) : [];
+      const tabs = [['when', 'When to use'], ['what', 'What it is'], ['how', 'How it works'], ...(exs.length ? [['examples', 'Example']] : []), ['links', 'Behind the scenes']];
+      TABS = tabs.map(t => t[0]);
+      if (!TABS.includes(tab)) tab = 'when';
       const text = (h4, body, key) => body ? `<h4>${h4}</h4><ul class="detail-bullets">${detailBullets(body).map(b => `<li title="${esc(b)}">${inline(b)}</li>`).join('')}</ul>` : `<h4>${h4}</h4><div class="pnone">Not written yet — add <code>${key}</code> to this node in the map model.</div>`;
       const verbs = (n.verbs || []).length ? `<div class="pverbs">${n.verbs.map(v => { const vid = N[nid + ':' + v] ? nid + ':' + v : null; return `<${vid ? `button data-n="${esc(vid)}"` : 'span'} class="pverb" style="--c:${c}">${esc(v)}</${vid ? 'button' : 'span'}>`; }).join('')}</div>` : '';
       const srcHtml = srcs.length ? '<ul class="source-list">' + srcs.map(s => `<li class="src">${srcHref(s) ? `<a href="${esc(srcHref(s))}" title="Open ${esc(sb ? srcLabel(s) : base + s)}"${sb ? ' target="_blank" rel="noopener"' : ''}>${esc(srcLabel(s))}</a>` : `<span>${esc(s)}</span>`}<button class="ibtn sm" data-copy="${esc(sb ? srcLabel(s) : base + s)}" title="Copy path" aria-label="Copy path">⧉</button></li>`).join('') + '</ul>' : '<div class="rel-none">No source listed</div>';
       const bodies = {
-        what: text('What it does', n.what, 'what') + verbs,
-        when: text('When it triggers', n.when, 'when'),
+        when: text('When to use', n.when, 'when'),
+        what: text('What it is', n.what, 'what') + verbs,
         how: text('How it works', n.how, 'how'),
-        links: `<div class="links"><div><h4>Upstream <span>${ups.length}</span></h4>${relRows(ups, 'up')}</div><div><h4>Downstream <span>${downs.length}</span></h4>${relRows(downs, 'down')}</div>
-          <div><h4>Source <span>${srcs.length}</span></h4>${srcHtml}${vIn.length ? `<h4 style="margin-top:10px">Also in <span>${vIn.length}</span></h4><ul class="pviews">${vIn.map(v => `<li><button class="pview" data-v="${esc(v.id)}" data-sel="${esc(nid)}">${esc(shortT(v.title || v.id))}</button></li>`).join('')}</ul>` : ''}</div></div>`,
+        examples: `<h4>Example</h4><ul class="exs">${exs.map((x, i) => `<li class="ex">${x.thumb ? `<button class="ex-thumb" data-ex="${i}" title="Open full size" aria-label="Open ${esc(x.title || 'example')} full size"><img src="${esc(x.thumb)}" alt="" loading="lazy"></button>` : ''}<b>${inline(x.title || '')}</b>${x.caption ? `<small>${inline(x.caption)}</small>` : ''}${x.href ? `<a href="${esc(x.href)}" target="_blank" rel="noopener">Open live page ↗</a>` : ''}</li>`).join('')}</ul>`,
+        links: `<div class="links"><div><h4>← Comes from</h4>${relRows(ups, 'up')}</div><div><h4>→ Leads to</h4>${relRows(downs, 'down')}</div>
+          <div><h4>Source files</h4>${srcHtml}${vIn.length ? `<h4 style="margin-top:10px">Also shown in</h4><ul class="pviews">${vIn.map(v => `<li><button class="pview" data-v="${esc(v.id)}" data-sel="${esc(nid)}">${esc(shortT(v.title || v.id))}</button></li>`).join('')}</ul>` : ''}</div></div>`,
       };
       panel.innerHTML = `<div class="ph" style="--c:${c}">
           <span class="big" style="background:${c}" aria-hidden="true"><svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[k]}</svg></span>
@@ -2255,9 +2286,19 @@
           <span class="pnav"><button class="ibtn sm" data-step="-1" title="Previous ([)" aria-label="Previous tab">‹</button><button class="ibtn sm" data-step="1" title="Next (])" aria-label="Next tab">›</button></span></div>
         <div class="pbody" id="m-pbody" role="tabpanel" aria-labelledby="pt-${tab}">${bodies[tab]}</div>`;
       panel.hidden = false;
+      panel.dataset.node = nid;
       panel.querySelectorAll('.clamp').forEach(el => { if (el.scrollHeight > el.clientHeight + 2) el.insertAdjacentHTML('afterend', '<button class="morebtn" data-more>Show all</button>'); });
     }
-    const TABS = ['what', 'when', 'how', 'links'];
+    let TABS = ['when', 'what', 'how', 'links'];
+    function openExample(nid, i) {
+      const x = ((nodeIn(nid) || {}).examples || [])[i]; if (!x) return;
+      let lb = $('m-lightbox');
+      if (!lb) { lb = h(`<div class="lightbox" id="m-lightbox" role="dialog" aria-modal="true" aria-label="Example" hidden></div>`); document.body.appendChild(lb);
+        lb.addEventListener('click', e => { if (e.target === lb || e.target.closest('[data-lbclose]')) closeExample(); }); }
+      lb.innerHTML = `<figure><img src="${esc(x.full || x.thumb)}" alt="${esc(x.title || '')}"><figcaption><span>${inline(x.title || '')}</span>${x.href ? `<a href="${esc(x.href)}" target="_blank" rel="noopener">Open live page ↗</a>` : ''}<button class="ibtn" data-lbclose title="Close (Esc)" aria-label="Close">×</button></figcaption></figure>`;
+      lb.hidden = false; lb.querySelector('[data-lbclose]').focus();
+    }
+    const closeExample = () => { const lb = $('m-lightbox'); if (lb) lb.hidden = true; };
     const setTab = t => { tab = t; try { localStorage.setItem('visual-tab', t); } catch (_) {} if (sel) renderPanel(sel); };
 
     /* navigation */
@@ -2335,6 +2376,7 @@
       const tb = t.closest('[data-tab]'); if (tb) return setTab(tb.dataset.tab);
       const st = t.closest('[data-step]'); if (st) return setTab(TABS[(TABS.indexOf(tab) + +st.dataset.step + TABS.length) % TABS.length]);
       const mb = t.closest('[data-more]'); if (mb) { mb.previousElementSibling.classList.add('open'); mb.remove(); }
+      const ex = t.closest('[data-ex]'); if (ex) return openExample(panel.dataset.node, +ex.dataset.ex);
     });
     document.addEventListener('click', e => {
       const t = e.target;
@@ -2413,7 +2455,7 @@
       else if (k === '-' || k === '_') cam.zoomAt(1 / 1.4, null, null, true);
       else if (k === '0') cam.fit();
       else if (k === '1') cam.actual();
-      else if (k === 'Escape' || k === 'Backspace') { if (!$('m-helpbox').hidden) closeHelp(); else if (!$('m-export-pop').hidden) closeExport(); else if ($('m-vpop') && !$('m-vpop').hidden) togglePill(false); else if (sel) deselect(); else up(); }
+      else if (k === 'Escape' || k === 'Backspace') { if ($('m-lightbox') && !$('m-lightbox').hidden) closeExample(); else if (!$('m-helpbox').hidden) closeHelp(); else if (!$('m-export-pop').hidden) closeExport(); else if ($('m-vpop') && !$('m-vpop').hidden) togglePill(false); else if (sel) deselect(); else up(); }
       else if (k === 'Enter' && sel) open(sel);
       else if (k === '/') openPal();
       else if (k === '?') $('m-help').click();
