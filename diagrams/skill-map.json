@@ -1513,14 +1513,17 @@
       "id": "security-audit",
       "label": "security-audit",
       "kind": "external",
-      "what": "Deep security audit of a whole repository: reconnaissance, attack-class hunting, validated findings and a coverage ledger.",
-      "when": "Only when you run /security-audit. No lane runs it; super-review may point you at it for a whole-repo pass.",
-      "how": "Installed by get.sh and onboard's Checks with `npx skills add cloudflare/security-audit-skill --skill security-audit` (skipped by --no-helper-skills; skills-lock.json marks it present). Optional in the skills-ready registry, so a missing copy never halts a run.",
+      "what": "Cloudflare's security-audit skill turns the agent into a source-first security auditor. Guidance mode answers questions; full audit mode runs six phases and writes the run files.",
+      "when": "Only when you run /security-audit or ask to security audit or pen-test a codebase. No lane runs it; super-review may point you at it for a whole-repo pass, and a focused security question uses guidance mode and writes nothing.",
+      "how": "Recon agents map the code into a coverage ledger, isolated hunters work through it with critics after each wave, and a fresh verifier tries to disprove every candidate. Findings land in findings.json, checked by two Node validators and re-checked by fresh agents before the three reports are written. get.sh and onboard's Checks install it with `npx skills add cloudflare/security-audit-skill --skill security-audit`; it is optional in the skills-ready registry, so a missing copy never halts a run.",
       "source": [
-        "https://github.com/cloudflare/security-audit-skill"
+        "https://erictechpro.github.io/super-board/security-audit/",
+        "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md",
+        "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md"
       ],
       "external": true,
       "origin": "cloudflare/security-audit-skill (installed via npx skills, MIT)",
+      "opensView": "security-audit",
       "author": "cloudflare"
     }
   ],
@@ -3116,6 +3119,7 @@
         "ui-refine-loop",
         "visual",
         "git-sync",
+        "security-audit",
         "hooks",
         "install"
       ]
@@ -5391,6 +5395,168 @@
         "gs-conflict",
         "gs-push"
       ]
+    },
+    {
+      "id": "security-audit",
+      "parent": "root",
+      "title": "security-audit · six phases (Cloudflare)",
+      "caption": "Outside skill, not run by any lane. Full audit mode runs these six phases; the full step-by-step map is the Security audit page.",
+      "nodeIds": [
+        "security-audit",
+        "sa-recon",
+        "sa-hunt",
+        "sa-validate",
+        "sa-output",
+        "sa-verify",
+        "sa-report"
+      ],
+      "edges": [
+        {
+          "from": "security-audit",
+          "to": "sa-recon",
+          "label": "full audit mode"
+        },
+        {
+          "from": "sa-recon",
+          "to": "sa-hunt",
+          "label": "ledger"
+        },
+        {
+          "from": "sa-hunt",
+          "to": "sa-validate",
+          "label": "candidates"
+        },
+        {
+          "from": "sa-validate",
+          "to": "sa-output",
+          "label": "decisions"
+        },
+        {
+          "from": "sa-output",
+          "to": "sa-verify",
+          "label": "records"
+        },
+        {
+          "from": "sa-verify",
+          "to": "sa-report",
+          "label": "verified"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "sa-recon",
+          "label": "Reconnaissance",
+          "kind": "step",
+          "what": "Four read-only research agents map the stack, trust, inputs and what can run locally. The parent writes architecture.md and coverage-ledger.json.",
+          "when": "First phase of a full audit, after run-metadata.json and the budget gate. Prior runs are read so this run targets gaps.",
+          "how": "Each ledger unit is one surface, boundary, subsystem and attack class. validate-coverage-ledger.cjs checks it after every update.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md"
+          ],
+          "sublabel": "Map code into a ledger"
+        },
+        {
+          "id": "sa-hunt",
+          "label": "Hunting",
+          "kind": "step",
+          "what": "Isolated general agents hunt their assigned ledger units and return one JSON result each.",
+          "when": "After the ledger validates. Units are ranked, lowest-trust entry surfaces first.",
+          "how": "A critic after every wave proposes missing or reopened units. Hunting ends when the critics come back clean.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md"
+          ],
+          "sublabel": "Hunters, then critics"
+        },
+        {
+          "id": "sa-validate",
+          "label": "Validation",
+          "kind": "step",
+          "what": "A fresh verifier that did not hunt the candidate tries to refute it from source and sandboxed local checks.",
+          "when": "After hunting ends. Candidates are merged by fingerprint first.",
+          "how": "It returns confirmed, needs_validation or rejected. Only confirmed gets a severity.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "Try to disprove each one"
+        },
+        {
+          "id": "sa-output",
+          "label": "Structured output",
+          "kind": "step",
+          "what": "The parent writes every final record to findings.json, sorted by fingerprint.",
+          "when": "After every candidate has a verifier decision.",
+          "how": "validate-findings.cjs checks it against report-schema.json, and the ledger validator runs again.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "findings.json + validators"
+        },
+        {
+          "id": "sa-verify",
+          "label": "Verification",
+          "kind": "step",
+          "what": "One fresh research verifier re-checks each confirmed and needs_validation record.",
+          "when": "After findings.json validates. A quick run merges this into validation.",
+          "how": "A material replacement goes to yet another independent verifier before it is applied.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "Fresh eyes on each record"
+        },
+        {
+          "id": "sa-report",
+          "label": "Reporting",
+          "kind": "step",
+          "what": "REPORT.md, FINDINGS-DETAIL.md and NEEDS-VALIDATION.md are derived from the verified records and the ledger.",
+          "when": "Only after every retained record passes verification.",
+          "how": "The prose never changes a verdict or severity. A clean run can report zero findings.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "Three reports, written last"
+        }
+      ],
+      "mainSteps": true,
+      "render": "process",
+      "lanes": false,
+      "stepIds": [
+        "sa-recon",
+        "sa-hunt",
+        "sa-validate",
+        "sa-output",
+        "sa-verify",
+        "sa-report"
+      ],
+      "layout": {
+        "security-audit": [
+          0,
+          0
+        ],
+        "sa-recon": [
+          1,
+          0
+        ],
+        "sa-hunt": [
+          2,
+          0
+        ],
+        "sa-validate": [
+          3,
+          0
+        ],
+        "sa-output": [
+          4,
+          0
+        ],
+        "sa-verify": [
+          5,
+          0
+        ],
+        "sa-report": [
+          6,
+          0
+        ]
+      }
     }
   ],
   "notes": [
