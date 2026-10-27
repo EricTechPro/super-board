@@ -17,6 +17,10 @@ description: GitHub-Project-driven autonomous pipeline. Five verbs — onboard, 
 
 If invoked with no verb, ask which one.
 
+Not sure the board is the right tool? The [routing rule](../../docs/super-board/routing.md) says
+which path to take: 1–5 tickets go to `/implement-spec`; 6+ tickets, or you walk away, go to
+super-board.
+
 In Codex the skill is not a slash command: it is `$super-board <verb>`, found in `.agents/skills/`.
 
 ## Routing
