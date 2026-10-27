@@ -77,6 +77,17 @@ If the input is ambiguous, default to reviewing the current branch against its u
      - structured `AppError({ error_code, context })`;
      - jsonb writes are Zod-validated.
 
+   **Security pass — every PR, not only security labels.** Whenever a PR exists, load
+   `pr-security-review` and follow it on the PR's diff against its base branch
+   (`gh pr view <PR> --json baseRefName`). It runs in this lane, not in a sub-agent: it
+   launches its own finding and false-positive sub-tasks. Each finding it keeps becomes a
+   row in your report: class **Bug**, severity **Blocker**, owner `builder`, `Where` = its
+   file:line, `Finding` = `security: <category> — <one line>`. A finding you can show is
+   wrong goes on the `✅ Done` line with the proof instead. No findings → say so on the
+   `Did:` line (`pr-security-review: 0 findings`). Skill missing → `⚠️ unverified`, never
+   merge-ready. For a deep audit of the whole repo, mention `security-audit` (standalone, if
+   installed) in the report; never run it from the lane.
+
 3. **Classify findings** — every finding gets a **class** (what kind of problem) and a
    **severity** (does it block). Class:
    - **Gap** — an acceptance criterion or requested behaviour is missing or incomplete.
@@ -98,7 +109,7 @@ If the input is ambiguous, default to reviewing the current branch against its u
      right stops the next round re-litigating it.
 
    Severity:
-   - **Blocker:** correctness, data loss, security, auth, migrations, money, customer-visible broken behavior, or failing required tests.
+   - **Blocker:** correctness, data loss, security (every `pr-security-review` finding), auth, migrations, money, customer-visible broken behavior, or failing required tests.
    - **Should fix:** maintainability, missing tests, risky edge cases, accessibility, i18n, observability, or design drift that is clearly in scope.
    - **Nit / optional:** style or cleanup that does not block merge.
    - **Deepening opportunity:** the diff is correct but leaves a shallow module, a

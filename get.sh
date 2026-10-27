@@ -7,7 +7,8 @@
 # Options (everything else that starts with "-" goes straight to install.sh):
 #   --target <dir>        project to install into (default: the current folder)
 #   --ref <tag|branch>    which version to fetch (default: the latest release)
-#   --no-helper-skills    skip `npx skills@latest add mattpocock/skills`
+#   --no-helper-skills    skip `npx skills@latest add` for mattpocock/skills and
+#                         cloudflare/security-audit-skill
 #   -h, --help            show this help
 # Passed through to install.sh: --no-hooks, --protect-main, --hosts=<list>.
 #
@@ -26,7 +27,7 @@ warn() { printf '⚠️  %s\n' "$*" >&2; }
 die()  { printf '❌ %s\n' "$*" >&2; exit "${2:-1}"; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
-usage() { sed -n '2,19p' "${BASH_SOURCE[0]:-$0}" 2>/dev/null | sed 's/^# \{0,1\}//' || true; }
+usage() { sed -n '2,20p' "${BASH_SOURCE[0]:-$0}" 2>/dev/null | sed 's/^# \{0,1\}//' || true; }
 
 # Matt Pocock's skills count as present when the project's skills-lock.json
 # lists them, or two of their skills already sit in a skills folder Claude reads.
@@ -37,6 +38,19 @@ helper_skills_present() {
   fi
   for d in "$t/.claude/skills" "${HOME:-/nonexistent}/.claude/skills"; do
     if [ -f "$d/grilling/SKILL.md" ] && [ -f "$d/tdd/SKILL.md" ]; then return 0; fi
+  done
+  return 1
+}
+
+# Cloudflare's security-audit counts as present when skills-lock.json lists it, or its
+# SKILL.md already sits in a skills folder Claude reads.
+security_audit_present() {
+  local t="$1" d
+  if [ -f "$t/skills-lock.json" ] && grep -q 'cloudflare/security-audit-skill' "$t/skills-lock.json" 2>/dev/null; then
+    return 0
+  fi
+  for d in "$t/.claude/skills" "$t/.agents/skills" "${HOME:-/nonexistent}/.claude/skills"; do
+    [ ! -f "$d/security-audit/SKILL.md" ] || return 0
   done
   return 1
 }
@@ -166,8 +180,24 @@ except Exception: print("")' 2>/dev/null || true)"
     fi
   fi
 
+  # --- security-audit (Cloudflare, standalone, run on demand) ------------
+  local audit_note
+  if [ "$helpers" -eq 0 ]; then
+    case " $later " in
+      *" node "*) audit_note="skipped — 🔍 Checks will fix this" ;;
+      *) audit_note="skipped (--no-helper-skills)" ;;
+    esac
+  elif security_audit_present "$target"; then
+    audit_note="already installed"
+  elif (cd "$target" && npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit -a claude-code -y </dev/null >"$tmp/npx-audit.log" 2>&1); then
+    audit_note="installed"
+  else
+    audit_note="failed — 🔍 Checks retries it (or: npx skills@latest add cloudflare/security-audit-skill --skill security-audit)"
+  fi
+
   # --- summary ----------------------------------------------------------
   say "🧠 helper skills: $helper_note"
+  say "🔒 security-audit: $audit_note"
   say "🎉 super-board $version is installed"
   say "👉 next: open Claude Code here and run /super-board onboard"
 }

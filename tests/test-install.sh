@@ -27,7 +27,7 @@ decoys_intact() { [ "$(ls "$1/.claude/skills" | grep -c '^decoy')" -eq 3 ]; }
 unset CODEX_THREAD_ID CODEX_SESSION_ID SUPER_BOARD_HOST
 
 SKILLS="super-board super-build super-qa super-review"
-ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual git-sync"
+ALL_SKILLS="$SKILLS super-collect ui-refine-loop visual git-sync pr-security-review"
 
 # 1 — a fresh project: plain directories, nothing to preserve. Every primary and
 #     secondary skill lands, and both workflows.
