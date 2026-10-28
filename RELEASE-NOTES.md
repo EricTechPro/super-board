@@ -1,6 +1,6 @@
 # Release notes
 
-## v3.2.0 — 2026-10-26
+## v3.3.0 — 2026-10-27
 
 Every PR gets a security pass, and every install gets a whole-repo security audit to run on demand.
 
