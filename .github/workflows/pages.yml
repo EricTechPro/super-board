@@ -14,11 +14,12 @@ name: pages
 #   /writing-standard/   diagrams/writing-standard/reference.html (read-only reference)
 # Pick-a-design pages (choose, confirm, carousels, older simulator versions) stay out.
 # Only files in this repo are copied; no event input is interpolated.
+# Pages show <span data-sb-version>dev</span> from disk; stamp_version.py writes VERSION in at build.
 
 on:
   push:
     branches: [main]
-    paths: ["diagrams/**", ".github/workflows/pages.yml"]
+    paths: ["diagrams/**", ".github/workflows/pages.yml", "VERSION"]
   workflow_dispatch:
 
 permissions:
@@ -49,6 +50,7 @@ jobs:
           cp diagrams/security-audit/index.html _site/security-audit/index.html
           cp diagrams/sdlc-template/index.html _site/sdlc-template/index.html
           cp diagrams/writing-standard/reference.html _site/writing-standard/index.html
+          python3 diagrams/_shared/stamp_version.py _site "$(cat VERSION)"
           touch _site/.nojekyll
           find _site -type f | sort
       - uses: actions/configure-pages@v5

@@ -24,3 +24,6 @@ A map directory with `map.json` (no `map.py`) renders through `layout_sdlc.py`: 
 
 ## Registry
 `maps.json` drives the site nav (entries with `nav: true`) and the landing page's Explore cards (`sync_explore.py`). Every map page must have an entry; `build_skillmap.py` and `sync_explore.py --check` fail otherwise.
+
+## Version label
+Pages show `<span data-sb-version>dev</span>` (or `data-sb-version="v"`) when opened from disk. The pages workflow runs `stamp_version.py _site "$(cat VERSION)"`, so the live site always shows the repo VERSION. Never type a release number into a page.
