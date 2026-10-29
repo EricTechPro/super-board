@@ -22,6 +22,23 @@ The security check moves to QA, and `/super-collect` hands its findings to Matt 
   linked from the README and the super-board skill.
 - 🧪 `test_collect_handoff.py` (route, findings doc, fork boundaries) and
   `test_skills_readiness.py` (security check required in QA, not in Review).
+- 👷 **The public site shows the repo `VERSION`.** Pages carry a `data-sb-version` placeholder
+  that reads "dev" from disk; `pages.yml` stamps `VERSION` in at build
+  (`diagrams/_shared/stamp_version.py`) and redeploys when `VERSION` changes. The release pill
+  links to `releases/latest`. Replaces the hardcoded v3.0.2. `test_pages_version.py` pins it.
+
+Ported from the EricOS vendored fork, each in its own PR:
+
+- 🐛 **Submodules keep their own board state** (#88). `halt_path()` and the card cache use
+  `<git-common-dir>/super-board/` when the common dir is not `<root>/.git`, so sibling
+  submodules no longer share a halt or cache. Normal repos and worktrees are unchanged.
+- 🐛 **A malformed agent read fails its call, not the run** (#89). `--kind diff` with no
+  `--meta`, a diff/meta mismatch, and short `prs-open`/`merge-state`/`issues` reads exit 64
+  with the valid form. Strict callers (preflight, merge gate, card) still halt with 79.
+- ✨ **PR history folds; `needs-you` can sit in the status alert** (#90). History renders in
+  `<details>` and `--append-file` keeps rows inside it; the merge gate reads
+  `> needs-you: <command>` in the status alert. #75's blocks (Door and Blast radius in Risk)
+  stay; the fork's block rename was not ported.
 
 ## v3.2.0 — 2026-10-26
 
