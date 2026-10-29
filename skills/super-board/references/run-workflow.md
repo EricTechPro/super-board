@@ -55,7 +55,8 @@ form; it never halts the run. Fixed-command scripts set `SB_GITHUB_READ_STRICT=1
 Exit **79**, a workflow result with `halted: true`, or a failed `--check` ends this
 run. Check the helper's `--check` before claims, board/comment writes, each new
 lane/wave, and all migration/merge steps. The marker is shared through the main
-checkout's `.claude/super-board/github-halt.json`, including linked worktrees.
+checkout's `.claude/super-board/github-halt.json`, including linked worktrees (a
+submodule keeps it in its own git dir: `<git-common-dir>/super-board/`).
 Cancel active workflow agents using local workflow controls (Codex: stop the background wave task); do not launch more
 lanes. Already-running agents stop at their next checkpoint; this is not an
 instantaneous process-wide kill. Preserve worktrees, claims, card statuses, and

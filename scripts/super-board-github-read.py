@@ -48,12 +48,16 @@ def halt_path():
     override = os.environ.get('SB_GITHUB_HALT_FILE')
     if override:
         return Path(override)
-    result = subprocess.run(['git', 'rev-parse', '--git-common-dir'], capture_output=True,
-                            text=True, timeout=5, cwd=os.environ.get('SB_REPO_PATH'))
     cwd = Path(os.environ.get('SB_REPO_PATH') or Path.cwd())
+    result = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+                            capture_output=True, text=True, timeout=5, cwd=cwd)
+    if result.returncode != 0:
+        return cwd / '.claude/super-board/github-halt.json'
+    # One repo, every worktree: <main checkout>/.claude/super-board/ when the common
+    # dir is <root>/.git; a submodule's (.git/modules/<path>) is not, so keep it inside.
     common = Path(result.stdout.strip())
-    root = (cwd / common).resolve().parent if result.returncode == 0 else cwd
-    return root / '.claude/super-board/github-halt.json'
+    state = common.parent / '.claude/super-board' if common.name == '.git' else common / 'super-board'
+    return state / 'github-halt.json'
 
 
 def check_halt():
