@@ -251,5 +251,28 @@ top_card_in_column Review
         self.assertEqual(self.read([{'out': '{}'}]).returncode, 0)
 
 
+    def git(self, *args):
+        subprocess.run(['git', '-c', 'user.name=test', '-c', 'user.email=test@test',
+                        '-c', 'protocol.file.allow=always', *args], check=True, capture_output=True)
+
+    def test_submodules_keep_their_own_halt(self):
+        # Two submodules share .git/modules/; one halting must not pause the other.
+        self.env.pop('SB_GITHUB_HALT_FILE')
+        for name in ('origin-a', 'origin-b', 'super'):
+            (self.root / name).mkdir()
+            self.git('init', '-q', str(self.root / name))
+            self.git('-C', str(self.root / name), 'commit', '--allow-empty', '-qm', 'initial')
+        sup = self.root / 'super'
+        self.git('-C', str(sup), 'submodule', 'add', '-q', str(self.root / 'origin-a'), 'projects/a')
+        self.git('-C', str(sup), 'submodule', 'add', '-q', str(self.root / 'origin-b'), 'projects/b')
+        self.env['SB_REPO_PATH'] = str(sup / 'projects/a')
+        self.assertEqual(self.read([{'rc': 1}]).returncode, 79)
+        self.assertTrue((sup / '.git/modules/projects/a/super-board/github-halt.json').exists())
+        self.assertFalse((sup / '.git/modules/projects/.claude').exists())
+        self.env['SB_REPO_PATH'] = str(sup / 'projects/b')
+        self.assertEqual(self.read([{'out': '{}'}]).returncode, 0)
+        self.env['SB_REPO_PATH'] = str(sup)
+        self.assertEqual(self.read([{'out': '{}'}]).returncode, 0)
+
 if __name__ == '__main__':
     unittest.main()

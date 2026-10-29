@@ -112,4 +112,17 @@ RC=0; card items >/dev/null 2>&1 || RC=$?
 [ "$RC" != 0 ] || fail "incomplete board read must fail"
 ok "incomplete board read refused"
 
+# 10 — no override: the cache lives with its repo. A normal repo keeps
+# <root>/.claude/super-board/cache; a submodule keeps its own, never the
+# .git/modules/ parent its siblings share.
+G() { git -c user.name=t -c user.email=t@t -c protocol.file.allow=always "$@" >/dev/null 2>&1; }
+for r in origin super; do mkdir -p "$TMP/$r"; G init -q "$TMP/$r"; G -C "$TMP/$r" commit --allow-empty -qm i; done
+G -C "$TMP/super" submodule add -q "$TMP/origin" projects/a
+(unset SB_CARD_CACHE_DIR; cd "$TMP/super" && card move 232 QA >/dev/null) || fail "move in normal repo"
+[ -f "$TMP/super/.claude/super-board/cache/board-acme-15.json" ] || fail "normal repo cache moved"
+(unset SB_CARD_CACHE_DIR; cd "$TMP/super/projects/a" && card move 232 QA >/dev/null) || fail "move in submodule"
+[ -f "$TMP/super/.git/modules/projects/a/super-board/cache/board-acme-15.json" ] || fail "submodule cache not in its own git dir"
+[ ! -e "$TMP/super/.git/modules/.claude" ] || fail "submodule cache leaked into shared .git/modules"
+ok "cache stays inside its own repo (normal + submodule)"
+
 echo "PASS: $pass card-helper checks"
