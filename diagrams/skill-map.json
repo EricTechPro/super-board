@@ -17,9 +17,9 @@
       "id": "super-board",
       "label": "/super-board",
       "kind": "public",
-      "what": "The autonomous GitHub-Project pipeline: five verbs (onboard, lint, status, run, stop) take one board shape (Backlog · Ready · Building · QA · Review · Blocked · Done) from empty to drained, with labels qa · bug · feature routing each card.",
-      "when": "Eric types /super-board <verb>, or says \"drain my GitHub project\" or \"stop super-board\"; with no verb it asks which one.",
-      "how": "The session is an orchestrator only: it routes the verb to its reference file, dispatches lane agents, and never does product work itself. Board state is the only state, so `run` is also resume. Every commit, ticket, PR body and comment follows references/writing-standard.md.",
+      "what": "The **autonomous GitHub-Project pipeline**: five verbs (onboard, lint, status, run, stop) take one board shape (Backlog · Ready · Building · QA · Review · Blocked · Done) ==from empty to drained==, with labels qa · bug · feature routing each card.",
+      "when": "Eric types **/super-board <verb>**, or says \"==drain my GitHub project==\" or \"stop super-board\"; with no verb it asks which one.",
+      "how": "The session is an **orchestrator** only: it routes the verb to its reference file, dispatches lane agents, and ==never does product work itself==. Board state is the only state, so `run` is also resume. Every commit, ticket, PR body and comment follows references/writing-standard.md.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/SKILL.md",
         "_skills/vendor/super-board/skills/super-board/references/writing-standard.md"
@@ -39,9 +39,9 @@
       "id": "super-collect",
       "label": "/super-collect",
       "kind": "public",
-      "what": "Finds problems in one project and files them as verified tickets into its super-board Backlog: five built-in sources plus any custom source added in onboard. It never builds, edits app code, or moves a card to Ready.",
-      "when": "Eric runs /super-collect (all enabled sources) or /super-collect <source…> with sentry, posthog, github, prs, architecture or a custom source's name; optional --since and --yes.",
-      "how": "Fetches each source for the window (default 14 days), sends every candidate to one fresh verifier sub-agent, then files through super-collect-file.sh. Dry-run by default: it shows a plan table and files on confirm.",
+      "what": "Finds **problems** in one project from Sentry, PostHog, GitHub, merged PRs, architecture and any custom source. It writes ==one findings doc== and never builds or edits app code.",
+      "when": "Use it when you want to know ==what keeps breaking==. Run /super-collect for every enabled source, or name some sources; --since sets the window.",
+      "how": "It fetches each source for the window (default 14 days) and sends every candidate to **one fresh verifier**. Verified problems go into the **findings doc**. That doc ==hands off to /to-spec, then /to-tickets==, instead of filing straight to Backlog.",
       "source": [
         "_skills/vendor/super-board/skills/super-collect/SKILL.md"
       ],
@@ -61,9 +61,9 @@
       "id": "ui-refine-loop",
       "label": "/ui-refine-loop",
       "kind": "public",
-      "what": "Unattended Impeccable check-then-fix loop on one page or component that ends in a draft PR with a Before | After table. Standalone: no board lane ever starts it.",
-      "when": "Eric runs /ui-refine-loop <route | component | description> [\"what's wrong\"] [--rounds N], or says \"refine loop\" or \"polish this page with impeccable\".",
-      "how": "Reads the target's code, grills Eric (at most 10 questions) into a taste file, then runs the saved ui-refine-loop workflow: each round fresh checkers rank typed problems and a fresh fixer chains Impeccable verbs, polish last. Default 5 rounds; a finish reviewer grades every fix. Commits are `💄 [ui] <slug>: …` and the PR body uses super-board-pr-body.sh's marker blocks.",
+      "what": "Unattended **Impeccable** check-then-fix loop on one page or component that ==ends in a draft PR== with a Before | After table. Standalone: no board lane ever starts it.",
+      "when": "Eric runs **/ui-refine-loop** <route | component | description> [\"what's wrong\"] [--rounds N], or says \"refine loop\" or \"==polish this page with impeccable==\".",
+      "how": "Reads the target's code, grills Eric (at most 10 questions) into a **taste file**, then runs the saved ui-refine-loop workflow: each round fresh checkers rank typed problems and a fresh fixer chains Impeccable verbs, polish last. Default 5 rounds; ==a finish reviewer grades every fix==. Commits are `💄 [ui] <slug>: …` and the PR body uses super-board-pr-body.sh's marker blocks.",
       "source": [
         "_skills/vendor/super-board/skills/ui-refine-loop/SKILL.md",
         "_skills/vendor/super-board/workflows/ui-refine-loop.js"
@@ -80,9 +80,9 @@
       "id": "visual",
       "label": "/visual",
       "kind": "public",
-      "what": "Turns the current work into one self-contained HTML page: a branch recap, a plan, or a map of a folder or architecture, with diagrams, a file map and annotated code.",
-      "when": "Eric runs /visual, /visual recap [base], /visual plan [file] or /visual <path>; with no argument visual.py detect picks the mode.",
-      "how": "Writes a data.json from git facts or the plan, then visual.py render injects it into an inline template with no build step. It screenshots the page headless to check it, and offers to publish only on a yes.",
+      "what": "Turns the current work into ==one self-contained HTML page==. It can be a **branch recap**, a **plan**, or a map of a folder or architecture, with diagrams, a file map and annotated code.",
+      "when": "Eric runs **/visual**, /visual recap [base], /visual plan [file] or /visual <path>; ==with no argument visual.py detect picks the mode==.",
+      "how": "Writes a **data.json** from git facts or the plan, then visual.py render injects it into an inline template with ==no build step==. It screenshots the page headless to check it, and offers to publish only on a yes.",
       "source": [
         "_skills/vendor/super-board/skills/visual/SKILL.md"
       ],
@@ -97,6 +97,36 @@
       "credits": [
         "BuilderIO",
         "tt-a1i"
+      ],
+      "examples": [
+        {
+          "title": "PR description",
+          "caption": "A **recap** of this skill-map branch, laid out like a GitHub PR.",
+          "thumb": "examples/pr-description.thumb.png",
+          "full": "examples/pr-description.png",
+          "href": "examples/pr-description.html"
+        },
+        {
+          "title": "Plan",
+          "caption": "A **plan** for the planned super-deploy lane.",
+          "thumb": "examples/plan-super-deploy.thumb.png",
+          "full": "examples/plan-super-deploy.png",
+          "href": "examples/plan-super-deploy.html"
+        },
+        {
+          "title": "Architecture map",
+          "caption": "super-board's **lanes and scripts**, explored.",
+          "thumb": "examples/architecture.thumb.png",
+          "full": "examples/architecture.png",
+          "href": "examples/architecture.html"
+        },
+        {
+          "title": "Command and script interface",
+          "caption": "super-board has no HTTP API, so this maps its **commands and scripts**.",
+          "thumb": "examples/api-endpoints.thumb.png",
+          "full": "examples/api-endpoints.png",
+          "href": "examples/api-endpoints.html"
+        }
       ]
     },
     {
@@ -174,9 +204,9 @@
       "id": "super-build",
       "label": "super-build",
       "kind": "lane",
-      "what": "Builder lane: takes a pre-flighted Ready card into its own worktree, makes the smallest safe change test-first under the 400-line PR cap, opens a draft PR and moves the card to QA. It never merges.",
-      "when": "Started by the board: the super-board-wave workflow runs it for Ready cards labelled feature or bug (or unlabelled) once pre-flight says proceed. Also runnable standalone as /super-build (legacy headless claude -p dispatch).",
-      "how": "Follows run.md's Builder lifecycle. An explicit `Skills:` line wins, else the type label picks the chain, always plus ponytail first, verification-before-completion and a code-review of its own diff. Past the size cap mid-build it stops and proposes a /to-tickets split. Commits and PR blocks follow the writing standard via super-board-pr-body.sh.",
+      "what": "**Builder lane**: takes a pre-flighted Ready card into its own worktree, makes the ==smallest safe change test-first== under the 400-line PR cap, opens a draft PR and moves the card to QA. It never merges.",
+      "when": "==Started by the board==: the super-board-wave workflow runs it for **Ready cards** labelled feature or bug (or unlabelled) once pre-flight says proceed. Also runnable standalone as /super-build (legacy headless claude -p dispatch).",
+      "how": "Follows run.md's Builder lifecycle. An explicit **`Skills:` line** wins, else the type label picks the chain, always plus ponytail first, verification-before-completion and a code-review of its own diff. Past the size cap mid-build it stops and ==proposes a /to-tickets split==. Commits and PR blocks follow the writing standard via super-board-pr-body.sh.",
       "source": [
         "_skills/vendor/super-board/skills/super-build/SKILL.md",
         "_skills/vendor/super-board/skills/super-build/references/decision-policy.md",
@@ -190,9 +220,9 @@
       "id": "super-qa",
       "label": "super-qa",
       "kind": "lane",
-      "what": "Tester lane: builds an issue-scoped test plan, runs a test-gap check on the Builder's diff, captures evidence and screenshots, then passes the card to Review or bounces it to Build.",
-      "when": "Started by the board for cards in QA, and straight from Ready for cards labelled qa (they skip Building). Also runnable standalone as /super-qa, a BFS route-crawling bug-bash, or /super-qa <url> for a live site with no repo.",
-      "how": "One observable test per AC plus the test-gap ledger, High gaps written red-first. On a qa card it creates the issue branch itself and files real defects as bug cards. It ticks the PR's ac block, writes visual and history rows with super-board-pr-body.sh, and posts `[qa] [report]` comments with screenshots pinned to a sha.",
+      "what": "**Tester lane**: builds an issue-scoped test plan, runs a ==test-gap check== on the Builder's diff, captures evidence and screenshots, then passes the card to Review or bounces it to Build.",
+      "when": "==Started by the board== for cards in **QA**, and straight from Ready for cards labelled qa (they skip Building). Also runnable standalone as /super-qa, a BFS route-crawling bug-bash, or /super-qa <url> for a live site with no repo.",
+      "how": "One observable test per AC plus the test-gap ledger, High gaps written red-first. On a qa card it creates the issue branch itself and files real defects as bug cards. It ticks the PR's ac block, writes visual and history rows with super-board-pr-body.sh, and posts `[qa] [report]` comments with screenshots pinned to a sha. It also runs **pr-security-review** on every PR, and ==a kept finding fails QA==.",
       "source": [
         "_skills/vendor/super-board/skills/super-qa/SKILL.md",
         "_skills/vendor/super-board/skills/super-qa/references/iteration-preamble.md",
@@ -205,14 +235,34 @@
       "id": "super-review",
       "label": "super-review",
       "kind": "lane",
-      "what": "Reviewer lane and standalone PR review: forms its own hypotheses first, remembers prior findings, classes every finding, and merges only through the merge gate.",
-      "when": "Started by the board for cards in Review (always on the session model). Also runnable standalone when Eric says \"review this branch\" or \"is this merge-ready\".",
-      "how": "Thread scan, prior-report round 1, own pass with code-review, codebase-design and ponytail-review, a rerun of the Tester's exact test command, then an adversarial truth-check on non-trivial diffs. One report comment is edited in place every round. A clean review merges through the gate pinned to the reviewed head SHA; exit 7 or 8 parks the card in Blocked with 🙋. Visual problems become a UI ticket, never a ui-refine-loop run. The truth-check sub-agents get a fixed verbatim brief, and Over-engineering is never a Blocker from any of them.",
+      "what": "**Reviewer lane** and standalone PR review: forms its own hypotheses first, remembers prior findings, classes every finding, and ==merges only through the merge gate==.",
+      "when": "==Started by the board== for cards in **Review** (always on the session model). Also runnable standalone when Eric says \"review this branch\" or \"is this merge-ready\".",
+      "how": "Thread scan, prior-report round 1, own pass with code-review, codebase-design and ponytail-review, a rerun of the Tester's exact test command, then an **adversarial truth-check** on non-trivial diffs. One report comment is edited in place every round. ==A clean review merges through the gate== pinned to the reviewed head SHA; exit 7 or 8 parks the card in Blocked with 🙋. Visual problems become a UI ticket, never a ui-refine-loop run. The truth-check sub-agents get a fixed verbatim brief, and Over-engineering is never a Blocker from any of them.",
       "source": [
         "_skills/vendor/super-board/skills/super-review/SKILL.md"
       ],
       "opensView": "super-review",
       "author": "EricTechPro"
+    },
+    {
+      "id": "super-deploy",
+      "label": "super-deploy",
+      "kind": "lane",
+      "change": "planned",
+      "what": "A **planned** lane that would look after a deploy once a PR merges. Today ==nothing runs here==, so you watch the deploy yourself.",
+      "when": "It would start **after a merge**, once super-review lands a PR. It is ==not built yet==.",
+      "how": "The plan is to **watch the deploy**, then smoke-test the live site. On a failure it would ==roll back==. Last, it would check **Sentry** and **PostHog** for new errors.",
+      "source": [],
+      "author": "EricTechPro",
+      "examples": [
+        {
+          "title": "Plan",
+          "caption": "A **plan** for the planned super-deploy lane.",
+          "thumb": "examples/plan-super-deploy.thumb.png",
+          "full": "examples/plan-super-deploy.png",
+          "href": "examples/plan-super-deploy.html"
+        }
+      ]
     },
     {
       "id": "gh-board",
@@ -496,11 +546,12 @@
       "id": "collect-file",
       "label": "super-collect-file.sh",
       "kind": "script",
-      "what": "Single filing entry point for /super-collect that routes each verified ticket to the pack's filers.",
-      "when": "Called once per candidate the verifier marked file or needs-triage (dry-run without --yes, real filing with it), or with --adopt <n>.",
-      "how": "bug/feature/fix go to super-qa-file-bug.sh, refactor to super-review-file-refactor.sh, every body in the writing-standard ticket format. It enforces per-source fingerprints (custom `custom|<name>|<key>`), exact-fingerprint dedupe and the board's holding column.",
+      "what": "The **one script** that puts super-collect tickets on the board. It ==never builds anything==.",
+      "when": "Used for 6+ tickets from /to-tickets (`--adopt <n>`), and for the **direct path**: `--direct`, scheduled runs, or a project with no /to-spec or /to-tickets. A **GitHub issue** is always adopted directly.",
+      "how": "bug, feature and fix go to super-qa-file-bug.sh, refactor to super-review-file-refactor.sh. It checks each finding's fingerprint, comments \"Seen again\" on a duplicate and files into the board's ==holding column== (Backlog). Without `--yes` it only shows what it would do.",
       "source": [
-        "_skills/vendor/super-board/skills/super-collect/scripts/super-collect-file.sh"
+        "_skills/vendor/super-board/skills/super-collect/scripts/super-collect-file.sh",
+        "_skills/vendor/super-board/skills/super-collect/SKILL.md"
       ]
     },
     {
@@ -597,6 +648,20 @@
       "author": "mattpocock"
     },
     {
+      "id": "grill-me",
+      "label": "/grill-me",
+      "kind": "external",
+      "what": "Matt Pocock's **grill-me** is a relentless interview about your plan. It asks one question at a time until ==every open choice is decided==.",
+      "when": "Use it when you have a **clear idea** that fits in ==one session==. You know roughly what to build and want the gaps found before any code.",
+      "how": "It runs the **grilling** skill and puts each round to you as a question. Your answers are saved as it goes. Then ==hand the result to /to-spec==.",
+      "source": [
+        ".agents/skills/grill-me/SKILL.md"
+      ],
+      "external": true,
+      "origin": "mattpocock-skills",
+      "author": "mattpocock"
+    },
+    {
       "id": "tdd",
       "label": "tdd",
       "kind": "external",
@@ -639,6 +704,20 @@
       "external": true,
       "origin": "mattpocock-skills (EricOS local override)",
       "opensView": "implement",
+      "author": "mattpocock"
+    },
+    {
+      "id": "implement-spec",
+      "label": "/implement-spec",
+      "kind": "external",
+      "what": "Matt Pocock's **implement-spec** builds a whole spec on one **integration branch**. It ==skips the QA lane==, so it is quicker but checks less.",
+      "when": "Use it for a **small job** of 1 to 5 tickets from /to-tickets. It is the ==fast route==, done in one session.",
+      "how": "It reads the tickets as a **task graph** and starts every ticket that is ready. Each ticket gets its own worktree and is built test-first with **tdd**. At the end it runs **code-review** once and ==opens or readies one PR==.",
+      "source": [
+        ".agents/skills/implement-spec/SKILL.md"
+      ],
+      "external": true,
+      "origin": "mattpocock-skills",
       "author": "mattpocock"
     },
     {
@@ -959,9 +1038,9 @@
       "id": "to-spec",
       "label": "to-spec",
       "kind": "external",
-      "what": "Turns the current conversation into a spec and publishes it to the issue tracker, no interview.",
-      "when": "Reached from ask-matt for multi-session builds; listed in super-build's skill map.",
-      "how": "Writes the spec from a template and applies the `ready-for-agent` label; needs the tracker config from setup-matt-pocock-skills.",
+      "what": "Matt Pocock's **to-spec** turns the conversation into one **spec**. It ==publishes it to the issue tracker== with no further interview.",
+      "when": "Use it once the idea is decided, from **/grill-me**, **/wayfinder** or a **/super-collect** findings doc. It is the ==shared next step for both doors==.",
+      "how": "It writes the spec from a template and adds the `ready-for-agent` label. It needs the tracker set up by setup-matt-pocock-skills. Next, **/to-tickets** ==breaks the spec into tickets==.",
       "source": [
         ".agents/skills/to-spec/SKILL.md"
       ],
@@ -974,9 +1053,9 @@
       "id": "to-tickets",
       "label": "to-tickets",
       "kind": "external",
-      "what": "Breaks a plan or spec into tracer-bullet tickets, each declaring its blocking edges.",
-      "when": "Reached from ask-matt after to-spec, and from /super-board lint to split a too-big ticket (criterion 15) into vertical slices; its `## Blocked by` template is why lint criterion 13 exists.",
-      "how": "Publishes blockers first so edges reference real ids, as files locally or native blocking links on a real tracker.",
+      "what": "Matt Pocock's **to-tickets** breaks a spec into **tracer-bullet tickets**. Each ticket ==says which tickets block it==.",
+      "when": "Use it right after **/to-spec**, to split the spec into work. /super-board lint also uses it to ==split a ticket that is too big==.",
+      "how": "It files blockers first, so every link points at a real ticket. The ticket count then ==picks the route==. With 1 to 5 tickets use **/implement-spec**, with 6 or more use **/super-board**.",
       "source": [
         ".agents/skills/to-tickets/SKILL.md"
       ],
@@ -1004,9 +1083,9 @@
       "id": "wayfinder",
       "label": "wayfinder",
       "kind": "external",
-      "what": "Charts a shared map of decision tickets for a huge, foggy effort and resolves them one at a time.",
-      "when": "Reached from ask-matt for greenfield projects or builds too big for one session.",
-      "how": "Tickets are research, prototype, grilling or task, HITL or AFK; it hands off to to-spec when the map clears instead of building.",
+      "what": "Matt Pocock's **wayfinder** charts a shared map of decision tickets for a huge effort. It ==resolves them one at a time== instead of building.",
+      "when": "Use it for a **big, foggy idea** that needs ==many sessions== to pin down. Pick /grill-me instead when the idea is already clear. ask-matt also routes greenfield builds here.",
+      "how": "Each ticket is **research**, a **prototype**, a grilling round or a task, done by you or by an agent. When the map clears it ==hands off to /to-spec==.",
       "source": [
         ".agents/skills/wayfinder/SKILL.md"
       ],
@@ -1485,15 +1564,46 @@
       "id": "git-sync",
       "label": "/git-sync",
       "kind": "public",
-      "what": "Commits the working tree as one commit per logical change, merge-pulls, pushes the current branch without force, and reports what it did.",
-      "when": "Eric runs /git-sync or says \"sync\", \"commit and push\" or \"pull and push\", usually at the end of a piece of work.",
-      "how": "Stages each group by path (never `git add -A`), refuses secrets, writes the host's commit format or the writing standard, gates `supabase/` changes on a migration file and advisors, then `git pull --no-rebase` and `git push`. The default or a protected branch needs a yes.",
+      "what": "Commits the working tree as **one commit per logical change**, merge-pulls, pushes the current branch ==without force==, and reports what it did.",
+      "when": "Eric runs **/git-sync** or says \"sync\", \"commit and push\" or \"pull and push\", usually ==at the end of a piece of work==.",
+      "how": "Stages each group by path (never `git add -A`), **refuses secrets**, writes the host's commit format or the writing standard, gates `supabase/` changes on a migration file and advisors, then `git pull --no-rebase` and `git push`. ==The default or a protected branch needs a yes==.",
       "source": [
         "_skills/vendor/super-board/skills/git-sync/SKILL.md"
       ],
       "sublabel": "commit · pull · push",
       "opensView": "git-sync",
       "author": "EricTechPro"
+    },
+    {
+      "id": "pr-security-review",
+      "label": "pr-security-review",
+      "kind": "external",
+      "what": "A **security review** of one PR's diff against its base branch. It reports only ==high-confidence, exploitable holes== that the PR adds.",
+      "when": "Run by **super-qa** on ==every PR==, not only on security labels. You can also run it by hand as /pr-security-review on a branch.",
+      "how": "One sub-task finds candidates such as injection, auth bypass, secrets and data exposure. A parallel sub-task per candidate drops false positives and anything under 8/10. Each kept finding ==fails QA and sends the card back to Build==. It is Anthropic's **claude-code-security-review**, ported under MIT, and replaces QA's old built-in /security-review call.",
+      "source": [
+        "_skills/vendor/super-board/skills/pr-security-review/SKILL.md"
+      ],
+      "external": true,
+      "origin": "anthropics/claude-code-security-review (bundled port, MIT)",
+      "author": "anthropics"
+    },
+    {
+      "id": "security-audit",
+      "label": "security-audit",
+      "kind": "external",
+      "what": "Cloudflare's security-audit skill turns the agent into a **source-first security auditor**. Guidance mode answers questions; ==full audit mode runs six phases== and writes the run files.",
+      "when": "Only when you run **/security-audit** or ask to security audit or pen-test a codebase. ==No lane runs it==; super-review may point you at it for a whole-repo pass, and a focused security question uses guidance mode and writes nothing.",
+      "how": "Recon agents map the code into a coverage ledger, isolated hunters work through it with critics after each wave, and a **fresh verifier** ==tries to disprove every candidate==. Findings land in findings.json, checked by two Node validators and re-checked by fresh agents before the three reports are written. get.sh and onboard's Checks install it with `npx skills add cloudflare/security-audit-skill --skill security-audit`; it is optional in the skills-ready registry, so a missing copy never halts a run.",
+      "source": [
+        "https://erictechpro.github.io/super-board/security-audit/",
+        "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/README.md",
+        "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/SKILL.md"
+      ],
+      "external": true,
+      "origin": "cloudflare/security-audit-skill (installed via npx skills, MIT)",
+      "opensView": "security-audit",
+      "author": "cloudflare"
     }
   ],
   "edges": [
@@ -1537,7 +1647,7 @@
       "from": "super-collect",
       "to": "gh-board",
       "label": "files to Backlog",
-      "when": "the verifier says file or needs-triage and the run is confirmed"
+      "when": "6+ tickets after /to-tickets, or the direct path (--direct, scheduled runs, no /to-spec or /to-tickets)"
     },
     {
       "id": "r-collect-config",
@@ -1918,6 +2028,13 @@
       "when": "pass: QA to Review; fail: QA to Ready (loop:rebuild-N); a qa card first moves itself Ready to QA"
     },
     {
+      "id": "q-secrev",
+      "from": "super-qa",
+      "to": "pr-security-review",
+      "label": "security pass on the PR diff",
+      "when": "every PR; a kept finding fails QA and goes back to Build"
+    },
+    {
       "id": "q-filebug",
       "from": "super-qa",
       "to": "file-bug",
@@ -2019,15 +2136,15 @@
       "id": "c-file",
       "from": "super-collect",
       "to": "collect-file",
-      "label": "files if verified",
-      "when": "one fresh verifier per candidate says file or needs-triage (duplicate gets a comment)"
+      "label": "adopts or files",
+      "when": "6+ tickets from /to-tickets, a GitHub issue, or the direct path; a duplicate gets a comment"
     },
     {
       "id": "file-gh",
       "from": "collect-file",
       "to": "gh-board",
       "label": "files to Backlog",
-      "when": "--yes or confirmed dry-run; dedupe by exact fingerprint"
+      "when": "--yes or a confirmed dry run; dedupe by exact fingerprint"
     },
     {
       "id": "u-grill",
@@ -2910,6 +3027,13 @@
       "to": "guard-protected-push",
       "label": "push checked by",
       "when": "the opt-in push guard is installed"
+    },
+    {
+      "id": "v-audit",
+      "from": "super-review",
+      "to": "security-audit",
+      "label": "mentions for a whole-repo audit",
+      "when": "never run by the lane; the user runs it on demand"
     }
   ],
   "views": [
@@ -2917,22 +3041,63 @@
       "id": "root",
       "parent": null,
       "title": "super-board pack",
-      "caption": "Collect verified tickets into the board; the board contains Build → QA → Review. UI refinement, visuals and Git sync are standalone skills. Open a family or step for its tools and policies.",
+      "caption": "Two ways in. Ideas start at /grill-me or /wayfinder; bugs and errors start at /super-collect. Both meet at /to-spec and /to-tickets, then the ticket count picks the route. The tools on the right run on their own.",
       "nodeIds": [
+        "grill-me",
+        "wayfinder",
         "super-collect",
+        "to-spec",
+        "to-tickets",
+        "route-fork",
+        "implement-spec",
         "super-board",
         "super-build",
         "super-qa",
         "super-review",
+        "super-deploy",
         "ui-refine-loop",
         "visual",
-        "git-sync"
+        "git-sync",
+        "security-audit"
       ],
       "edges": [
         {
+          "from": "grill-me",
+          "to": "to-spec",
+          "label": "clear idea"
+        },
+        {
+          "from": "wayfinder",
+          "to": "to-spec",
+          "label": "map cleared"
+        },
+        {
           "from": "super-collect",
+          "to": "to-spec",
+          "label": "findings doc",
+          "when": "one findings doc per run; you run /to-spec on it"
+        },
+        {
+          "from": "to-spec",
+          "to": "to-tickets",
+          "label": "one spec"
+        },
+        {
+          "from": "to-tickets",
+          "to": "route-fork",
+          "label": "count tickets"
+        },
+        {
+          "from": "route-fork",
+          "to": "implement-spec",
+          "label": "1–5 tickets",
+          "when": "small job: one session, one branch, no QA lane"
+        },
+        {
+          "from": "route-fork",
           "to": "super-board",
-          "label": "Backlog → lint"
+          "label": "6+ tickets",
+          "when": "big job: every ticket gets its own build, QA and review"
         },
         {
           "from": "super-board",
@@ -2943,10 +3108,18 @@
         "r-qa-review",
         {
           "from": "super-review",
+          "to": "super-deploy",
+          "label": "merge",
+          "style": "dashed",
+          "when": "planned: after a merge, watch the deploy and roll back on failure"
+        },
+        {
+          "from": "super-review",
           "to": "super-collect",
-          "label": "review done → collect the next tickets",
+          "label": "review done → collect again",
           "kind": "feeds",
-          "when": "the board drains; /super-collect files the next verified tickets into Backlog"
+          "when": "the board drains; /super-collect looks for the next problems",
+          "loop": true
         }
       ],
       "intake": [
@@ -2968,6 +3141,9 @@
       ],
       "tour": [
         "super-collect",
+        "to-spec",
+        "to-tickets",
+        "route-fork",
         "super-board",
         "super-build",
         "super-qa",
@@ -2976,48 +3152,80 @@
       ],
       "lanes": false,
       "layout": {
-        "super-collect": [
+        "grill-me": [
           0,
           0
         ],
-        "super-board": [
+        "wayfinder": [
+          0,
+          1
+        ],
+        "super-collect": [
+          0,
+          3
+        ],
+        "to-spec": [
           1,
-          0
+          1
         ],
-        "super-build": [
+        "to-tickets": [
           2,
-          0
+          1
         ],
-        "super-qa": [
+        "route-fork": [
           3,
-          0
+          1
         ],
-        "super-review": [
+        "implement-spec": [
           4,
           0
         ],
-        "ui-refine-loop": [
+        "super-board": [
+          4,
+          2
+        ],
+        "super-build": [
           5,
+          2
+        ],
+        "super-qa": [
+          6,
+          2
+        ],
+        "super-review": [
+          7,
+          2
+        ],
+        "super-deploy": [
+          8,
+          3
+        ],
+        "ui-refine-loop": [
+          9,
           0
         ],
         "visual": [
-          5,
+          9,
           1
         ],
         "git-sync": [
-          5,
+          9,
           2
+        ],
+        "security-audit": [
+          9,
+          3
         ]
       },
       "nodeOverrides": {
         "super-collect": {
           "verbs": [],
-          "sublabel": "Find verified tickets",
+          "sublabel": "Find real problems",
           "emphasis": true
         },
         "super-board": {
           "verbs": [],
-          "sublabel": "Run the board",
+          "sublabel": "6+ tickets · run the board",
           "emphasis": true
         },
         "ui-refine-loop": {
@@ -3043,19 +3251,61 @@
           "verbs": [],
           "sublabel": "Commit · pull · push",
           "emphasis": true
+        },
+        "grill-me": {
+          "sublabel": "Clear idea · one session",
+          "emphasis": true
+        },
+        "wayfinder": {
+          "sublabel": "Foggy idea · many sessions",
+          "emphasis": true,
+          "label": "/wayfinder"
+        },
+        "to-spec": {
+          "label": "/to-spec",
+          "sublabel": "Write one spec",
+          "emphasis": true
+        },
+        "to-tickets": {
+          "label": "/to-tickets",
+          "sublabel": "Split into tickets",
+          "emphasis": true
+        },
+        "route-fork": {
+          "emphasis": true
+        },
+        "implement-spec": {
+          "sublabel": "Fast · one session · no QA",
+          "emphasis": true
+        },
+        "super-deploy": {
+          "sublabel": "Planned · not built yet",
+          "emphasis": true
+        },
+        "security-audit": {
+          "label": "/security-audit",
+          "sublabel": "Whole-repo audit",
+          "emphasis": true
         }
       },
       "containers": [
         {
-          "id": "collect-family",
-          "label": "/super-collect · intake feeds the board",
+          "id": "door-ideas",
+          "label": "Ideas",
+          "nodeIds": [
+            "grill-me",
+            "wayfinder"
+          ]
+        },
+        {
+          "id": "door-bugs",
+          "label": "Bugs and errors",
           "nodeIds": [
             "super-collect"
           ]
         },
         {
           "id": "board-family",
-          "parent": "collect-family",
           "label": "/super-board · Build → QA → Review",
           "nodeIds": [
             "super-board",
@@ -3063,10 +3313,23 @@
             "super-qa",
             "super-review"
           ]
+        },
+        {
+          "id": "side-tools",
+          "label": "Run on their own",
+          "nodeIds": [
+            "ui-refine-loop",
+            "visual",
+            "git-sync",
+            "security-audit"
+          ]
         }
       ],
       "browserOrder": [
+        "wayfinder",
         "super-collect",
+        "to-spec",
+        "to-tickets",
         "super-board",
         "super-build",
         "super-qa",
@@ -3074,8 +3337,21 @@
         "ui-refine-loop",
         "visual",
         "git-sync",
+        "security-audit",
         "hooks",
         "install"
+      ],
+      "nodes": [
+        {
+          "id": "route-fork",
+          "label": "How many tickets?",
+          "kind": "step",
+          "sublabel": "1–5 fast · 6+ board",
+          "what": "This is the **fork** between two ways to build. A small job takes the ==fast route==, and a big one goes to the board.",
+          "when": "Pick a route right after **/to-tickets**, once you know ==how many tickets== the spec made. Count the tickets, not the files.",
+          "how": "With **1 to 5 tickets**, run **/implement-spec**. One session builds them all on one branch, with no QA lane. With **6 or more**, run **/super-board**, so ==each ticket gets its own build, QA and review==. Not sure? Pick the board when the work touches auth, billing or data.",
+          "source": []
+        }
       ]
     },
     {
@@ -3391,7 +3667,7 @@
       "id": "super-qa",
       "parent": "super-board",
       "title": "super-qa · test plan, gap check, evidence",
-      "caption": "Issue-scoped inside a run (qa-labelled cards skip Building); standalone it crawls routes and files onto the Super Ultimate QA board.",
+      "caption": "Issue-scoped inside a run (qa-labelled cards skip Building); standalone it crawls routes and files onto the Super Ultimate QA board. Every PR also gets the pr-security-review pass.",
       "nodeIds": [
         "super-qa",
         "tdd",
@@ -3403,6 +3679,7 @@
         "vitest",
         "playwright-bp",
         "gh-board",
+        "pr-security-review",
         "file-bug",
         "qa-board",
         "pr-body",
@@ -3418,6 +3695,7 @@
         "q-vitest",
         "q-pw",
         "q-gh",
+        "q-secrev",
         "q-filebug",
         "filebug-qaboard",
         "super-qa-prbody",
@@ -3442,6 +3720,7 @@
         "code-review",
         "codebase-design",
         "ponytail-review",
+        "security-audit",
         "file-refactor",
         "merge-gate",
         "gh-board",
@@ -3453,6 +3732,7 @@
         "v-cr",
         "v-design",
         "v-pony",
+        "v-audit",
         "v-refactor",
         "review-gate",
         "v-gh",
@@ -3470,7 +3750,7 @@
       "id": "super-collect",
       "parent": "root",
       "title": "/super-collect · fetch, verify, file",
-      "caption": "Fetch sources → verify → confirm → file to Backlog. Five built-in sources plus custom ones; collecting never moves a card to Ready.",
+      "caption": "Fetch sources → verify → confirm → write one findings doc. The doc goes to /to-spec, then /to-tickets; collecting never moves a card to Ready.",
       "nodeIds": [
         "collect-fetch",
         "collect-verify",
@@ -3536,16 +3816,16 @@
         },
         {
           "id": "collect-submit",
-          "label": "File to Backlog",
+          "label": "Write findings doc",
           "kind": "step",
-          "what": "File verified problems into Backlog. Apply fingerprints and duplicate checks.",
-          "when": "After confirmation or an authorized --yes run. File candidates marked file or needs-triage.",
-          "how": "Use one filing entry point for all sources. Route bugs, features and fixes separately from refactors.",
+          "what": "Write every verified problem into **one findings doc**. Each finding ==keeps its proof==.",
+          "when": "After you confirm the plan. Only verified problems go in.",
+          "how": "Hand the doc to **/to-spec**, then **/to-tickets**. The tickets then ==pick the route==, /implement-spec or /super-board.",
           "source": [
             "_skills/vendor/super-board/skills/super-collect/scripts/super-collect-file.sh"
           ],
           "opensView": "collect-submit",
-          "sublabel": "Then lint"
+          "sublabel": "Then /to-spec"
         }
       ],
       "mainSteps": true,
@@ -5101,10 +5381,15 @@
     {
       "id": "collect-submit",
       "parent": "super-collect",
-      "title": "File · one entry point and dedupe",
-      "caption": "",
+      "title": "Hand-off · findings doc, spec, tickets",
+      "caption": "Verified problems go into one findings doc, then /to-spec and /to-tickets. 1–5 tickets go to /implement-spec once you say yes; 6 or more go to Backlog. --direct, scheduled runs and a missing /to-spec or /to-tickets file straight to Backlog. GitHub issues are adopted as they are.",
       "nodeIds": [
         "collect-submit",
+        "findings-doc",
+        "to-spec",
+        "to-tickets",
+        "collect-fork",
+        "implement-spec",
         "collect-file",
         "file-bug",
         "file-refactor",
@@ -5113,26 +5398,86 @@
       "edges": [
         {
           "from": "collect-submit",
+          "to": "findings-doc",
+          "label": "verified problems"
+        },
+        {
+          "from": "findings-doc",
+          "to": "to-spec",
+          "label": "one spec"
+        },
+        {
+          "from": "to-spec",
+          "to": "to-tickets",
+          "label": "spec"
+        },
+        {
+          "from": "to-tickets",
+          "to": "collect-fork",
+          "label": "count tickets"
+        },
+        {
+          "from": "collect-fork",
+          "to": "implement-spec",
+          "label": "1–5, on yes"
+        },
+        {
+          "from": "collect-fork",
           "to": "collect-file",
-          "label": "single entry point"
+          "label": "6+, adopted"
         },
         {
           "from": "collect-submit",
+          "to": "collect-file",
+          "label": "--direct · scheduled · GitHub issue",
+          "style": "dashed"
+        },
+        {
+          "from": "collect-file",
           "to": "file-bug",
           "label": "bug / feature / fix"
         },
         {
-          "from": "collect-submit",
+          "from": "collect-file",
           "to": "file-refactor",
           "label": "refactor"
         },
         {
-          "from": "collect-submit",
+          "from": "collect-file",
           "to": "gh-board",
           "label": "Backlog"
         }
       ],
-      "node": "collect-submit"
+      "node": "collect-submit",
+      "nodes": [
+        {
+          "id": "findings-doc",
+          "label": "Findings doc",
+          "kind": "board",
+          "sublabel": "collect-<date>.md",
+          "what": "**One file** for the whole run: `docs/super-board/findings/collect-<date>.md`. Findings with the same cause ==share one group==.",
+          "when": "Written after you confirm. Only problems the verifier marked **file** or **needs-triage** go in. Drops and duplicates are listed under \"Not in this doc\".",
+          "how": "`collect_handoff.py doc` shows it first and writes it with `--yes`. It never overwrites: a second run that day gets `-2`. A duplicate still gets its \"Seen again\" comment, and a **GitHub issue** is ==adopted as it is==, not copied into the doc.",
+          "source": [
+            "_skills/vendor/super-board/skills/super-collect/SKILL.md",
+            "_skills/vendor/super-board/skills/super-collect/scripts/collect_handoff.py"
+          ]
+        },
+        {
+          "id": "collect-fork",
+          "label": "How many tickets?",
+          "kind": "step",
+          "sublabel": "1–5 fast · 6+ board",
+          "what": "The **fork** after /to-tickets. The ticket count ==picks who builds==.",
+          "when": "Right after /to-tickets publishes the tickets. `collect_handoff.py fork --tickets <n>` makes the call.",
+          "how": "With **1 to 5 tickets**, super-collect prints `/implement-spec <spec>` and ==starts it only after you say yes==. One session, no QA lane. With **6 or more**, each ticket is adopted into **Backlog**; then run /super-board lint. No /implement-spec installed? The tickets go to Backlog too.",
+          "source": [
+            "_skills/vendor/super-board/skills/super-collect/SKILL.md",
+            "_skills/vendor/super-board/skills/super-collect/scripts/collect_handoff.py",
+            "_skills/vendor/super-board/docs/super-board/routing.md"
+          ]
+        }
+      ]
     },
     {
       "id": "refine-brief",
@@ -5345,6 +5690,168 @@
         "gs-conflict",
         "gs-push"
       ]
+    },
+    {
+      "id": "security-audit",
+      "parent": "root",
+      "title": "security-audit · six phases (Cloudflare)",
+      "caption": "Outside skill, not run by any lane. Full audit mode runs these six phases; the full step-by-step map is the Security audit page.",
+      "nodeIds": [
+        "security-audit",
+        "sa-recon",
+        "sa-hunt",
+        "sa-validate",
+        "sa-output",
+        "sa-verify",
+        "sa-report"
+      ],
+      "edges": [
+        {
+          "from": "security-audit",
+          "to": "sa-recon",
+          "label": "full audit mode"
+        },
+        {
+          "from": "sa-recon",
+          "to": "sa-hunt",
+          "label": "ledger"
+        },
+        {
+          "from": "sa-hunt",
+          "to": "sa-validate",
+          "label": "candidates"
+        },
+        {
+          "from": "sa-validate",
+          "to": "sa-output",
+          "label": "decisions"
+        },
+        {
+          "from": "sa-output",
+          "to": "sa-verify",
+          "label": "records"
+        },
+        {
+          "from": "sa-verify",
+          "to": "sa-report",
+          "label": "verified"
+        }
+      ],
+      "nodes": [
+        {
+          "id": "sa-recon",
+          "label": "Reconnaissance",
+          "kind": "step",
+          "what": "Four read-only research agents map the stack, trust, inputs and what can run locally. The parent writes architecture.md and coverage-ledger.json.",
+          "when": "First phase of a full audit, after run-metadata.json and the budget gate. Prior runs are read so this run targets gaps.",
+          "how": "Each ledger unit is one surface, boundary, subsystem and attack class. validate-coverage-ledger.cjs checks it after every update.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/RECONNAISSANCE.md"
+          ],
+          "sublabel": "Map code into a ledger"
+        },
+        {
+          "id": "sa-hunt",
+          "label": "Hunting",
+          "kind": "step",
+          "what": "Isolated general agents hunt their assigned ledger units and return one JSON result each.",
+          "when": "After the ledger validates. Units are ranked, lowest-trust entry surfaces first.",
+          "how": "A critic after every wave proposes missing or reopened units. Hunting ends when the critics come back clean.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/HUNTING.md"
+          ],
+          "sublabel": "Hunters, then critics"
+        },
+        {
+          "id": "sa-validate",
+          "label": "Validation",
+          "kind": "step",
+          "what": "A fresh verifier that did not hunt the candidate tries to refute it from source and sandboxed local checks.",
+          "when": "After hunting ends. Candidates are merged by fingerprint first.",
+          "how": "It returns confirmed, needs_validation or rejected. Only confirmed gets a severity.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "Try to disprove each one"
+        },
+        {
+          "id": "sa-output",
+          "label": "Structured output",
+          "kind": "step",
+          "what": "The parent writes every final record to findings.json, sorted by fingerprint.",
+          "when": "After every candidate has a verifier decision.",
+          "how": "validate-findings.cjs checks it against report-schema.json, and the ledger validator runs again.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "findings.json + validators"
+        },
+        {
+          "id": "sa-verify",
+          "label": "Verification",
+          "kind": "step",
+          "what": "One fresh research verifier re-checks each confirmed and needs_validation record.",
+          "when": "After findings.json validates. A quick run merges this into validation.",
+          "how": "A material replacement goes to yet another independent verifier before it is applied.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "Fresh eyes on each record"
+        },
+        {
+          "id": "sa-report",
+          "label": "Reporting",
+          "kind": "step",
+          "what": "REPORT.md, FINDINGS-DETAIL.md and NEEDS-VALIDATION.md are derived from the verified records and the ledger.",
+          "when": "Only after every retained record passes verification.",
+          "how": "The prose never changes a verdict or severity. A clean run can report zero findings.",
+          "source": [
+            "https://github.com/cloudflare/security-audit-skill/blob/c1c8a8c1471069fb0e188eeaff69b8e8db6564a8/skills/security-audit/VALIDATION-AND-REPORTING.md"
+          ],
+          "sublabel": "Three reports, written last"
+        }
+      ],
+      "mainSteps": true,
+      "render": "process",
+      "lanes": false,
+      "stepIds": [
+        "sa-recon",
+        "sa-hunt",
+        "sa-validate",
+        "sa-output",
+        "sa-verify",
+        "sa-report"
+      ],
+      "layout": {
+        "security-audit": [
+          0,
+          0
+        ],
+        "sa-recon": [
+          1,
+          0
+        ],
+        "sa-hunt": [
+          2,
+          0
+        ],
+        "sa-validate": [
+          3,
+          0
+        ],
+        "sa-output": [
+          4,
+          0
+        ],
+        "sa-verify": [
+          5,
+          0
+        ],
+        "sa-report": [
+          6,
+          0
+        ]
+      }
     }
   ],
   "notes": [
@@ -5398,6 +5905,14 @@
     "tt-a1i": {
       "name": "tt-a1i (archify)",
       "url": "https://github.com/tt-a1i"
+    },
+    "anthropics": {
+      "name": "Anthropic",
+      "url": "https://github.com/anthropics"
+    },
+    "cloudflare": {
+      "name": "Cloudflare",
+      "url": "https://github.com/cloudflare"
     }
   },
   "version": "3.0.0"

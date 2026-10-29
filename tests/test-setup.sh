@@ -318,6 +318,21 @@ TXT=$(python3 "$SETUP" check --root "$WORK/bare" --text || true)
 echo "$TXT" | grep -q "✗ .*b.json.*gemini" || fail "text report must name the bad host: $TXT"
 python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
 q '.host == "gemini"' "$H/b.json" || fail "fix must not guess over a set host: $(cat "$H/b.json")"
+# A non-Claude host keeps merge_policy.default unset (merges by hand, #47); claude gets "auto".
+# Backups are stamped per minute, so clear them between fixes run back to back.
+BK="$WORK/bare/.claude/super-board/backup"
+for h in codex opencode; do
+  printf '{"host":"%s"}' "$h" > "$H/b.json"; rm -rf "$BK"
+  python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
+  q '.columns != null and (.merge_policy.default // null) == null' "$H/b.json" || fail "fix must migrate but not turn auto-merge on for host $h: $(cat "$H/b.json")"
+done
+rm "$H/b.json"; echo '{}' > "$H/b.json"; rm -rf "$BK"
+python3 "$SETUP" fix --root "$WORK/bare" --no-helpers --host codex >&2 || true
+q '.host == "codex" and (.merge_policy.default // null) == null' "$H/b.json" \
+  || fail "fix filling host codex must not turn auto-merge on: $(cat "$H/b.json")"
+printf '{"host":"claude"}' > "$H/b.json"; rm -rf "$BK"
+python3 "$SETUP" fix --root "$WORK/bare" --no-helpers >/dev/null || true
+q '.merge_policy.default == "auto"' "$H/b.json" || fail "host claude keeps the auto migration: $(cat "$H/b.json")"
 rm "$H/b.json"
 
 echo "PASS: test-setup.sh (13 scenarios)"

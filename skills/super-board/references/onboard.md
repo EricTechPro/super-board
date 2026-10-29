@@ -15,6 +15,11 @@ selected card may need fewer helpers. Node or `skills-lock.json` never proves
 readiness. `check` and dispatch install nothing. Explicit `fix` retains helper
 installation, then re-resolves actual files; an installer exit of zero alone is
 not success. `--no-helpers` suppresses that repair attempt, not missing evidence.
+Cloudflare's `security-audit` is an optional QA entry (no lane runs it): when `security_audit` is false,
+`fix` runs `npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit`
+(same `--no-helpers` rule); `skills-lock.json` listing it, or a resolved file, skips that.
+A failed download is a note, never a red check. The bundled `pr-security-review` is a pack
+skill: install.sh ships it and the QA lane requires it.
 A host plugin inventory may be supplied with `--catalog <active-skills.json>`;
 only enabled entries applying to this project count.
 
@@ -152,7 +157,8 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │    Fixes with NO question, backed up first to .claude/super-board/backup/<ts>/:
    │    skills, .claude/bin scripts, workflows, guard hooks + settings.json entries (runs the
    │    pack's install.sh), removes old skill folders (super-refine, cleanup-wt, arch-loop),
-   │    migrates every config to the v3 keys, git init, Matt Pocock's helper skills (Node present).
+   │    migrates every config to the v3 keys, git init, Matt Pocock's helper skills and
+   │    Cloudflare's optional security-audit skill (Node present).
    ├─ Print its list exactly, one ✓ per line:
    │      ⏺ Fixed for you:
    │        ✓ super-board skills and scripts installed
@@ -160,11 +166,12 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    │        ✓ 6 safety guards switched on
    │        ✓ settings.json entries added (backup kept)
    │        ✓ git repo found
+   │        ✓ security-audit skill installed (optional, run on demand)
    ├─ Each `needs` item (a system tool): one line, then run its `command` with Bash — Claude
    │    Code's permission prompt IS the question. No AskUserQuestion.
    │      Needs your machine: Node.js isn't installed. It's needed for the helper installer; actual coding
    │      skills (tests, code review, debugging) the board uses.
-   │      → Bash(brew install node && npx -y skills@latest add mattpocock/skills)
+   │      → Bash(brew install node && npx -y skills@latest add mattpocock/skills … && npx -y skills@latest add cloudflare/security-audit-skill …)
    │    The command is per OS (brew / apt / dnf / winget) and comes from the script.
    │    Declined: node → report exact missing skills and keep readiness red; existing resolved
    │    helpers still count, but missing required helpers halt dispatch;
@@ -179,7 +186,7 @@ Write it atomically (temp file + rename) after every answer. A halt never loses 
    └─ OLDER SUPER-BOARD (the result says `upgraded: true`): same rule, no question. Header
       `1 of 8 · 🔍 Checks — found super-board v<from>; upgrading to v<pack>.` and the list:
           ⏺ Upgraded for you (backup: .claude/super-board/backup/<ts>/)
-            ✓ skills updated; added super-collect, visual, git-sync, ui-refine-loop
+            ✓ skills updated; added super-collect, visual, git-sync, ui-refine-loop, pr-security-review
             ✓ removed old folders: super-refine, cleanup-wt, arch-loop
             ✓ scripts, board engine and safety guards updated
             ✓ config moved to the new keys (merge rule, migrations, sources)

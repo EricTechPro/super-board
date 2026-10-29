@@ -27,20 +27,20 @@ REGISTRY = {
     'boundaries': {
         'build': ['ponytail:ponytail', 'verification-before-completion', 'mattpocock-skills:code-review'],
         'qa': ['mattpocock-skills:tdd', 'mattpocock-skills:diagnosing-bugs', 'verification-before-completion',
-               'testing-strategy', 'mattpocock-skills:code-review'],
+               'testing-strategy', 'mattpocock-skills:code-review', 'pr-security-review'],
         'review': ['mattpocock-skills:code-review', 'mattpocock-skills:codebase-design']},
     'conditional': {
         'build': ['vitest', 'playwright-best-practices', 'testing-strategy',
                   'mattpocock-skills:resolving-merge-conflicts', 'mattpocock-skills:domain-modeling'],
         'qa': ['mattpocock-skills:ask-matt', 'vitest', 'playwright-best-practices'], 'review': []},
-    'optional': {'build': [], 'qa': [], 'review': ['ponytail:ponytail-review']},
+    'optional': {'build': [], 'qa': ['security-audit'], 'review': ['ponytail:ponytail-review']},
     'aliases': {'mattpocock-skills': ['diagnosing-bugs', 'tdd', 'implement', 'codebase-design', 'code-review',
-                                   'resolving-merge-conflicts', 'domain-modeling', 'ask-matt', 'to-spec', 'to-tickets', 'improve-codebase-architecture'],
+                                   'resolving-merge-conflicts', 'domain-modeling', 'ask-matt', 'to-spec', 'to-tickets', 'implement-spec', 'improve-codebase-architecture'],
                 'ponytail': ['ponytail', 'ponytail-review']},
     'fallbacks': {'ponytail:ponytail': {'id': 'simplest-solution-first', 'source': POLICY + '#simplest-solution-first'},
                   'ponytail:ponytail-review': {'id': 'over-engineering-ladder', 'source': 'skills/super-review/SKILL.md#over-engineering'}},
 }
-CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync', 'ui-refine-loop']
+CORE = ['super-board', 'super-build', 'super-qa', 'super-review', 'super-collect', 'visual', 'git-sync', 'ui-refine-loop', 'pr-security-review']
 LANES = ['build', 'qa', 'review']
 NAME = re.compile(r'[a-zA-Z0-9][a-zA-Z0-9._-]*(?::[a-zA-Z0-9][a-zA-Z0-9._-]*)?\Z')
 INTERACTIVE = {'grilling', 'shape', 'clarify', 'mattpocock-skills:grilling', 'mattpocock-skills:shape', 'mattpocock-skills:clarify'}
@@ -401,7 +401,7 @@ def report(root, host, cards=None, profile=None, lane=None, require=(), home=Non
             raise ValueError('each card needs number, status and literal body')
         chain = list(requirements(card, lane, require))
         if profile:
-            chain += [('setup', name, 'required', 'boundary: setup eight-skill installation') for name in CORE]
+            chain += [('setup', name, 'required', 'boundary: setup nine-skill installation') for name in CORE]
             for _, names in REGISTRY['build_rows']:
                 chain += [('build', name, 'required', 'label: ' + POLICY) for name in names]
         seen = set()

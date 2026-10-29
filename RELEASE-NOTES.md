@@ -1,5 +1,68 @@
 # Release notes
 
+## v3.3.0 — 2026-10-27
+
+The security check moves to QA, and `/super-collect` hands its findings to Matt Pocock's planning chain.
+
+- 🔒 **super-qa runs `pr-security-review` on every PR.** It is QA's one security check and
+  replaces the old call to Claude Code's built-in `/security-review`. Each kept finding fails QA
+  like any failing check: a `❌` line, a `[builder]` thread on its file:line, card QA → Ready.
+  A missing skill blocks the card. The skills-ready registry now requires it in QA; Cloudflare's
+  `security-audit` stays optional and no lane runs it.
+- ♻️ **super-review no longer runs the security step.** The rest of the Review lane is unchanged.
+- ✨ **`/super-collect` → findings doc → `/to-spec` → `/to-tickets`.** After the fresh verifier,
+  super-collect writes one findings doc grouped by root cause at
+  `docs/super-board/findings/collect-<YYYY-MM-DD>.md`, then hands it to `/to-spec` and
+  `/to-tickets`. Build fork: 1–5 tickets → `/implement-spec`; 6+ → super-board Backlog.
+  Dry-run stays the default. No `/to-spec` or `/to-tickets` installed, or `--direct`, files
+  straight into Backlog as before and prints why. Scheduled intake uses `--direct`.
+- ✨ `skills/super-collect/scripts/collect_handoff.py` (`route`, `doc`, `fork`); `implement-spec`
+  joins the registry's Matt Pocock aliases.
+- 📝 **Routing rule in plain words**: [`docs/super-board/routing.md`](docs/super-board/routing.md),
+  linked from the README and the super-board skill.
+- 🧪 `test_collect_handoff.py` (route, findings doc, fork boundaries) and
+  `test_skills_readiness.py` (security check required in QA, not in Review).
+- 👷 **The public site shows the repo `VERSION`.** Pages carry a `data-sb-version` placeholder
+  that reads "dev" from disk; `pages.yml` stamps `VERSION` in at build
+  (`diagrams/_shared/stamp_version.py`) and redeploys when `VERSION` changes. The release pill
+  links to `releases/latest`. Replaces the hardcoded v3.0.2. `test_pages_version.py` pins it.
+
+Ported from the EricOS vendored fork, each in its own PR:
+
+- 🐛 **Submodules keep their own board state** (#88). `halt_path()` and the card cache use
+  `<git-common-dir>/super-board/` when the common dir is not `<root>/.git`, so sibling
+  submodules no longer share a halt or cache. Normal repos and worktrees are unchanged.
+- 🐛 **A malformed agent read fails its call, not the run** (#89). `--kind diff` with no
+  `--meta`, a diff/meta mismatch, and short `prs-open`/`merge-state`/`issues` reads exit 64
+  with the valid form. Strict callers (preflight, merge gate, card) still halt with 79.
+- ✨ **PR history folds; `needs-you` can sit in the status alert** (#90). History renders in
+  `<details>` and `--append-file` keeps rows inside it; the merge gate reads
+  `> needs-you: <command>` in the status alert. #75's blocks (Door and Blast radius in Risk)
+  stay; the fork's block rename was not ported.
+
+## v3.2.0 — 2026-10-26
+
+Every PR gets a security pass, and every install gets a whole-repo security audit to run on demand.
+
+- 🔒 **`pr-security-review`, a new bundled skill.** A port of the local `/security-review` command
+  from [anthropics/claude-code-security-review](https://github.com/anthropics/claude-code-security-review)
+  (commit `0c6a49f`, MIT © 2025 Anthropic, `skills/pr-security-review/LICENSE`). The prompt is
+  verbatim; only the diff target changed, from `origin/HEAD` to the PR's base branch. The name
+  leaves Claude Code's built-in `/security-review` alone.
+- 🔒 **super-review runs it on every PR**, not only on `security`/`auth`/`payments` labels. Each
+  finding is a `Bug` · `blocker` row routed to Super Build; a missing skill makes the review
+  `⚠️ unverified`. The skills-ready registry lists it as a required Review boundary.
+- 🔒 **Cloudflare's `security-audit`, installed by default.** `get.sh` and onboard's 🔍 Checks
+  run `npx -y skills@latest add cloudflare/security-audit-skill --skill security-audit -a claude-code -y`,
+  skip it when `skills-lock.json` lists it or its `SKILL.md` is present, and honour
+  `--no-helper-skills`. It is optional in the registry and no lane runs it.
+- 🔧 **super-qa no longer calls `/security-review`**; the Review lane covers it.
+- 📝 README Security section and credits, main page, skill map (two new nodes), setup
+  simulator, plugin manifests and onboard.md list the two skills.
+- 🧪 `test-get.sh` (security-audit fetched, skipped, deferred), `test_skill_dispatch.py`
+  (onboard repair order, lock detection) and `test_skills_readiness.py` (required review
+  entry, optional audit).
+
 ## v3.1.2 — 2026-10-11
 
 `/super-collect` dedupes on the exact fingerprint and says when Sentry or PostHog is down.

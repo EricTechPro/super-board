@@ -28,4 +28,4 @@ Drives a GitHub Project board on its own: drag a card into `Ready`, and it comes
 
 ## Install
 
-Part of the super-board pack: `./install.sh /path/to/project`. Needs `gh` (authenticated), `jq`, bash 3.2+, a GitHub Project (v2) with a `Status` field, dynamic workflows on in `/config`, and the [mattpocock/skills](https://github.com/mattpocock/skills) pack. Full reference: [`docs/super-board/README.md`](../../docs/super-board/README.md).
+Part of the super-board pack: `./install.sh /path/to/project`. Needs `gh` (authenticated), `jq`, bash 3.2+, a GitHub Project (v2) with a `Status` field, dynamic workflows on in `/config`, and the [mattpocock/skills](https://github.com/mattpocock/skills) pack. Ships `pr-security-review` (run by the Tester in QA on every PR); `get.sh` and onboard also add Cloudflare's on-demand [`security-audit`](https://github.com/cloudflare/security-audit-skill). Full reference: [`docs/super-board/README.md`](../../docs/super-board/README.md).

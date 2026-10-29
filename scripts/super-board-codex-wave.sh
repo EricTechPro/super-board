@@ -4,7 +4,7 @@
 # Usage: --config f --cards '<JSON array>' --codex[=model] [--tier low|medium|high] [--output f]
 # Unless one model is pinned (--codex=<model> or codex.model), a cheap router
 # (ROUTER_MODEL) grades each Ready card low/medium/high; the lane launcher maps
-# tier x grade to a model through its CODEX_LADDERS table.
+# tier x grade to a model through its Codex.LADDERS table.
 set -euo pipefail
 exec python3 - "${BASH_SOURCE[0]}" "$@" <<'PY'
 import argparse
@@ -31,7 +31,7 @@ if len(codex) != 1 or (codex[0].startswith('--codex=') and not codex[0].partitio
     parser.error('exactly one explicit --codex[=<non-empty-model>] is required')
 args = parser.parse_args([arg for arg in raw if arg not in codex])
 output_path = Path(args.output).resolve() if args.output else None
-launcher = Path(sys.argv[1]).resolve().with_name('super-board-codex-lane.sh')
+launcher = Path(sys.argv[1]).resolve().with_name('super-board-lane.sh')
 try:
     config_path = Path(args.config).resolve()
     config = json.loads(config_path.read_text())
@@ -203,7 +203,7 @@ def run_card(card):
             process = None
             lock = inflight / str(card['number'])
             try:
-                process = subprocess.Popen(['bash', str(launcher), '--config', str(config_path),
+                process = subprocess.Popen(['bash', str(launcher), '--backend', 'codex', '--config', str(config_path),
                                             '--card', json.dumps(current), '--lane', lane, codex[0],
                                             '--tier', args.tier] + (['--complexity', complexity] if complexity else []),
                                            stdout=subprocess.PIPE, text=True, start_new_session=True)

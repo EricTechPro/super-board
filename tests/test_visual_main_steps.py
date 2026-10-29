@@ -58,9 +58,9 @@ for vid in ("merge-policy", "size-cap", "needs-you", "usage-pause", "guard-prote
         cursor = views[cursor["parent"]]
     assert cursor["id"] == "super-board-run", f"{vid}: policy is detached from the run"
 
-# Root and verb chooser offer public decisions rather than state/scripts.
-for vid, limit in (("root", 8), ("super-board", 6)):
+# Root (two doors, the route fork, the board, side tools) and verb chooser offer decisions, not state/scripts.
+for vid, limit in (("root", 16), ("super-board", 6)):
     view = views[vid]
     assert len(view["nodeIds"]) <= limit, f"{vid}: overly wide summary"
-    assert all(nodes[nid]["kind"] in {"public", "lane", "verb", "step"} for nid in view["nodeIds"]), f"{vid}: implementation clutter"
+    assert all(nodes[nid]["kind"] in {"public", "lane", "external", "verb", "step"} for nid in view["nodeIds"]), f"{vid}: implementation clutter"
 print(f"PASS: test_visual_main_steps.py ({len(nodes)} reachable nodes, {len(views)} views)")

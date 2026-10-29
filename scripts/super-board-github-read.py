@@ -40,7 +40,20 @@ FORMS = {
     'head': 'pr view <N> --json headRefName,headRefOid --jq \'"\\(.headRefName) \\(.headRefOid)"\'',
     'body': 'pr view <N> --json body,headRefOid',
     'metadata': 'pr view <N> --json files,labels,body,additions,deletions,changedFiles',
+    # A lane that reads metadata, pushes, then reads the diff races its own head.
+    'diff': ('pr diff <N> --repo <owner/repo>, with --meta <file> (before the --) from --kind metadata -- '
+             'pr view <N> --json files,labels,body,additions,deletions,changedFiles > <file> taken right before; '
+             'if you pushed in between, re-take the metadata'),
     'state': 'issue view <N> --json state --jq .state',
+    'merge-state': 'pr view <N> --json state,headRefOid,mergeCommit',
+    'prs-open': 'pr list --state open --json number,title,body,url,headRefName,files',
+    'prs-merged': 'pr list --state merged --json number,title,body,url',
+    'issues-closed': 'issue list --state closed --json number,title,body,stateReason',
+    'issues': ('api graphql --paginate --slurp -f query=\'query($owner:String!,$repo:String!,$endCursor:String){ '
+               'repository(owner:$owner,name:$repo){ issues(states:OPEN,first:100,after:$endCursor){ '
+               'pageInfo{ hasNextPage endCursor } nodes{ number title body state labels(first:30){ nodes{ name } } '
+               'comments(last:8){ nodes{ body } } } } } }\' -F owner=<owner> -F repo=<repo> '
+               '(see .claude/bin/super-board-deps.sh; not issue list)'),
 }
 
 
@@ -48,12 +61,16 @@ def halt_path():
     override = os.environ.get('SB_GITHUB_HALT_FILE')
     if override:
         return Path(override)
-    result = subprocess.run(['git', 'rev-parse', '--git-common-dir'], capture_output=True,
-                            text=True, timeout=5, cwd=os.environ.get('SB_REPO_PATH'))
     cwd = Path(os.environ.get('SB_REPO_PATH') or Path.cwd())
+    result = subprocess.run(['git', 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+                            capture_output=True, text=True, timeout=5, cwd=cwd)
+    if result.returncode != 0:
+        return cwd / '.claude/super-board/github-halt.json'
+    # One repo, every worktree: <main checkout>/.claude/super-board/ when the common
+    # dir is <root>/.git; a submodule's (.git/modules/<path>) is not, so keep it inside.
     common = Path(result.stdout.strip())
-    root = (cwd / common).resolve().parent if result.returncode == 0 else cwd
-    return root / '.claude/super-board/github-halt.json'
+    state = common.parent / '.claude/super-board' if common.name == '.git' else common / 'super-board'
+    return state / 'github-halt.json'
 
 
 def check_halt():
@@ -295,6 +312,11 @@ def validate(text, kind, meta=None):
 def read(args, kind='json', meta=None, recovering=False):
     if not read_only(args):
         raise ValueError('retry helper accepts read-only GitHub commands only')
+    # A diff read with no meta is the caller's malformed read, not missing evidence:
+    # fail this call (exit 64), never retry or halt.
+    if kind == 'diff' and not isinstance(meta, dict):
+        raise ValueError(f'--kind diff needs --meta; this call failed, the run continues. Valid form: first '
+                         f'--kind metadata -- {FORMS["metadata"]} > <file>, then --kind diff --meta <file> -- pr diff <N>')
     if not recovering:
         check_halt()
     operation = {'args': args, 'kind': kind, 'meta': meta}

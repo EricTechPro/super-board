@@ -7,14 +7,14 @@
 #
 #   super-board-pr-body.sh --pr <N> --block <name> --expect-head <sha> \
 #                          (--body-file <md> | --append-file <md>) [--repo o/r] [--dry-run]
-#   super-board-pr-body.sh --skeleton          # empty body with every marker, in order
+#   super-board-pr-body.sh --skeleton          # empty body with every marker, in order (history folded)
 #   super-board-pr-body.sh --time [--config <cfg.json>]   # "Oct 2, 10:02 EDT" in config timezone
 #
 # Blocks, in body order: redcheck status problem solution ac history visual risk.
 # A block that is missing is inserted at its place in that order.
 #
 # --body-file    replaces the block's content.
-# --append-file  appends lines inside the block (history rows).
+# --append-file  appends lines inside the block (history rows), above a closing </details>.
 # --expect-head  the PR head you based this edit on. The script refuses (exit 6) when
 #                the PR head is no longer that commit: the block would describe code
 #                that is not the code on the PR. Required unless --dry-run.
@@ -49,6 +49,10 @@ done
 if [ "$MODE" = "skeleton" ]; then
   for b in $BLOCKS; do
     [ "$b" = redcheck ] && continue   # only when a check was red
+    if [ "$b" = history ]; then       # folded; --append-file keeps rows inside
+      printf '<!-- sb:history -->\n<details><summary>Iteration history</summary>\n\n| Lane | Done | Time | Details |\n|---|---|---|---|\n\n</details>\n<!-- /sb:history -->\n\n'
+      continue
+    fi
     printf '<!-- sb:%s -->\n<!-- /sb:%s -->\n\n' "$b" "$b"
   done
   exit 0
@@ -113,13 +117,19 @@ if span:
     inner = body[span[0] + len(open_m):span[1] - len(close_m)].strip("\n")
     if mode == "append":
         lines = inner.split("\n") if inner else []
-        new_lines = [l for l in content.split("\n")]
+        # A folded block keeps its rows inside the fold, above </details>
+        # (and above the blank line GitHub needs before it).
+        tail = []
+        if lines and lines[-1].strip() == "</details>":
+            tail = [lines.pop()]
+            while lines and not lines[-1].strip():
+                tail.insert(0, lines.pop())
         # Idempotent append: a row already present is not added twice.
-        for l in new_lines:
+        for l in content.split("\n"):
             if l.strip() and l in lines:
                 continue
             lines.append(l)
-        inner = "\n".join(lines).strip("\n")
+        inner = "\n".join(lines + tail).strip("\n")
     else:
         inner = content
     out = body[:span[0]] + f"{open_m}\n{inner}\n{close_m}" + body[span[1]:]

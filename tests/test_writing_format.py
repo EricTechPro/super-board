@@ -227,6 +227,17 @@ def test_pr_body_markers():
     assert "## Not verified" not in run_md and "**Status:**" not in run_md
 
 
+def test_history_is_folded_and_needs_you_sits_in_the_status_alert():
+    """From the pr-skill template: history folds in <details>; a human step can ride the status alert."""
+    run_md = (REF / "run.md").read_text(encoding="utf-8")
+    for name, text in (("writing-standard.md", STANDARD), ("run.md", run_md)):
+        hist = text[text.index("<!-- sb:history -->"):text.index("<!-- /sb:history -->")] if "<!-- sb:history -->\n" in text else \
+            next(b for b in fenced(text) if "Iteration history" in b)
+        assert "<details><summary>Iteration history</summary>" in hist, f"{name} history is not folded"
+        assert hist.rstrip().endswith("</details>"), f"{name} history fold is not closed"
+    assert "> needs-you: " in STANDARD, "writing-standard.md shows no needs-you line in the status alert"
+
+
 def test_risk_names_door_and_blast_radius():
     """Risk carries the merge danger: a two-way or one-way door and a blast radius."""
     run_md = (REF / "run.md").read_text(encoding="utf-8")

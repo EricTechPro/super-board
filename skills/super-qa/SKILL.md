@@ -511,6 +511,27 @@ Builder's reasoning.
    (QA → Ready) with the list (witness, expected, rung, target file). Medium and Low go
    in the handoff under `Test gaps (not written)` and never block.
 
+## Security pass (every PR)
+
+QA's one security check. Run it on every PR, not only on security labels; with no PR yet
+(a `qa` card with no diff), say `pr-security-review: no diff` on the `Did:` line.
+
+1. Load `pr-security-review` and follow it on the PR's diff against its base branch
+   (`gh pr view <PR> --json baseRefName`). It runs in this lane, not in a sub-agent: it
+   launches its own finding and false-positive sub-tasks.
+2. Each finding it keeps is a QA failure, filed the normal way: one `❌ Not done` line
+   (`security: <category> — <one line> · <file:line>`), one `[builder]` PR thread on that
+   line, then the **Fail** exit (QA → Ready, `loop:rebuild-N`). A finding outside the
+   card's scope is filed with `super-qa-file-bug.sh` (`source:qa`, priority high) and still
+   fails the card while the PR adds the hole.
+3. A finding you can show is wrong goes on the `✅ Done` line with the proof.
+4. No findings → `pr-security-review: 0 findings` on the `Did:` line.
+5. Skill missing → Block the card (`🔐`, needs install). Never pass a PR unchecked.
+
+This replaces Claude Code's built-in `/security-review`, which super-qa no longer calls.
+For a deep audit of the whole repo, mention `security-audit` (standalone, if installed);
+never run it from the lane.
+
 
 ## Skill dependencies
 
@@ -521,6 +542,7 @@ The worker (per `references/iteration-preamble.md`) must load and follow:
   anti-patterns; does not change with the kind of test)
 - `mattpocock-skills:diagnosing-bugs`
 - `verification-before-completion` (no Matt Pocock equivalent — kept as-is)
+- `pr-security-review` — the security pass on every PR (bundled with the pack)
 - `testing-strategy` — coverage judgment per component type, and what to skip.
   Consult it for *what is worth testing*; it does not pick the layer. The
   localisation ladder in `references/iteration-preamble.md` picks the layer.
@@ -639,6 +661,7 @@ See `.claude/skills/super-board/references/run.md` → Tester (first pass — re
 3a. Existing project verifier → follow [project-verifier.md](references/project-verifier.md)
 for affected selection, host readiness, real assertions and fresh proof.
 3b. Run the **Test-gap check** (above) against the Builder's diff; its High gaps join the plan.
+3c. Run the **Security pass** (above) on the PR's diff. Any kept finding → Fail (step 7).
 4. Run tests. Capture evidence to `docs/super-board/runs/issue-<N>-qa-v<N>/`. **For any UI-affecting issue, capture at least one screenshot per AC** (Playwright `page.screenshot` or `browse --screenshot`). Save with descriptive names: `ac1-<short-desc>.png`, not `screenshot1.png`.
 5. **Commit the evidence directory** to the issue branch alongside test files (`git add docs/super-board/runs/issue-<N>-qa-v<N>/ && git commit && git push`). This is non-optional — without it, the inline image markdown in the issue comment won't render on GitHub.
 6. **Pass** → tick the PR's `ac` block with proof lines, write `visual` for UI, append a `history` row, rewrite `status` (`super-board-pr-body.sh`) → `[qa] [report] ✅` PR comment with results + evidence path → **issue comment with screenshot evidence** (see "Issue-comment evidence format" below) → move QA → Review. Clean up worktree.

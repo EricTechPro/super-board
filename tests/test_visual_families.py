@@ -60,14 +60,16 @@ probe = r"""
     await waitFor(() => !$('#m-ghosts') && !!$('.mcol'), 'initial column browser');
     await waitFor(() => document.fonts.status === 'loaded', 'fonts');
     await document.fonts.ready;
-    const collect = frame('collect-family'), board = frame('board-family');
-    check(!!collect && !!board, 'root draws nested intake and board family boxes');
-    if (collect && board) {
-      check(contains(box(collect), box(board)), 'board container nests inside intake');
+    const ideas = frame('door-ideas'), bugs = frame('door-bugs'), board = frame('board-family');
+    check(!!ideas && !!bugs && !!board, 'root draws the two doors and the board family box');
+    if (ideas && bugs && board) {
+      for (const id of ['grill-me','wayfinder']) check(contains(box(ideas),nodeBox(id)), 'Ideas door contains '+id);
+      check(contains(box(bugs),nodeBox('super-collect')), 'Bugs door contains super-collect');
       for (const id of ['super-board','super-build','super-qa','super-review'])
         check(contains(box(board),nodeBox(id)), 'board contains '+id);
-      for (const id of ['ui-refine-loop','visual'])
-        check(!contains(box(collect),nodeBox(id)), id+' stays standalone');
+      for (const id of ['implement-spec','super-deploy','ui-refine-loop','visual'])
+        check(!contains(box(board),nodeBox(id)), id+' stays outside the board');
+      check(nodeBox('to-spec').x > nodeBox('wayfinder').x && nodeBox('to-tickets').x > nodeBox('to-spec').x && nodeBox('route-fork').x > nodeBox('to-tickets').x, 'both doors meet at to-spec, then to-tickets, then the fork');
       check(nodeBox('super-build').x < nodeBox('super-qa').x && nodeBox('super-qa').x < nodeBox('super-review').x, 'lanes read Build → QA → Review');
     }
     const column = all('.mcol').find(c => c.querySelector('[data-v="super-board"]'));
@@ -75,7 +77,7 @@ probe = r"""
     if (column) {
       const buttons = [...column.querySelectorAll('.mit')];
       facts.rootOrder = buttons.map(b => b.dataset.v);
-      check(facts.rootOrder.slice(0,7).join(',') === 'super-collect,super-board,super-build,super-qa,super-review,ui-refine-loop,visual', 'owner browser order');
+      check(facts.rootOrder.slice(0,7).join(',') === 'wayfinder,super-collect,to-spec,to-tickets,super-board,super-build,super-qa', 'owner browser order');
       check(column.getBoundingClientRect().width >= 210, 'column has readable width');
       check(buttons.every(b => b.getBoundingClientRect().height >= 32), 'rows have >=32px click targets');
       check(buttons.every(b => getComputedStyle(b.querySelector('span')).whiteSpace !== 'nowrap'), 'labels wrap without truncation');

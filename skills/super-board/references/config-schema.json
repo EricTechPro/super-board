@@ -128,7 +128,11 @@
   // still overrides it and makes the Reviewer stop before the gate.
   // Absent → the defaults below apply.
   "merge_policy": {
-    // "auto" (default): normal changes merge on a clean review.
+    // "auto" (default on host "claude" or with no host key): normal changes
+    // merge on a clean review.
+    // Non-Claude default: when `host` is "codex" or "opencode" (any value but
+    // "claude") and this key is absent, every PR waits for a human (gate exits 7,
+    // "host <x>: auto-merge not turned on"). Set "auto" explicitly to merge there.
     // "human": every PR requires human approval (gate exits 7 → Blocked).
     // A human can merge it or approve the pinned request for the next wave.
     // Onboard recommends "human" when base_branch is production-detected.

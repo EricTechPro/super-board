@@ -36,13 +36,15 @@ bash -n "$GET" || fail "get.sh has a syntax error"
 # 1 — default install into --target: pack lands, hooks wired, helper skills called.
 T="$WORK/t1"; mkdir -p "$T"; : > "$NPX_LOG"
 out=$(bash "$GET" --target "$T" 2>&1) || fail "default install exited non-zero: $out"
-for s in super-board super-build super-qa super-review super-collect visual git-sync ui-refine-loop; do
+for s in super-board super-build super-qa super-review super-collect visual git-sync ui-refine-loop pr-security-review; do
   [ -f "$T/.claude/skills/$s/SKILL.md" ] || fail "skill $s not installed"
 done
 [ -x "$T/.claude/bin/super-board-run.sh" ] || fail "dispatcher script not installed"
 [ -f "$T/.claude/workflows/super-board-wave.js" ] || fail "workflow not installed"
 [ -f "$T/.claude/settings.json" ] || fail "hooks were not merged into settings.json"
 grep -q 'add mattpocock/skills' "$NPX_LOG" || fail "helper skills step not called (npx log: $(cat "$NPX_LOG"))"
+grep -q 'add cloudflare/security-audit-skill --skill security-audit -a claude-code -y' "$NPX_LOG" \
+  || fail "security-audit step not called (npx log: $(cat "$NPX_LOG"))"
 echo "$out" | grep -q '/super-board onboard' || fail "summary is missing the next step"
 n=$(printf '%s\n' "$out" | grep -c '/super-board onboard' || true)
 [ "$n" -eq 1 ] || fail "the next step should be printed once, got $n times: $out"
@@ -51,7 +53,7 @@ n=$(printf '%s\n' "$out" | grep -c '/super-board onboard' || true)
 T="$WORK/t2"; mkdir -p "$T"; : > "$NPX_LOG"
 bash -s -- --protect-main --no-helper-skills "$T" < "$GET" >/dev/null 2>&1 || fail "piped install with --protect-main failed"
 grep -q 'guard-protected-push' "$T/.claude/settings.json" || fail "--protect-main was not passed through to install.sh"
-[ ! -s "$NPX_LOG" ] || fail "--no-helper-skills still called npx"
+[ ! -s "$NPX_LOG" ] || fail "--no-helper-skills still called npx (security-audit included)"
 
 # 3 — --no-hooks passes through: no settings.json, no hooks dir.
 T="$WORK/t3"; mkdir -p "$T"
@@ -61,10 +63,19 @@ bash "$GET" --no-hooks --no-helper-skills --target "$T" >/dev/null 2>&1 || fail 
 
 # 4 — helper skills already present (lock file lists them): npx is not called.
 T="$WORK/t4"; mkdir -p "$T"; : > "$NPX_LOG"
-printf '{"skills":{"tdd":{"source":"mattpocock/skills"}}}\n' > "$T/skills-lock.json"
+printf '{"skills":{"tdd":{"source":"mattpocock/skills"},"security-audit":{"source":"cloudflare/security-audit-skill"}}}\n' > "$T/skills-lock.json"
 out=$(bash "$GET" --target "$T" 2>&1) || fail "install with helpers present failed"
 [ ! -s "$NPX_LOG" ] || fail "helper skills already present, but npx was called"
-echo "$out" | grep -q 'already' || fail "summary should say helper skills are already installed"
+echo "$out" | grep -q '^🧠 helper skills: already installed$' || fail "summary should say helper skills are already installed"
+echo "$out" | grep -q '^🔒 security-audit: already installed$' || fail "summary should say security-audit is already installed"
+
+# 4b — only Matt Pocock's skills in the lock file: security-audit alone is fetched.
+T="$WORK/t4b"; mkdir -p "$T"; : > "$NPX_LOG"
+printf '{"skills":{"tdd":{"source":"mattpocock/skills"}}}\n' > "$T/skills-lock.json"
+out=$(bash "$GET" --target "$T" 2>&1) || fail "install with only mattpocock present failed"
+! grep -q 'mattpocock/skills' "$NPX_LOG" || fail "mattpocock/skills already present, but npx fetched it"
+grep -q 'cloudflare/security-audit-skill' "$NPX_LOG" || fail "security-audit missing, but npx did not fetch it"
+echo "$out" | grep -q '^🔒 security-audit: installed$' || fail "security-audit line wrong: $out"
 
 # 5 — a target that isn't a directory is refused, and nothing is written.
 : > "$WORK/a-file"
@@ -85,16 +96,16 @@ fi
 [ -z "$(ls -A "$WORK/tmp7")" ] || fail "temp folder was left behind after a failed download"
 
 # 8 — grouped output, in the spec's order: header · checks · download · installing ·
-#     helper skills · 🎉 · 👉. One line per group of files, no per-file list.
+#     helper skills · security-audit · 🎉 · 👉. One line per group of files, no per-file list.
 T="$WORK/t8"; mkdir -p "$T"; printf '# Rules\n- pnpm\n' > "$T/CLAUDE.md"; : > "$NPX_LOG"
 out=$(bash "$GET" --target "$T" 2>&1) || fail "grouped-output install failed: $out"
-order=$(printf '%s\n' "$out" | grep -oE '^(🧩|🔍|📦|🔧|🧠|🎉|👉)' | tr -d '\n')
-[ "$order" = "🧩🔍📦🔧🧠🎉👉" ] || fail "groups out of order ($order): $out"
+order=$(printf '%s\n' "$out" | grep -oE '^(🧩|🔍|📦|🔧|🧠|🔒|🎉|👉)' | tr -d '\n')
+[ "$order" = "🧩🔍📦🔧🧠🔒🎉👉" ] || fail "groups out of order ($order): $out"
 printf '%s\n' "$out" | grep -q '^   ✓ curl · tar · python3 · gh · jq · node$' || fail "checks line wrong: $out"
 printf '%s\n' "$out" | grep -q '^   🛡️  6 guard hooks → .claude/settings.json (new file)$' || fail "guard line wrong: $out"
 printf '%s\n' "$out" | grep -q '^   ! CLAUDE.md holds its own rules — onboard offers a merge$' || fail "CLAUDE.md hint missing: $out"
 printf '%s\n' "$out" | grep -q '^🧠 helper skills: installed$' || fail "helper line wrong: $out"
-[ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -le 12 ] || fail "output should stay ≤ 12 lines: $out"
+[ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -le 13 ] || fail "output should stay ≤ 13 lines: $out"
 
 # 9 — Node missing: the checks line marks it ✗ and helper skills wait for 🔍 Checks.
 T="$WORK/t9"; mkdir -p "$T"
@@ -106,5 +117,6 @@ done
 out=$(PATH="$NOBIN" bash "$GET" --target "$T" 2>&1) || fail "install without node failed: $out"
 printf '%s\n' "$out" | grep -q '✗ node' || fail "missing node should be marked ✗: $out"
 printf '%s\n' "$out" | grep -q '^🧠 helper skills: skipped — 🔍 Checks will fix this$' || fail "helper line should defer to Checks: $out"
+printf '%s\n' "$out" | grep -q '^🔒 security-audit: skipped — 🔍 Checks will fix this$' || fail "security-audit line should defer to Checks: $out"
 
-echo "PASS: test-get.sh (9 cases)"
+echo "PASS: test-get.sh (10 cases)"

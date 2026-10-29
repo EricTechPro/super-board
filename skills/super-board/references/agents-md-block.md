@@ -11,7 +11,7 @@ Board: Backlog · Ready · Building · QA · Review · Blocked · Done. Labels r
 | Build one ticket | `/super-build` | NEVER build outside the card's worktree |
 | QA a branch, or a live URL alone | `/super-qa` · `/super-qa <url>` | NEVER mark QA pass without evidence |
 | Review a PR, merge | `/super-review` | NEVER `gh pr merge` direct — merge gate only |
-| File bugs from Sentry, PostHog, PRs | `/super-collect` | DON'T file without a verifier pass |
+| Turn Sentry, PostHog, PR problems into tickets | `/super-collect` | DON'T skip the verifier; it hands off to `/to-spec` |
 | UI polish | `/ui-refine-loop` (human runs it) | board NEVER runs it |
 | Diagram / explainer page | `/visual` | |
 | Commit, pull, push this branch | `/git-sync` | NEVER force push or rebase shared history |

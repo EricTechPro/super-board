@@ -297,6 +297,34 @@ RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts "" 5000)" gate --expect-head
 [ "$RC" -eq 0 ] || fail "auto_max_lines 0 should turn the size cap off, got $RC"
 teardown
 
+# 15d — a non-Claude host (config `host` only) merges by hand unless
+#       merge_policy.default is "auto"; claude, no host and an explicit auto merge.
+head_setup
+for h in codex opencode; do
+  cfgset ".host = \"$h\" | del(.merge_policy)"
+  RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts)" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+  [ "$RC" -eq 7 ] || fail "host $h with no merge_policy.default should exit 7, got $RC"
+  echo "$OUT" | grep -q "^human-gate: default — host $h: auto-merge not turned on" || fail "host $h gate must say why, got: $OUT"
+done
+grep -q '^pr merge' "$GH_LOG" && fail "no merge may run on a non-Claude host without auto"
+cfgset '.host = "codex" | .merge_policy = {default: "auto"}'
+RC=0; STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts)" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 0 ] || fail "host codex with merge_policy.default auto should merge, got $RC"
+teardown
+T15=$(mktemp -d); printf '%s' "$(meta "" src/x.ts)" > "$T15/m.json"
+for c in '{"host":"claude"}' '{}' '{"host":"claude","merge_policy":{}}' '{"host":"opencode","merge_policy":{"default":"auto"}}'; do
+  echo "$c" > "$T15/c.json"
+  python3 ../scripts/super-board-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
+    | jq -e '.human == []' >/dev/null || fail "config $c should leave a small clean PR ungated"
+done
+for c in '{"host":"codex"}' '{"host":"opencode","merge_policy":{"auto_max_lines":0}}'; do
+  echo "$c" > "$T15/c.json"
+  python3 ../scripts/super-board-merge-policy.py --config "$T15/c.json" --meta "$T15/m.json" --diff /dev/null \
+    | jq -e '.human | length == 1 and .[0].category == "default"' >/dev/null \
+    || fail "config $c should add one default human entry"
+done
+rm -rf "$T15"
+
 # 15c — lockfiles, snapshots and generated files do not count toward the cap;
 #       migration SQL is left out and reported separately; size_exclude is
 #       configurable ([] counts everything).
@@ -460,6 +488,21 @@ RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts 'Notes
 needs-you: `npm run backfill -- --env live`')" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
 [ "$RC" -eq 8 ] || fail "a needs-you: line in the body should exit 8, got $RC"
 echo "$OUT" | grep -q "^needs-you: npm run backfill -- --env live" || fail "the declared step must be printed, got: $OUT"
+teardown
+
+# 22b — the status block carries needs-you inside its alert (writing-standard.md § 2).
+head_setup
+RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts '<!-- sb:status -->
+> [!WARNING]
+> 🛑 Blocked · needs you · Closes #7 · head `3f9c2a1`
+> needs-you: `npm run backfill -- --env live`
+<!-- /sb:status -->
+
+<!-- sb:problem -->
+## Problem
+<!-- /sb:problem -->')" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+[ "$RC" -eq 8 ] || fail "a needs-you line in the status alert should exit 8, got $RC"
+echo "$OUT" | grep -q "^needs-you: npm run backfill -- --env live" || fail "the status-block step must be printed, got: $OUT"
 teardown
 
 # 23 — metadata the gate cannot read fails safe to a human (7), never to merge.

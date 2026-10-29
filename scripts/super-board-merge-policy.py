@@ -23,6 +23,10 @@ unreadable metadata, so the gate fails safe to "human".
 
 Rules, from references/config-schema.json → merge_policy / migrations:
 - merge_policy.default "human" → everything waits for a human.
+- config `host` other than "claude" (codex, opencode) with merge_policy.default
+  unset → everything waits for a human; an explicit "auto" merges as usual.
+  Read from config only (no host detection). No `host` key → the Claude
+  default ("auto"), so configs written before the key existed do not change.
 - merge_policy.auto_max_lines (default 400; 0 = no cap): changed lines
   (additions + deletions) above it → human ("big PR — please review"). Files
   matching merge_policy.size_exclude (default: lockfiles, generated output,
@@ -36,7 +40,7 @@ Rules, from references/config-schema.json → merge_policy / migrations:
   PR. Every env in allowed_envs with a command runs (a command of "-" means the
   deploy pipeline applies it: nothing to run). target_env not in allowed_envs, or
   allowed with no command → needs you. migrations.human_steps (any migration PR)
-  and `needs-you: <command>` lines in the PR body (any PR) → needs you.
+  and `needs-you: <command>` lines in the PR body, bare or inside the status alert (any PR) → needs you.
 Globs: `**/` any directories (incl. none), `**` anything, `*` within one path
 segment, `?` one character.
 """
@@ -130,8 +134,12 @@ def main() -> int:
 
     policy = cfg.get("merge_policy") or {}
     human = []
+    host = cfg.get("host")
     if (policy.get("default") or "auto") == "human":
         human.append({"category": "default", "why": "merge_policy.default is \"human\""})
+    elif not policy.get("default") and host not in (None, "claude"):
+        human.append({"category": "default", "why": f"host {host}: auto-merge not turned on "
+                      "(set merge_policy.default to \"auto\")"})
     mig = cfg.get("migrations") or {}
     globs = mig.get("globs") or DEFAULT_MIGRATION_GLOBS
     mig_files = [p for p in paths if matches(p, globs)]
@@ -188,7 +196,7 @@ def main() -> int:
                 needs.append(f"{cmd or '<your ' + target + ' migrate command>'}   # {target}: the base deploys here and it is not in allowed_envs")
         needs += [str(s) for s in mig.get("human_steps") or []]
     for line in body.splitlines():
-        m = re.match(r"^\s*(?:[-*]\s*)?needs-you:\s*(.+?)\s*$", line, re.I)
+        m = re.match(r"^\s*(?:>\s*)?(?:[-*]\s*)?needs-you:\s*(.+?)\s*$", line, re.I)
         if m and m.group(1).lower() != "done":
             needs.append(m.group(1).strip("`"))
 

@@ -22,10 +22,13 @@ column each card is in.
 
 ```mermaid
 flowchart LR
-  collect["/super-collect<br/>sentry · posthog · issues · PRs · architecture"] --> backlog["Backlog"]
+  collect["/super-collect<br/>sentry · posthog · issues · PRs · architecture"] --> findings["findings doc"]
+  findings --> spec["/to-spec → /to-tickets"]
+  spec -->|"1–5 tickets"| impl["/implement-spec"]
+  spec -->|"6+ tickets"| backlog["Backlog"]
   backlog -->|"/super-board lint, then you"| ready["Ready"]
   ready --> build["Building<br/>super-build: worktree + draft PR"]
-  build --> qa["QA<br/>super-qa: tests, evidence"]
+  build --> qa["QA<br/>super-qa: tests, evidence,<br/>pr-security-review"]
   ready -->|"label qa"| qa
   qa --> review["Review<br/>super-review: own hypotheses,<br/>prior findings"]
   review --> gate{"merge gate<br/>base + verify_commands"}
@@ -92,7 +95,7 @@ card dropped on purpose is closed as not planned and moved to Done with a 🤷 c
 | `/super-build` | `Ready` → `QA`. Worktree, smallest safe change, draft PR. |
 | `/super-qa` | `QA` → `Review`. Tests per AC, test-gap check, screenshots/logs/HARs on the PR, or a bounce with a rebuild label. Off-ticket findings file as `source:qa` cards. |
 | `/super-review` | `Review` → `Done`. Re-runs the Tester's tests, adversarial truth-check, merges through the gate or hands to a human. On a re-review it first checks every finding from its last report. Shape problems are filed to `Backlog`, never blocked on. |
-| `/super-collect` | Filling `Backlog` from Sentry, PostHog, unboarded issues, recurring PR problems and architecture findings, each checked by one verifier first. |
+| `/super-collect` | Finding problems in Sentry, PostHog, unboarded issues, recurring PR problems and architecture, each checked by one verifier, then one findings doc for `/to-spec` and `/to-tickets` (1–5 tickets → `/implement-spec`, 6+ → `Backlog`). |
 | `/ui-refine-loop` | Polishing one page or component, standalone: Impeccable check → fix rounds ending in a draft PR. The board never runs it. |
 | `/git-sync` | Secondary helper: commit per logical change, merge-pull, push without force. |
 | `/visual` | Secondary helper: a visual recap or plan. Merged-worktree cleanup is a hook (`hooks/cleanup-wt.py`): the merge gate runs it after each merge and SessionStart runs it when a base moved. |
@@ -320,6 +323,7 @@ Missing, unreadable or stale evidence is a hold for a person, never a pass.
 - The usage guard reads only what an interactive status line recorded; headless runs see no usage.
 - `verify_commands` are only as good as your test suite. Without them the gate says it proved nothing.
 - Lanes call [mattpocock/skills](https://github.com/mattpocock/skills) by name; without that pack a worker fails when it reaches for one.
+- The Tester (QA lane) runs the bundled `pr-security-review` on every PR, and a finding fails QA; it reports only high-confidence findings, so it is not a full audit. Cloudflare's `security-audit` (added by get.sh and onboard) covers the whole repo, and only runs when you ask.
 - `bash` 3.2+ (stock macOS is fine), `jq` and Python 3 are required on the machine running the loop.
 
 ## Pack layout and tests

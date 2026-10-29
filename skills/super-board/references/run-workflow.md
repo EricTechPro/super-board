@@ -15,7 +15,7 @@ overriding `worker_backend`. Use it when Claude's remaining usage is low or to t
 `--codex --low` / `--codex --high` pick the Codex ladder the same way the tier flags
 pick Claude's (flag, else config `model_tier`, else medium); pass it as `--tier`.
 A cheap router (`gpt-6-luna`) grades each Ready card low/medium/high, and the lane
-launcher's `CODEX_LADDERS` table maps tier × grade to `-m <model>`; a card entering past
+launcher's `Codex.LADDERS` table (`super-board-lane.sh`) maps tier × grade to `-m <model>`; a card entering past
 Ready takes its tier's medium cell. `--codex=<model>`, else optional `codex.model`,
 pins one model for every card and skips the router.
 Keep this run choice in each wave and resume command; skip only the Claude usage guard.
@@ -31,7 +31,7 @@ Say so once, in the first wave report: `🔁 codex host — running as --codex`.
 
 After the same plan and claim steps, launch this command as a background task:
 `bash .claude/bin/super-board-codex-wave.sh --config <config-path> --cards <claimed-cards.json> --codex[=<model>] --tier <low|medium|high> --output <wave-result.json>`.
-The helper starts one `super-board-codex-lane.sh` per card/lane, cards in parallel,
+The helper starts one `super-board-lane.sh --backend codex` per card/lane, cards in parallel,
 each advancing Build → QA → Review only after a successful handoff (QA labels skip Build).
 Concurrency uses positive `max_workers`, otherwise `max(1, min(16, cpus - 2))`.
 Pre-flight/classification and truth-check run inline; there are no Claude sub-agents.
@@ -55,7 +55,8 @@ form; it never halts the run. Fixed-command scripts set `SB_GITHUB_READ_STRICT=1
 Exit **79**, a workflow result with `halted: true`, or a failed `--check` ends this
 run. Check the helper's `--check` before claims, board/comment writes, each new
 lane/wave, and all migration/merge steps. The marker is shared through the main
-checkout's `.claude/super-board/github-halt.json`, including linked worktrees.
+checkout's `.claude/super-board/github-halt.json`, including linked worktrees (a
+submodule keeps it in its own git dir: `<git-common-dir>/super-board/`).
 Cancel active workflow agents using local workflow controls (Codex: stop the background wave task); do not launch more
 lanes. Already-running agents stop at their next checkpoint; this is not an
 instantaneous process-wide kill. Preserve worktrees, claims, card statuses, and

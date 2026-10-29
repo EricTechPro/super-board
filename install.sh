@@ -53,10 +53,10 @@ done
 TARGET="${TARGET:-$PWD}"
 
 # Primary: the board and its lanes. Secondary: standalone helpers the lanes
-# can call (visual, git-sync, ui-refine-loop). Worktree cleanup (cleanup-wt) is a
+# can call (visual, git-sync, ui-refine-loop, pr-security-review). Worktree cleanup (cleanup-wt) is a
 # hook, not a skill: it ships with the guard hooks below.
 PRIMARY_SKILLS="super-board super-build super-qa super-review super-collect"
-SECONDARY_SKILLS="visual git-sync ui-refine-loop"
+SECONDARY_SKILLS="visual git-sync ui-refine-loop pr-security-review"
 
 if [ ! -d "$TARGET" ]; then
   echo "target directory not found: $TARGET" >&2
@@ -226,7 +226,7 @@ for skill in $PRIMARY_SKILLS $SECONDARY_SKILLS; do
   install_skill "$skill" "$SHARED/skills/$skill" || true
 done
 
-SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
+SCRIPTS="super-board-project-verifier.py super-board-skills-ready.py super-board-calibration.py super-board-verification-ready.py super-board-github-read.py super-board-collect-state.py super-board-run.sh super-board-gh-guard.sh super-board-card.sh super-board-status.py super-board-wave-plan.sh super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-merge-policy.py super-board-approval.py super-board-env-check.sh super-board-agents-md.py super-board-settings.py super-board-setup.py super-board-usage.sh super-board-throttle.sh super-board-host.sh super-board-pr-body.sh super-review-file-refactor.sh super-qa-file-bug.sh super-board-stop.sh"
 for script in $SCRIPTS; do
   if [ -f "$REPO_ROOT/scripts/$script" ]; then
     copy_file "$REPO_ROOT/scripts/$script" "$SHARED/bin/$script"

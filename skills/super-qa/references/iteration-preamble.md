@@ -332,7 +332,7 @@ acceptable; a fix can silently disable a feature to make a wrong spec pass.
    ```bash
    # /review — primary code review
    # /plan-eng-review — architectural sanity, regression risk
-   # /security-review — only if PR touches auth/RLS/payments
+   # /pr-security-review — the one security check, every PR (SKILL.md → "Security pass")
    ```
    Capture each reviewer's verdict in the PR comments. If any reviewer
    flags a blocking issue, leave the PR open with `needs-human-review`

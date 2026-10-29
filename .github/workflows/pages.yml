@@ -4,19 +4,22 @@ name: pages
 #   /                    diagrams/index.html (landing)
 #   /assets/             diagrams/assets/*.png (page-card screenshots)
 #   /skill-map/          diagrams/visual/skill-map.html
+#   /skill-map/examples/ diagrams/visual/examples/ (/visual example pages + thumbnails)
 #   /onboarding/         diagrams/onboarding/index.html (setup simulator)
 #   /impeccable/         diagrams/impeccable/index.html
 #   /pstack/             diagrams/pstack/index.html
 #   /mattpocock/         diagrams/mattpocock/index.html
+#   /security-audit/     diagrams/security-audit/index.html
 #   /sdlc-template/      diagrams/sdlc-template/index.html (preview of the SDLC layout, sample data)
 #   /writing-standard/   diagrams/writing-standard/reference.html (read-only reference)
 # Pick-a-design pages (choose, confirm, carousels, older simulator versions) stay out.
 # Only files in this repo are copied; no event input is interpolated.
+# Pages show <span data-sb-version>dev</span> from disk; stamp_version.py writes VERSION in at build.
 
 on:
   push:
     branches: [main]
-    paths: ["diagrams/**", ".github/workflows/pages.yml"]
+    paths: ["diagrams/**", ".github/workflows/pages.yml", "VERSION"]
   workflow_dispatch:
 
 permissions:
@@ -35,16 +38,19 @@ jobs:
       - uses: actions/checkout@v4
       - name: assemble site
         run: |
-          mkdir -p _site/assets _site/skill-map _site/onboarding _site/impeccable _site/pstack _site/mattpocock _site/sdlc-template _site/writing-standard
+          mkdir -p _site/assets _site/skill-map _site/onboarding _site/impeccable _site/pstack _site/mattpocock _site/security-audit _site/sdlc-template _site/writing-standard
           cp diagrams/index.html _site/index.html
           cp diagrams/assets/*.png _site/assets/
           cp diagrams/visual/skill-map.html _site/skill-map/index.html
+          cp -R diagrams/visual/examples _site/skill-map/examples
           cp diagrams/onboarding/index.html _site/onboarding/index.html
           cp diagrams/impeccable/index.html _site/impeccable/index.html
           cp diagrams/pstack/index.html _site/pstack/index.html
           cp diagrams/mattpocock/index.html _site/mattpocock/index.html
+          cp diagrams/security-audit/index.html _site/security-audit/index.html
           cp diagrams/sdlc-template/index.html _site/sdlc-template/index.html
           cp diagrams/writing-standard/reference.html _site/writing-standard/index.html
+          python3 diagrams/_shared/stamp_version.py _site "$(cat VERSION)"
           touch _site/.nojekyll
           find _site -type f | sort
       - uses: actions/configure-pages@v5

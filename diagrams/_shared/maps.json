@@ -58,6 +58,18 @@
   "kind": "map"
  },
  {
+  "id": "security-audit",
+  "label": "Security audit map",
+  "short": "Security audit",
+  "path": "security-audit/",
+  "dir": "security-audit",
+  "blurb": "Cloudflare's security-audit skill in 6 phases: recon, hunting, validation, findings, verification, reports. Click a part for how it works.",
+  "thumb": "assets/security-audit.png",
+  "nav": true,
+  "logo": "assets/logos/cloudflare.png",
+  "kind": "map"
+ },
+ {
   "id": "writing-standard",
   "label": "Writing standard",
   "path": "writing-standard/",
