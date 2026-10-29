@@ -193,10 +193,13 @@ read it — re-read, then redo the edit. Builder opens the PR with every block f
 <!-- /sb:ac -->
 
 <!-- sb:history -->
-## Iteration history
+<details><summary>Iteration history</summary>
+
 | Lane | Done | Time | Details |
 |---|---|---|---|
 | 🔨 builder | ✅ | <super-board-pr-body.sh --time> | draft · `<sha>` |
+
+</details>
 <!-- /sb:history -->
 
 <!-- sb:risk -->

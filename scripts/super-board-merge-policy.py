@@ -36,7 +36,7 @@ Rules, from references/config-schema.json → merge_policy / migrations:
   PR. Every env in allowed_envs with a command runs (a command of "-" means the
   deploy pipeline applies it: nothing to run). target_env not in allowed_envs, or
   allowed with no command → needs you. migrations.human_steps (any migration PR)
-  and `needs-you: <command>` lines in the PR body (any PR) → needs you.
+  and `needs-you: <command>` lines in the PR body, bare or inside the status alert (any PR) → needs you.
 Globs: `**/` any directories (incl. none), `**` anything, `*` within one path
 segment, `?` one character.
 """
@@ -188,7 +188,7 @@ def main() -> int:
                 needs.append(f"{cmd or '<your ' + target + ' migrate command>'}   # {target}: the base deploys here and it is not in allowed_envs")
         needs += [str(s) for s in mig.get("human_steps") or []]
     for line in body.splitlines():
-        m = re.match(r"^\s*(?:[-*]\s*)?needs-you:\s*(.+?)\s*$", line, re.I)
+        m = re.match(r"^\s*(?:>\s*)?(?:[-*]\s*)?needs-you:\s*(.+?)\s*$", line, re.I)
         if m and m.group(1).lower() != "done":
             needs.append(m.group(1).strip("`"))
 

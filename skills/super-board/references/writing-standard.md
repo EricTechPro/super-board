@@ -115,7 +115,14 @@ Each block closes with `<!-- /sb:<name> -->`.
 | merged | `> [!TIP]` | `✅ Merged · \`9c41e07\`` |
 | blocked, red check | `> [!WARNING]` | `🛑 Blocked · needs Eric` |
 
-A partial PR writes `Refs #N`, never `Closes #N`.
+A partial PR writes `Refs #N`, never `Closes #N`. A human-only step can ride inside the
+alert, one `> needs-you: <command>` line each; the merge gate reads it there or under Risk:
+
+```
+> [!WARNING]
+> 🛑 Blocked · needs you · ✅ 2/3 AC · Closes #790 · head `3f9c2a1`
+> needs-you: `npm run db:migrate:live`
+```
 
 **Problem** — lettered steps under Where. GitHub has no lettered-list syntax, so type the letter:
 
@@ -156,17 +163,22 @@ goes in Before | After.
   ↳ not verified: needs prod deploy · Eric
 ```
 
-**Iteration history** — local time from config `timezone` (onboard sets it to the machine's
-zone). Get the stamp with `super-board-pr-body.sh --time --config <cfg>`.
+**Iteration history** — folded in `<details>`, so the reader sees Problem to Risk first.
+Local time from config `timezone` (onboard sets it to the machine's zone). Get the stamp with
+`super-board-pr-body.sh --time --config <cfg>`. `--append-file` keeps a new row inside the
+fold, above the blank line and `</details>`; an older unfolded history still appends at its end.
 
 ```
-## Iteration history
+<details><summary>Iteration history</summary>
+
 | Lane | Done | Time | Details |
 |---|---|---|---|
 | 🔨 builder | ✅ | Oct 2, 10:02 EDT | draft · `3f9c2a1` |
 | 🔍 qa | ❌ v1 | Oct 2, 10:40 EDT | mobile hidden · `runs/issue-790-qa-v1/` |
 | 🔍 qa | ✅ v2 | Oct 2, 11:55 EDT | `runs/issue-790-qa-v2/` |
 | 🧐 reviewer | ✅ merged | Oct 2, 12:20 EDT | squash `9c41e07` |
+
+</details>
 ```
 
 **Before | After** — two columns, one row per viewport, both shas in the header. Images are
@@ -193,7 +205,8 @@ here too.
 Levels: 🟢 Low · 🟡 Medium · 🔴 High. **Door** is two-way (a revert undoes it) or one-way
 (hard to undo: DROP, rename, data rewrite, public API, sent email); a one-way door is never 🟢.
 **Blast radius** is a short label (`none`, `page`, `billing`, `all users`) and one line on who
-breaks. A `needs-you: <command>` line (merge gate reads it) goes under Risk.
+breaks. A `needs-you: <command>` line (merge gate reads it) goes under Risk or inside the
+status alert.
 
 ## 3 · Ticket
 
