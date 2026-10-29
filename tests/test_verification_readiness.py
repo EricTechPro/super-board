@@ -36,7 +36,7 @@ class VerificationReadiness(unittest.TestCase):
         self.assertEqual(result.stdout, "")
 
     def test_codex_entry_points_halt_before_launching_or_touching_owned_state(self):
-        for launcher in ("super-board-codex-lane.sh", "super-board-codex-wave.sh"):
+        for launcher in ("super-board-codex-lane.sh", "super-board-lane.sh", "super-board-codex-wave.sh"):
             with self.subTest(launcher=launcher), tempfile.TemporaryDirectory() as tmp:
                 root = pathlib.Path(tmp)
                 subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -52,6 +52,8 @@ class VerificationReadiness(unittest.TestCase):
                 card = {"number": 1, "status": "Review", "title": "example"}
                 args = (["--card", json.dumps(card), "--lane", "review"] if "lane" in launcher
                         else ["--cards", json.dumps([card])])
+                if launcher == "super-board-lane.sh":
+                    args = ["--backend", "codex"] + args
                 result = subprocess.run(["bash", str(ROOT / "scripts" / launcher),
                                          "--config", str(config), "--codex"] + args,
                                         cwd=root, env=dict(os.environ, PATH=str(binary.parent) + ":" + os.environ["PATH"]),

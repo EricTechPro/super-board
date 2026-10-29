@@ -169,11 +169,13 @@ rm -rf "$T"
 T=$(mktemp -d)
 "$INSTALL" "$T" >/dev/null 2>&1
 for s in super-board-run.sh super-board-stop.sh super-board-wave-plan.sh \
-         super-board-codex-lane.sh super-board-codex-wave.sh super-board-card.sh super-board-throttle.sh super-board-host.sh \
+         super-board-lane.sh super-board-codex-lane.sh super-board-codex-wave.sh super-board-card.sh super-board-throttle.sh super-board-host.sh \
          super-board-deps.sh super-board-preflight.sh super-board-merge-gate.sh super-board-usage.sh super-board-pr-body.sh \
          super-review-file-refactor.sh super-qa-file-bug.sh; do
   [ -x "$T/.claude/bin/$s" ] || fail "$s was not installed, or is not executable"
 done
+# The Codex shim runs the shared launcher installed beside it.
+[ -x "$T/.agents/bin/super-board-lane.sh" ] && [ -e "$T/.agents/bin/super-board-codex-lane.sh" ] || fail "super-board-lane.sh must sit next to its codex shim in .agents/bin"
 rm -rf "$T"
 
 # 6 — guard hooks: scripts copied, settings merged into an existing file without
