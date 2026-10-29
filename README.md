@@ -6,6 +6,8 @@
 
 <p><strong>Add tasks, walk away, get merged PRs with proof.</strong></p>
 
+<p>Stop babysitting coding agents: cards you drop in Ready come back as tested, reviewed PRs.</p>
+
 <p>8 skills (5 you type, 3 the board runs) · 9 commands · 6 guard hooks</p>
 
 <p>
@@ -16,6 +18,8 @@
 
 <p><a href="https://erictechpro.github.io/super-board/"><strong>🌐 Live site: erictechpro.github.io/super-board</strong></a></p>
 
+<p>⭐ Star this repo if it helps · <a href="https://www.skool.com/erictech">Join the builders using this → weekly live calls, setup help</a> · <a href="https://youtu.be/aggJvNZxfKA">▶ Watch the walkthrough</a></p>
+
 <p><a href="#install">Install</a> · <a href="#quick-start">Quick start</a> · <a href="#how-it-works">How it works</a> · <a href="#skills">Skills</a> · <a href="#commands">Commands</a> · <a href="#guards--hooks">Guards</a></p>
 
 </div>
@@ -24,6 +28,12 @@
 <p align="center"><sub>The skill map. Click it for the live version: zoom, pan, open any node.</sub></p>
 
 ## Install
+
+Before you start:
+
+- [ ] Claude Code, and `gh` with board access: `gh auth refresh -s project,read:project,repo`
+- [ ] Dynamic workflows on in `/config` ([backends](docs/super-board/README.md#backends))
+- [ ] `verify_commands` set in your config, so the merge gate can prove the build ([setup notes](docs/super-board/README.md#setup-notes))
 
 In your project folder:
 
