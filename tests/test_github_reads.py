@@ -67,7 +67,7 @@ sys.exit(r.get('rc', 0))
         self.assertEqual(self.log.read_text(), '1')
 
     def test_successful_exit_with_malformed_or_partial_payload_halts(self):
-        for out, kind in [('{"resources":{"graphql":null,"core":null}}', 'quota'), ('[{}]', 'prs-open'), ('{"items":[{"id":"I","content":{}}],"totalCount":1}', 'items'), ('{"items":[]}', 'items'),
+        for out, kind in [('{"resources":{"graphql":null,"core":null}}', 'quota'), ('{"items":[{"id":"I","content":{}}],"totalCount":1}', 'items'), ('{"items":[]}', 'items'),
                           ('{"items":[],"totalCount":1}', 'items'),
                           ('{"data":{},"errors":[{"message":"partial"}]}', 'json')]:
             with self.subTest(out=out):
@@ -82,8 +82,13 @@ sys.exit(r.get('rc', 0))
         # #32: a malformed agent read is not an outage; zero comments is a valid read.
         r = self.read([{'out': '[[]]'}], 'comments')
         self.assertEqual((r.returncode, r.stdout), (0, '[[]]'), r.stderr)
+        # 2026-10-25: agent reads that left out one field halted every lane.
         for out, kind in [('not json', 'json'), ('{"comments":[]}', 'issue'), ('[]', 'comments'),
-                          ('0123456789abcdef0123456789abcdef01234567', 'head')]:
+                          ('0123456789abcdef0123456789abcdef01234567', 'head'), ('[{}]', 'prs-open'),
+                          ('[{"number":7,"title":"t","body":"b","headRefName":"x","files":[{"path":"a.ts"}]}]', 'prs-open'),
+                          ('{"state":"MERGED","mergeCommit":{"oid":"%s"}}' % ('a' * 40), 'merge-state'),
+                          ('[{}]', 'prs-merged'), ('[{}]', 'issues-closed'),
+                          ('[{"number":7,"title":"t","state":"OPEN"}]', 'issues')]:
             with self.subTest(out=out):
                 self.log.unlink(missing_ok=True)
                 r = self.read([{'out': out}], kind)
@@ -114,8 +119,13 @@ sys.exit(r.get('rc', 0))
         page = {'data': {'repository': {'issues': {
             'nodes': [], 'pageInfo': {'hasNextPage': True, 'endCursor': 'next'}}}}}
         r = self.read([{'out': json.dumps([page])}], 'issues')
-        self.assertEqual(r.returncode, 79)
+        self.assertEqual(r.returncode, 64, r.stderr)
         self.assertEqual(self.log.read_text(), '3')
+        self.assertIn('api graphql --paginate --slurp', r.stderr)
+        self.assertFalse(self.halt.exists())
+        self.env['SB_GITHUB_READ_STRICT'] = '1'
+        self.log.unlink()
+        self.assertEqual(self.read([{'out': json.dumps([page])}], 'issues').returncode, 79)
 
     def test_failed_recovery_keeps_original_reason(self):
         self.assertEqual(self.read([{'rc': 1}]).returncode, 79)
@@ -156,7 +166,30 @@ dispatch_lane build 7
         self.assertEqual(result.returncode, 79)
         self.assertEqual(self.log.read_text(), '3')
 
+    def test_diff_without_meta_fails_that_call_without_reading(self):
+        r = self.read([{'out': 'diff --git a/a b/a\n'}], 'diff', ['pr', 'diff', '1'])
+        self.assertEqual(r.returncode, 64, r.stderr)
+        self.assertIn('--kind metadata', r.stderr)
+        self.assertIn('pr view <N> --json files,labels,body,additions,deletions,changedFiles', r.stderr)
+        self.assertIn('--meta <file>', r.stderr)
+        self.assertFalse(self.log.exists())
+        self.assertFalse(self.halt.exists())
+
+    def test_diff_that_disagrees_with_meta_fails_that_call(self):
+        # 2026-10-25: lanes read metadata, pushed, then read the diff; the head race halted every lane.
+        metadata = self.root / 'meta.json'
+        metadata.write_text(json.dumps({'files':[{'path':'a'},{'path':'b'}], 'additions':1,'deletions':0}))
+        self.env['READ_RESPONSES'] = json.dumps([{'out':'diff --git a/a b/a\n@@ -0,0 +1 @@\n+one\n'}])
+        r = subprocess.run(['python3', str(HELPER), '--kind', 'diff', '--meta', str(metadata),
+                            '--', 'pr', 'diff', '1'], env=self.env, cwd=self.root, text=True, capture_output=True)
+        self.assertEqual(r.returncode, 64, r.stderr)
+        self.assertIn('diff file list incomplete', r.stderr)
+        self.assertIn('re-take the metadata', r.stderr)
+        self.assertFalse(self.halt.exists())
+
     def test_truncated_diff_is_not_complete_evidence(self):
+        # Strict callers (merge gate) still halt on a diff that disagrees with its meta.
+        self.env['SB_GITHUB_READ_STRICT'] = '1'
         metadata = self.root / 'meta.json'
         metadata.write_text(json.dumps({'files':[{'path':'x.sql'}], 'additions':2,'deletions':0}))
         self.env['READ_RESPONSES'] = json.dumps([{'out':'diff --git a/x.sql b/x.sql\n@@ -0,0 +1,2 @@\n+one\n'}])
