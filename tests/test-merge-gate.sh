@@ -462,6 +462,21 @@ needs-you: `npm run backfill -- --env live`')" gate --expect-head "$SHA" 2>/dev/
 echo "$OUT" | grep -q "^needs-you: npm run backfill -- --env live" || fail "the declared step must be printed, got: $OUT"
 teardown
 
+# 22b — the status block carries needs-you inside its alert (writing-standard.md § 2).
+head_setup
+RC=0; OUT=$(STUB_OID="$SHA" STUB_META="$(meta "" src/x.ts '<!-- sb:status -->
+> [!WARNING]
+> 🛑 Blocked · needs you · Closes #7 · head `3f9c2a1`
+> needs-you: `npm run backfill -- --env live`
+<!-- /sb:status -->
+
+<!-- sb:problem -->
+## Problem
+<!-- /sb:problem -->')" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+[ "$RC" -eq 8 ] || fail "a needs-you line in the status alert should exit 8, got $RC"
+echo "$OUT" | grep -q "^needs-you: npm run backfill -- --env live" || fail "the status-block step must be printed, got: $OUT"
+teardown
+
 # 23 — metadata the gate cannot read fails safe to a human (7), never to merge.
 head_setup
 RC=0; STUB_OID="$SHA" STUB_META='not json' gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?

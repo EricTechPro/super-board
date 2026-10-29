@@ -84,6 +84,31 @@ has "row appended" "$(cat "$BODY")" "runs/issue-7-qa-v1/"
 is  "re-append is a no-op" "unchanged" "$(run --pr 7 --block history --expect-head 3f9c2a1 --append-file "$WORK/row.md")"
 is  "row appears once" "1" "$(grep -c 'runs/issue-7-qa-v1/' "$BODY")"
 
+echo "── a folded history keeps new rows inside the fold"
+cp "$BODY" "$WORK/unfolded.md"
+cat > "$BODY" <<'FOLD'
+<!-- sb:status -->
+> [!NOTE]
+> ⏳ In QA · Closes #7 · head `3f9c2a1`
+<!-- /sb:status -->
+
+<!-- sb:history -->
+<details><summary>Iteration history</summary>
+
+| Lane | Done | Time | Details |
+|---|---|---|---|
+| 🔨 builder | ✅ | Oct 2, 10:02 EDT | draft |
+
+</details>
+<!-- /sb:history -->
+FOLD
+run --pr 7 --block history --expect-head 3f9c2a1 --append-file "$WORK/row.md" >/dev/null
+ROW=$(grep -n 'runs/issue-7-qa-v1/' "$BODY" | cut -d: -f1); END=$(grep -n '^</details>$' "$BODY" | cut -d: -f1)
+[ -n "$ROW" ] && [ "$ROW" -lt "$END" ] && ok "row lands above </details>" || bad "row lands above </details>" "row < $END" "${ROW:-none}"
+is  "blank line kept before </details>" "" "$(sed -n "$((END - 1))p" "$BODY")"
+is  "folded re-append is a no-op" "unchanged" "$(run --pr 7 --block history --expect-head 3f9c2a1 --append-file "$WORK/row.md")"
+cp "$WORK/unfolded.md" "$BODY"
+
 echo "── refuses when the head moved"
 cp "$BODY" "$WORK/before.md"
 RC=0; run --pr 7 --block status --expect-head deadbee --body-file "$WORK/risk.md" >/dev/null || RC=$?
@@ -101,6 +126,7 @@ hasnt "dry run edits nothing" "$(cat "$GH_LOG")" "PATCH"
 echo "── skeleton"
 SK=$("$SCRIPT" --skeleton)
 for b in status problem solution ac history visual risk; do has "skeleton has $b" "$SK" "<!-- sb:$b -->"; done
+has "skeleton folds the history" "$SK" "<details><summary>Iteration history</summary>"
 
 echo "── time in config timezone"
 echo '{"timezone":"UTC"}' > "$WORK/cfg.json"
