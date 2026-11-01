@@ -195,6 +195,8 @@
   .flowing svg .edge { opacity: .8; }
   @keyframes flowdash { to { stroke-dashoffset: -160; } }
   /* intake badges and the view tour: a ticket dot rides the loop while flow is on */
+  svg .n-logo { fill: #fff; stroke: var(--border-2); stroke-width: .8; }
+  .ph .big.logo { background: #fff !important; box-shadow: inset 0 0 0 1px var(--border-2); }
   svg .intake-chip { fill: #fff; stroke: var(--border-2); stroke-width: 1.2; }
   svg .intake-tx { fill: var(--muted); font: 600 10.5px var(--sans); }
   svg .intake-chip.dashed { fill: var(--panel); stroke: var(--w-feeds); stroke-dasharray: 3 3; }
@@ -775,7 +777,7 @@
     const px = n.emphasis ? 15 : 13;
     const sub = n.sub || n.sublabel || '';
     return Math.min(n.emphasis ? 205 : 240, Math.max(n.emphasis ? 146 : 138,
-      Math.ceil(textW(n.label, px) + 38), Math.min(205, Math.ceil(textW(sub, 10) + 24))));
+      Math.ceil(textW(n.label, px) + (n.logo ? 72 : 38)), Math.min(205, Math.ceil(textW(sub, 10) + 24))));
   };
   /* Geometry: node boxes, ports, orthogonal routes, label slots. */
   function layoutGraph(dg, map) {
@@ -1177,7 +1179,8 @@
       const subTxt = n.sub || (map && n.origin ? n.origin : '') || (map ? (n.what ? n.what.replace(/[`*]/g, '').split(/(?<=\.)\s/)[0] : KIND[n.k][1]) : '');
       const sub = subTxt && !verbs ? fit(subTxt, 10, n.w - 24) : '';
       const labelPx = n.emphasis ? 15 : 13;
-      const lpx = textW(n.label, labelPx) > n.w - 30 ? Math.max(11, (n.w - 30) / (String(n.label).length * 0.6)) : labelPx;
+      const lw = n.w - (n.logo ? 72 : 30);  // a logo tile reaches 27 px in: its card keeps the name 36 px clear
+      const lpx = textW(n.label, labelPx) > lw ? Math.max(11, lw / (String(n.label).length * 0.6)) : labelPx;
       const ly = n.y + n.h / 2 + (sub || verbs ? -3 : 4);
       s += `<g class="node${pub ? ' pub' : ''}${priv ? ' priv' : ''}${kids ? ' has-child' : ''}${subject ? ' subject' : ''}${n.emphasis ? ' main-step' : ''}${planned ? ' planned' : ''}${tour && n.id in tour.at ? ' tour-stop' : ''}"${tour && n.id in tour.at ? ` style="animation-delay:${(tour.at[n.id] * TOUR - .32).toFixed(2)}s"` : ''} data-id="${esc(n.id)}" tabindex="${map ? 0 : -1}" role="${map ? 'button' : 'img'}" aria-label="${esc(n.label)}${kids ? ' (opens inner view)' : ''}">
         <title>${esc(n.label)}${subTxt ? ' · ' + esc(subTxt) : ''}${n.note ? '\n' + esc(n.note) : ''}${kids ? '\nDouble-click to open' : ''}</title>`;
@@ -1188,8 +1191,9 @@
       else s += `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-mask"/>
         <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="${rx}" class="n-body" fill="${f}" stroke="${c}" ${removed || ext || planned ? 'stroke-dasharray="6 4"' : ''} ${removed ? 'opacity=".6"' : ''}/>`;
       s += `
-<g transform="translate(${n.x + (verb ? 14 : hook ? 17 : 9)} ${n.y + (priv ? 6 : 9)}) scale(.8)" class="n-sigil" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[n.k]}</g>
-        <text x="${n.x + n.w / 2}" y="${ly}" text-anchor="middle" class="n-label" data-o="${esc(n.id)}" data-t="nl" style="font-size:${lpx.toFixed(1)}px" ${removed ? 'text-decoration="line-through"' : ''}>${esc(fit(n.label, lpx, n.w - 30))}</text>`;
+${n.logo ? `<rect x="${n.x + (verb ? 12 : hook ? 15 : 7)}" y="${n.y + (priv ? 6 : 9)}" width="20" height="20" rx="4" class="n-logo"/><image href="${esc(n.logo)}" x="${n.x + (verb ? 14 : hook ? 17 : 9)}" y="${n.y + (priv ? 8 : 11)}" width="16" height="16"/>`
+  : `<g transform="translate(${n.x + (verb ? 14 : hook ? 17 : 9)} ${n.y + (priv ? 6 : 9)}) scale(.8)" class="n-sigil" fill="none" stroke="${c}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[n.k]}</g>`}
+        <text x="${n.x + n.w / 2}" y="${ly}" text-anchor="middle" class="n-label" data-o="${esc(n.id)}" data-t="nl" style="font-size:${lpx.toFixed(1)}px" ${removed ? 'text-decoration="line-through"' : ''}>${esc(fit(n.label, lpx, lw))}</text>`;
       if (sub) s += `<text x="${n.x + n.w / 2}" y="${ly + 16}" text-anchor="middle" class="n-sub depth-read" data-o="${esc(n.id)}" data-t="ns">${esc(sub)}</text>`;
       if (verbs) { // verb chips: the node's public surface, at a glance
         let vx = 0; const chips = [], maxW = n.w - 24;
@@ -2282,7 +2286,7 @@
           <div><h4>Source files</h4>${srcHtml}${vIn.length ? `<h4 style="margin-top:10px">Also shown in</h4><ul class="pviews">${vIn.map(v => `<li><button class="pview" data-v="${esc(v.id)}" data-sel="${esc(nid)}">${esc(shortT(v.title || v.id))}</button></li>`).join('')}</ul>` : ''}</div></div>`,
       };
       panel.innerHTML = `<div class="ph" style="--c:${c}">
-          <span class="big" style="background:${c}" aria-hidden="true"><svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[k]}</svg></span>
+          ${n.logo ? `<span class="big logo" aria-hidden="true"><img src="${esc(n.logo)}" width="22" height="22" alt=""></span>` : `<span class="big" style="background:${c}" aria-hidden="true"><svg viewBox="0 0 16 16" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${SIGIL[k]}</svg></span>`}
           <div class="pt"><h3>${esc(n.label || nid)}</h3><small><span>${esc(KIND[k][1])}</span><span class="vis ${pub ? 'pub' : ext ? 'ext' : ''}">${pub ? 'PUBLIC' : ext ? 'EXTERNAL' : 'INTERNAL'}</span>${by}${n.origin ? `<span class="origin">${esc(n.origin)}</span>` : ''}</small></div>
           <div class="acts">${canOpen ? `<button class="obtn" data-open="${esc(child)}" style="--c:${c}">⤢ Open ${esc(shortT(V[child].title || child))} <span>${(V[child].nodeIds || []).length} nodes · Enter</span></button>` : ''}<button class="ibtn x" data-close title="Close (Esc)" aria-label="Close details">×</button></div>
         </div>
