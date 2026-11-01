@@ -407,9 +407,16 @@ def load_map(path: Path) -> dict:
 
 
 def embed_logos(d: dict, base: Path) -> int:
-    """Inline each view's intake `logo` (an SVG path relative to the map file), so the page works offline."""
+    """Inline each view's intake `logo` and each node's `logo` (an SVG or PNG path relative to the map file), so the
+    page works offline."""
     import base64
     n = 0
+    for node in d.get("nodes", []):
+        logo = node.get("logo")
+        if logo and not str(logo).startswith("data:") and (base / logo).is_file():
+            mime = "image/svg+xml" if str(logo).lower().endswith(".svg") else "image/" + str(logo).rsplit(".", 1)[-1].lower()
+            node["logo"] = f"data:{mime};base64," + base64.b64encode((base / logo).read_bytes()).decode()
+            n += 1
     for v in d.get("views", []):
         for src in v.get("intake", []):
             logo = src.get("logo")

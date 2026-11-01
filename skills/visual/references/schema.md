@@ -94,6 +94,8 @@ The drill-down map takes its own file: shared nodes and edges, plus views that e
       "what": "One line: what it does.", "when": "What triggers it.", "how": "How it works (markdown).",
       "source": "skills/super-board/SKILL.md",      // string or array; `:line` suffixes are fine
       "sublabel": "optional line under the label",
+      "logo": "logos/github.svg",          // optional: the product's official mark (SVG or PNG, relative to the map
+                                           // file, inlined at render), drawn on a white tile where the kind sigil sits
       "opensView": "super-board",          // optional; otherwise a view with the node's id opens
       "author": "EricTechPro",             // optional GitHub login; external skills show the author's avatar
       "origin": "mattpocock-skills",       // optional: where an external skill comes from
