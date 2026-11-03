@@ -16,7 +16,7 @@ Example:
 
 ```
 C1 · visual 22/40 (design 11/20 · audit 11/20 · detector 6) · baseline · P0×0 P1×2 P2×3 P3×1 · committed 4f2a9c1 [distill → layout → polish]
-  fixed: summary-strip-cramped, header-duplicate-actions · skipped: export-menu-copy (needs Eric: wording)
+  fixed: summary-strip-cramped, header-duplicate-actions · skipped: export-menu-copy (needs owner: wording)
 C2 · visual 27/40 (design 14/20 · audit 13/20 · detector 2) · better · P0×0 P1×1 P2×2 P3×0 · committed 9b03e7d [harden → polish]
   fixed: dark-table-contrast · skipped: —
 C3 · visual 29/40 (design 15/20 · audit 14/20 · detector 1) · better · P0×0 P1×0 P2×2 P3×0 · committed 1c77d20 [typeset → polish]

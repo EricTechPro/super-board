@@ -39,7 +39,7 @@ Why I (bot) cannot decide:
 To unblock:  <concrete action the human can take, in their own checklist form>
              [ ] <step 1>
              [ ] <step 2>
-Owner:       <who acts next — "Eric", "repo admin", "design" — never "someone">
+Owner:       <who acts next — "owner", "repo admin", "design" — never "someone">
 Move back:   drag this card to Ready after the steps above are done
 blocked-by:  <comma-separated issue numbers, or "-" if nothing on this board clears it>
 ```
@@ -116,7 +116,7 @@ After a trusted human confirms this version, the next wave returns it to Review 
 PR #<P> <one line — e.g. "adds prisma/migrations/0042_add_plan">. <env> isn't in the databases the robot may migrate.
 Tests green on <base>@<sha>; migrated <test, staging>.
 Evidence: <the gate's `needs-you:` lines, verbatim>
-Reason tag: 🙋 needs you · Owner: <Eric | repo admin>
+Reason tag: 🙋 needs you · Owner: <owner | repo admin>
 approval-request: <copy the gate's exact JSON here>
 blocked-by: -
 </details>
