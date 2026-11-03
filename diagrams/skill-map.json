@@ -18,7 +18,7 @@
       "label": "/super-board",
       "kind": "public",
       "what": "The **autonomous GitHub-Project pipeline**: five verbs (onboard, lint, status, run, stop) take one board shape (Backlog · Ready · Building · QA · Review · Blocked · Done) ==from empty to drained==, with labels qa · bug · feature routing each card.",
-      "when": "Eric types **/super-board <verb>**, or says \"==drain my GitHub project==\" or \"stop super-board\"; with no verb it asks which one.",
+      "when": "The owner types **/super-board <verb>**, or says \"==drain my GitHub project==\" or \"stop super-board\"; with no verb it asks which one.",
       "how": "The session is an **orchestrator** only: it routes the verb to its reference file, dispatches lane agents, and ==never does product work itself==. Board state is the only state, so `run` is also resume. Every commit, ticket, PR body and comment follows references/writing-standard.md.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/SKILL.md",
@@ -62,8 +62,8 @@
       "label": "/ui-refine-loop",
       "kind": "public",
       "what": "Unattended **Impeccable** check-then-fix loop on one page or component that ==ends in a draft PR== with a Before | After table. Standalone: no board lane ever starts it.",
-      "when": "Eric runs **/ui-refine-loop** <route | component | description> [\"what's wrong\"] [--rounds N], or says \"refine loop\" or \"==polish this page with impeccable==\".",
-      "how": "Reads the target's code, grills Eric (at most 10 questions) into a **taste file**, then runs the saved ui-refine-loop workflow: each round fresh checkers rank typed problems and a fresh fixer chains Impeccable verbs, polish last. Default 5 rounds; ==a finish reviewer grades every fix==. Commits are `💄 [ui] <slug>: …` and the PR body uses super-board-pr-body.sh's marker blocks.",
+      "when": "The owner runs **/ui-refine-loop** <route | component | description> [\"what's wrong\"] [--rounds N], or says \"refine loop\" or \"==polish this page with impeccable==\".",
+      "how": "Reads the target's code, grills the owner (at most 10 questions) into a **taste file**, then runs the saved ui-refine-loop workflow: each round fresh checkers rank typed problems and a fresh fixer chains Impeccable verbs, polish last. Default 5 rounds; ==a finish reviewer grades every fix==. Commits are `💄 [ui] <slug>: …` and the PR body uses super-board-pr-body.sh's marker blocks.",
       "source": [
         "_skills/vendor/super-board/skills/ui-refine-loop/SKILL.md",
         "_skills/vendor/super-board/workflows/ui-refine-loop.js"
@@ -81,7 +81,7 @@
       "label": "/visual",
       "kind": "public",
       "what": "Turns the current work into ==one self-contained HTML page==. It can be a **branch recap**, a **plan**, or a map of a folder or architecture, with diagrams, a file map and annotated code.",
-      "when": "Eric runs **/visual**, /visual recap [base], /visual plan [file] or /visual <path>; ==with no argument visual.py detect picks the mode==.",
+      "when": "The owner runs **/visual**, /visual recap [base], /visual plan [file] or /visual <path>; ==with no argument visual.py detect picks the mode==.",
       "how": "Writes a **data.json** from git facts or the plan, then visual.py render injects it into an inline template with ==no build step==. It screenshots the page headless to check it, and offers to publish only on a yes.",
       "source": [
         "_skills/vendor/super-board/skills/visual/SKILL.md"
@@ -134,7 +134,7 @@
       "label": "/super-board onboard",
       "kind": "public",
       "what": "An 8-step setup wizard (Checks · GitHub · Board · Branch · AGENTS.md · Policies · Bug sources · Review) that installs or repairs what the board needs and writes the config once.",
-      "when": "Eric runs /super-board onboard (or /super-board:super-board onboard after a plugin install), on a new project, after an upgrade from 2.x, or to check and repair an existing setup.",
+      "when": "The owner runs /super-board onboard (or /super-board:super-board onboard after a plugin install), on a new project, after an upgrade from 2.x, or to check and repair an existing setup.",
       "how": "One AskUserQuestion per step with the recommended option first; must-haves are fixed without asking by super-board-setup.py. Answers save to onboard-answers.json as they come, so a halt resumes, and repo files change only at step 8 after \"Write everything\". It ends by naming /super-board lint.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/onboard.md",
@@ -148,8 +148,8 @@
       "label": "/super-board lint",
       "kind": "public",
       "what": "Pre-flight readiness check that walks Ready, Building, QA and Review, flags issues that fail any of 18 criteria, proposes a qa/bug/feature label, and dispatches a helper skill per flagged issue.",
-      "when": "Eric runs /super-board lint before a run, typically after /super-collect filed new Backlog cards.",
-      "how": "Criteria 13–18 cover what the loop needs: a parseable `## Blocked by` line, a fake with no follow-up card, too big (over ~400 changed lines or many areas), the ticket sections, a checklist AC, and lettered Context steps. Phase 4 routes each flagged pattern to one skill sub-agent while Eric keeps the pace.",
+      "when": "The owner runs /super-board lint before a run, typically after /super-collect filed new Backlog cards.",
+      "how": "Criteria 13–18 cover what the loop needs: a parseable `## Blocked by` line, a fake with no follow-up card, too big (over ~400 changed lines or many areas), the ticket sections, a checklist AC, and lettered Context steps. Phase 4 routes each flagged pattern to one skill sub-agent while the owner keeps the pace.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/lint.md"
       ],
@@ -161,7 +161,7 @@
       "label": "/super-board status",
       "kind": "public",
       "what": "Read-only snapshot of the active config, every column in board order (Backlog included), and in-flight workers.",
-      "when": "Eric runs /super-board status to see where a run stands.",
+      "when": "The owner runs /super-board status to see where a run stands.",
       "how": "super-board-status.py reads the board and local in-flight state and prints the columns in the board's own order; it changes nothing.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/status.md",
@@ -174,7 +174,7 @@
       "label": "/super-board run",
       "kind": "public",
       "what": "The autonomous loop: repeated waves of the super-board-wave workflow from this session until the board drains or a halt gate fires. Also the resume command.",
-      "when": "Eric runs /super-board run [--low|--high] [<slug>]; the default worker_backend \"workflow\" stays in-session, \"claude-p\" opts into the legacy headless runner.",
+      "when": "The owner runs /super-board run [--low|--high] [<slug>]; the default worker_backend \"workflow\" stays in-session, \"claude-p\" opts into the legacy headless runner.",
       "how": "Each wave: rate and usage guard, plan with super-board-wave-plan.sh (which refuses an old `variant: qa-only` config with exit 65), act on sweep/flag/stranded/resume, claim cards by assignee, launch the workflow, reconcile, report. Halts after 3 zero-progress waves, a high block rate, or a stop.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/run-workflow.md",
@@ -192,7 +192,7 @@
       "label": "/super-board stop",
       "kind": "public",
       "what": "Graceful shutdown: stops the wave, posts \"stopped mid-flight\" comments, releases assignee claims, and removes the wave lock so the next run resumes.",
-      "when": "Eric runs /super-board stop or says \"stop the run\" / \"pause the loop\".",
+      "when": "The owner runs /super-board stop or says \"stop the run\" / \"pause the loop\".",
       "how": "Stops the workflow (or kills the legacy dispatcher via super-board-stop.sh), comments on every in-flight issue and PR, and strips bot_identity assignees. Resume is just `run` again.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/stop.md",
@@ -236,7 +236,7 @@
       "label": "super-review",
       "kind": "lane",
       "what": "**Reviewer lane** and standalone PR review: forms its own hypotheses first, remembers prior findings, classes every finding, and ==merges only through the merge gate==.",
-      "when": "==Started by the board== for cards in **Review** (always on the session model). Also runnable standalone when Eric says \"review this branch\" or \"is this merge-ready\".",
+      "when": "==Started by the board== for cards in **Review** (always on the session model). Also runnable standalone when the owner says \"review this branch\" or \"is this merge-ready\".",
       "how": "Thread scan, prior-report round 1, own pass with code-review, codebase-design and ponytail-review, a rerun of the Tester's exact test command, then an **adversarial truth-check** on non-trivial diffs. One report comment is edited in place every round. ==A clean review merges through the gate== pinned to the reviewed head SHA; exit 7 or 8 parks the card in Blocked with 🙋. Visual problems become a UI ticket, never a ui-refine-loop run. The truth-check sub-agents get a fixed verbatim brief, and Over-engineering is never a Blocker from any of them.",
       "source": [
         "_skills/vendor/super-board/skills/super-review/SKILL.md"
@@ -1473,7 +1473,7 @@
       "label": "AGENTS.md + CLAUDE.md",
       "kind": "board",
       "what": "The project's instruction files: AGENTS.md as the single source of truth with a managed super-board block, and CLAUDE.md as `@AGENTS.md` plus Claude-only rules.",
-      "when": "Written at onboard step 8 when Eric chose to move his rules (or only add the section); the block is rewritten on re-install.",
+      "when": "Written at onboard step 8 when the owner chose to move their rules (or only add the section); the block is rewritten on re-install.",
       "how": "The block sits between `<!-- super-board:begin -->` and `<!-- super-board:end -->`, rendered from agents-md-block.md with a Writing table that links the writing standard; nothing outside the markers is touched.",
       "source": [
         "_skills/vendor/super-board/skills/super-board/references/agents-md-block.md",
@@ -1519,7 +1519,7 @@
       "label": "get.sh",
       "kind": "script",
       "what": "One-line installer: `curl -fsSL …/get.sh | bash` fetches the latest super-board release and runs install.sh.",
-      "when": "Eric (or a user) runs it in a project folder to install or upgrade; options --target, --ref, --no-helper-skills, and --no-hooks / --protect-main passed through.",
+      "when": "The owner runs it in a project folder to install or upgrade; options --target, --ref, --no-helper-skills, and --no-hooks / --protect-main passed through.",
       "how": "Downloads the release tarball, runs install.sh, adds Matt Pocock's skills via `npx skills@latest add mattpocock/skills` unless told not to, and prints the next step once.",
       "source": [
         "_skills/vendor/super-board/get.sh"
@@ -1565,7 +1565,7 @@
       "label": "/git-sync",
       "kind": "public",
       "what": "Commits the working tree as **one commit per logical change**, merge-pulls, pushes the current branch ==without force==, and reports what it did.",
-      "when": "Eric runs **/git-sync** or says \"sync\", \"commit and push\" or \"pull and push\", usually ==at the end of a piece of work==.",
+      "when": "The owner runs **/git-sync** or says \"sync\", \"commit and push\" or \"pull and push\", usually ==at the end of a piece of work==.",
       "how": "Stages each group by path (never `git add -A`), **refuses secrets**, writes the host's commit format or the writing standard, gates `supabase/` changes on a migration file and advisors, then `git pull --no-rebase` and `git push`. ==The default or a protected branch needs a yes==.",
       "source": [
         "_skills/vendor/super-board/skills/git-sync/SKILL.md"
@@ -1724,35 +1724,35 @@
       "from": "super-board",
       "to": "sb-onboard",
       "label": "routes onboard",
-      "when": "Eric runs /super-board onboard"
+      "when": "The owner runs /super-board onboard"
     },
     {
       "id": "sb-v-lint",
       "from": "super-board",
       "to": "sb-lint",
       "label": "routes lint",
-      "when": "Eric runs /super-board lint"
+      "when": "The owner runs /super-board lint"
     },
     {
       "id": "sb-v-status",
       "from": "super-board",
       "to": "sb-status",
       "label": "routes status",
-      "when": "Eric runs /super-board status"
+      "when": "The owner runs /super-board status"
     },
     {
       "id": "sb-v-run",
       "from": "super-board",
       "to": "sb-run",
       "label": "routes run",
-      "when": "Eric runs /super-board run, or asks to resume"
+      "when": "The owner runs /super-board run, or asks to resume"
     },
     {
       "id": "sb-v-stop",
       "from": "super-board",
       "to": "sb-stop",
       "label": "routes stop",
-      "when": "Eric runs /super-board stop or says pause"
+      "when": "The owner runs /super-board stop or says pause"
     },
     {
       "id": "sb-onb-config",
@@ -1793,7 +1793,7 @@
       "id": "lint-grill",
       "from": "sb-lint",
       "to": "grilling",
-      "label": "grills Eric",
+      "label": "grills the owner",
       "when": "an issue needs a rethink (criteria 10, 11) or has several readings (12)"
     },
     {
@@ -2150,7 +2150,7 @@
       "id": "u-grill",
       "from": "ui-refine-loop",
       "to": "grilling",
-      "label": "grills Eric",
+      "label": "grills the owner",
       "when": "after reading the target's code; at most 10 questions in waves"
     },
     {
