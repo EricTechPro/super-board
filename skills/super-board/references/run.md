@@ -713,8 +713,10 @@ Before planning any wave, `super-board-wave-plan.sh` reports five lists the orch
   Move it to **Review** and remove stale `needs-you:done` display labels. The Reviewer
   reviews the new code and lets the gate produce a new pinned request, then returns
   it to **Blocked** for a fresh human reply. This is not an approved resume.
-- **`flag`** — cards whose `## Blocked by` section could not be parsed. Leave them where they are
-  and comment asking for the line to be fixed, quoting the `why`. Never guess: a card treated as
+- **`flag`** — cards whose `## Blocked by` section could not be parsed, and Ready cards with no
+  real acceptance criteria (labelled `needs-ac`, or an empty / placeholder-only section; never
+  built). Leave them where they are and comment asking for the line or the criteria to be fixed
+  (`super-board lint`), quoting the `why`. Never guess: a card treated as
   free on an unreadable line gets built against a base that does not have what it needs.
 
 **Why the sweep exists.** `Blocked` used to be terminal. A card parked naming the issue it waited

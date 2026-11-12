@@ -207,7 +207,7 @@ Repeat until a done condition or halt gate fires:
    cards to `Review` solely to review the changed head and post a fresh human request;
    clear their stale `needs-you:done` display labels. They have no approval to merge.
    Comment on flagged cards asking for their
-   `## Blocked by` line to be fixed, and return every stranded Building card to
+   `## Blocked by` line or their acceptance criteria (`needs-ac`) to be fixed, and return every stranded Building card to
    `Ready` (below). Swept, resumed, approval-refresh and stranded cards are NOT in this pass's
    `cards`; they join the next wave.
 

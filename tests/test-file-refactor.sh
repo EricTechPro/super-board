@@ -158,6 +158,38 @@ case "$(cat "$GH_LOG")" in
   *) ok "a bare note never falls back into Ready" ;;
 esac
 
+echo "── no real acceptance criteria → needs-ac, Backlog"
+# A card filed with an empty or placeholder-only criteria section reached Ready,
+# the planner picked it, and the builder had nothing to test against. A heading
+# is not criteria: only an item that is not a placeholder counts.
+labels_of() { grep '^issue create' "$GH_LOG" | grep -oE -- '--label [^ ]+' | sed 's/--label //' | tr '\n' ' '; }
+no_ready() { case "$(cat "$GH_LOG")" in *opt_Ready*) bad "$1" "no opt_Ready" "found it" ;; *) ok "$1" ;; esac; }
+no_label() { case "$(labels_of)" in *needs-ac*) bad "$1" "no needs-ac" "$(labels_of)" ;; *) ok "$1" ;; esac; }
+
+DEDUPE_HIT="" run --config "$WORK/config.json" --title "Bare note" --body-file "$WORK/bare.md" --fingerprint "ac|bare" >/dev/null
+has "a bare note is labelled needs-ac" "$(labels_of)" "needs-ac"
+
+printf '## Problem\nP.\n\n## Context\n- **Where:** `src/x.ts`\n\n## Fix\nF.\n\n## Acceptance Criteria\n\n## Risk\n🟢 **Low** · one file.\n' > "$WORK/emptyac.md"
+DEDUPE_HIT="" run --config "$WORK/config.json" --title "Empty AC" --body-file "$WORK/emptyac.md" --fingerprint "ac|empty" >/dev/null
+has "an empty criteria section is labelled needs-ac" "$(labels_of)" "needs-ac"
+has "an empty criteria section lands in Backlog"     "$(cat "$GH_LOG")" "opt_Backlog"
+no_ready "an empty criteria section never lands in Ready"
+
+for ph in "_Not written by the Reviewer that filed this. Run \`super-board lint\` on this card_" "TBD" "<checkable outcome>" "…"; do
+  printf '## Problem\nP.\n\n## Context\n- **Where:** `src/x.ts`\n\n## Fix\nF.\n\n## Acceptance Criteria\n\n- [ ] %s\n' "$ph" > "$WORK/phac.md"
+  DEDUPE_HIT="" run --config "$WORK/config.json" --title "Placeholder AC" --body-file "$WORK/phac.md" --fingerprint "ac|ph" >/dev/null
+  has "placeholder '${ph:0:20}' is labelled needs-ac" "$(labels_of)" "needs-ac"
+  no_ready "placeholder '${ph:0:20}' never lands in Ready"
+done
+
+DEDUPE_HIT="" run --config "$WORK/config.json" --title "Forced" --body-file "$WORK/phac.md" --fingerprint "ac|forced" --column Ready >/dev/null
+no_ready "--column Ready cannot override missing criteria"
+has "says why it ignored --column Ready" "$(cat "$WORK/err")" "needs-ac"
+
+DEDUPE_HIT="" run --config "$WORK/config.json" --title "Real AC" --body-file "$WORK/full.md" --fingerprint "ac|real" >/dev/null
+has "real criteria still land in Ready" "$(cat "$GH_LOG")" "opt_Ready"
+no_label "real criteria are not labelled needs-ac"
+
 echo "── degradation (must never fail the review)"
 # A board with NO holding column at all: warn loudly, because a status-less card
 # sits in a No Status group nobody opens. Observed for real on 2026-08-20, where

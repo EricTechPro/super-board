@@ -153,4 +153,29 @@ OUT19=$("$PLAN" --config <(echo "$NOCAP") --items "$ITEMS" --deps <(jq '.["21"].
 echo "$OUT19" | jq -e '[.refreshApproval[].number] == [21]' >/dev/null || fail "stale approval must get a fresh request"
 echo "$OUT19" | jq -e '[.resume[].number, .cards[].number, .sweep[].number] | index(21) == null' >/dev/null || fail "refresh is not permission to merge or build"
 
-echo "PASS: test-wave-plan.sh (19 scenarios)"
+# 20 — a card filed with no real acceptance criteria is never picked: the builder
+#      has nothing to test against. Either signal holds it: the filer's `needs-ac`
+#      label, or the graph's acItems == 0. Both are flagged for super-board lint.
+#      A graph entry without acItems (an older payload) is not held on that ground.
+AC_ITEMS=$(jq -n '{items: [
+  {status:"Ready", labels:["needs-ac","refactor"], content:{type:"Issue", number:40, title:"labelled", assignees:[]}},
+  {status:"Ready", content:{type:"Issue", number:41, title:"no criteria", assignees:[]}},
+  {status:"Ready", labels:["feature"], content:{type:"Issue", number:42, title:"real", assignees:[]}},
+  {status:"Ready", content:{type:"Issue", number:43, title:"old graph", assignees:[]}},
+  {status:"Backlog", labels:["needs-ac"], content:{type:"Issue", number:44, title:"waiting for lint", assignees:[]}}]}')
+AC_DEPS=$(jq -n '{"40":{runnable:true,parseable:true,blockers:[],acItems:2},
+                  "41":{runnable:true,parseable:true,blockers:[],acItems:0},
+                  "42":{runnable:true,parseable:true,blockers:[],acItems:3},
+                  "43":{runnable:true,parseable:true,blockers:[]},
+                  "44":{runnable:true,parseable:true,blockers:[],acItems:0}}')
+OUT20=$("$PLAN" --config <(echo "$NOCAP") --items <(echo "$AC_ITEMS") --deps <(echo "$AC_DEPS"))
+echo "$OUT20" | jq -e '[.cards[].number] == [42,43]' >/dev/null \
+  || fail "cards with no real criteria must not be picked, got: $(echo "$OUT20" | jq -c '[.cards[].number]')"
+echo "$OUT20" | jq -e '[.flag[].number] | sort == [40,41]' >/dev/null \
+  || fail "Ready cards with no real criteria must be flagged (Backlog ones are lint's), got: $(echo "$OUT20" | jq -c .flag)"
+echo "$OUT20" | jq -e '[.flag[].why] | all(test("lint"))' >/dev/null \
+  || fail "the flag must send the card to super-board lint, got: $(echo "$OUT20" | jq -c .flag)"
+echo "$OUT20" | jq -e '.flag[] | select(.number == 40) | .why | test("needs-ac")' >/dev/null \
+  || fail "the needs-ac flag must say to remove the label once criteria are written"
+
+echo "PASS: test-wave-plan.sh (20 scenarios)"
