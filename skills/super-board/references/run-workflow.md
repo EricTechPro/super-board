@@ -46,11 +46,15 @@ use the lane launcher's sandbox settings, including an external submodule git di
 
 Required reads use `.claude/bin/super-board-github-read.py --kind <shape> -- <gh args>`.
 Three total attempts means the first attempt plus two retries of that same read;
-unrelated successful calls do not reset its failures. Invalid GraphQL queries,
-authentication, and permission errors stop immediately. Do not retry mutations.
-A payload that misses an agent-facing `--kind` shape (`READ_SHAPES` in
-`workflows/super-board-wave.js`) exits 64 for that call only, printing the valid
-form; it never halts the run. Fixed-command scripts set `SB_GITHUB_READ_STRICT=1`.
+unrelated successful calls do not reset its failures. Do not retry mutations.
+A lane's malformed read fails that lane's call only (exit 64), never the run: a
+payload that misses its `--kind` shape after three attempts, for every kind
+(`READ_SHAPES` in `workflows/super-board-wave.js` lists the valid forms), and a
+read GitHub refuses for that query alone (HTTP 403 or 404, an unknown GraphQL
+field) on the first attempt. A refusal every read would hit (HTTP 401, a bad
+token, missing scopes) halts at once with exit 79, and a rate-limit 403 halts
+after three attempts. Fixed-command scripts set `SB_GITHUB_READ_STRICT=1` and keep
+halting on all of these.
 
 Exit **79**, a workflow result with `halted: true`, or a failed `--check` ends this
 run. Check the helper's `--check` before claims, board/comment writes, each new
