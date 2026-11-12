@@ -545,4 +545,47 @@ RC=0; STUB_OID="$SHA" "$GATE" --config "$TMP/failing.json" --pr 1 --expect-head 
 grep -q '^pr merge' "$GH_LOG" && fail "failed check must not merge"
 teardown
 
+# 26 — a flaky verify is retried on the same tree, not sent to a rebase pass. A
+#      timing test failed verify once at the gate; exit 2 bounced the card to Build
+#      and the rebuilt PR was identical. `verify_retries` (default 1) reruns the
+#      failed command on the same scratch tree; a pass prints `flaky: <cmd>` and
+#      merges. Fails on its first run only, like a timing test under load:
+FLAKY='n=$(cat COUNT 2>/dev/null || echo 0); echo $((n + 1)) > COUNT; [ "$n" -ge 1 ]'
+head_setup
+cfgcmd() { jq --arg c "$1" ".verify_commands = [\$c]${2:-}" "$TMP/c.json" > "$TMP/c2.json" && mv "$TMP/c2.json" "$TMP/c.json"; }
+cfgcmd "${FLAKY//COUNT/$TMP/count}"
+RC=0; OUT=$(STUB_OID="$SHA" gate --expect-head "$SHA" 2>"$TMP/err") || RC=$?
+[ "$RC" -eq 0 ] || fail "a flake that passes on retry should merge (exit 0), got $RC: $(cat "$TMP/err")"
+echo "$OUT" | grep -q '^flaky: ' || fail "a pass on retry must print flaky: <cmd> on stdout, got: $OUT"
+grep -q 'retry 1/1 on the same tree' "$TMP/err" || fail "the retry must be on the same tree, got: $(cat "$TMP/err")"
+[ "$(cat "$TMP/count")" = 2 ] || fail "the flaky command should run exactly twice, ran $(cat "$TMP/count")"
+grep -q -- "--match-head-commit $SHA" "$GH_LOG" || fail "the flake should merge the reviewed head"
+teardown
+
+# 27 — a real failure still exits 2 after the retry, and runs exactly 1 + retries times.
+head_setup
+cfgcmd "echo run >> $TMP/count; exit 1" ' | .verify_retries = 2'
+RC=0; OUT=$(STUB_OID="$SHA" gate --expect-head "$SHA" 2>/dev/null) || RC=$?
+[ "$RC" -eq 2 ] || fail "a command that fails every try must exit 2, got $RC"
+[ "$(wc -l < "$TMP/count" | tr -d ' ')" = 3 ] || fail "verify_retries 2 should run the command 3 times, ran $(wc -l < "$TMP/count")"
+echo "$OUT" | grep -q '^flaky:' && fail "a real failure is not a flake"
+grep -q '^pr merge' "$GH_LOG" && fail "a real failure must not merge"
+teardown
+
+# 28 — verify_retries: 0 keeps the old behaviour: one failure is exit 2.
+head_setup
+cfgcmd "${FLAKY//COUNT/$TMP/count}" ' | .verify_retries = 0'
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 2 ] || fail "verify_retries 0 must exit 2 on the first failure, got $RC"
+[ "$(cat "$TMP/count")" = 1 ] || fail "verify_retries 0 must not retry, ran $(cat "$TMP/count")"
+teardown
+
+# 29 — a verify_retries that is not a whole number is a usage error, before the lock.
+head_setup
+cfgset '.verify_retries = "twice"'
+RC=0; STUB_OID="$SHA" gate --expect-head "$SHA" >/dev/null 2>&1 || RC=$?
+[ "$RC" -eq 64 ] || fail "a bad verify_retries should exit 64, got $RC"
+[ ! -d "$LOCK" ] || fail "a bad verify_retries must not take the merge lock"
+teardown
+
 echo "PASS: test-merge-gate.sh (merge, policy and approval scenarios)"

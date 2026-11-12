@@ -259,8 +259,8 @@
   // Shell commands proving the branch still BUILDS against the base branch as it
   // is right now. Run by super-board-merge-gate.sh from the root of a scratch
   // worktree that already has the current base merged in, inside the merge lock,
-  // immediately before the squash-merge. Any non-zero exit sends the card back
-  // to Build for a rebase pass; it never Blocks.
+  // immediately before the squash-merge. A non-zero exit on every try (see
+  // verify_retries) sends the card back to Build for a rebase pass; it never Blocks.
   //
   // Not optional in practice. GitHub's `mergeable: CLEAN` only answers "does the
   // text conflict" — it says nothing about whether the result compiles. On
@@ -292,6 +292,12 @@
   "verify_commands": [
     "cd server && npm ci --silent && npm run typecheck && npm test"
   ],
+
+  // How many times the merge gate reruns a failed verify command on the same
+  // scratch tree (same head, same base, no rebuild) before exit 2 sends the card
+  // to a rebase pass. Default 1; 0 = no retry. A pass on a retry prints
+  // `flaky: <command>` on stdout and merges: a flake is not a stale branch.
+  "verify_retries": 1,
 
   // Optional throttle on how many cards a single wave dispatches. ABSENT OR 0
   // MEANS UNLIMITED, which is the default and is usually what you want.

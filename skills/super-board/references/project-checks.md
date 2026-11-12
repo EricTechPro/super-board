@@ -19,7 +19,9 @@ contain:
 These are examples, not commands to invent in every app. Python/Rust/other projects
 use their own runners. The readiness gate checks that commands are configured;
 it cannot prove that a custom command tests the right behaviour. Failed checks
-stop merging through the existing gate.
+stop merging through the existing gate. A failed command is rerun on the same
+tree `verify_retries` times (default 1, `0` = none) first; a pass on a retry
+merges and prints `flaky: <command>` so the flaky check can be fixed.
 
 For import boundaries, enforce a decision the app already made, such as an
 internal server module being accessible only from server code. A browser app may
