@@ -61,12 +61,80 @@ sys.exit(r.get('rc', 0))
         self.assertFalse(self.halt.exists())
 
     def test_permanent_graphql_error_is_not_retried(self):
-        r = self.read([{'rc': 1, 'err': 'GraphQL: Cannot query field wrong on type Query'}],
-                      command=['api', 'graphql', '-f', 'query=query { wrong }'])
+        # A bad field is that caller's query, not an outage: it fails the call, never the run.
+        for err in ['GraphQL: Cannot query field wrong on type Query',
+                    "GraphQL: Field 'wrong' doesn't exist on type 'Issue' (repository.issue.wrong)"]:
+            with self.subTest(err=err):
+                self.log.unlink(missing_ok=True)
+                r = self.read([{'rc': 1, 'err': err}], command=['api', 'graphql', '-f', 'query=query { wrong }'])
+                self.assertEqual(r.returncode, 64, r.stderr)
+                self.assertEqual(self.log.read_text(), '1')
+                self.assertFalse(self.halt.exists())
+                self.env['SB_GITHUB_READ_STRICT'] = '1'
+                self.log.unlink()
+                r = self.read([{'rc': 1, 'err': err}], command=['api', 'graphql', '-f', 'query=query { wrong }'])
+                self.assertEqual(r.returncode, 79, 'fixed-command scripts still halt')
+                self.assertEqual(self.log.read_text(), '1')
+                self.env.pop('SB_GITHUB_READ_STRICT')
+                self.halt.unlink()
+
+    def test_refusal_for_one_query_fails_only_that_call(self):
+        # A lane's 403 on a PR or a resource the token cannot see halted the whole run.
+        for err in ['gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)',
+                    'gh: Resource not accessible by integration (HTTP 403)', 'gh: Not Found (HTTP 404)',
+                    'GraphQL: Could not resolve to a PullRequest with the number of 999. (repository.pullRequest)']:
+            with self.subTest(err=err):
+                self.log.unlink(missing_ok=True)
+                r = self.read([{'rc': 1, 'err': err}], command=['api', 'repos/x/y/rules/branches/main'])
+                self.assertEqual(r.returncode, 64, r.stderr)
+                self.assertEqual(self.log.read_text(), '1', 'no retry')
+                self.assertEqual(r.stdout, '')
+                self.assertIn('this call failed, the run continues', r.stderr)
+                self.assertFalse(self.halt.exists(), 'one lane refused must not halt other lanes')
+        self.env['SB_GITHUB_READ_STRICT'] = '1'
+        r = self.read([{'rc': 1, 'err': 'gh: Not Found (HTTP 404)'}], command=['api', 'repos/x/y/pulls/9'])
+        self.assertEqual(r.returncode, 79, 'fixed-command scripts still halt')
+
+    def test_refusal_every_read_hits_still_halts(self):
+        for err in ['gh: Bad credentials (HTTP 401)', 'gh: Requires authentication (HTTP 401)',
+                    'gh: Your token has not been granted the required scopes; missing required scopes [read:project]']:
+            with self.subTest(err=err):
+                self.halt.unlink(missing_ok=True)
+                self.log.unlink(missing_ok=True)
+                r = self.read([{'rc': 1, 'err': err}], command=['api', 'repos/x/y/pulls/1'])
+                self.assertEqual(r.returncode, 79, r.stderr)
+                self.assertEqual(self.log.read_text(), '1')
+                self.assertTrue(self.halt.exists())
+
+    def test_rate_limit_403_still_retries_then_halts(self):
+        r = self.read([{'rc': 1, 'err': 'gh: API rate limit exceeded for user (HTTP 403)'}],
+                      command=['api', 'repos/x/y/pulls/1'])
         self.assertEqual(r.returncode, 79)
-        self.assertEqual(self.log.read_text(), '1')
+        self.assertEqual(self.log.read_text(), '3')
+
+    def test_agent_shape_miss_fails_only_that_read_fixed_kinds_halt(self):
+        # A quota read with a --jq that prints text had no form, so it halted the run.
+        r = self.read([{'out': 'graphql=4000/5000 rest=4900/5000\n'}], 'quota',
+                      ['api', 'rate_limit', '--jq', '"graphql=\\(.resources.graphql.remaining)"'])
+        self.assertEqual(r.returncode, 64, r.stderr)
+        self.assertIn('Valid form: --kind quota -- api rate_limit', r.stderr)
+        self.assertFalse(self.halt.exists())
+        # A kind with no form serves a fixed-command script: a payload it cannot use, or a
+        # refusal, is an outage there and still halts.
+        for out, kind in [('[]', 'object'), ('{"items":[]}', 'items'), ('{}', 'permission')]:
+            with self.subTest(kind=kind):
+                self.halt.unlink(missing_ok=True)
+                self.log.unlink(missing_ok=True)
+                r = self.read([{'out': out}], kind)
+                self.assertEqual(r.returncode, 79, r.stderr)
+                self.assertEqual(r.stdout, '')
+        self.halt.unlink(missing_ok=True)
+        r = self.read([{'rc': 1, 'err': 'gh: Not Found (HTTP 404)'}], 'items', ['api', 'repos/x/y/pulls/9'])
+        self.assertEqual(r.returncode, 79, r.stderr)
 
     def test_successful_exit_with_malformed_or_partial_payload_halts(self):
+        # Fixed-command scripts (strict): a payload they cannot use is an outage.
+        self.env['SB_GITHUB_READ_STRICT'] = '1'
         for out, kind in [('{"resources":{"graphql":null,"core":null}}', 'quota'), ('{"items":[{"id":"I","content":{}}],"totalCount":1}', 'items'), ('{"items":[]}', 'items'),
                           ('{"items":[],"totalCount":1}', 'items'),
                           ('{"data":{},"errors":[{"message":"partial"}]}', 'json')]:
@@ -77,6 +145,11 @@ sys.exit(r.get('rc', 0))
                 self.assertEqual(r.returncode, 79)
                 self.assertEqual(self.log.read_text(), '3')
                 self.assertEqual(r.stdout, '')
+        # GitHub's own error payload is an outage for every caller, strict or not.
+        self.env.pop('SB_GITHUB_READ_STRICT')
+        self.halt.unlink(missing_ok=True)
+        r = self.read([{'out': '{"data":{},"errors":[{"message":"partial"}]}'}])
+        self.assertEqual(r.returncode, 79, r.stderr)
 
     def test_agent_shape_mismatch_fails_only_that_read(self):
         # #32: a malformed agent read is not an outage; zero comments is a valid read.
@@ -216,7 +289,9 @@ dispatch_lane build 7
 
     def test_corrected_query_can_resume_without_erasing_original_failure(self):
         bad = ['api', 'graphql', '-f', 'query=query { wrong }']
+        self.env['SB_GITHUB_READ_STRICT'] = '1'
         self.assertEqual(self.read([{'rc':1,'err':'Cannot query field wrong'}], command=bad).returncode,79)
+        self.env.pop('SB_GITHUB_READ_STRICT')
         original = self.halt.read_text()
         self.env['READ_RESPONSES'] = json.dumps([{'out':'{"resources":{"graphql":{"remaining":5000,"reset":0},"core":{"remaining":5000,"reset":0}}}'}])
         result = subprocess.run(['python3',str(HELPER),'--resume','--kind','json','--',
@@ -244,6 +319,7 @@ top_card_in_column Review
         self.assertEqual(self.log.read_text(),'4','one state read, three failed project reads, no claim release')
 
     def test_dedupe_capped_or_malformed_data_is_never_no_match(self):
+        self.env['SB_GITHUB_READ_STRICT'] = '1'
         for data in [[{}], [{'number': n+1, 'body':'old'} for n in range(200)]]:
             self.halt.unlink(missing_ok=True); self.log.unlink(missing_ok=True)
             result = self.read([{'out':json.dumps(data)}],'dedupe', ['issue','list','--json','number,body'])

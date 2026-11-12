@@ -7,8 +7,12 @@ The halt file is shared through the main checkout, including linked worktrees.
 Only an explicit new run clears it with --resume after preserving the old reason.
 Mutations never enter this retry helper. For the agent-facing kinds in FORMS, a
 payload that fails its shape on every attempt is the caller's malformed read, not
-an outage: that call exits 64 with the valid form and the run keeps going. Scripts
-whose commands are fixed set SB_GITHUB_READ_STRICT=1 to keep halting on it.
+an outage: that call exits 64 with the valid form and the run keeps going. So is a
+read GitHub refuses for this query alone (HTTP 403/404, an unknown GraphQL field,
+a resource the token may not see): it exits 64 on the first attempt. A refusal
+every read will hit (HTTP 401, bad credentials, missing scopes) still halts at once.
+Kinds outside FORMS serve scripts whose commands are fixed and keep halting; those
+scripts also set SB_GITHUB_READ_STRICT=1 to halt on the agent-facing kinds.
 """
 from __future__ import annotations
 
@@ -46,6 +50,7 @@ FORMS = {
              'if you pushed in between, re-take the metadata'),
     'state': 'issue view <N> --json state --jq .state',
     'merge-state': 'pr view <N> --json state,headRefOid,mergeCommit',
+    'quota': 'api rate_limit (no --jq: the payload must stay JSON)',
     'prs-open': 'pr list --state open --json number,title,body,url,headRefName,files',
     'prs-merged': 'pr list --state merged --json number,title,body,url',
     'issues-closed': 'issue list --state closed --json number,title,body,stateReason',
@@ -124,8 +129,24 @@ def permanent_error(text):
         return False
     return re.search(r'Cannot query field|Unknown (?:argument|type)|Syntax Error|Parse error on|'
                      r'GRAPHQL_VALIDATION_FAILED|undefinedField|variableRequiresValidType|'
+                     r"Field '[^']+' doesn't exist on type|"
                      r'HTTP 40[134]|Bad credentials|requires authentication|Resource not accessible|'
                      r'Could not resolve to (?:a|an) |missing required scopes', text, re.I) is not None
+
+
+def every_read_fails(text):
+    """A refusal every read will hit, whoever made it: the run cannot go on."""
+    return re.search(r'HTTP 401|Bad credentials|requires authentication|missing required scopes',
+                     text, re.I) is not None
+
+
+def strict():
+    return bool(os.environ.get('SB_GITHUB_READ_STRICT'))
+
+
+def caller_failure(why, kind):
+    form = f' Valid form: --kind {kind} -- {FORMS[kind]}' if kind in FORMS else ''
+    return ValueError(f'{why}; this call failed, the run continues.{form}')
 
 
 def require(condition, why):
@@ -341,6 +362,10 @@ def read(args, kind='json', meta=None, recovering=False):
                 except ValueError:
                     pass
             if permanent_error(diagnostic):
+                if kind in FORMS and not strict() and not every_read_fails(diagnostic):
+                    status = re.search(r'HTTP [0-9]{3}', diagnostic)
+                    raise caller_failure('GitHub refused this read' + (f' ({status[0]})' if status else '')
+                                         + ' for this query or resource alone', kind)
                 halt('GitHub rejected a required read (query, authentication, or permission error); fix it before restarting', attempt, operation)
             if result.returncode:
                 shape_only = False
@@ -361,8 +386,8 @@ def read(args, kind='json', meta=None, recovering=False):
         if attempt < 3:
             print(f'[github-read] {last}; retry {attempt + 1}/3', file=sys.stderr)
             time.sleep(max(0, delay) * attempt)
-    if shape_only and kind in FORMS and not os.environ.get('SB_GITHUB_READ_STRICT'):
-        raise ValueError(f'{last}; this call failed, the run continues. Valid form: --kind {kind} -- {FORMS[kind]}')
+    if shape_only and kind in FORMS and not strict():
+        raise caller_failure(last, kind)
     halt(f'{last}; stopped after 3 failed attempts', 3, operation)
 
 
