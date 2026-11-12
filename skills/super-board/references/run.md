@@ -477,7 +477,10 @@ on the base branch**.
    when the `.claude/hooks/cleanup-wt.py` hook is installed (local only; a cleanup failure never changes the exit). Route by exit code:
      9 → verification-readiness: halt the run and preserve card, approval, claims, and worktree. Repair `config.verify_commands` with the project's real checks, then restart explicitly. Never bounce to Build, retry a rebase, or bypass the gate.
      0 → merged; continue to step 4
-     2 → the branch no longer builds against the base → **rebase pass** (see below)
+     2 → the branch no longer builds against the base (verify failed on every try,
+          including the gate's `verify_retries` reruns on the same tree) → **rebase pass** (see below).
+          A `flaky: <command>` stdout line means it failed and then passed on a retry:
+          the gate merged (exit 0); name the flaky command in the merged report, no rebase
      3 → GitHub refused after a green verify (branch protection, required check)
           → Blocked with the §4 template; this one really is a human's
      4 → another card holds the merge lock → leave the card in Review, next wave retries

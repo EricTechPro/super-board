@@ -45,6 +45,13 @@
 # Missing, empty, or whitespace-only commands halt with exit 9 before locking or
 # reading GitHub. Configure the owning project's checks; this gate invents none.
 #
+#   verify_retries: 1   (default) reruns a failed command on the same tree.
+#
+# A flaky test is not a stale branch. A timing test once failed verify at the
+# gate; exit 2 sent the card to a rebase pass and the rebuilt PR was identical.
+# The retry runs the same commit against the same base with no rebuild, so a
+# pass on retry proves what a first-time pass does, minus the flake. 0 = no retry.
+#
 # Usage:
 #   super-board-merge-gate.sh --config <config.json> --pr <number>
 #                             [--expect-head <sha>] [--subject <title>] [--body-file <md>]
@@ -69,7 +76,10 @@
 #
 # Exit codes, all meaningful to the caller:
 #   0  merged
-#   2  verification failed — branch needs a rebase pass, NOT a Blocked card
+#   2  verification failed on every try (1 + verify_retries) on the same tree —
+#      branch needs a rebase pass, NOT a Blocked card. A command that fails and
+#      then passes on a retry is a flake: stdout carries `flaky: <command>` and
+#      the merge goes ahead.
 #   3  PR is closed without a merge; no merge attempted
 #   4  could not take the lock within the timeout
 #   5  the base could not be merged in (real conflict) — needs a rebase pass
@@ -160,6 +170,8 @@ if [ "${#VERIFY[@]}" -eq 0 ]; then
   echo "verification-readiness: verify_commands yielded no usable shell commands; repair the project config and restart the board." >&2
   exit 9
 fi
+VERIFY_RETRIES=$(echo "$CONFIG_JSON" | jq -r '.verify_retries // 1')
+case "$VERIFY_RETRIES" in ''|*[!0-9]*) echo "verify_retries must be a whole number (got: $VERIFY_RETRIES)" >&2; exit 64 ;; esac
 python3 "$GITHUB_READ" --check
 
 LOCK_DIR="${REPO_PATH}/.claude/super-board/inflight/merge.lock"
@@ -280,11 +292,20 @@ fi
 
 for cmd in "${VERIFY[@]}"; do
   say "verify: ${cmd}"
-  if ! ( cd "$SCRATCH" && eval "$cmd" ) >"$SCRATCH/.verify.log" 2>&1; then
+  try=0
+  until ( cd "$SCRATCH" && eval "$cmd" ) >"$SCRATCH/.verify.log" 2>&1; do
     say "FAILED: ${cmd}"
     tail -30 "$SCRATCH/.verify.log" >&2
-    say "the branch is stale against ${BASE} — send it back to Build for a rebase pass"
-    exit 2
+    if [ "$try" -ge "$VERIFY_RETRIES" ]; then
+      say "failed on every try — the branch is stale against ${BASE}; send it back to Build for a rebase pass"
+      exit 2
+    fi
+    try=$(( try + 1 ))
+    say "retry ${try}/${VERIFY_RETRIES} on the same tree (${HEAD_SHA} + ${BASE})"
+  done
+  if [ "$try" -gt 0 ]; then
+    echo "flaky: ${cmd}"
+    say "flaky: ${cmd} failed, then passed on the same tree — not a rebase"
   fi
 done
 say "verified green against ${BASE} (${#VERIFY[@]} command(s))"
