@@ -90,7 +90,7 @@
           "body": "blocked-by: 2\n"
         },
         {
-          "body": "the blocker closed\nblocked-by: -\n"
+          "body": "[builder] [blocker] 🛑 blocked · 🔐 the blocker closed, now needs a key\nWhy blocked: no API key\nblocked-by: -\n"
         }
       ]
     }
@@ -178,6 +178,115 @@
         },
         {
           "body": "🛡 super-board · Review · BLOCKED\nReason tag:  🙋 needs you\nTo unblock:  [ ] npm run db:migrate:live\nblocked-by:  -"
+        }
+      ]
+    }
+  },
+  {
+    "number": 30,
+    "title": "bounce writes dash",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "[reviewer] [blocker] 🛑 blocked · 🙋 PR #9 is over the size cap\nCard:        #N card\nReason tag:  🙋\nWhy blocked: over the size cap\nblocked-by:  -"
+        },
+        {
+          "body": "[reviewer] [report] ↩️ back to Ready · loop:rebase\nDid: gate exit 5, base does not merge cleanly\nNext: builder\nblocked-by: -"
+        }
+      ]
+    }
+  },
+  {
+    "number": 31,
+    "title": "bare bounce clears block",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "[reviewer] [blocker] 🛑 blocked · 🙋 PR #9 is over the size cap\nCard:        #N card\nReason tag:  🙋\nWhy blocked: over the size cap\nblocked-by:  -"
+        },
+        {
+          "body": "[reviewer] [report] ↩️ back to Ready · loop:rebase\nDid: gate exit 5\nNext: builder"
+        },
+        {
+          "body": "[qa] [report] ✅ pass · round 2\nDid: AC1–AC3 pass\nNext: reviewer"
+        }
+      ]
+    }
+  },
+  {
+    "number": 32,
+    "title": "bounce says none",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "[reviewer] [blocker] 🛑 blocked · 🙋 PR #9 is over the size cap\nCard:        #N card\nReason tag:  🙋\nWhy blocked: over the size cap\nblocked-by:  -"
+        },
+        {
+          "body": "[reviewer] [report] ↩️ back to Ready · loop:rebase\nNext: builder\nblocked-by: none"
+        }
+      ]
+    }
+  },
+  {
+    "number": 33,
+    "title": "bounce names open blocker",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "[reviewer] [report] ↩️ back to Ready · loop:rebase\nDid: gate exit 5\nNext: builder\nblocked-by: 2"
+        }
+      ]
+    }
+  },
+  {
+    "number": 34,
+    "title": "report does not clear block",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "[reviewer] [blocker] 🛑 blocked · 🙋 PR #9 is over the size cap\nCard:        #N card\nReason tag:  🙋\nWhy blocked: over the size cap\nblocked-by:  -"
+        },
+        {
+          "body": "[qa] [report] ✅ pass · round 2\nDid: AC1–AC3 pass\nNext: reviewer"
+        }
+      ]
+    }
+  },
+  {
+    "number": 35,
+    "title": "block after bounce",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "[reviewer] [report] ↩️ back to Ready · loop:rebase\nNext: builder\nblocked-by: none"
+        },
+        {
+          "body": "[reviewer] [blocker] 🛑 blocked · 🙋 PR #9 is over the size cap\nCard:        #N card\nReason tag:  🙋\nWhy blocked: over the size cap\nblocked-by:  -"
+        }
+      ]
+    }
+  },
+  {
+    "number": 36,
+    "title": "dash outside a block",
+    "state": "OPEN",
+    "body": "## Blocked by\n\n- None.\n",
+    "comments": {
+      "nodes": [
+        {
+          "body": "the blocker closed\nblocked-by: -\n"
         }
       ]
     }
