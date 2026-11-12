@@ -112,10 +112,13 @@ Each block closes with `<!-- /sb:<name> -->`.
 | State | Alert | Line |
 |---|---|---|
 | building, in QA, in review | `> [!NOTE]` | `⏳ In review · round 1 · ✅ 2/3 AC · Closes #790 · head \`3f9c2a1\`` |
-| merged | `> [!TIP]` | `✅ Merged · \`9c41e07\`` |
-| blocked, red check | `> [!WARNING]` | `🛑 Blocked · needs Eric` |
+| merged | `> [!TIP]` | `✅ Merged · \`9c41e07\` · Closes #790` |
+| blocked, red check | `> [!WARNING]` | `🛑 Blocked · needs Eric · Closes #790` |
 
-A partial PR writes `Refs #N`, never `Closes #N`. A human-only step can ride inside the
+A partial PR writes `Refs #N`, never `Closes #N`. Every status line carries its own card's
+`Closes #N` (or `Refs #N`), merged and blocked lines too: the approval check reads the link
+there. `super-board-pr-body.sh` adds `· Closes #<card>` when the line has none, and refuses a
+line that names another card or another PR's head. A human-only step can ride inside the
 alert, one `> needs-you: <command>` line each; the merge gate reads it there or under Risk:
 
 ```

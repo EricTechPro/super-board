@@ -5,7 +5,7 @@
 # some of them. Rewriting the whole body from memory clobbers the blocks another
 # lane wrote since you read it; this script touches only the block you name.
 #
-#   super-board-pr-body.sh --pr <N> --block <name> --expect-head <sha> \
+#   super-board-pr-body.sh --pr <N> --block <name> --expect-head <sha> [--issue <card>] \
 #                          (--body-file <md> | --append-file <md>) [--repo o/r] [--dry-run]
 #   super-board-pr-body.sh --skeleton          # empty body with every marker, in order (history folded)
 #   super-board-pr-body.sh --time [--config <cfg.json>]   # "Oct 2, 10:02 EDT" in config timezone
@@ -18,23 +18,37 @@
 # --expect-head  the PR head you based this edit on. The script refuses (exit 6) when
 #                the PR head is no longer that commit: the block would describe code
 #                that is not the code on the PR. Required unless --dry-run.
+# --issue        the card you are working on. Refused (exit 65) when the PR's branch is
+#                another card's (`issue-<M>-…`). Running inside a card worktree whose
+#                branch names another card than the PR's is refused the same way.
 # --dry-run      prints the new body on stdout, edits nothing.
+#
+# The card is the `issue-<N>-` prefix of the PR's head branch, read from GitHub, not
+# from the caller; a branch without one falls back to --issue. The status block is
+# checked against this PR (parallel lanes sharing a /tmp file once wrote another
+# card's status onto their own PR, and the approval check then refused the human):
+#   - a `head \`<sha>\`` that is not this PR's head is refused (exit 65)
+#   - a `Closes/Fixes/Resolves/Refs #N` naming another card is refused (exit 65)
+#   - a status line with no `Closes #N`/`Refs #N` gets `· Closes #<card>`
+# Other blocks are not checked.
 #
 # Same content twice is a no-op ("unchanged"), so a retried lane exit is safe.
 #
 # Exits: 0 ok (stdout: updated | unchanged | the body on --dry-run)
-#        6 PR head moved · 64 usage · 66 unreadable file · 70 gh failure
+#        6 PR head moved · 64 usage · 65 the content or the card is another PR's
+#        66 unreadable file · 70 gh failure
 set -uo pipefail
 
 BLOCKS="redcheck status problem solution ac history visual risk"
 die() { echo "pr-body: $1" >&2; exit "$2"; }
 
-PR=""; BLOCK=""; HEAD=""; BODY_FILE=""; APPEND_FILE=""; REPO=""; DRY=0; MODE="edit"; CONFIG=""
+PR=""; BLOCK=""; HEAD=""; BODY_FILE=""; APPEND_FILE=""; REPO=""; DRY=0; MODE="edit"; CONFIG=""; ISSUE=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --pr)          PR="$2"; shift 2 ;;
     --block)       BLOCK="$2"; shift 2 ;;
     --expect-head) HEAD="$2"; shift 2 ;;
+    --issue)       ISSUE="$2"; shift 2 ;;
     --body-file)   BODY_FILE="$2"; shift 2 ;;
     --append-file) APPEND_FILE="$2"; shift 2 ;;
     --repo)        REPO="$2"; shift 2 ;;
@@ -73,13 +87,14 @@ SRC="${BODY_FILE:-$APPEND_FILE}"
 [ -n "$SRC" ] || die "--body-file or --append-file is required" 64
 [ -r "$SRC" ] || die "cannot read $SRC" 66
 [ "$DRY" -eq 1 ] || [ -n "$HEAD" ] || die "--expect-head <sha> is required (the PR head your edit is based on)" 64
+case "$ISSUE" in 0*|*[!0-9]*) die "--issue must be an issue number (got: $ISSUE)" 64 ;; esac
 
 GITHUB_READ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/super-board-github-read.py"
 # REST, not `gh pr view`/`gh pr edit`: this script runs ~3 times per lane per
 # card, and the REST core bucket is separate from the GraphQL one the board
 # lives on. GH_REPO fills {owner}/{repo}; unset, gh uses the current checkout.
 export GH_REPO="${REPO:-${GH_REPO:-}}"; [ -n "$GH_REPO" ] || unset GH_REPO
-META=$(python3 "$GITHUB_READ" --kind body -- api "repos/{owner}/{repo}/pulls/$PR" --jq '{headRefOid: .head.sha, body: (.body // "")}' ) || exit $?
+META=$(python3 "$GITHUB_READ" --kind body -- api "repos/{owner}/{repo}/pulls/$PR" --jq '{headRefOid: .head.sha, headRefName: .head.ref, body: (.body // "")}' ) || exit $?
 NOW=$(printf '%s' "$META" | jq -r '.headRefOid // empty')
 if [ -n "$HEAD" ]; then
   # Short or full sha both work: the PR head must start with what you passed.
@@ -91,8 +106,55 @@ if [ -n "$HEAD" ]; then
   esac
 fi
 
-OLD_TMP=$(mktemp); NEW_TMP=$(mktemp)
-trap 'rm -f "$OLD_TMP" "$NEW_TMP"' EXIT
+# ---- which card this PR is for ----------------------------------------------
+# Branches are `issue-<N>-<slug>` (run.md); read from GitHub, so a wrong --pr can't borrow a card.
+card_of() { printf '%s' "$1" | sed -nE 's/^issue-([0-9]+)-.*/\1/p'; }
+BRANCH=$(printf '%s' "$META" | jq -r '.headRefName // empty')
+CARD=$(card_of "$BRANCH")
+if [ -n "$ISSUE" ] && [ -n "$CARD" ] && [ "$ISSUE" != "$CARD" ]; then
+  die "PR #$PR is branch $BRANCH, the PR for #$CARD, not #$ISSUE — check --pr" 65
+fi
+HERE=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+HERE_CARD=$(card_of "$HERE")
+if [ -n "$HERE_CARD" ] && [ -n "$CARD" ] && [ "$HERE_CARD" != "$CARD" ]; then
+  die "you are on $HERE (#$HERE_CARD) but PR #$PR is $BRANCH (#$CARD) — check --pr" 65
+fi
+CARD="${CARD:-$ISSUE}"
+
+OLD_TMP=$(mktemp); NEW_TMP=$(mktemp); SRC_TMP=$(mktemp)
+trap 'rm -f "$OLD_TMP" "$NEW_TMP" "$SRC_TMP"' EXIT
+
+# ---- the status block must describe THIS PR -----------------------------------
+if [ "$BLOCK" = status ]; then
+  python3 - "$SRC" "$NOW" "$CARD" "$PR" > "$SRC_TMP" <<'PY' || exit $?
+import re, sys
+src, head, card, pr = sys.argv[1:5]
+text = open(src, encoding="utf-8").read().strip("\n")
+def refuse(why):
+    sys.stderr.write(f"pr-body: {why} — this status belongs to another PR; rewrite it for PR #{pr}\n")
+    sys.exit(65)
+for sha in re.findall(r"\bhead\s+`([0-9a-f]{7,40})`", text):
+    if head and not head.startswith(sha):
+        refuse(f"status names head {sha}, PR #{pr} head is {head}")
+refs = re.findall(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?):?\s+#(\d+)\b", text, re.I)
+if card:
+    other = sorted({n for n in refs if n != card})
+    if other:
+        refuse(f"status names #{', #'.join(other)}, PR #{pr} is the PR for #{card}")
+    if not refs:
+        # The status line: the first alert line that is not the [!TYPE] marker or a needs-you line.
+        lines = text.split("\n")
+        cand = [i for i, l in enumerate(lines) if l.strip()
+                and not re.match(r"\s*>\s*(\[!\w+\]|needs-you:)", l)]
+        if cand:
+            lines[cand[0]] = lines[cand[0]].rstrip() + f" · Closes #{card}"
+            text = "\n".join(lines)
+elif not refs:
+    sys.stderr.write(f"pr-body: warning: PR #{pr} branch has no issue-<N>- prefix and no --issue; the status names no card\n")
+sys.stdout.write(text + "\n")
+PY
+  SRC="$SRC_TMP"
+fi
 printf '%s' "$META" | jq -r '.body // ""' > "$OLD_TMP"
 
 MODE_FLAG=replace; [ -n "$APPEND_FILE" ] && MODE_FLAG=append

@@ -145,9 +145,14 @@ There is **exactly one branch per issue** and **exactly one PR per issue**. All 
 
 Format: `writing-standard.md` § 2. Title = the commit subject format
 (`✨ [feat] chat: stream replies`). The body is marker blocks; each lane rewrites only its own
-with `.claude/bin/super-board-pr-body.sh --pr <P> --block <name> --expect-head <sha>
+with `.claude/bin/super-board-pr-body.sh --pr <P> --issue <N> --block <name> --expect-head <sha>
 (--body-file | --append-file) <md>`. The script refuses (exit 6) when the PR head moved since you
-read it — re-read, then redo the edit. Builder opens the PR with every block filled
+read it — re-read, then redo the edit. It refuses (exit 65) a PR that is another card's, and a
+status block naming another card's `Closes #N` or another PR's head: re-read your own PR and
+rewrite the block. A status with no `Closes #N`/`Refs #N` gets `· Closes #<card>` added. Write
+block files inside your own worktree's git dir (`"$(git rev-parse --git-dir)/sb-status.md"`: per
+worktree, never committed), never a shared `/tmp` name: parallel lanes overwrite each other's
+files. Builder opens the PR with every block filled
 (`super-board-pr-body.sh --skeleton` prints the empty markers).
 
 | Block | Builder | Tester | Reviewer |
