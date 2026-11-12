@@ -9,6 +9,7 @@ protected-push guard (opt-in) and the dev-only skill-eval gate.
 - `guard-secrets.py` — PreToolUse `Bash|Read|Grep`: denies reading or piping dotenv files, SSH keys, `.npmrc`, `credentials(.json)`, service-account JSON and `.pem`; `.env.example` stays readable. One plain call to `super-board-env-check.sh KEY…` is allowed: it prints present / empty / missing per key and never a value (no pipe, chain or redirect may ride along).
 - `guard-key-literals.py` — PreToolUse `Edit|MultiEdit|Write|NotebookEdit|Bash`: denies writing a live-looking API key into a file; PostToolUse `Edit|MultiEdit|Write|NotebookEdit`: flags one already on disk. Reports line numbers, never the value.
 - `guard-delete-outside.py` — PreToolUse `Bash`: denies `rm`, `rmdir`, `unlink`, `find … -delete` / `-exec rm` and `git clean` whose target resolves outside `$CLAUDE_PROJECT_DIR`, and always `/` or `~` itself (honours `cd X &&`, `git -C X`, `~`, `$HOME`). Inside `/tmp`, `/private/tmp`, `/var/folders` and `$TMPDIR` stays allowed. A path whose value is only known at run time (`$(…)`, a variable set earlier in the same command) is allowed.
+- `guard-approval-edit.py` — PreToolUse `Bash`: denies editing an existing comment (`gh issue|pr comment --edit-last`, a PATCH to `issues/comments/<id>`, GraphQL `updateIssueComment`) whose new body carries an `approval-request:` line or a `Reason tag: … 🙋` line. The merge gate refuses an edited request, so the human's `done` would be lost; post a new comment instead. Reads the body from the command (inline, heredoc) and from the files it names (`--body-file`, `-F body=@file`, `--input`, `$(cat file)`, `< file`). Posting a new comment is never blocked. `SB_ALLOW_APPROVAL_EDIT=1` turns it off for a session.
 - `cleanup-wt.py` — SessionStart (`--auto`): when a base branch tip moved since the last session, removes worktrees and local branches already merged into it. The merge gate also runs it with `--post-merge` after every merge. Never deletes unmerged work (a dirty worktree on a merged branch is wip-committed and its branch kept), never touches bases or the worktree it runs in, and writes a recovery TSV to `<git-common-dir>/cleanup-wt/<timestamp>.tsv` before acting. Restore with `git branch <name> <sha>`. A manual dry run (`python3 .claude/hooks/cleanup-wt.py`, then `--apply`) still works.
 
 ## Enable
@@ -32,6 +33,10 @@ project and merges the block below (kept in `settings-snippet.json`) into
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-delete-outside.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/guard-approval-edit.py"
           }
         ]
       },
