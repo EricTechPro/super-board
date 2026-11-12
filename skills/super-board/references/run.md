@@ -532,6 +532,10 @@ Next: <builder | qa | reviewer | Eric | none>
 - NEVER list changed files — the PR shows them. No restating the issue, no adjectives.
 - Machine lines go last and do not count: `Local tests:` (Tester and Builder, the exact command
   the Reviewer reruns), `gh-quota-on-exit:`, `blocked-by:`.
+- A bounce (`↩️`, card back to Ready or QA) ends with `blocked-by: none`, or the numbers of
+  blockers that are still open. NEVER `blocked-by: -` on a bounce: `-` is a human gate.
+  `super-board-deps.sh` reads `-` as a gate only in a Block comment, and a newer `↩️` report
+  clears an older Block's line.
 - Run the prose through `humanizer` when installed (else the plain-words rules in
   writing-standard.md).
 - The **issue comment** is the same header plus the PR link; the PR comment carries the detail.
@@ -679,6 +683,7 @@ function. Three cards lost a wave to a mechanical edit.
 [ ] label the issue `loop:rebase`
 [ ] move the card Review → Ready  (NOT Blocked)
 [ ] comment on the PR: which files conflicted, or which verify command failed, and its output
+[ ] end the issue comment with `blocked-by: none` (NEVER `-`: that reads as a human gate)
 ```
 
 The Builder picks it up as an ordinary pass, routes `mattpocock-skills:resolving-merge-conflicts`,

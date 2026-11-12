@@ -54,9 +54,16 @@
 # A 🙋 card stays humanGated either way — only the resume path moves it.
 #
 # `runnable` is true only when the line parses, no blocker is still open, AND the
-# card is not human-gated. `humanGated` comes from `blocked-by: -`, which means
-# "nothing on this board clears it" — credentials, permissions, a product ruling.
-# The sweep must never free one of those; only a person can.
+# card is not human-gated. `humanGated` comes from `blocked-by: -` in a Block
+# comment, which means "nothing on this board clears it" — credentials,
+# permissions, a product ruling. The sweep must never free one of those; only a
+# person can.
+#
+# A bounce is not a human gate. A card bounced back to Ready for a rebase kept an
+# older Block's `blocked-by: -`, or wrote its own, and the planner skipped it as
+# human-gated until someone cleared the line by hand. So: `blocked-by: none` means
+# no blockers; `-` outside a Block comment reads as none; and a newer `↩️` report
+# (a bounce) with no `blocked-by:` line clears an older Block's line.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -131,14 +138,23 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
   # most recent one wins over the issue body: a lane that just parked the card
   # knows why, and the `## Blocked by` in the body may be weeks older.
   #
-  # `blocked-by: -` is NOT "no blockers". It means nothing on this board clears
-  # it — a credentials, permissions or product-decision block — so the card is
-  # parseable AND deliberately not runnable. Only a person moves it.
+  # `blocked-by: -` in a Block comment is NOT "no blockers". It means nothing on
+  # this board clears it — a credentials, permissions or product-decision block —
+  # so the card is parseable AND deliberately not runnable. Only a person moves
+  # it. In any other comment (a bounce report) `-` reads as none.
+  #
+  # Newest wins, comment by comment, as {line, block}. A `↩️` report (a bounce)
+  # with no `blocked-by:` line of its own resets the line of an older Block to none.
+  # A Block is the `[blocker]` header, or a `Reason tag:` or `Why blocked:` field
+  # of the Block template (older Block comments carry only the fields).
+  def is_block: test("^\\[[a-z]+\\] \\[blocker\\]"; "m") or test("(Reason tag|Why blocked):");
+  def is_bounce: (split("\n")[0]) | test("^\\[[a-z]+\\] \\[report\\] ↩️");
   def comment_line:
-    [ (.comments.nodes // .comments // [])[]
-      | (.body // "") | split("\n")[]
-      | select(test("^[ \t]*blocked-by:"; "i")) ]
-    | last // null;
+    reduce ((.comments.nodes // .comments // [])[] | (.body // "")) as $b (null;
+      ([ $b | split("\n")[] | select(test("^[ \t]*blocked-by:"; "i")) ] | last) as $l
+      | if $l != null then { line: $l, block: ($b | is_block) }
+        elif ($b | is_bounce) then { line: "blocked-by: none", block: false }
+        else . end);
 
   def bodies: [ (.comments.nodes // .comments // [])[] | (.body // "") ];
   def label_names: [ (.labels.nodes // .labels // [])[] | (.name // "") ];
@@ -155,14 +171,16 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
       | ($i.body | section) as $sec
       | ($i | comment_line) as $cl
       | ( if $cl != null then
-            ( $cl | capture("blocked-by:[ \t]*(?<v>.*)$"; "i").v | gsub("[ \t]"; "") ) as $v
-            | if $v == "-" or $v == "" then
+            ( $cl.line | capture("blocked-by:[ \t]*(?<v>.*)$"; "i").v | gsub("[ \t]"; "") ) as $v
+            | if ($v == "-" or $v == "") and $cl.block then
                 { parseable: true, blockers: [], human_gated: true, why: "" }
+              elif $v == "-" or $v == "" or ($v | ascii_downcase) == "none" then
+                { parseable: true, blockers: [], human_gated: false, why: "" }
               elif ($v | test("^[0-9]+(,[0-9]+)*$")) then
                 { parseable: true, blockers: ($v / "," | map(tonumber)), human_gated: false, why: "" }
               else
                 { parseable: false, blockers: [], human_gated: false,
-                  why: ("the `blocked-by:` line reads \"" + $v + "\" — it must be issue numbers alone, or `-`") }
+                  why: ("the `blocked-by:` line reads \"" + $v + "\" — it must be issue numbers alone, `none`, or `-`") }
               end
           elif $sec == null then
             { parseable: false, blockers: [], human_gated: false,

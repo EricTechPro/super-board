@@ -113,4 +113,34 @@ get 28 '.needsYouDone == false' || fail "#28: a 'done' before the 🙋 block mus
 get 26 '.runnable == false'     || fail "#26: done goes through resume, never the Ready sweep"
 get 2  '.needsYou == false and .needsYouDone == false' || fail "an ordinary card is not needsYou"
 
-echo "PASS: test-deps.sh (18 scenarios)"
+# ---- bounces are not human gates -------------------------------------------
+# A card bounced back to Ready for a rebase kept an older Block's `blocked-by: -`,
+# or wrote its own, and the planner skipped it as human-gated until someone
+# cleared the line by hand. `-` gates only in a Block comment; `none` is none;
+# a newer `↩️` report with no line of its own clears an older Block's line.
+
+# 19 — a bounce that writes `-` is not a human gate.
+get 30 '.humanGated == false and .runnable == true' || fail "#30: a bounce's \`-\` must not gate: $(echo "$OUT" | jq -c '.["30"]')"
+
+# 20 — a bounce with no `blocked-by:` line clears an older Block's line, and a
+#      later ordinary report does not bring the Block back.
+get 31 '.humanGated == false and .runnable == true' || fail "#31: a newer ↩️ bounce should clear the older Block: $(echo "$OUT" | jq -c '.["31"]')"
+
+# 21 — `blocked-by: none` means no blockers, not a blocker named "none".
+get 32 '.parseable == true and .humanGated == false and .blockers == [] and .runnable == true' \
+  || fail "#32: \`blocked-by: none\` should mean no blockers: $(echo "$OUT" | jq -c '.["32"]')"
+
+# 22 — a bounce that names an open blocker still waits for it.
+get 33 '.openBlockers == [2] and .runnable == false' || fail "#33: a bounce naming open #2 must wait"
+
+# 23 — an ordinary report is not a bounce: the Block still gates.
+get 34 '.humanGated == true and .runnable == false' || fail "#34: a later report must not clear a Block"
+
+# 24 — a Block newer than the bounce gates again.
+get 35 '.humanGated == true and .runnable == false' || fail "#35: a Block after a bounce must gate"
+
+# 25 — `-` in a comment that is not a Block reads as none.
+get 36 '.parseable == true and .humanGated == false and .runnable == true' \
+  || fail "#36: \`-\` outside a Block comment should read as none: $(echo "$OUT" | jq -c '.["36"]')"
+
+echo "PASS: test-deps.sh (25 scenarios)"
