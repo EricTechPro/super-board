@@ -112,22 +112,25 @@ sys.exit(r.get('rc', 0))
         self.assertEqual(r.returncode, 79)
         self.assertEqual(self.log.read_text(), '3')
 
-    def test_shape_miss_on_any_kind_fails_only_that_read(self):
+    def test_agent_shape_miss_fails_only_that_read_fixed_kinds_halt(self):
         # A quota read with a --jq that prints text had no form, so it halted the run.
         r = self.read([{'out': 'graphql=4000/5000 rest=4900/5000\n'}], 'quota',
                       ['api', 'rate_limit', '--jq', '"graphql=\\(.resources.graphql.remaining)"'])
         self.assertEqual(r.returncode, 64, r.stderr)
         self.assertIn('Valid form: --kind quota -- api rate_limit', r.stderr)
         self.assertFalse(self.halt.exists())
-        # A kind with no form still fails only the call.
+        # A kind with no form serves a fixed-command script: a payload it cannot use, or a
+        # refusal, is an outage there and still halts.
         for out, kind in [('[]', 'object'), ('{"items":[]}', 'items'), ('{}', 'permission')]:
             with self.subTest(kind=kind):
+                self.halt.unlink(missing_ok=True)
                 self.log.unlink(missing_ok=True)
                 r = self.read([{'out': out}], kind)
-                self.assertEqual(r.returncode, 64, r.stderr)
+                self.assertEqual(r.returncode, 79, r.stderr)
                 self.assertEqual(r.stdout, '')
-                self.assertIn('this call failed, the run continues', r.stderr)
-                self.assertFalse(self.halt.exists())
+        self.halt.unlink(missing_ok=True)
+        r = self.read([{'rc': 1, 'err': 'gh: Not Found (HTTP 404)'}], 'items', ['api', 'repos/x/y/pulls/9'])
+        self.assertEqual(r.returncode, 79, r.stderr)
 
     def test_successful_exit_with_malformed_or_partial_payload_halts(self):
         # Fixed-command scripts (strict): a payload they cannot use is an outage.

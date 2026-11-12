@@ -5,14 +5,14 @@ A logical read gets three total attempts. Success resets its own sequence; other
 reads cannot reset it. Permanent query/auth errors stop on the first attempt.
 The halt file is shared through the main checkout, including linked worktrees.
 Only an explicit new run clears it with --resume after preserving the old reason.
-Mutations never enter this retry helper. A payload that fails its shape on every
-attempt is the caller's malformed read, not an outage: that call exits 64 (with the
-valid form when FORMS has one) and the run keeps going, whatever its --kind. So is
-a read GitHub refuses for this query alone (HTTP 403/404, an unknown GraphQL field,
-a resource the token may not see): it exits 64 on the first attempt. Only a refusal
-every read will hit (HTTP 401, bad credentials, missing scopes) halts at once.
-Scripts whose commands are fixed set SB_GITHUB_READ_STRICT=1 to keep halting on all
-of these: a fixed command that stops working is an outage.
+Mutations never enter this retry helper. For the agent-facing kinds in FORMS, a
+payload that fails its shape on every attempt is the caller's malformed read, not
+an outage: that call exits 64 with the valid form and the run keeps going. So is a
+read GitHub refuses for this query alone (HTTP 403/404, an unknown GraphQL field,
+a resource the token may not see): it exits 64 on the first attempt. A refusal
+every read will hit (HTTP 401, bad credentials, missing scopes) still halts at once.
+Kinds outside FORMS serve scripts whose commands are fixed and keep halting; those
+scripts also set SB_GITHUB_READ_STRICT=1 to halt on the agent-facing kinds.
 """
 from __future__ import annotations
 
@@ -362,7 +362,7 @@ def read(args, kind='json', meta=None, recovering=False):
                 except ValueError:
                     pass
             if permanent_error(diagnostic):
-                if not strict() and not every_read_fails(diagnostic):
+                if kind in FORMS and not strict() and not every_read_fails(diagnostic):
                     status = re.search(r'HTTP [0-9]{3}', diagnostic)
                     raise caller_failure('GitHub refused this read' + (f' ({status[0]})' if status else '')
                                          + ' for this query or resource alone', kind)
@@ -386,7 +386,7 @@ def read(args, kind='json', meta=None, recovering=False):
         if attempt < 3:
             print(f'[github-read] {last}; retry {attempt + 1}/3', file=sys.stderr)
             time.sleep(max(0, delay) * attempt)
-    if shape_only and not strict():
+    if shape_only and kind in FORMS and not strict():
         raise caller_failure(last, kind)
     halt(f'{last}; stopped after 3 failed attempts', 3, operation)
 

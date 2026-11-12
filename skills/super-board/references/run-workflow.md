@@ -48,8 +48,8 @@ Required reads use `.claude/bin/super-board-github-read.py --kind <shape> -- <gh
 Three total attempts means the first attempt plus two retries of that same read;
 unrelated successful calls do not reset its failures. Do not retry mutations.
 A lane's malformed read fails that lane's call only (exit 64), never the run: a
-payload that misses its `--kind` shape after three attempts, for every kind
-(`READ_SHAPES` in `workflows/super-board-wave.js` lists the valid forms), and a
+payload that misses its `--kind` shape after three attempts, for every lane-facing
+kind (`READ_SHAPES` in `workflows/super-board-wave.js` lists the valid forms), and a
 read GitHub refuses for that query alone (HTTP 403 or 404, an unknown GraphQL
 field) on the first attempt. A refusal every read would hit (HTTP 401, a bad
 token, missing scopes) halts at once with exit 79, and a rate-limit 403 halts
