@@ -113,4 +113,25 @@ get 28 '.needsYouDone == false' || fail "#28: a 'done' before the 🙋 block mus
 get 26 '.runnable == false'     || fail "#26: done goes through resume, never the Ready sweep"
 get 2  '.needsYou == false and .needsYouDone == false' || fail "an ordinary card is not needsYou"
 
-echo "PASS: test-deps.sh (18 scenarios)"
+# 19 — acItems counts real acceptance criteria, so the planner never picks a card
+#      the builder has nothing to test against. A heading over nothing, or over a
+#      placeholder the filer appended, is zero. Missing section is zero too.
+AC_FIX=$(jq -n --arg bd $'## Blocked by\n\n- None.\n' '[
+  {number:30, title:"real", state:"OPEN", body:("## Acceptance Criteria\n\n- [ ] Saving twice keeps one row\n- [x] The list shows it\n\n" + $bd)},
+  {number:31, title:"empty", state:"OPEN", body:("## Acceptance Criteria\n\n" + $bd)},
+  {number:32, title:"placeholder", state:"OPEN", body:("## Acceptance criteria\n\n- [ ] _Not written by the Reviewer that filed this. Run `super-board lint`_\n- [ ] TBD\n- [ ] <checkable outcome>\n\n" + $bd)},
+  {number:33, title:"none", state:"OPEN", body:$bd},
+  {number:34, title:"next section", state:"OPEN", body:("## Acceptance Criteria\n\n## Notes\n- [ ] this is not a criterion at all\n\n" + $bd)},
+  {number:35, title:"sub-headings", state:"OPEN", body:("## Acceptance Criteria\n\n### Desktop\n- [ ] The table fits at 1440 wide\n\n" + $bd)}]')
+AC_OUT=$("$DEPS" --from <(echo "$AC_FIX"))
+ac() { echo "$AC_OUT" | jq -r --arg n "$1" '.[$n].acItems'; }
+[ "$(ac 30)" = 2 ] || fail "#30 has two real criteria, got $(ac 30)"
+[ "$(ac 31)" = 0 ] || fail "#31: an empty section is no criteria, got $(ac 31)"
+[ "$(ac 32)" = 0 ] || fail "#32: placeholders are no criteria, got $(ac 32)"
+[ "$(ac 33)" = 0 ] || fail "#33: no section is no criteria, got $(ac 33)"
+[ "$(ac 34)" = 0 ] || fail "#34: the section stops at the next heading, got $(ac 34)"
+[ "$(ac 35)" = 1 ] || fail "#35: a sub-heading inside the section does not end it, got $(ac 35)"
+echo "$AC_OUT" | jq -e '.["31"].runnable == true' >/dev/null \
+  || fail "acItems must not change runnable: the planner gates on it, the graph does not"
+
+echo "PASS: test-deps.sh (19 scenarios)"

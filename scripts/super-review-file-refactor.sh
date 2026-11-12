@@ -7,10 +7,13 @@
 # warning; unavailable required evidence or an unknown write outcome pauses the
 # run (79) while preserving any issue already created. No mutation is retried.
 #
-# A card with real acceptance criteria lands in Ready; one without lands in Backlog.
-# A bare note has had no human eyes on it; auto-promoting it to Ready would feed the
-# build lane work nobody asked for. It waits for `super-board lint` like any other
-# unrefined ticket.
+# A card with real acceptance criteria lands in Ready; one without lands in Backlog
+# with the `needs-ac` label, even when --column Ready is passed. "Real" means at
+# least one item under `## Acceptance Criteria` that is not a placeholder: an empty
+# section or a `- [ ] TBD` is not criteria. A bare note has had no human eyes on it;
+# auto-promoting it to Ready would feed the build lane work nobody asked for, and the
+# builder would have nothing to test against. It waits for `super-board lint`, which
+# writes the criteria and removes the label; the wave planner never picks it before.
 #
 # Usage:
 #   super-review-file-refactor.sh --config <config.json> \
@@ -105,14 +108,46 @@ fi
 #
 # A card with real acceptance criteria is buildable, so it goes to `Ready` and the
 # next wave takes it. A card without them is a note, and `Ready` feeds the Builder
-# lane directly — so it goes to the holding column and waits for `super-board
-# lint` like any other unrefined ticket.
+# lane directly — so it goes to the holding column, labelled `needs-ac`, and waits
+# for `super-board lint` like any other unrefined ticket. An explicit --column
+# Ready does not override that: criteria nobody wrote cannot be built against.
+#
+# A heading is not criteria. Cards were filed with an empty section, or with only
+# a placeholder item, and reached Ready; the builder had nothing to test against.
+# Same rule as `acItems` in super-board-deps.sh, which the wave planner reads.
 #
 # This used to be an unconditional `Backlog`, which was wrong twice over: it fed
 # nothing to the loop even when the card was ready, and on a board with no
 # `Backlog` column it produced cards with no Status at all.
-if [ -z "$COLUMN" ]; then
-  if grep -qiE '^## +Acceptance criteria *$' "$BODY_FILE"; then COLUMN="Ready"; else COLUMN="Backlog"; fi
+AC_ITEMS=$(python3 - "$BODY_FILE" <<'PY'
+import re, sys
+at, n = None, 0
+for line in open(sys.argv[1], encoding="utf-8").read().splitlines():
+    h = re.match(r"^(#{1,6})[ \t]", line)
+    if h:
+        if re.match(r"^#{1,3}[ \t]+acceptance criteria[ \t]*$", line, re.I):
+            at = len(h[1])
+        elif at is not None and len(h[1]) <= at:
+            at = None
+        continue
+    if at is None or not re.match(r"^[ \t]*[-*][ \t]+", line):
+        continue
+    text = re.sub(r"^[ \t]*[-*][ \t]+(\[[ xX]\][ \t]*)?", "", line).strip(" \t_*")
+    if len(text) < 8 or re.search(r"not written|placeholder|\bTBD\b|\bTODO\b|^<.*>$|^…$|^\.\.\.$", text, re.I):
+        continue
+    n += 1
+print(n)
+PY
+)
+NEEDS_AC=0
+if [ "${AC_ITEMS:-0}" -gt 0 ]; then
+  [ -n "$COLUMN" ] || COLUMN="Ready"
+else
+  NEEDS_AC=1
+  if [ "$COLUMN" = "Ready" ]; then
+    echo "note: no acceptance criteria items — filing to Backlog with needs-ac, not Ready" >&2
+  fi
+  [ -n "$COLUMN" ] && [ "$COLUMN" != "Ready" ] || COLUMN="Backlog"
 fi
 
 # --- create -----------------------------------------------------------------
@@ -169,6 +204,7 @@ trap 'rm -f "$BODY_TMP"' EXIT
 
 LABELS=("refactor" "source:review" "strength:${STRENGTH}")
 if [ -n "$AREA" ]; then LABELS+=("area:${AREA}"); fi
+if [ "$NEEDS_AC" -eq 1 ]; then LABELS+=("needs-ac"); fi
 
 # Labels may not exist yet on a fresh repo. Create them best-effort; `gh issue
 # create` hard-fails on an unknown label, which would lose the finding entirely.

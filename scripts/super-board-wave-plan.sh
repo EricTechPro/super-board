@@ -48,6 +48,11 @@
 # reported in `stranded`; the orchestrator checks its branch and worktree and
 # moves it back to Ready, keeping the branch.
 #
+# NO CRITERIA, NO BUILD. A Ready card labelled `needs-ac` (a filer found no real
+# acceptance criteria), or whose graph entry counts zero criteria items, is never
+# picked: the builder would have nothing to test against. It is reported in `flag`
+# for `super-board lint`, and left in Ready.
+#
 # LABEL ROUTING (v3.0.0). One board shape for every project; a card's label picks
 # its lane. Three labels: `qa`, `bug`, `feature`. A Ready card labelled `qa` skips
 # the Builder and goes straight to the Tester (lane "qa"); every other Ready card,
@@ -145,6 +150,10 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
     else "build" end;
   # Unknown to the graph (closed, or beyond the fetch limit) is not "free".
   def free($n): (dep($n) | if . == null then false else .runnable end);
+  # No real acceptance criteria: the filer labelled it `needs-ac`, or the graph
+  # counted zero criteria items. The builder would have nothing to test against.
+  # An entry without acItems (an older graph) is not held on that ground.
+  def no_ac($c): ($c.labels | index("needs-ac")) or ((dep($c.number).acItems // 1) == 0);
 
   [ .items[]
     | select(.content.type == "Issue")
@@ -158,8 +167,8 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
   # spends its slots on the work closest to Done.
   | [ $cols[] as $c | $all[] | select(.status == $c and $c != "Ready") ] as $flight
 
-  # Ready: only the ones the graph says are actually free.
-  | [ $all[] | select(.status == "Ready") | select(free(.number)) ] as $ready
+  # Ready: only the ones the graph says are actually free, and have criteria.
+  | [ $all[] | select(.status == "Ready") | select(free(.number)) | select(no_ac(.) | not) ] as $ready
 
   # Downstream-first, so work already begun finishes before new work starts.
   | ($flight + $ready) as $picked
@@ -188,10 +197,18 @@ echo "$ITEMS" | jq --argjson cols "$COLUMNS" --argjson cap "$MAX_WORKERS" --argj
 
       # Cards the graph could not read. Left where they are, reported so the
       # orchestrator can ask for the line to be fixed.
-      flag:  [ $all[]
+      # Ready cards with no real acceptance criteria are flagged too: lint writes
+      # them (and removes `needs-ac`), then the next wave picks the card.
+      flag:  ([ $all[]
                | select(.status as $s | ["Ready","Blocked"] | index($s))
                | select(dep(.number) != null and (dep(.number).parseable | not))
-               | { number, title, why: (dep(.number) | .why) } ],
+               | { number, title, why: (dep(.number) | .why) } ]
+             + [ $all[]
+               | select(.status == "Ready" and no_ac(.))
+               | { number, title,
+                   why: (if (.labels | index("needs-ac"))
+                         then "labelled needs-ac: filed with no acceptance criteria — run super-board lint to write them, then remove the label"
+                         else "no acceptance criteria items (empty section or placeholders only) — run super-board lint to write them" end) } ]),
 
       # Building with no claim between waves = no live worker. Back to Ready.
       stranded: [ $all[] | select(.status == "Building") | { number, title } ] }'

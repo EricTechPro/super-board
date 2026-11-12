@@ -44,7 +44,10 @@
 #   { "40": { "number": 40, "title": "…", "state": "OPEN",
 #             "blockers": [32,36], "openBlockers": [32],
 #             "parseable": true, "humanGated": false, "runnable": false, "why": "",
-#             "needsYou": false, "needsYouDone": false } }
+#             "acItems": 3, "needsYou": false, "needsYouDone": false } }
+#
+# `acItems` — real acceptance-criteria items in the body (placeholders and an
+# empty section count 0). The wave planner never picks a Ready card at 0.
 #
 # `needsYou` — the newest Block comment carries the 🙋 reason tag, or the issue
 # has the `needs-you` label: a human-only command is waiting (block-template.md).
@@ -147,6 +150,28 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
                   | map(select(.value | test("Reason tag:[^\n]*🙋"))) | last | .key ) // null;
   def needs_you: (label_names | index("needs-you") != null) or (needs_at != null);
 
+  # Real acceptance criteria: bullets under an `Acceptance Criteria` heading, up to
+  # the next heading, that are not a placeholder. A heading over nothing, or over
+  # the line a filer appends for lint to replace, is zero: the builder would have
+  # nothing to test against. The wave planner gates Ready cards on this.
+  def placeholder:
+    (length < 8) or test("not written|placeholder|\\bTBD\\b|\\bTODO\\b|^<.*>$|^…$|^\\.\\.\\.$"; "i");
+  # A sub-heading inside the section (`### Desktop`) does not end it; a heading at
+  # the same level or above does.
+  def ac_items:
+    reduce ((. // "") / "\n")[] as $l ({at: null, n: 0};
+      if ($l | test("^#{1,6}[ \t]")) then
+        ($l | capture("^(?<h>#+)").h | length) as $lv
+        | if ($l | test("^#{1,3}[ \t]+acceptance criteria[ \t]*$"; "i")) then .at = $lv
+          elif .at != null and $lv <= .at then .at = null
+          else . end
+      elif .at != null and ($l | test("^[ \t]*[-*][ \t]+"))
+           and ($l | sub("^[ \t]*[-*][ \t]+(\\[[ xX]\\][ \t]*)?"; "") | gsub("^[ \t_*]+|[ \t_*]+$"; "")
+                   | placeholder | not) then
+        .n += 1
+      else . end)
+    | .n;
+
 
   ( [ .[] | .number ] ) as $open
   | ( if $only == "" then null else ($only / "," | map(tonumber)) end ) as $filter
@@ -188,6 +213,7 @@ echo "$ISSUES" | jq --arg only "$ONLY" '
           humanGated: $p.human_gated,
           runnable: ($p.parseable and ($p.human_gated | not) and (($stillOpen | length) == 0)),
           why: $p.why,
+          acItems: ($i.body | ac_items),
           needsYou: ($i | needs_you),
           needsYouDone: false }
     ]

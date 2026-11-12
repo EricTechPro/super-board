@@ -4,7 +4,10 @@
 
 **Where it runs:** current Claude Code session. Interactive. Single-pass.
 **Purpose:** clarify issues so a headless worker won't hallucinate. Every
-active-pipeline issue must have testable acceptance criteria.
+active-pipeline issue must have testable acceptance criteria. Cards labelled
+`needs-ac` (filed mid-run with no real criteria) are always flagged: write the
+criteria, then remove the label. The wave planner skips them until then, and also
+skips any Ready card whose criteria section is empty or placeholders only.
 
 All clarifications are saved to GitHub via `gh issue edit` /
 `gh issue comment` — **no local file writes** during the per-issue loop.

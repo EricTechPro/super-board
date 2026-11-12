@@ -234,6 +234,11 @@ status alert.
 | `## Risk` | 🟢/🟡/🔴 level + one line | yes |
 | `## Blocked by` | `- #N — why` bullets, or exactly `- None.` | yes |
 
+An empty `## Acceptance Criteria` section, or one holding only placeholders (`TBD`,
+`<checkable outcome>`, a filer's "Not written" line), counts as no criteria. A filer files
+such a card to Backlog labelled `needs-ac`; the wave planner never picks it and flags it
+for `super-board lint`, which writes the criteria and removes the label.
+
 When an unsettled design triggers [design preflight](design-preflight.md), retain the
 approved choice and short rationale in the existing Context, or link its applicable
 spec/ADR there. Keep the same sections. Lint saves only the exact issue edit the user approves.
