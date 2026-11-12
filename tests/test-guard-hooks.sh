@@ -139,6 +139,33 @@ dd allow 'T=$(mktemp -d); rm -rf "$T/x"'           "unknowable value is allowed"
 dd allow 'echo "rm -rf /"'                         "quoted text is not a command"
 dd allow 'ls -la ~ && git status'                  "no deletion"
 
+# ---- guard-approval-edit -----------------------------------------------------
+# The merge gate refuses an edited 🙋 request ("approval request was edited"), so the
+# human's `done` is lost. An edit whose new body keeps a request line is denied; posting
+# a new comment never is.
+AP=$(mktemp -d)
+printf '[reviewer] [blocker] 🙋 Your turn\nReason tag: 🙋 needs you\napproval-request: {"head":"%s","pr":7}\n' \
+  "$(printf 'a%.0s' $(seq 1 40))" > "$AP/request.md"
+printf '[reviewer] [report] ✅ link: PR #7\n' > "$AP/note.md"
+ae() { expect "$1" guard-approval-edit.py "$(bash_cmd "$2" "$AP")" "$3"; }
+ae deny  'gh issue comment 7 --edit-last --body-file request.md'                     "edit-last with a request file"
+ae deny  'gh pr comment 7 --edit-last --body "approval-request: {}"'                 "edit-last with an inline request"
+ae deny  'gh api -X PATCH repos/o/r/issues/comments/991 -F body=@request.md'         "PATCH with body=@file"
+ae deny  'gh api repos/o/r/issues/comments/991 --method PATCH -f body="$(cat request.md)" && echo ok' "PATCH with \$(cat file)"
+ae deny  "gh api repos/o/r/issues/comments/991 -X PATCH --input - <<'EOF'
+{\"body\": \"approval-request: {}\"}
+EOF"                                                                                  "PATCH with a heredoc"
+ae deny  'gh api repos/o/r/issues/comments/991 -X PATCH --input - < request.md'      "PATCH with < file"
+ae deny  "gh api graphql -f query='mutation{updateIssueComment(input:{id:\"X\",body:\"Reason tag: 🙋 needs you\"}){issueComment{id}}}'" "GraphQL updateIssueComment"
+ae allow 'gh issue comment 7 --body-file request.md'                                 "posting a new request"
+ae allow 'gh api repos/o/r/issues/7/comments -F body=@request.md'                    "POSTing a new request via api"
+ae allow 'gh issue comment 7 --edit-last --body-file note.md'                        "editing a plain note"
+ae allow 'cat request.md && git status'                                              "unrelated command"
+expect allow guard-approval-edit.py "not json"                                       "garbage input fails open"
+OUT=$(printf '%s' "$(bash_cmd 'gh issue comment 7 --edit-last --body-file request.md' "$AP")" | SB_ALLOW_APPROVAL_EDIT=1 python3 "$H/guard-approval-edit.py")
+[ -z "$OUT" ] || fail "SB_ALLOW_APPROVAL_EDIT=1 should turn the guard off"; PASS=$((PASS + 1))
+rm -rf "$AP"
+
 # ---- dev/gate-skill-evals (Stop; pack + EricOS only) -------------------------
 G=$(mktemp -d); G=$(cd "$G" && pwd -P)
 git -C "$G" init -q -b main; git -C "$G" config user.email t@t; git -C "$G" config user.name t

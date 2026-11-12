@@ -502,7 +502,11 @@ on the base branch**.
           human comments `done` after the current pinned request, the wave planner
           verifies their permission and the head before resuming Review. For exits
           7 and 8, copy the gate's `approval-request:` line into the canonical issue
-          block; link it from the PR without duplicating the request.
+          block; link it from the PR without duplicating the request. Post that block
+          ONCE, as the exit's LAST GitHub write (after the PR comment, labels and card
+          move), and never edit it: the gate refuses an edited request and the human's
+          `done` is lost. A correction is a new comment; a changed request is a fresh
+          full block. `hooks/guard-approval-edit.py` denies the edit.
    → do NOT leave a card in Review on exit 2, 3, 5, 7 or 8. A card left in Review is
      re-picked next tick and re-reviewed forever, which is the re-dispatch waste
      tracked in issue #10. Exits 4 and 6 are the exceptions: 4 simply queued, and

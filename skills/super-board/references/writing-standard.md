@@ -412,3 +412,6 @@ that comment; it pins the repository, PR, full head and policy/human-step scope.
 Other threads link to that request without repeating its machine lines. A trusted
 human replies `done` in that same thread. Labels are status display, never approval.
 Do not edit the request or approval comment; changed code or steps need a fresh request.
+Post the request once, as the last write of the exit. A follow-up is a new comment with no
+🙋 `Reason tag:` line: a newer 🙋 block supersedes the request even without its machine line.
+`guard-approval-edit.py` denies an edit whose body keeps a request line.

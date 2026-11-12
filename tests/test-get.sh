@@ -102,7 +102,7 @@ out=$(bash "$GET" --target "$T" 2>&1) || fail "grouped-output install failed: $o
 order=$(printf '%s\n' "$out" | grep -oE '^(🧩|🔍|📦|🔧|🧠|🔒|🎉|👉)' | tr -d '\n')
 [ "$order" = "🧩🔍📦🔧🧠🔒🎉👉" ] || fail "groups out of order ($order): $out"
 printf '%s\n' "$out" | grep -q '^   ✓ curl · tar · python3 · gh · jq · node$' || fail "checks line wrong: $out"
-printf '%s\n' "$out" | grep -q '^   🛡️  6 guard hooks → .claude/settings.json (new file)$' || fail "guard line wrong: $out"
+printf '%s\n' "$out" | grep -q '^   🛡️  7 guard hooks → .claude/settings.json (new file)$' || fail "guard line wrong: $out"
 printf '%s\n' "$out" | grep -q '^   ! CLAUDE.md holds its own rules — onboard offers a merge$' || fail "CLAUDE.md hint missing: $out"
 printf '%s\n' "$out" | grep -q '^🧠 helper skills: installed$' || fail "helper line wrong: $out"
 [ "$(printf '%s\n' "$out" | wc -l | tr -d ' ')" -le 13 ] || fail "output should stay ≤ 13 lines: $out"

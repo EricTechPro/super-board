@@ -144,7 +144,8 @@ issue comment. It records the full PR head and the exact policy/human steps bein
 confirmed. The issue must be linked by the PR's closing reference (`Closes #N`).
 For a standalone PR, post the canonical request on the PR instead. Keep a single
 request location: the PR's status comment links to the issue request and does not
-repeat `Reason tag: 🙋` or `approval-request:`. Never edit a request after posting;
+repeat `Reason tag: 🙋` or `approval-request:`. Never edit a request after posting
+(the gate refuses an edited request; `guard-approval-edit.py` denies the edit);
 post a new one when the code, steps or actual human question changes. Do not
 repost the same pending request on every poll or retry. Generic credential or
 product blocks without a PR remain manual; a bare `done` does not automate them.
